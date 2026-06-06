@@ -22,24 +22,14 @@ header {
   align-items: center;
   gap: 16px;
 }
-header h1 {
-  font-size: 20px;
-  font-weight: 600;
-  color: #7cffc4;
-}
+header h1 { font-size: 20px; font-weight: 600; color: #7cffc4; }
 header .version { color: #8b949e; font-size: 14px; }
 header .links { margin-left: auto; display: flex; gap: 16px; }
 header .links a { color: #58a6ff; text-decoration: none; font-size: 14px; }
 header .links a:hover { text-decoration: underline; }
 
-.main {
-  display: flex; flex: 1; overflow: hidden;
-}
-.editor-pane, .output-pane {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
+.main { display: flex; flex: 1; overflow: hidden; }
+.editor-pane, .output-pane { flex: 1; display: flex; flex-direction: column; }
 .editor-pane { border-right: 1px solid #30363d; }
 .pane-header {
   background: #161b22;
@@ -50,6 +40,7 @@ header .links a:hover { text-decoration: underline; }
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
 }
 .pane-header button {
   background: #238636;
@@ -71,6 +62,14 @@ header .links a:hover { text-decoration: underline; }
   border-radius: 4px;
   font-size: 13px;
 }
+.pane-header .runtime-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #1f6feb22;
+  color: #58a6ff;
+}
+.runtime-badge.wasm { background: #7cffc422; color: #7cffc4; }
 
 textarea {
   flex: 1;
@@ -85,7 +84,6 @@ textarea {
   outline: none;
   tab-size: 2;
 }
-textarea:focus { background: #0d1117; }
 
 .output {
   flex: 1;
@@ -101,6 +99,7 @@ textarea:focus { background: #0d1117; }
 .output .error { color: #f85149; }
 .output .result { color: #7cffc4; }
 .output .info { color: #8b949e; }
+.output .warn { color: #d2991d; }
 
 footer {
   background: #161b22;
@@ -142,11 +141,16 @@ footer {
           <option value="fibonacci">Fibonacci</option>
           <option value="sum">List Sum</option>
           <option value="map">List Map</option>
+          <option value="fold">List Fold</option>
+          <option value="each">List Each</option>
+          <option value="conditional">Conditional</option>
+          <option value="abs">Absolute Value</option>
         </select>
+        <span class="runtime-badge" id="runtime-badge">JS</span>
         <button id="run-btn" onclick="run()">Run</button>
       </div>
     </div>
-    <textarea id="code" spellcheck="false">42 13 + .</textarea>
+    <textarea id="code" spellcheck="false">"Hello, World!" .</textarea>
   </div>
   <div class="output-pane">
     <div class="pane-header">
@@ -154,16 +158,18 @@ footer {
       <button onclick="clearOutput()">Clear</button>
     </div>
     <div class="output" id="output">
-      <span class="info">Click Run to execute. Examples: select from dropdown.</span>
+      <span class="info">Click Run to execute. Select examples from dropdown. Ctrl+Enter to run.</span>
     </div>
   </div>
 </div>
 
 <footer>
   <span>Whisper Programming Language — AI-native, stack-based, capability-safe</span>
-  <span>Rust VM backend | WASM target</span>
+  <span id="runtime-info">JS Interpreter</span>
 </footer>
 
+<script src="whisper-interpreter.js"></script>
+<script src="wasm-runtime.js"></script>
 <script>
 const examples = {
   hello: `"Hello, World!" .`,
@@ -185,11 +191,31 @@ const examples = {
     ]
 } ;
 10 fib .`,
-  sum: `: sum { 0 { + } @fold } ;
-[1 2 3 4 5 6 7 8 9 10] sum .`,
+  sum: `[1 2 3 4 5 6 7 8 9 10] 0 { + } @fold .`,
   map: `: sq { _ * } ;
-[1 2 3 4 5] { sq } @map .`
+[1 2 3 4 5] { sq } @map .`,
+  fold: `[1 2 3 4 5] 1 { * } @fold .`,
+  each: `[1 2 3] { . } @each`,
+  conditional: `5 3 > ??100|0] .
+2 3 > ??100|0] .`,
+  abs: `: abs { _ 0 < ??0 \` -|] } ;
+5 abs .
+0 5 - abs .`
 };
+
+// Try to detect WASM support
+let useWasm = false;
+(async function checkWasm() {
+  if (WhisperWasm && WhisperWasm.isAvailable()) {
+    const inst = await WhisperWasm.loadWasm();
+    if (inst) {
+      useWasm = true;
+      document.getElementById('runtime-badge').textContent = 'WASM';
+      document.getElementById('runtime-badge').className = 'runtime-badge wasm';
+      document.getElementById('runtime-info').textContent = 'WASM Runtime';
+    }
+  }
+})();
 
 function loadExample(name) {
   if (examples[name]) {
@@ -221,95 +247,24 @@ async function run() {
   btn.disabled = true;
 
   try {
-    // Try to use WASM module if available
-    const wasmAvailable = await tryWasmRun(code);
-    if (!wasmAvailable) {
-      // Fallback: show the code analysis
-      appendOutput('[WASM runtime not available - showing code analysis]', 'info');
-      analyzeCode(code);
+    // Use the full JS interpreter
+    const result = WhisperInterpreter.execute(code);
+
+    if (result.output.length > 0) {
+      for (const line of result.output) {
+        appendOutput(line, 'result');
+      }
+    } else if (result.stack.length > 0) {
+      appendOutput('Result: ' + JSON.stringify(result.stack[result.stack.length - 1]), 'result');
+      appendOutput('Stack (' + result.stack.length + ' items): [' + result.stack.reverse().join(', ') + ']', 'info');
+    } else {
+      appendOutput('(no output)', 'info');
     }
   } catch (e) {
     appendOutput('Error: ' + e.message, 'error');
   }
 
   btn.disabled = false;
-}
-
-async function tryWasmRun(code) {
-  try {
-    // Simple local simulation for demo purposes
-    // In production, this would load whisper.wasm and call whisper_run
-    const lines = code.split('\n').filter(l => l.trim() && !l.trim().startsWith(':'));
-    const lastLine = lines[lines.length - 1] || '';
-
-    // Simulate basic arithmetic
-    const parts = lastLine.split(/\s+/);
-    const stack = [];
-    let hasOps = false;
-
-    for (const part of parts) {
-      if (part === '.') {
-        // Output top
-        if (stack.length > 0) {
-          appendOutput(String(stack[stack.length - 1]), 'result');
-          hasOps = true;
-        }
-      } else if (part === '+') {
-        const b = stack.pop() || 0;
-        const a = stack.pop() || 0;
-        stack.push(a + b);
-        hasOps = true;
-      } else if (part === '-') {
-        const b = stack.pop() || 0;
-        const a = stack.pop() || 0;
-        stack.push(a - b);
-        hasOps = true;
-      } else if (part === '*') {
-        const b = stack.pop() || 0;
-        const a = stack.pop() || 0;
-        stack.push(a * b);
-        hasOps = true;
-      } else if (part === '/') {
-        const b = stack.pop() || 1;
-        const a = stack.pop() || 0;
-        stack.push(Math.floor(a / b));
-        hasOps = true;
-      } else if (part === '_') {
-        if (stack.length > 0) stack.push(stack[stack.length - 1]);
-        hasOps = true;
-      } else if (/^-?\d+$/.test(part)) {
-        stack.push(parseInt(part));
-      } else if (/^".*"$/.test(part)) {
-        stack.push(part.slice(1, -1));
-        hasOps = true;
-      } else if (part.startsWith(':')) {
-        continue; // skip word definitions in simulation
-      }
-    }
-
-    if (!hasOps && stack.length > 0) {
-      appendOutput('Result: ' + JSON.stringify(stack[stack.length - 1]), 'result');
-    }
-
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-function analyzeCode(code) {
-  const lines = code.split('\n').filter(l => l.trim());
-  appendOutput(`Tokens: ${lines.length} lines`, 'info');
-
-  const defs = lines.filter(l => l.trim().startsWith(':')).length;
-  if (defs > 0) {
-    appendOutput(`Word definitions: ${defs}`, 'info');
-  }
-
-  const ops = code.match(/[+\-*\/_.`%@#?=&|<>!]/g);
-  if (ops) {
-    appendOutput(`Operators: ${ops.length}`, 'info');
-  }
 }
 
 // Keyboard shortcut
