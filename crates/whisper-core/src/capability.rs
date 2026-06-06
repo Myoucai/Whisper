@@ -1,5 +1,6 @@
 /// Capability-based security model.
 ///
+use std::rc::Rc;
 /// Whisper programs have zero IO by default. All side effects require
 /// explicit capability tokens that are bound at load time by the host.
 ///
@@ -210,3 +211,120 @@ impl Capability for FileWriteCap {
             .map_err(|e| VmError::IoError(e.to_string()))
     }
 }
+
+/// HTTP GET capability with host whitelist.
+pub struct HttpGetCap {
+    pub id: u16,
+    pub allowed_hosts: Vec<String>,
+}
+
+impl Capability for HttpGetCap {
+    fn id(&self) -> u16 { self.id }
+    fn name(&self) -> &str { "http_get" }
+    fn description(&self) -> &str { "HTTP GET requests to allowed hosts" }
+
+    fn call(&self, data_stack: &mut Vec<Value>, args: &[Value]) -> Result<(), VmError> {
+        if args.is_empty() {
+            return Err(VmError::ProgramError("http_get: expected URL argument".into()));
+        }
+        let url_str = match &args[0] {
+            Value::Str(s) => s.as_ref().clone(),
+            other => return Err(VmError::TypeMismatch {
+                expected: "str".into(), actual: other.type_name().into(),
+            }),
+        };
+
+        let host = extract_host(&url_str).unwrap_or(&url_str);
+        let allowed = self.allowed_hosts.iter().any(|h| host.contains(h.as_str()));
+        if !allowed {
+            return Err(VmError::CapabilityDenied(format!(
+                "Host '{}' not in allowed hosts: {:?}", host, self.allowed_hosts
+            )));
+        }
+
+        match http_get(&url_str) {
+            Ok(body) => {
+                data_stack.push(Value::Str(Rc::new(body)));
+                Ok(())
+            }
+            Err(e) => Err(VmError::IoError(e)),
+        }
+    }
+}
+
+/// HTTP POST capability with host whitelist.
+pub struct HttpPostCap {
+    pub id: u16,
+    pub allowed_hosts: Vec<String>,
+}
+
+impl Capability for HttpPostCap {
+    fn id(&self) -> u16 { self.id }
+    fn name(&self) -> &str { "http_post" }
+    fn description(&self) -> &str { "HTTP POST requests to allowed hosts" }
+
+    fn call(&self, data_stack: &mut Vec<Value>, args: &[Value]) -> Result<(), VmError> {
+        if args.len() < 2 {
+            return Err(VmError::ProgramError("http_post: expected URL and body".into()));
+        }
+        let url_str = match &args[0] { Value::Str(s) => s.as_ref().clone(), other => return Err(VmError::TypeMismatch { expected: "str".into(), actual: other.type_name().into() }) };
+        let body_str = match &args[1] { Value::Str(s) => s.as_ref().clone(), other => return Err(VmError::TypeMismatch { expected: "str".into(), actual: other.type_name().into() }) };
+
+        let host = extract_host(&url_str).unwrap_or(&url_str);
+        let allowed = self.allowed_hosts.iter().any(|h| host.contains(h.as_str()));
+        if !allowed {
+            return Err(VmError::CapabilityDenied(format!("Host '{}' not allowed", host)));
+        }
+
+        match http_post(&url_str, &body_str) {
+            Ok(response) => { data_stack.push(Value::Str(Rc::new(response))); Ok(()) }
+            Err(e) => Err(VmError::IoError(e)),
+        }
+    }
+}
+
+fn extract_host(url: &str) -> Option<&str> {
+    let s = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://"))?;
+    s.split('/').next()
+}
+
+fn http_get(url: &str) -> Result<String, String> {
+    let host = extract_host(url).ok_or_else(|| "Invalid URL".to_string())?;
+    let path = url.find(host).map(|i| &url[i + host.len()..]).unwrap_or("/");
+
+    let mut stream = std::net::TcpStream::connect((host, 80))
+        .or_else(|_| std::net::TcpStream::connect((host, 443)))
+        .map_err(|e| format!("Connect failed: {e}"))?;
+
+    use std::io::{Read, Write};
+    let request = format!("GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n");
+    stream.write_all(request.as_bytes()).map_err(|e| e.to_string())?;
+
+    let mut response = String::new();
+    stream.read_to_string(&mut response).map_err(|e| e.to_string())?;
+
+    let body = response.split("\r\n\r\n").nth(1).unwrap_or(&response);
+    Ok(body.to_string())
+}
+
+fn http_post(url: &str, body: &str) -> Result<String, String> {
+    let host = extract_host(url).ok_or_else(|| "Invalid URL".to_string())?;
+    let path = url.find(host).map(|i| &url[i + host.len()..]).unwrap_or("/");
+
+    let mut stream = std::net::TcpStream::connect((host, 80))
+        .map_err(|e| format!("Connect failed: {e}"))?;
+
+    use std::io::{Read, Write};
+    let request = format!(
+        "POST {path} HTTP/1.1\r\nHost: {host}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    stream.write_all(request.as_bytes()).map_err(|e| e.to_string())?;
+
+    let mut response = String::new();
+    stream.read_to_string(&mut response).map_err(|e| e.to_string())?;
+
+    let body = response.split("\r\n\r\n").nth(1).unwrap_or(&response);
+    Ok(body.to_string())
+}
+

@@ -51,7 +51,14 @@ pub fn run_file(
         }));
     }
     if allow_http {
-        eprintln!("Note: HTTP capabilities not yet implemented");
+        capability_table.bind(Box::new(whisper_core::capability::HttpGetCap {
+            id: 2,
+            allowed_hosts: vec!["api.github.com".into(), "jsonplaceholder.typicode.com".into()],
+        }));
+        capability_table.bind(Box::new(whisper_core::capability::HttpPostCap {
+            id: 3,
+            allowed_hosts: vec!["api.github.com".into(), "jsonplaceholder.typicode.com".into()],
+        }));
     }
 
     let mut vm = Vm::with_capabilities(capability_table);

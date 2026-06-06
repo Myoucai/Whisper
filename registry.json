@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "packages": {
+    "whisper/std": {
+      "name": "std",
+      "description": "Whisper standard library",
+      "versions": {
+        "1.0.0": {
+          "source": "github.com/Myoucai/Whisper",
+          "path": "crates/whisper-stdlib",
+          "capabilities": ["@file_read", "@file_write"],
+          "dependencies": []
+        }
+      }
+    },
+    "whisper/json": {
+      "name": "json",
+      "description": "JSON parsing and generation",
+      "versions": {
+        "0.1.0": {
+          "source": "github.com/Myoucai/Whisper",
+          "path": "crates/whisper-stdlib/std",
+          "capabilities": [],
+          "dependencies": []
+        }
+      }
+    }
+  }
+}
