@@ -14,6 +14,7 @@ fn help() {
     println!("  whisper repl               Start interactive REPL");
     println!("  whisper fmt    <file.ws>    Format a source file");
     println!("  whisper install <pkg>       Install a package");
+    println!("  whisper serve   <file.ws>   Start HTTP server");
     println!("  whisper bootstrap <file.ws> Self-hosting compiler pipeline");
     println!();
     println!("OPTIONS:");
@@ -43,6 +44,7 @@ fn main() {
         "repl" => commands::repl::start_repl(),
         "fmt" => cmd_fmt(&args),
         "install" => cmd_install(&args),
+        "serve" => cmd_serve(&args),
         "bootstrap" => cmd_bootstrap(&args),
         _ => {
             eprintln!("Unknown command: {cmd}");
@@ -115,6 +117,12 @@ fn cmd_bootstrap(args: &[String]) -> Result<(), String> {
     let source = std::fs::read_to_string(file)
         .map_err(|e| format!("Cannot read '{file}': {e}"))?;
     commands::bootstrap::bootstrap_compile(&source)
+}
+
+fn cmd_serve(args: &[String]) -> Result<(), String> {
+    let file = args.get(2).ok_or("Expected: whisper serve <handler.ws>")?;
+    let port: u16 = get_opt(args, "--port").and_then(|p| p.parse().ok()).unwrap_or(8080);
+    commands::serve::serve(file, port)
 }
 
 fn cmd_install(args: &[String]) -> Result<(), String> {
