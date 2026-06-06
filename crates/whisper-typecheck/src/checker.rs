@@ -93,7 +93,7 @@ impl TypeChecker {
         errors
     }
 
-    fn infer_sig(&self, body: &[AstNode]) -> WordSig {
+    fn infer_sig(&self, _body: &[AstNode]) -> WordSig {
         // Conservative: assume 0 inputs, 1 output (T)
         // Full inference would require complex analysis
         WordSig {

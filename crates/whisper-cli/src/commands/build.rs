@@ -1,7 +1,6 @@
 /// whisper build — Compile .ws to .wbin or .wasm
 
 use whisper_codegen::bytecode_gen::BytecodeGenerator;
-use whisper_codegen::wasm_gen::WasmGenerator;
 use whisper_codegen::wbin::WbinWriter;
 use whisper_parser::Parser;
 

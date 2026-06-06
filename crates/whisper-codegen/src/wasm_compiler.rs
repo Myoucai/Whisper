@@ -17,7 +17,7 @@ const CODE: u8 = 10;
 const DATA: u8 = 11;
 
 /// WASM value types
-const I32: u8 = 0x7F;
+#[allow(dead_code)] const I32: u8 = 0x7F;
 const I64: u8 = 0x7E;
 
 /// WASM opcodes
@@ -28,7 +28,7 @@ const I64_ADD: u8 = 0x7C;
 const I64_SUB: u8 = 0x7D;
 const I64_MUL: u8 = 0x7E;
 const I64_DIV_S: u8 = 0x7F;
-const I32_STORE: u8 = 0x36;
+#[allow(dead_code)] const I32_STORE: u8 = 0x36;
 const I64_STORE: u8 = 0x37;
 
 /// Compile a linear Whisper program directly to WASM.

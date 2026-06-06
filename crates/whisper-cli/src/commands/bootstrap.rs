@@ -73,9 +73,6 @@ fn ast_to_vec(nodes: &[AstNode]) -> Vec<Value> {
     }
 }
 
-fn list_token(ty: i64) -> Value {
-    Value::List(Rc::new(vec![Value::I64(ty), Value::I64(0)]))
-}
 
 pub fn bootstrap_compile(source: &str) -> Result<(), String> {
     // Phase 1: Parse with Rust compiler (reference)
