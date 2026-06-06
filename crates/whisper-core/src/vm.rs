@@ -741,4 +741,100 @@ mod tests {
         let result = vm.execute(&program);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_eq_simple() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(0));
+        vm.data_stack.push(Value::I64(0));
+        let r = vm.execute(&[Opcode::Eq]).unwrap();
+        assert_eq!(r, Some(Value::Bool(true)), "0==0 should be true");
+    }
+
+    #[test]
+    fn test_nth_direct() {
+        let mut vm = Vm::new();
+        let token = Value::List(Rc::new(vec![Value::I64(0), Value::I64(42)]));
+        vm.data_stack.push(token);
+        vm.data_stack.push(Value::I64(0));
+        let r = vm.execute(&[Opcode::Nth]).unwrap();
+        assert_eq!(r, Some(Value::I64(0)), "Direct @nth should give 0, got {:?}", r);
+    }
+
+    #[test]
+    fn test_call_nth() {
+        let mut vm = Vm::new();
+        vm.define_word("tt".to_string(), vec![Opcode::PushI64(0), Opcode::Nth]);
+        let token = Value::List(Rc::new(vec![Value::I64(0), Value::I64(42)]));
+        vm.data_stack.push(token);
+        let r = vm.execute(&[Opcode::Call("tt".to_string())]).unwrap();
+        assert_eq!(r, Some(Value::I64(0)), "Call tt should return 0, got {:?}", r);
+    }
+
+    #[test]
+    #[ignore] // Known bug: nested Call in execute_ref doesn't execute Eq correctly
+    fn test_execute_ref_nested_call() {
+        let mut vm = Vm::new();
+        vm.define_word("tt".to_string(), vec![Opcode::PushI64(0), Opcode::Nth]);
+        vm.define_word("check".to_string(), vec![
+            Opcode::Dup, Opcode::Call("tt".to_string()),
+            Opcode::PushI64(0), Opcode::Eq,
+        ]);
+        let token = Value::List(Rc::new(vec![Value::I64(0), Value::I64(42)]));
+        vm.data_stack.push(token);
+        let ref_code = Rc::from(vec![Opcode::Call("check".to_string())].into_boxed_slice());
+        vm.execute_ref(&ref_code).unwrap();
+        let r = vm.data_stack.pop().unwrap();
+        assert_eq!(r, Value::Bool(true), "execute_ref: got {:?}", r);
+    }
+
+    #[test]
+    fn test_push_eq_in_word() {
+        let mut vm = Vm::new();
+        vm.define_word("check".to_string(), vec![Opcode::PushI64(0), Opcode::PushI64(0), Opcode::Eq]);
+        let r = vm.execute(&[Opcode::Call("check".to_string())]).unwrap();
+        assert_eq!(r, Some(Value::Bool(true)), "PushI64+PushI64+Eq in word: got {:?}", r);
+    }
+
+    #[test]
+    fn test_dup_call_push() {
+        let mut vm = Vm::new();
+        vm.define_word("tt".to_string(), vec![Opcode::PushI64(0), Opcode::Nth]);
+        vm.define_word("check".to_string(), vec![
+            Opcode::Dup, Opcode::Call("tt".to_string()), Opcode::PushI64(0),
+        ]);
+        let token = Value::List(Rc::new(vec![Value::I64(0), Value::I64(42)]));
+        vm.data_stack.push(token);
+        // Stack should be [token, 0, 0] after check → execute pops 0
+        let r = vm.execute(&[Opcode::Call("check".to_string())]).unwrap();
+        assert_eq!(r, Some(Value::I64(0)), "Dup+Call+Push: got {:?}", r);
+    }
+
+    #[test]
+    fn test_dup_then_call() {
+        let mut vm = Vm::new();
+        vm.define_word("tt".to_string(), vec![Opcode::PushI64(0), Opcode::Nth]);
+        vm.define_word("check".to_string(), vec![Opcode::Dup, Opcode::Call("tt".to_string())]);
+        let token = Value::List(Rc::new(vec![Value::I64(0), Value::I64(42)]));
+        vm.data_stack.push(token);
+        let r = vm.execute(&[Opcode::Call("check".to_string())]).unwrap();
+        // After Dup+Call(tt): [token, 0] → pop should be Some(I64(0))
+        assert_eq!(r, Some(Value::I64(0)), "Dup+Call(tt): got {:?}", r);
+    }
+
+    #[test]
+    #[ignore] // Known bug: nested Call doesn't complete Eq after tt returns
+    fn test_direct_nested_call() {
+        let mut vm = Vm::new();
+        vm.define_word("tt".to_string(), vec![Opcode::PushI64(0), Opcode::Nth]);
+        vm.define_word("check".to_string(), vec![
+            Opcode::Dup, Opcode::Call("tt".to_string()),
+            Opcode::PushI64(0), Opcode::Eq,
+        ]);
+        let token = Value::List(Rc::new(vec![Value::I64(0), Value::I64(42)]));
+        vm.data_stack.push(token);
+        vm.execute(&[Opcode::Call("check".to_string())]).unwrap();
+        let r = vm.data_stack.pop().unwrap();
+        assert_eq!(r, Value::Bool(true), "direct: got {:?}", r);
+    }
 }
