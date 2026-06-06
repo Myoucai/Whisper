@@ -233,7 +233,20 @@ impl Vm {
             Opcode::PushBool(b) => self.data_stack.push(Value::Bool(*b)),
             Opcode::PushList => {
                 // Pop count from stack, then pop that many elements
-                let count = self.pop_i64()? as usize;
+                let count = self.pop_i64()?;
+                if count < 0 {
+                    return Err(VmError::ProgramError(format!(
+                        "PushList: negative count {count}"
+                    )));
+                }
+                let count = count as usize;
+                // Reasonable upper bound to prevent memory exhaustion
+                const MAX_LIST_SIZE: usize = 1_048_576; // 2^20
+                if count > MAX_LIST_SIZE {
+                    return Err(VmError::ProgramError(format!(
+                        "PushList: count {count} exceeds max list size {MAX_LIST_SIZE}"
+                    )));
+                }
                 let mut items = Vec::with_capacity(count);
                 for _ in 0..count {
                     items.push(self.pop()?);
