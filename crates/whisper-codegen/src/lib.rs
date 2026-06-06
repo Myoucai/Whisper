@@ -4,6 +4,7 @@ pub mod bytecode_gen;
 pub mod optimizer;
 pub mod wasm_compiler;
 pub mod wasm_gen;
+mod wasm_utils;
 pub mod wbin;
 
 pub use bytecode_gen::BytecodeGenerator;

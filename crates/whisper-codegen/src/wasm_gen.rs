@@ -467,45 +467,7 @@ fn push_f64(b: &mut Vec<u8>) {
 
 // === WASM binary format helpers ===
 
-fn sec(id: u8, data: &[u8]) -> Vec<u8> {
-    let mut v = vec![id];
-    v.extend_from_slice(&vec_u8(data));
-    v
-}
-
-fn vec_u8(d: &[u8]) -> Vec<u8> {
-    let mut v = Vec::new();
-    uleb128(&mut v, d.len() as u64);
-    v.extend_from_slice(d);
-    v
-}
-
-fn uleb128(b: &mut Vec<u8>, mut n: u64) {
-    loop {
-        let mut byte = (n & 0x7F) as u8;
-        n >>= 7;
-        if n != 0 { byte |= 0x80; }
-        b.push(byte);
-        if n == 0 { break; }
-    }
-}
-
-fn leb128_s(b: &mut Vec<u8>, mut n: i64) {
-    loop {
-        let byte = (n & 0x7F) as u8;
-        n >>= 7;
-        if (n == 0 && (byte & 0x40) == 0) || (n == -1 && (byte & 0x40) != 0) {
-            b.push(byte); break;
-        }
-        b.push(byte | 0x80);
-    }
-}
-
-fn export(buf: &mut Vec<u8>, name: &str, kind: u8, idx: u32) {
-    buf.extend_from_slice(&vec_u8(name.as_bytes()));
-    buf.push(kind);
-    uleb128(buf, idx as u64);
-}
+use crate::wasm_utils::{section as sec, vec_u8, leb128_u as uleb128, leb128_s, export_entry as export};
 
 fn data_seg(buf: &mut Vec<u8>, addr: u32, payload: &[u8]) {
     buf.push(0x00); // active, memory 0

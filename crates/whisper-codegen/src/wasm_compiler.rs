@@ -150,47 +150,9 @@ fn align_up(n: u32, align: u32) -> u32 {
     (n + align - 1) & !(align - 1)
 }
 
-// === WASM encoding helpers ===
+// === WASM encoding helpers (delegated to wasm_utils) ===
 
-fn section(id: u8, payload: &[u8]) -> Vec<u8> {
-    let mut v = vec![id];
-    v.extend_from_slice(&vec_u8(payload));
-    v
-}
-
-fn vec_u8(d: &[u8]) -> Vec<u8> {
-    let mut v = Vec::new();
-    leb128_u(&mut v, d.len() as u64);
-    v.extend_from_slice(d);
-    v
-}
-
-fn leb128_u(b: &mut Vec<u8>, mut n: u64) {
-    loop {
-        let mut byte = (n & 0x7F) as u8;
-        n >>= 7;
-        if n != 0 { byte |= 0x80; }
-        b.push(byte);
-        if n == 0 { break; }
-    }
-}
-
-fn leb128_s(b: &mut Vec<u8>, mut n: i64) {
-    loop {
-        let byte = (n & 0x7F) as u8;
-        n >>= 7;
-        if (n == 0 && byte & 0x40 == 0) || (n == -1 && byte & 0x40 != 0) {
-            b.push(byte); break;
-        }
-        b.push(byte | 0x80);
-    }
-}
-
-fn export_entry(buf: &mut Vec<u8>, name: &str, kind: u8, idx: u32) {
-    buf.extend_from_slice(&vec_u8(name.as_bytes()));
-    buf.push(kind);
-    leb128_u(buf, idx as u64);
-}
+use crate::wasm_utils::{section, vec_u8, leb128_u, leb128_s, export_entry};
 
 #[cfg(test)]
 mod tests {
