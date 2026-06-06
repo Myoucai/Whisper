@@ -28,10 +28,11 @@ pub fn build_file(source: &str, target: &str, output: &str) -> Result<(), String
             println!("Compiled {} bytes → {}", size, output);
         }
         "wasm" => {
-            let gen = WasmGenerator::new(bytecode);
-            gen.compile_to_file(std::path::Path::new(output))
-                .map_err(|e| format!("Failed to compile to WASM: {e}"))?;
-            println!("Compiled → {}", output);
+            let wasm = whisper_codegen::compile_direct(&bytecode);
+            std::fs::write(output, wasm)
+                .map_err(|e| format!("Failed to write WASM: {e}"))?;
+            let size = std::fs::metadata(output).map(|m| m.len()).unwrap_or(0);
+            println!("Compiled {} bytes → {}", size, output);
         }
         other => {
             return Err(format!(

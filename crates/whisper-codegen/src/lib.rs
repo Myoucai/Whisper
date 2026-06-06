@@ -2,10 +2,12 @@
 
 pub mod bytecode_gen;
 pub mod optimizer;
+pub mod wasm_compiler;
 pub mod wasm_gen;
 pub mod wbin;
 
 pub use bytecode_gen::BytecodeGenerator;
 pub use optimizer::optimize;
+pub use wasm_compiler::compile_direct;
 pub use wasm_gen::WasmGenerator;
 pub use wbin::WbinWriter;
