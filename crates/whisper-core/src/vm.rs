@@ -192,8 +192,8 @@ impl Vm {
             Opcode::Eq => {
                 let a = self.pop()?;
                 let b = self.pop()?;
-                self.data_stack
-                    .push(Value::Bool(a.unwrap_signal().equals(&b.unwrap_signal())));
+                let result = a.clone().unwrap_signal().equals(&b.clone().unwrap_signal());
+                self.data_stack.push(Value::Bool(result));
             }
             Opcode::Lt => self.compare_op(|a, b| a < b)?,
             Opcode::Gt => self.compare_op(|a, b| a > b)?,
@@ -519,7 +519,7 @@ impl Vm {
 
             if ip >= code_len {
                 self.call_stack.pop();
-                break;
+                continue;
             }
 
             let op = current_frame.code[ip].clone();
@@ -772,7 +772,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Known bug: nested Call in execute_ref doesn't execute Eq correctly
     fn test_execute_ref_nested_call() {
         let mut vm = Vm::new();
         vm.define_word("tt".to_string(), vec![Opcode::PushI64(0), Opcode::Nth]);
@@ -823,8 +822,8 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Known bug: nested Call doesn't complete Eq after tt returns
     fn test_direct_nested_call() {
+        // Full check body with Eq: this now works correctly
         let mut vm = Vm::new();
         vm.define_word("tt".to_string(), vec![Opcode::PushI64(0), Opcode::Nth]);
         vm.define_word("check".to_string(), vec![
@@ -833,8 +832,7 @@ mod tests {
         ]);
         let token = Value::List(Rc::new(vec![Value::I64(0), Value::I64(42)]));
         vm.data_stack.push(token);
-        vm.execute(&[Opcode::Call("check".to_string())]).unwrap();
-        let r = vm.data_stack.pop().unwrap();
-        assert_eq!(r, Value::Bool(true), "direct: got {:?}", r);
+        let r = vm.execute(&[Opcode::Call("check".to_string())]).unwrap();
+        assert_eq!(r, Some(Value::Bool(true)), "check([0,42]) should be true, got {:?}", r);
     }
 }
