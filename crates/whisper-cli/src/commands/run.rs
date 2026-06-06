@@ -21,6 +21,10 @@ pub fn run_file(
     let mut gen = BytecodeGenerator::new();
     let (bytecode, defs) = gen.compile(&ast);
 
+    // Phase 2b: Optimize bytecode
+    let bytecode = whisper_codegen::optimize(&bytecode);
+    let defs: Vec<_> = defs.into_iter().map(|(k, v)| (k, whisper_codegen::optimize(&v))).collect();
+
     // Phase 4: Set up VM with requested capabilities
     let mut capability_table = CapabilityTable::new();
 
@@ -42,9 +46,9 @@ pub fn run_file(
 
     let mut vm = Vm::with_capabilities(capability_table);
 
-    // Register word definitions
-    for (name, code) in defs {
-        vm.define_word(name, code);
+    // Register optimized word definitions
+    for (name, code) in &defs {
+        vm.define_word(name.clone(), code.clone());
     }
 
     // Phase 5: Execute
