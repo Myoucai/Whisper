@@ -131,11 +131,12 @@ impl BytecodeGenerator {
             whisper_core::value::Value::Bool(b) => self.emit(Opcode::PushBool(*b)),
             whisper_core::value::Value::Str(s) => self.emit(Opcode::PushStr(s.as_ref().clone())),
             whisper_core::value::Value::List(items) => {
-                // Push count first, then elements, then PushList op
-                self.emit(Opcode::PushI64(items.len() as i64));
+                // Push elements first, then count, then PushList
+                // Count goes LAST so PushList pops it first (LIFO)
                 for item in items.iter() {
                     self.compile_literal(item);
                 }
+                self.emit(Opcode::PushI64(items.len() as i64));
                 self.emit(Opcode::PushList);
             }
             whisper_core::value::Value::Ref(code) => {

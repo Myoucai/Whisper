@@ -99,6 +99,31 @@ fn test_list_creation() {
 }
 
 #[test]
+fn test_list_literal_order() {
+    // Verify list literal elements are in correct order
+    use whisper_core::opcode::Opcode;
+    let source = "[1 2 3 4 5]";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bytecode, _defs) = gen.compile(&ast);
+
+    // Should emit: PushI64(1..5), PushI64(5), PushList
+    // Elements first, then count on top (LIFO: count popped first)
+    assert_eq!(&bytecode[0..5], &[
+        Opcode::PushI64(1), Opcode::PushI64(2), Opcode::PushI64(3),
+        Opcode::PushI64(4), Opcode::PushI64(5),
+    ], "Elements should be 1,2,3,4,5");
+    assert_eq!(bytecode[5], Opcode::PushI64(5), "Count=5 after elements");
+    assert_eq!(bytecode[6], Opcode::PushList);
+
+    // Execute and verify stack result
+    let result = eval(source).unwrap();
+    assert_eq!(result, Some(Value::List(std::rc::Rc::new(vec![
+        Value::I64(1), Value::I64(2), Value::I64(3), Value::I64(4), Value::I64(5),
+    ]))), "List should be [1, 2, 3, 4, 5]");
+}
+
+#[test]
 fn test_wbin_roundtrip_full() {
     use whisper_codegen::wbin::{WbinReader, WbinWriter};
     let source = "3 4 + 7 =";
