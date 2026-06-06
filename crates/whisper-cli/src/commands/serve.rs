@@ -69,8 +69,12 @@ fn handle_request(
     for (name, code) in defs {
         vm.define_word(name.clone(), code.clone());
     }
+    // Run main bytecode to register definitions
+    vm.execute(bytecode).map_err(|e| format!("Handler init: {e}"))?;
+    // Call handler word with request
     vm.data_stack.push(req);
-    vm.execute(bytecode).map_err(|e| format!("Handler error: {e}"))?;
+    let call_handler = [whisper_core::opcode::Opcode::Call("handler".to_string())];
+    vm.execute(&call_handler).map_err(|e| format!("Handler error: {e}"))?;
 
     // Get response
     let response = match vm.data_stack.pop() {
