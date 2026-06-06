@@ -49,13 +49,15 @@ fn ast_to_whisper_tokens(nodes: &[AstNode]) -> Value {
                 ])));
             }
             AstNode::List(items) => {
-                // Flatten list: emit LBracket marker, then element tokens, then RBracket
-                // LBracket = type 9, RBracket = type 10
-                tokens.push(list_token(9));
+                // Emit element tokens, then a count marker (type 14)
                 for item in items {
                     tokens.append(&mut ast_to_vec(&[item.clone()]));
                 }
-                tokens.push(list_token(10));
+                // Count token: type 14 = "PushList with count"
+                tokens.push(Value::List(Rc::new(vec![
+                    Value::I64(14),
+                    Value::I64(items.len() as i64),
+                ])));
             }
             _ => {}
         }
@@ -179,6 +181,12 @@ fn values_to_opcodes(vals: Vec<Value>) -> Vec<Opcode> {
                     0x33 => { // PushBool
                         if let Value::I64(n) = &items[1] {
                             ops.push(Opcode::PushBool(*n != 0));
+                        }
+                    }
+                    0x34 => { // PushList with count
+                        if let Value::I64(n) = &items[1] {
+                            ops.push(Opcode::PushI64(*n));
+                            ops.push(Opcode::PushList);
                         }
                     }
                     0x60 => { // Call

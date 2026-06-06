@@ -699,6 +699,21 @@ mod tests {
     }
 
     #[test]
+    fn test_fold_sum() {
+        let mut vm = Vm::new();
+        // [1, 2, 3] 0 { + } @fold
+        vm.data_stack.push(Value::List(Rc::new(vec![
+            Value::I64(1), Value::I64(2), Value::I64(3),
+        ])));
+        vm.data_stack.push(Value::I64(0));
+        vm.data_stack.push(Value::Ref(Rc::from(
+            vec![Opcode::Add].into_boxed_slice()
+        )));
+        let result = vm.execute(&[Opcode::Fold]).unwrap();
+        assert_eq!(result, Some(Value::I64(6)), "Fold sum [1,2,3] should be 6");
+    }
+
+    #[test]
     fn test_fibonacci() {
         // Naive fib using word definitions and recursion
         // : fib { _ 1 > ??_ 1 - fib _ 2 - fib +|_]] } ;

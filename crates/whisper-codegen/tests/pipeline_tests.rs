@@ -1,6 +1,7 @@
 /// Integration tests for the full Whisper compilation pipeline:
 /// .ws → Parse → TypeCheck → Compile → VM Execute
 
+use std::rc::Rc;
 use whisper_core::opcode::Opcode;
 use whisper_core::value::Value;
 use whisper_core::vm::Vm;
@@ -97,6 +98,20 @@ fn test_factorial_via_definition() {
 fn test_list_creation() {
     let result = eval("[1 2 3] len").unwrap();
     assert_eq!(result, Some(Value::I64(3)));
+}
+
+#[test]
+fn test_fold_sum_via_pipeline() {
+    let result = eval("[1 2 3] 0 { + } @fold").unwrap();
+    assert_eq!(result, Some(Value::I64(6)), "Fold sum should be 6");
+}
+
+#[test]
+fn test_map_via_pipeline() {
+    let result = eval("[1 2 3] { _ * } @map").unwrap();
+    assert_eq!(result, Some(Value::List(Rc::new(vec![
+        Value::I64(1), Value::I64(4), Value::I64(9),
+    ]))), "Map square should be [1,4,9]");
 }
 
 #[test]
