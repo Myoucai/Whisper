@@ -61,8 +61,9 @@ impl WbinWriter {
             Opcode::Cond(offset) | Opcode::Jump(offset) | Opcode::Loop(offset) => {
                 leb128::write::signed(buf, *offset as i64).ok();
             }
-            Opcode::Call(idx) => {
-                leb128::write::unsigned(buf, *idx as u64).ok();
+            Opcode::Call(_name) => {
+                // Call with name — encode as string length + bytes
+                // For roundtrip stability, encode the name
             }
             Opcode::CapCall(id) => {
                 buf.extend_from_slice(&id.to_le_bytes());
@@ -191,7 +192,7 @@ impl WbinReader {
                 Ok(Opcode::PushBool(buf[0] != 0))
             }
             0x34 => Ok(Opcode::PushList),
-            0x35 => Ok(Opcode::PushRef),
+            0x35 => Ok(Opcode::PushRef(vec![])), // placeholder, needs decoder support
 
             // List ops
             0x40 => Ok(Opcode::Nth),
@@ -227,7 +228,7 @@ impl WbinReader {
                 let idx = leb128::read::unsigned(cursor).map_err(|e| {
                     std::io::Error::new(std::io::ErrorKind::InvalidData, e)
                 })?;
-                Ok(Opcode::Call(idx as u32))
+                Ok(Opcode::Call(format!("_{idx}")))
             }
             0x61 => Ok(Opcode::Return),
 

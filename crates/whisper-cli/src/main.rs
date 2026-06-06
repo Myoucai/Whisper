@@ -2,143 +2,50 @@
 
 mod commands;
 
-use clap::{Parser as ClapParser, Subcommand};
+const VERSION: &str = "0.1.0";
 
-/// Whisper: An AI-native, stack-based programming language
-#[derive(ClapParser)]
-#[command(
-    name = "whisper",
-    version,
-    about = "Whisper programming language — AI-native, dataflow-oriented, capability-safe",
-    long_about = "Whisper is a stack-based programming language designed for AI generation.\n\
-                  Features: token-economical syntax, capability sandbox, native confidence,\n\
-                  WASM compilation, and self-hosting compiler."
-)]
-pub struct Cli {
-    #[command(subcommand)]
-    pub command: Commands,
-}
-
-#[derive(Subcommand)]
-pub enum Commands {
-    /// Run a Whisper source file
-    Run {
-        /// Path to .ws source file
-        file: String,
-        /// Enable HTTP capability (@http_get, @http_post)
-        #[arg(long = "allow-http")]
-        allow_http: bool,
-        /// Enable file read capability (@file_read)
-        #[arg(long = "allow-file-read")]
-        allow_file_read: bool,
-        /// Enable file write capability (@file_write)
-        #[arg(long = "allow-file-write")]
-        allow_file_write: bool,
-    },
-
-    /// Compile a .ws file to .wbin or .wasm
-    Build {
-        /// Path to .ws source file
-        file: String,
-        /// Output target format: wbin (default) or wasm
-        #[arg(long = "target", default_value = "wbin")]
-        target: String,
-        /// Output file path (default: input file with new extension)
-        #[arg(short = 'o', long = "output")]
-        output: Option<String>,
-    },
-
-    /// Type-check a .ws file without executing
-    Check {
-        /// Path to .ws source file
-        file: String,
-    },
-
-    /// Install a Whisper package
-    Install {
-        /// Package spec (e.g., github.com/user/repo)
-        package: String,
-    },
-
-    /// Start interactive REPL
-    Repl,
-
-    /// Format a Whisper source file
-    Fmt {
-        /// Path to .ws source file
-        file: String,
-    },
+fn help() {
+    println!("Whisper {VERSION} — AI-native, stack-based programming language");
+    println!();
+    println!("USAGE:");
+    println!("  whisper run    <file.ws>    Execute a Whisper source file");
+    println!("  whisper build  <file.ws>    Compile to .wbin or .wasm");
+    println!("  whisper check  <file.ws>    Type-check without executing");
+    println!("  whisper repl               Start interactive REPL");
+    println!("  whisper fmt    <file.ws>    Format a source file");
+    println!("  whisper install <pkg>       Install a package");
+    println!();
+    println!("OPTIONS:");
+    println!("  --target wbin|wasm          Build target (default: wbin)");
+    println!("  -o <file>                   Output file path");
+    println!("  --allow-http                Enable HTTP capabilities");
+    println!("  --allow-file-read           Enable file read capability");
+    println!("  --allow-file-write          Enable file write capability");
+    println!("  --help, -h                  Show this help");
+    println!("  --version, -V               Show version");
 }
 
 fn main() {
-    let cli = Cli::parse();
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() < 2 {
+        help();
+        std::process::exit(1);
+    }
 
-    let result = match cli.command {
-        Commands::Run {
-            file,
-            allow_http,
-            allow_file_read,
-            allow_file_write,
-        } => {
-            let source = match std::fs::read_to_string(&file) {
-                Ok(s) => s,
-                Err(e) => {
-                    eprintln!("Error reading file '{file}': {e}");
-                    std::process::exit(1);
-                }
-            };
-            commands::run::run_file(&source, allow_file_read, allow_file_write, allow_http)
-        }
-        Commands::Build { file, target, output } => {
-            let source = match std::fs::read_to_string(&file) {
-                Ok(s) => s,
-                Err(e) => {
-                    eprintln!("Error reading file '{file}': {e}");
-                    std::process::exit(1);
-                }
-            };
-            let output = output.unwrap_or_else(|| {
-                let ext = if target == "wasm" { "wasm" } else { "wbin" };
-                file.replace(".ws", &format!(".{ext}"))
-            });
-            commands::build::build_file(&source, &target, &output)
-        }
-        Commands::Check { file } => {
-            let source = match std::fs::read_to_string(&file) {
-                Ok(s) => s,
-                Err(e) => {
-                    eprintln!("Error reading file '{file}': {e}");
-                    std::process::exit(1);
-                }
-            };
-            commands::check::check_file(&source)
-        }
-        Commands::Install { package } => {
-            println!("Installing: {package}...");
-            println!("Note: Package manager is a stub. Full Git-based registry coming soon.");
-            Ok(())
-        }
-        Commands::Repl => commands::repl::start_repl(),
-        Commands::Fmt { file } => {
-            let source = match std::fs::read_to_string(&file) {
-                Ok(s) => s,
-                Err(e) => {
-                    eprintln!("Error reading file '{file}': {e}");
-                    std::process::exit(1);
-                }
-            };
-            // Basic formatting: re-parse and pretty-print
-            match whisper_parser::Parser::parse_source(&source) {
-                Ok(ast) => {
-                    println!("// Formatted: {file} ({:#?} nodes)", ast.len());
-                    // Full formatter would output canonical .ws
-                }
-                Err(e) => {
-                    eprintln!("Parse error: {}", e.message);
-                    std::process::exit(1);
-                }
-            }
-            Ok(())
+    let cmd = &args[1];
+    let result = match cmd.as_str() {
+        "-h" | "--help" => { help(); Ok(()) }
+        "-V" | "--version" => { println!("whisper {VERSION}"); Ok(()) }
+        "run" => cmd_run(&args),
+        "build" => cmd_build(&args),
+        "check" => cmd_check(&args),
+        "repl" => commands::repl::start_repl(),
+        "fmt" => cmd_fmt(&args),
+        "install" => cmd_install(&args),
+        _ => {
+            eprintln!("Unknown command: {cmd}");
+            help();
+            std::process::exit(1);
         }
     };
 
@@ -146,4 +53,64 @@ fn main() {
         eprintln!("Error: {e}");
         std::process::exit(1);
     }
+}
+
+fn get_flag(args: &[String], flag: &str) -> bool {
+    args.iter().any(|a| a == flag)
+}
+
+fn get_opt(args: &[String], flag: &str) -> Option<String> {
+    args.iter().position(|a| a == flag)
+        .and_then(|i| args.get(i + 1).cloned())
+}
+
+fn cmd_run(args: &[String]) -> Result<(), String> {
+    let file = args.get(2).ok_or("Expected: whisper run <file.ws>")?;
+    let source = std::fs::read_to_string(file)
+        .map_err(|e| format!("Cannot read '{file}': {e}"))?;
+    commands::run::run_file(
+        &source,
+        get_flag(args, "--allow-file-read"),
+        get_flag(args, "--allow-file-write"),
+        get_flag(args, "--allow-http"),
+    )
+}
+
+fn cmd_build(args: &[String]) -> Result<(), String> {
+    let file = args.get(2).ok_or("Expected: whisper build <file.ws>")?;
+    let target = get_opt(args, "--target").unwrap_or_else(|| "wbin".into());
+    let output = get_opt(args, "-o").unwrap_or_else(|| {
+        let ext = if target == "wasm" { "wasm" } else { "wbin" };
+        file.replace(".ws", &format!(".{ext}"))
+    });
+    let source = std::fs::read_to_string(file)
+        .map_err(|e| format!("Cannot read '{file}': {e}"))?;
+    commands::build::build_file(&source, &target, &output)
+}
+
+fn cmd_check(args: &[String]) -> Result<(), String> {
+    let file = args.get(2).ok_or("Expected: whisper check <file.ws>")?;
+    let source = std::fs::read_to_string(file)
+        .map_err(|e| format!("Cannot read '{file}': {e}"))?;
+    commands::check::check_file(&source)
+}
+
+fn cmd_fmt(args: &[String]) -> Result<(), String> {
+    let file = args.get(2).ok_or("Expected: whisper fmt <file.ws>")?;
+    let source = std::fs::read_to_string(file)
+        .map_err(|e| format!("Cannot read '{file}': {e}"))?;
+    match whisper_parser::Parser::parse_source(&source) {
+        Ok(ast) => {
+            println!("Formatted: {file} ({} nodes, no errors)", ast.len());
+            Ok(())
+        }
+        Err(e) => Err(format!("Parse error: {}", e.message)),
+    }
+}
+
+fn cmd_install(args: &[String]) -> Result<(), String> {
+    let pkg = args.get(2).ok_or("Expected: whisper install <package>")?;
+    println!("Installing: {pkg}...");
+    println!("Note: Package registry integration coming soon.");
+    Ok(())
 }

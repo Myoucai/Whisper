@@ -74,8 +74,8 @@ pub enum Opcode {
     PushBool(bool),
     /// Push list (followed by element count and elements)
     PushList,
-    /// Push quotation block (followed by bytecode length)
-    PushRef,
+    /// Push quotation block with inline bytecode
+    PushRef(Vec<Opcode>),
 
     // === List operations (0x40-0x47) ===
     /// Take nth element: list n → element
@@ -102,8 +102,8 @@ pub enum Opcode {
     Times,
 
     // === Call/Return (0x60-0x67) ===
-    /// Call word by dictionary index
-    Call(u32),
+    /// Call word by name (looked up in VM word_dict at runtime)
+    Call(String),
     /// Return from word/block
     Return,
 
@@ -175,7 +175,7 @@ impl Opcode {
             Opcode::PushStr(_) => 0x32,
             Opcode::PushBool(_) => 0x33,
             Opcode::PushList => 0x34,
-            Opcode::PushRef => 0x35,
+            Opcode::PushRef(_) => 0x35,
 
             // List ops
             Opcode::Nth => 0x40,
@@ -243,7 +243,7 @@ impl Opcode {
             Opcode::PushStr(_) => "push_str",
             Opcode::PushBool(_) => "push_bool",
             Opcode::PushList => "push_list",
-            Opcode::PushRef => "push_ref",
+            Opcode::PushRef(_) => "push_ref",
             Opcode::Nth => "nth",
             Opcode::Append => "append",
             Opcode::Len => "len",

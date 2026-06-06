@@ -63,13 +63,31 @@ impl WasmGenerator {
                 Opcode::PushBool(v) => b.push(if *v { 1 } else { 0 }),
                 Opcode::Cond(o) | Opcode::Jump(o) | Opcode::Loop(o) =>
                     b.extend_from_slice(&o.to_le_bytes()),
-                Opcode::Call(i) => b.extend_from_slice(&i.to_le_bytes()),
+                Opcode::Call(_) => b.extend_from_slice(&0u32.to_le_bytes()),
                 Opcode::CapCall(i) => b.extend_from_slice(&i.to_le_bytes()),
                 Opcode::ConfLabel(c) => b.extend_from_slice(&c.to_le_bytes()),
+                Opcode::PushRef(inner) => {
+                    b.extend_from_slice(&(inner.len() as u32).to_le_bytes());
+                    // Flatten inner opcodes
+                    for inner_op in inner {
+                        Self::encode_op_raw(&mut b, inner_op);
+                    }
+                }
                 _ => {}
             }
         }
         b
+    }
+
+    fn encode_op_raw(b: &mut Vec<u8>, op: &Opcode) {
+        b.push(op.to_byte());
+        match op {
+            Opcode::PushI64(n) => b.extend_from_slice(&n.to_le_bytes()),
+            Opcode::PushF64(n) => b.extend_from_slice(&n.to_le_bytes()),
+            Opcode::PushBool(v) => b.push(if *v { 1 } else { 0 }),
+            Opcode::Pick(n) => b.push(*n),
+            _ => {}
+        }
     }
 
     pub fn compile(&self) -> Vec<u8> {

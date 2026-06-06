@@ -14,8 +14,6 @@ pub struct BytecodeGenerator {
     bytecode: Vec<Opcode>,
     /// Dictionary of compiled word definitions (name → bytecode)
     word_dict: HashMap<String, Vec<Opcode>>,
-    /// Counter for generating unique word indices
-    word_counter: u32,
     /// Pending word definitions to include in result
     pending_defs: Vec<(String, Vec<Opcode>)>,
 }
@@ -25,25 +23,27 @@ impl BytecodeGenerator {
         BytecodeGenerator {
             bytecode: Vec::new(),
             word_dict: HashMap::new(),
-            word_counter: 0,
             pending_defs: Vec::new(),
         }
     }
 
     /// Compile a sequence of AST nodes into (main_bytecode, word_definitions).
     pub fn compile(&mut self, nodes: &[AstNode]) -> (Vec<Opcode>, HashMap<String, Vec<Opcode>>) {
-        // Pass 1: Register all word definitions (process in order so
-        // later defs can reference earlier ones)
+        // Pass 1a: Pre-register all word names (for recursion support)
+        for node in nodes {
+            if let AstNode::Def { name, .. } = node {
+                self.word_dict.insert(name.clone(), vec![]);
+            }
+        }
+
+        // Pass 1b: Compile word bodies (now recursive references resolve)
         for node in nodes {
             if let AstNode::Def { name, body } = node {
-                // Use parent's word_dict so references to previous defs resolve
                 let mut sub_gen = BytecodeGenerator::new();
                 sub_gen.word_dict = self.word_dict.clone();
                 let (body_code, _) = sub_gen.compile(body);
-                let mut def_code = body_code;
-                def_code.push(Opcode::Return);
-                self.word_dict.insert(name.clone(), def_code.clone());
-                self.pending_defs.push((name.clone(), def_code));
+                self.word_dict.insert(name.clone(), body_code.clone());
+                self.pending_defs.push((name.clone(), body_code));
             }
         }
 
@@ -80,7 +80,7 @@ impl BytecodeGenerator {
                 let mut values = Vec::new();
                 for item in items {
                     // Compile to a temporary to extract literal values
-                    values.push(ast_node_to_value(item));
+                    values.push(ast_node_to_value(item, &self.word_dict));
                 }
                 let list_val = whisper_core::value::Value::List(
                     std::rc::Rc::new(values),
@@ -138,38 +138,38 @@ impl BytecodeGenerator {
                 }
                 self.emit(Opcode::PushList);
             }
+            whisper_core::value::Value::Ref(code) => {
+                self.emit(Opcode::PushRef(code.iter().cloned().collect()));
+            }
             _ => {}
         }
     }
 
     fn compile_word_ref(&mut self, name: &str) {
-        if let Some(def_code) = self.word_dict.get(name).cloned() {
-            // Inline the word's bytecode
-            for op in &def_code[..def_code.len() - 1] {
-                // Skip the Return at end
-                self.bytecode.push(op.clone());
-            }
-        } else {
-            // Unknown word — emit Call with index (fallback)
-            let idx = self.word_counter;
-            self.word_counter += 1;
-            self.emit(Opcode::Call(idx));
-        }
+        // Always use Call — VM looks up word_dict at runtime
+        // This supports recursion and mutual recursion correctly
+        self.emit(Opcode::Call(name.to_string()));
     }
 
     fn compile_quote(&mut self, body: &[AstNode]) {
         // Pre-construct the quotation as a Ref value at compile time
-        let ref_val = ast_node_to_value(&AstNode::Quote(body.to_vec()));
+        let ref_val = ast_node_to_value(&AstNode::Quote(body.to_vec()), &self.word_dict);
         self.compile_literal(&ref_val);
+    }
+
+    fn new_sub_gen(&self) -> BytecodeGenerator {
+        let mut gen = BytecodeGenerator::new();
+        gen.word_dict = self.word_dict.clone();
+        gen
     }
 
     fn compile_cond(&mut self, then_branch: &[AstNode], else_branch: Option<&[AstNode]>) {
         // condition should already be on stack
-        let mut then_gen = BytecodeGenerator::new();
+        let mut then_gen = self.new_sub_gen();
         let (then_code, _) = then_gen.compile(then_branch);
 
         let else_code = else_branch.map(|eb| {
-            let mut else_gen = BytecodeGenerator::new();
+            let mut else_gen = self.new_sub_gen();
             let (code, _) = else_gen.compile(eb);
             code
         });
@@ -193,12 +193,12 @@ impl BytecodeGenerator {
         let loop_start = self.bytecode.len();
 
         // Compile body
-        let mut body_gen = BytecodeGenerator::new();
+        let mut body_gen = self.new_sub_gen();
         let (body_code, _) = body_gen.compile(body);
         self.bytecode.extend(body_code);
 
         // Compile condition (pushes bool onto stack)
-        let mut cond_gen = BytecodeGenerator::new();
+        let mut cond_gen = self.new_sub_gen();
         let (cond_code, _) = cond_gen.compile(condition);
         let cond_end = self.bytecode.len() + cond_code.len();
         self.bytecode.extend(cond_code);
@@ -256,24 +256,23 @@ impl BytecodeGenerator {
 }
 
 /// Extract a literal Value from an AST node (compile-time evaluation).
-fn ast_node_to_value(node: &AstNode) -> whisper_core::value::Value {
+fn ast_node_to_value(node: &AstNode, word_dict: &HashMap<String, Vec<Opcode>>) -> whisper_core::value::Value {
     match node {
         AstNode::Literal(v) => v.clone(),
         AstNode::List(items) => {
-            let values: Vec<_> = items.iter().map(ast_node_to_value).collect();
+            let values: Vec<_> = items.iter().map(|n| ast_node_to_value(n, word_dict)).collect();
             whisper_core::value::Value::List(std::rc::Rc::new(values))
         }
         AstNode::Quote(body) => {
-            // Compile the body and store as a Ref
             let mut gen = BytecodeGenerator::new();
+            gen.word_dict = word_dict.clone();
             let (code, _) = gen.compile(body);
             whisper_core::value::Value::Ref(std::rc::Rc::from(code.into_boxed_slice()))
         }
         AstNode::Op(Operator::Sub) => {
-            // For negative numbers, the literal is handled by the lexer
             whisper_core::value::Value::I64(0)
         }
-        _ => whisper_core::value::Value::I64(0), // fallback
+        _ => whisper_core::value::Value::I64(0),
     }
 }
 

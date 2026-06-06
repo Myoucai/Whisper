@@ -242,10 +242,10 @@ impl Vm {
                 self.data_stack
                     .push(Value::List(Rc::new(items)));
             }
-            Opcode::PushRef => {
-                return Err(VmError::ProgramError(
-                    "PushRef must be handled by compiler".into(),
-                ));
+            Opcode::PushRef(ref code) => {
+                self.data_stack.push(Value::Ref(Rc::from(
+                    code.clone().into_boxed_slice(),
+                )));
             }
 
             // === List operations ===
@@ -338,12 +338,19 @@ impl Vm {
             }
 
             // === Call/Return ===
-            Opcode::Call(_index) => {
-                // For now, Call uses word_dict lookup
-                // In .wbin, this would be pre-resolved
-                return Err(VmError::ProgramError(
-                    "Call must be resolved by compiler to direct bytecode".into(),
-                ));
+            Opcode::Call(name) => {
+                let word_code = self
+                    .word_dict
+                    .get(name)
+                    .cloned()
+                    .ok_or_else(|| VmError::UndefinedWord(name.clone()))?;
+                let frame = CallFrame {
+                    word_name: Some(name.clone()),
+                    code: Rc::from(word_code.into_boxed_slice()),
+                    ip: 0,
+                    base: self.data_stack.len(),
+                };
+                self.call_stack.push(frame);
             }
             Opcode::Return => {
                 // Pop current frame
