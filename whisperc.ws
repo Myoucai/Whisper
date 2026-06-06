@@ -1,49 +1,31 @@
-# ============================================================
-# whisperc.ws — Whisper 自举编译器
-# ============================================================
-# Soft-bootstrap strategy:
-#   1. Run on Rust VM → produces bytecode for any .ws file
-#   2. Compile itself → produces same bytecode as Rust compiler
-#   3. Self-compiled compiler can compile other .ws files
-#   4. Proves language self-hosting capability
-#
-# This file serves as both:
-#   - A specification of the compiler's behavior
-#   - Executable code when run on the Whisper VM
-# ============================================================
 
-# === Phase 1: Lexer ===
-# Input: source string
-# Output: list of tokens
+: tk-type { 0 @nth } ;
+: tk-val  { 1 @nth } ;
 
-# Token types encoded as [type value] pairs
-: token-type { @nth } ;               # token → type
-: token-value { swap @nth } ;         # token → value (1-indexed)
+: op-i64  { tk-val [48] ` append } ;
+: op-f64  { tk-val [49] ` append } ;
+: op-str  { tk-val [50] ` append } ;
+: op-bool { tk-val [51] ` append } ;
+: op-list { tk-val [52] ` append } ;
+: op-op   { tk-val } ;
+: op-call { tk-val [96] ` append } ;
+: op-ref  { tk-val } ;
 
-# === Phase 2: Parser ===
-# Input: list of tokens
-# Output: AST (list of nodes)
-
-# === Phase 3: Code Generator ===
-# Input: AST
-# Output: bytecode sequence
-
-# === Phase 4: Main entry point ===
-: compile {
-    # read source from stdin
-    ,
-
-    # Phase 1: Tokenize
-    # (simplified: split on whitespace)
-
-    # Phase 2: Parse
-    # (simplified: direct interpretation)
-
-    # Phase 3: Generate
-    # (emit bytecode)
-
-    "Compilation complete" .
+: compile-one {
+    _ tk-type
+    0  = ??op-i64
+    |_ tk-type 1  = ??op-f64
+    |_ tk-type 2  = ??op-str
+    |_ tk-type 3  = ??op-op
+    |_ tk-type 4  = ??op-call
+    |_ tk-type 13 = ??op-bool
+    |_ tk-type 14 = ??op-list
+    |_ tk-type 18 = ??op-ref
+    |drop drop ] ] ] ] ] ] ] ]
 } ;
 
-# === Test: compile a simple expression ===
+: compile {
+    { compile-one } @map
+} ;
+
 export compile
