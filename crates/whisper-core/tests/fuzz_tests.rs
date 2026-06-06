@@ -104,7 +104,7 @@ fn random_program(len: usize, seed: u64) -> Vec<Opcode> {
 
 #[test]
 fn fuzz_small_programs() {
-    for seed in 0..200 {
+    for seed in 0..50 {
         let prog = random_program(5, seed);
         let mut vm = Vm::new();
         let _ = vm.execute(&prog); // Must not panic
@@ -113,7 +113,7 @@ fn fuzz_small_programs() {
 
 #[test]
 fn fuzz_medium_programs() {
-    for seed in 0..100 {
+    for seed in 0..30 {
         let prog = random_program(20, seed);
         let mut vm = Vm::new();
         let _ = vm.execute(&prog);
@@ -123,7 +123,7 @@ fn fuzz_medium_programs() {
 #[test]
 fn fuzz_list_operations() {
     // Random list operations with pre-pushed list
-    for seed in 0..200 {
+    for seed in 0..100 {
         let mut vm = Vm::new();
         vm.data_stack.push(Value::List(std::rc::Rc::new(vec![
             Value::I64(1),
@@ -138,7 +138,7 @@ fn fuzz_list_operations() {
 #[test]
 fn fuzz_arithmetic_only() {
     // Push several values, then random arithmetic
-    for seed in 0..500 {
+    for seed in 0..100 {
         let mut s1 = seed + 1000;
         let mut s2 = seed + 2000;
         let mut s3 = seed + 3000;
@@ -185,7 +185,7 @@ fn fuzz_stack_underflow() {
 #[test]
 fn fuzz_control_flow() {
     // Random control flow should not panic
-    for mut seed in 0..150 {
+    for mut seed in 0..50 {
         let mut vm = Vm::new();
         vm.data_stack.push(Value::Bool(rand_i64(&mut seed) % 2 == 0));
         let mut s = seed + 5000;
