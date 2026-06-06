@@ -274,7 +274,6 @@ fn test_type_error_undefined_word() {
 }
 
 #[test]
-#[ignore] // wbin format needs update for Call(String) serialization
 fn test_wbin_with_definitions() {
     use whisper_codegen::wbin::{WbinReader, WbinWriter};
     let source = ": double { 2 * } ; 10 double";

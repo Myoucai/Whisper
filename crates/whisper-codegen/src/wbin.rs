@@ -61,9 +61,16 @@ impl WbinWriter {
             Opcode::Cond(offset) | Opcode::Jump(offset) | Opcode::Loop(offset) => {
                 leb128::write::signed(buf, *offset as i64).ok();
             }
-            Opcode::Call(_name) => {
-                // Call with name — encode as string length + bytes
-                // For roundtrip stability, encode the name
+            Opcode::Call(name) => {
+                let name_bytes = name.as_bytes();
+                leb128::write::unsigned(buf, name_bytes.len() as u64).ok();
+                buf.extend_from_slice(name_bytes);
+            }
+            Opcode::PushRef(inner) => {
+                leb128::write::unsigned(buf, inner.len() as u64).ok();
+                for inner_op in inner {
+                    Self::encode_opcode(inner_op, buf);
+                }
             }
             Opcode::CapCall(id) => {
                 buf.extend_from_slice(&id.to_le_bytes());
@@ -192,7 +199,18 @@ impl WbinReader {
                 Ok(Opcode::PushBool(buf[0] != 0))
             }
             0x34 => Ok(Opcode::PushList),
-            0x35 => Ok(Opcode::PushRef(vec![])), // placeholder, needs decoder support
+            0x35 => {
+                let count = leb128::read::unsigned(cursor).map_err(|e| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, e)
+                })? as usize;
+                let mut inner = Vec::with_capacity(count);
+                for _ in 0..count {
+                    let mut byte_buf = [0u8; 1];
+                    cursor.read_exact(&mut byte_buf)?;
+                    inner.push(Self::decode_opcode(byte_buf[0], cursor)?);
+                }
+                Ok(Opcode::PushRef(inner))
+            }
 
             // List ops
             0x40 => Ok(Opcode::Nth),
@@ -225,10 +243,14 @@ impl WbinReader {
 
             // Call/Return
             0x60 => {
-                let idx = leb128::read::unsigned(cursor).map_err(|e| {
+                let len = leb128::read::unsigned(cursor).map_err(|e| {
                     std::io::Error::new(std::io::ErrorKind::InvalidData, e)
-                })?;
-                Ok(Opcode::Call(format!("_{idx}")))
+                })? as usize;
+                let mut name_buf = vec![0u8; len];
+                cursor.read_exact(&mut name_buf)?;
+                let name = String::from_utf8(name_buf)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+                Ok(Opcode::Call(name))
             }
             0x61 => Ok(Opcode::Return),
 
@@ -290,6 +312,68 @@ mod tests {
     #[test]
     fn test_wbin_empty() {
         let ops: Vec<Opcode> = vec![];
+        let data = WbinWriter::write(&ops);
+        let decoded = WbinReader::decode(&data).unwrap();
+        assert_eq!(ops, decoded);
+    }
+
+    #[test]
+    fn test_wbin_call_roundtrip() {
+        let ops = vec![
+            Opcode::PushI64(10),
+            Opcode::Call("double".to_string()),
+            Opcode::Call("square".to_string()),
+        ];
+        let data = WbinWriter::write(&ops);
+        let decoded = WbinReader::decode(&data).unwrap();
+        assert_eq!(ops, decoded);
+    }
+
+    #[test]
+    fn test_wbin_pushref_roundtrip() {
+        let inner = vec![Opcode::PushI64(2), Opcode::Mul, Opcode::Return];
+        let ops = vec![
+            Opcode::PushI64(5),
+            Opcode::PushRef(inner.clone()),
+            Opcode::PushI64(10),
+            Opcode::PushRef(vec![Opcode::Add, Opcode::Return]),
+        ];
+        let data = WbinWriter::write(&ops);
+        let decoded = WbinReader::decode(&data).unwrap();
+        assert_eq!(ops, decoded);
+    }
+
+    #[test]
+    fn test_wbin_nested_pushref_roundtrip() {
+        // PushRef containing a PushRef (nested quotations)
+        let inner = vec![Opcode::Dup, Opcode::PushI64(1), Opcode::Add];
+        let outer = vec![
+            Opcode::PushRef(inner.clone()),
+            Opcode::PushI64(10),
+            Opcode::Call("apply".to_string()),
+        ];
+        let ops = vec![Opcode::PushRef(outer.clone())];
+        let data = WbinWriter::write(&ops);
+        let decoded = WbinReader::decode(&data).unwrap();
+        assert_eq!(ops, decoded);
+    }
+
+    #[test]
+    fn test_wbin_full_roundtrip_with_defs() {
+        // Simulates a real program with Call and PushRef
+        let ops = vec![
+            Opcode::PushI64(10),
+            Opcode::Call("double".to_string()),
+            Opcode::PushStr("hello".to_string()),
+            Opcode::PushRef(vec![
+                Opcode::Dup,
+                Opcode::PushI64(1),
+                Opcode::Add,
+                Opcode::Return,
+            ]),
+            Opcode::PushBool(true),
+            Opcode::Cond(3),
+        ];
         let data = WbinWriter::write(&ops);
         let decoded = WbinReader::decode(&data).unwrap();
         assert_eq!(ops, decoded);
