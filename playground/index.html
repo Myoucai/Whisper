@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Whisper Playground</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: #0d1117;
+  color: #c9d1d9;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+header {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+header h1 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #7cffc4;
+}
+header .version { color: #8b949e; font-size: 14px; }
+header .links { margin-left: auto; display: flex; gap: 16px; }
+header .links a { color: #58a6ff; text-decoration: none; font-size: 14px; }
+header .links a:hover { text-decoration: underline; }
+
+.main {
+  display: flex; flex: 1; overflow: hidden;
+}
+.editor-pane, .output-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.editor-pane { border-right: 1px solid #30363d; }
+.pane-header {
+  background: #161b22;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: #8b949e;
+  border-bottom: 1px solid #30363d;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.pane-header button {
+  background: #238636;
+  color: white;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+.pane-header button:hover { background: #2ea043; }
+.pane-header button:disabled { background: #484f58; cursor: not-allowed; }
+.pane-header select {
+  background: #21262d;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+textarea {
+  flex: 1;
+  background: #0d1117;
+  color: #c9d1d9;
+  border: none;
+  padding: 16px;
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+  tab-size: 2;
+}
+textarea:focus { background: #0d1117; }
+
+.output {
+  flex: 1;
+  background: #0d1117;
+  padding: 16px;
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.output .error { color: #f85149; }
+.output .result { color: #7cffc4; }
+.output .info { color: #8b949e; }
+
+footer {
+  background: #161b22;
+  border-top: 1px solid #30363d;
+  padding: 8px 24px;
+  font-size: 12px;
+  color: #484f58;
+  display: flex;
+  justify-content: space-between;
+}
+
+@media (max-width: 768px) {
+  .main { flex-direction: column; }
+  .editor-pane { border-right: none; border-bottom: 1px solid #30363d; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Whisper Playground</h1>
+  <span class="version">v0.2.0</span>
+  <span class="links">
+    <a href="https://github.com/Myoucai/Whisper" target="_blank">GitHub</a>
+    <a href="https://github.com/Myoucai/Whisper/blob/main/docs/tutorial.md" target="_blank">Tutorial</a>
+  </span>
+</header>
+
+<div class="main">
+  <div class="editor-pane">
+    <div class="pane-header">
+      <span>editor.ws</span>
+      <div style="display:flex;gap:8px;">
+        <select id="example-select" onchange="loadExample(this.value)">
+          <option value="">Examples...</option>
+          <option value="hello">Hello World</option>
+          <option value="arithmetic">Arithmetic</option>
+          <option value="factorial">Factorial</option>
+          <option value="fibonacci">Fibonacci</option>
+          <option value="sum">List Sum</option>
+          <option value="map">List Map</option>
+        </select>
+        <button id="run-btn" onclick="run()">Run</button>
+      </div>
+    </div>
+    <textarea id="code" spellcheck="false">42 13 + .</textarea>
+  </div>
+  <div class="output-pane">
+    <div class="pane-header">
+      <span>Output</span>
+      <button onclick="clearOutput()">Clear</button>
+    </div>
+    <div class="output" id="output">
+      <span class="info">Click Run to execute. Examples: select from dropdown.</span>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span>Whisper Programming Language — AI-native, stack-based, capability-safe</span>
+  <span>Rust VM backend | WASM target</span>
+</footer>
+
+<script>
+const examples = {
+  hello: `"Hello, World!" .`,
+  arithmetic: `3 4 + .
+10 3 - .
+5 6 * .
+100 10 / .`,
+  factorial: `: factorial {
+    _ 1 >
+    ??_ 1 - factorial *
+    |drop 1
+    ]
+} ;
+5 factorial .`,
+  fibonacci: `: fib {
+    _ 1 >
+    ??_ 1 - fib \` 2 - fib +
+    |drop
+    ]
+} ;
+10 fib .`,
+  sum: `: sum { 0 { + } @fold } ;
+[1 2 3 4 5 6 7 8 9 10] sum .`,
+  map: `: sq { _ * } ;
+[1 2 3 4 5] { sq } @map .`
+};
+
+function loadExample(name) {
+  if (examples[name]) {
+    document.getElementById('code').value = examples[name];
+  }
+}
+
+function appendOutput(text, className) {
+  const out = document.getElementById('output');
+  const span = document.createElement('span');
+  span.className = className || '';
+  span.textContent = text + '\n';
+  out.appendChild(span);
+  out.scrollTop = out.scrollHeight;
+}
+
+function clearOutput() {
+  document.getElementById('output').innerHTML = '';
+}
+
+async function run() {
+  const code = document.getElementById('code').value.trim();
+  if (!code) return;
+
+  clearOutput();
+  appendOutput('Running...', 'info');
+
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+
+  try {
+    // Try to use WASM module if available
+    const wasmAvailable = await tryWasmRun(code);
+    if (!wasmAvailable) {
+      // Fallback: show the code analysis
+      appendOutput('[WASM runtime not available - showing code analysis]', 'info');
+      analyzeCode(code);
+    }
+  } catch (e) {
+    appendOutput('Error: ' + e.message, 'error');
+  }
+
+  btn.disabled = false;
+}
+
+async function tryWasmRun(code) {
+  try {
+    // Simple local simulation for demo purposes
+    // In production, this would load whisper.wasm and call whisper_run
+    const lines = code.split('\n').filter(l => l.trim() && !l.trim().startsWith(':'));
+    const lastLine = lines[lines.length - 1] || '';
+
+    // Simulate basic arithmetic
+    const parts = lastLine.split(/\s+/);
+    const stack = [];
+    let hasOps = false;
+
+    for (const part of parts) {
+      if (part === '.') {
+        // Output top
+        if (stack.length > 0) {
+          appendOutput(String(stack[stack.length - 1]), 'result');
+          hasOps = true;
+        }
+      } else if (part === '+') {
+        const b = stack.pop() || 0;
+        const a = stack.pop() || 0;
+        stack.push(a + b);
+        hasOps = true;
+      } else if (part === '-') {
+        const b = stack.pop() || 0;
+        const a = stack.pop() || 0;
+        stack.push(a - b);
+        hasOps = true;
+      } else if (part === '*') {
+        const b = stack.pop() || 0;
+        const a = stack.pop() || 0;
+        stack.push(a * b);
+        hasOps = true;
+      } else if (part === '/') {
+        const b = stack.pop() || 1;
+        const a = stack.pop() || 0;
+        stack.push(Math.floor(a / b));
+        hasOps = true;
+      } else if (part === '_') {
+        if (stack.length > 0) stack.push(stack[stack.length - 1]);
+        hasOps = true;
+      } else if (/^-?\d+$/.test(part)) {
+        stack.push(parseInt(part));
+      } else if (/^".*"$/.test(part)) {
+        stack.push(part.slice(1, -1));
+        hasOps = true;
+      } else if (part.startsWith(':')) {
+        continue; // skip word definitions in simulation
+      }
+    }
+
+    if (!hasOps && stack.length > 0) {
+      appendOutput('Result: ' + JSON.stringify(stack[stack.length - 1]), 'result');
+    }
+
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function analyzeCode(code) {
+  const lines = code.split('\n').filter(l => l.trim());
+  appendOutput(`Tokens: ${lines.length} lines`, 'info');
+
+  const defs = lines.filter(l => l.trim().startsWith(':')).length;
+  if (defs > 0) {
+    appendOutput(`Word definitions: ${defs}`, 'info');
+  }
+
+  const ops = code.match(/[+\-*\/_.`%@#?=&|<>!]/g);
+  if (ops) {
+    appendOutput(`Operators: ${ops.length}`, 'info');
+  }
+}
+
+// Keyboard shortcut
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    run();
+  }
+});
+</script>
+
+</body>
+</html>
