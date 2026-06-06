@@ -343,3 +343,215 @@ fn test_fib_recursive_working() {
     let result = vm.execute(&bytecode).unwrap();
     assert_eq!(result, Some(Value::I64(8))); // fib(6) = 8
 }
+
+// === Standard Library Integration Tests ===
+
+/// Load stdlib modules and register their definitions in the VM.
+fn load_stdlib(vm: &mut Vm, modules: &[&str]) -> Result<(), String> {
+    for module_name in modules {
+        let source = match *module_name {
+            "math" => include_str!("../../../stdlib/math.ws"),
+            "list" => include_str!("../../../stdlib/list.ws"),
+            "test" => include_str!("../../../stdlib/test.ws"),
+            "str" => include_str!("../../../stdlib/str.ws"),
+            "io" => include_str!("../../../stdlib/io.ws"),
+            "json" => include_str!("../../../stdlib/json.ws"),
+            _ => return Err(format!("Unknown stdlib module: {module_name}")),
+        };
+        let ast = Parser::parse_source(source).map_err(|e| e.message)?;
+        let mut gen = BytecodeGenerator::new();
+        let (_bytecode, defs) = gen.compile(&ast);
+        for (name, code) in defs {
+            vm.define_word(name, code);
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn test_stdlib_math_sq() {
+    let source = "5 sq";
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["math"]).unwrap();
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::I64(25)), "5² = 25");
+}
+
+#[test]
+fn test_stdlib_math_cube() {
+    let source = "3 cube";
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["math"]).unwrap();
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::I64(27)), "3³ = 27");
+}
+
+#[test]
+fn test_stdlib_math_abs_positive() {
+    let source = "5 abs";
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["math"]).unwrap();
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::I64(5)), "|5| = 5");
+}
+
+#[test]
+fn test_stdlib_math_abs_negative() {
+    let source = "0 5 - abs";
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["math"]).unwrap();
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::I64(5)), "|-5| = 5");
+}
+
+#[test]
+fn test_stdlib_math_factorial() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["math"]).unwrap();
+    let source = "5 factorial";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::I64(120)), "5! = 120");
+}
+
+#[test]
+fn test_stdlib_math_fib() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["math"]).unwrap();
+    let source = "6 fib";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::I64(8)), "fib(6) = 8");
+}
+
+#[test]
+fn test_stdlib_math_even_odd() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["math"]).unwrap();
+
+    let source = "6 even";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::Bool(true)), "6 is even");
+
+    let source = "7 odd";
+    let ast = Parser::parse_source(source).unwrap();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::Bool(true)), "7 is odd");
+}
+
+#[test]
+fn test_stdlib_list_sum() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["list"]).unwrap();
+    let source = "[1 2 3 4 5] sum";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::I64(15)), "sum [1..5] = 15");
+}
+
+#[test]
+fn test_stdlib_list_length() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["list"]).unwrap();
+    let source = "[1 2 3] length";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::I64(3)), "len [1,2,3] = 3");
+}
+
+#[test]
+fn test_stdlib_list_map() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["math", "list"]).unwrap();
+    // Use std/math sq with std/list map
+    let source = "[1 2 3 4] { sq } map";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(
+        result,
+        Some(Value::List(std::rc::Rc::new(vec![
+            Value::I64(1),
+            Value::I64(4),
+            Value::I64(9),
+            Value::I64(16),
+        ]))),
+        "map sq [1,2,3,4] = [1,4,9,16]"
+    );
+}
+
+#[test]
+fn test_stdlib_list_product() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["list"]).unwrap();
+    let source = "[1 2 3 4] product";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::I64(24)), "product [1,2,3,4] = 24");
+}
+
+#[test]
+fn test_stdlib_test_assert_true() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["test"]).unwrap();
+    // #t assert-true → prints "PASS", leaves nothing
+    let source = "#t assert-true";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_stdlib_test_assert_eq() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["test"]).unwrap();
+    // 3 4 + 7 assert-eq → true → PASS
+    let source = "3 4 + 7 assert-eq";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_stdlib_io_println() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["io"]).unwrap();
+    // println just calls OutputTop
+    let source = "42 println";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc);
+    assert!(result.is_ok());
+}
