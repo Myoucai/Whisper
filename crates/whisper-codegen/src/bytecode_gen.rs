@@ -178,11 +178,12 @@ impl BytecodeGenerator {
         let then_len = then_code.len() as i32;
 
         if let Some(ref else_c) = else_code {
-            let else_len = else_c.len() as i32;
-            // If false, jump past then_branch to else
-            self.emit(Opcode::Cond(then_len + 2)); // +2 for Jump after then
+            // If false, jump past then_branch AND the Jump opcode
+            // Offset = then_len + 1 (then_len opcodes + 1 Jump opcode)
+            self.emit(Opcode::Cond(then_len + 1));
             self.bytecode.extend(then_code);
-            self.emit(Opcode::Jump(else_len + 1));
+            let jmp_off = else_c.len() as i32;
+            self.emit(Opcode::Jump(jmp_off));
             self.bytecode.extend(else_c.clone());
         } else {
             self.emit(Opcode::Cond(then_len as i32));
