@@ -14,7 +14,7 @@ pub fn build_file(source: &str, target: &str, output: &str) -> Result<(), String
 
     // Phase 2: Compile to bytecode
     let mut gen = BytecodeGenerator::new();
-    let bytecode = gen.compile(&ast);
+    let (bytecode, _defs) = gen.compile(&ast);
 
     // Phase 3: Output in target format
     match target {

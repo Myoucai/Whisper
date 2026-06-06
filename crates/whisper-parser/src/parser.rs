@@ -77,12 +77,14 @@ impl Parser {
 
             // Lists: [ ... ]
             TokenKind::LBracket => {
+                self.advance(); // consume [
                 let items = self.parse_until(TokenKind::RBracket)?;
                 Ok(Some(AstNode::List(items)))
             }
 
             // Quotations: { ... }
             TokenKind::LBrace => {
+                self.advance(); // consume {
                 let body = self.parse_until(TokenKind::RBrace)?;
                 Ok(Some(AstNode::Quote(body)))
             }

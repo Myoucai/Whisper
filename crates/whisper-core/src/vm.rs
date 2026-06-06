@@ -232,9 +232,15 @@ impl Vm {
             }
             Opcode::PushBool(b) => self.data_stack.push(Value::Bool(*b)),
             Opcode::PushList => {
-                return Err(VmError::ProgramError(
-                    "PushList must be handled by compiler".into(),
-                ));
+                // Pop count from stack, then pop that many elements
+                let count = self.pop_i64()? as usize;
+                let mut items = Vec::with_capacity(count);
+                for _ in 0..count {
+                    items.push(self.pop()?);
+                }
+                items.reverse(); // elements were pushed in order
+                self.data_stack
+                    .push(Value::List(Rc::new(items)));
             }
             Opcode::PushRef => {
                 return Err(VmError::ProgramError(

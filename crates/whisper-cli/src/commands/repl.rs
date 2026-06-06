@@ -82,7 +82,10 @@ pub fn start_repl() -> Result<(), String> {
         match Parser::parse_source(line) {
             Ok(ast) => {
                 let mut gen = BytecodeGenerator::new();
-                let bytecode = gen.compile(&ast);
+                let (bytecode, defs) = gen.compile(&ast);
+                for (name, code) in defs {
+                    vm.define_word(name, code);
+                }
                 match vm.execute(&bytecode) {
                     Ok(Some(result)) => {
                         println!("→ {result}");
@@ -129,7 +132,7 @@ fn parse_definition(line: &str) -> Result<(String, Vec<whisper_core::opcode::Opc
     let ast = Parser::parse_source(body_str)
         .map_err(|e| format!("Parse error in body: {}", e.message))?;
     let mut gen = BytecodeGenerator::new();
-    let bytecode = gen.compile(&ast);
+    let (bytecode, _defs) = gen.compile(&ast);
 
     Ok((name, bytecode))
 }
