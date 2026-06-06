@@ -22,6 +22,7 @@ mod w {
     pub const BR_IF: u8 = 0x0D;
     pub const IF: u8 = 0x04;
     pub const I32_CONST: u8 = 0x41;
+    pub const I64_CONST: u8 = 0x42;
     pub const I32_LOAD: u8 = 0x28;
     pub const I64_LOAD: u8 = 0x29;
     pub const F64_LOAD: u8 = 0x2B;
@@ -270,6 +271,67 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     b.push(w::I64_GT_S);
     b.push(w::I64_EXTEND_I32_S);
     push(&mut b);
+    b.push(w::END);
+
+    // 0x01 Swap — exchange top two stack values
+    if_op(&mut b, 0x01);
+    // pop a, pop b, push a, push b (using scratch)
+    pop(&mut b); // a
+    ci32(&mut b, 0x1010); b.push(w::I64_STORE); b.push(3); b.push(0); // scratch1 = a
+    pop(&mut b); // b
+    ci32(&mut b, 0x1020); b.push(w::I64_STORE); b.push(3); b.push(0); // scratch2 = b
+    ci32(&mut b, 0x1010); b.push(w::I64_LOAD); b.push(3); b.push(0); // load a
+    push(&mut b); // push a
+    ci32(&mut b, 0x1020); b.push(w::I64_LOAD); b.push(3); b.push(0); // load b
+    push(&mut b); // push b
+    b.push(w::END);
+
+    // 0x50 Cond — pop bool, if false add offset to ip
+    // Offset is i32 at bytecode[ip]; ip already advanced past opcode byte
+    if_op(&mut b, 0x50);
+    // Pop condition from data stack
+    pop(&mut b); // cond value (i64, 0 or non-zero)
+    ci32(&mut b, 0x1030); b.push(w::I64_STORE); b.push(3); b.push(0); // save cond to scratch
+    // cond == 0 means false → jump
+    ci32(&mut b, 0x1030); b.push(w::I64_LOAD); b.push(3); b.push(0);
+    b.push(w::I64_CONST); leb128_s(&mut b, 0);
+    b.push(w::I64_EQ); // cond == 0?
+    b.push(w::IF); b.push(0x40);
+    // Read i32 offset from bytecode[ip], add to ip
+    // ip currently points to offset bytes; advance ip past them + apply offset
+    ld_i32(&mut b, 0x0004); // ip
+    ci32(&mut b, 0x0010);
+    b.push(w::I32_ADD); // bytecode + ip = addr of offset
+    b.push(w::I32_LOAD); b.push(2); b.push(0); // load i32 offset
+    // ip += 4 + offset
+    ld_i32(&mut b, 0x0004);
+    b.push(w::I32_ADD); // ip + offset
+    ci32(&mut b, 4);
+    b.push(w::I32_ADD); // ip + offset + 4
+    ci32(&mut b, 0x0004);
+    b.push(w::I32_STORE); b.push(2); b.push(0); // store new ip
+    b.push(w::END); // end if
+    // If true (cond != 0): just advance ip past the 4 offset bytes
+    ci32(&mut b, 0x1030); b.push(w::I64_LOAD); b.push(3); b.push(0);
+    b.push(w::I64_CONST); leb128_s(&mut b, 0);
+    b.push(w::I64_GT_S); // cond > 0
+    b.push(w::IF); b.push(0x40);
+    add_ip(&mut b, 4); // skip offset bytes
+    b.push(w::END);
+    b.push(w::END);
+
+    // 0x51 Jump — unconditional jump by i32 offset
+    if_op(&mut b, 0x51);
+    ld_i32(&mut b, 0x0004);
+    ci32(&mut b, 0x0010);
+    b.push(w::I32_ADD);
+    b.push(w::I32_LOAD); b.push(2); b.push(0); // load offset
+    ld_i32(&mut b, 0x0004);
+    b.push(w::I32_ADD); // ip + offset
+    ci32(&mut b, 4);
+    b.push(w::I32_ADD); // ip + offset + 4 (skip offset bytes)
+    ci32(&mut b, 0x0004);
+    b.push(w::I32_STORE); b.push(2); b.push(0);
     b.push(w::END);
 
     // 0x90 OutputTop
