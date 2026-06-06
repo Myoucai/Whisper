@@ -50,47 +50,47 @@ fn handle_request(
     bytecode: &[whisper_core::opcode::Opcode],
     defs: &std::collections::HashMap<String, Vec<whisper_core::opcode::Opcode>>,
 ) -> Result<(), String> {
-    let mut buf = [0u8; 4096];
-    let n = stream.read(&mut buf).map_err(|e| e.to_string())?;
+    stream.set_read_timeout(Some(std::time::Duration::from_secs(5)))
+        .map_err(|e| e.to_string())?;
+
+    let mut buf = [0u8; 8192];
+    let n = stream.read(&mut buf).map_err(|e| format!("Read error: {e}"))?;
     if n == 0 { return Ok(()); }
 
     let request = String::from_utf8_lossy(&buf[..n]);
-    let (method, path, body) = parse_http(&request);
+    let (method, path, _body) = parse_http(&request);
+    println!("{} {}", method, path);
 
-    // Create request value: [method, path, body]
     let req = Value::List(Rc::new(vec![
         Value::Str(Rc::new(method)),
         Value::Str(Rc::new(path.to_string())),
-        Value::Str(Rc::new(body)),
+        Value::Str(Rc::new(String::new())),
     ]));
 
-    // Execute handler
     let mut vm = Vm::new();
     for (name, code) in defs {
         vm.define_word(name.clone(), code.clone());
     }
-    // Run main bytecode to register definitions
-    vm.execute(bytecode).map_err(|e| format!("Handler init: {e}"))?;
-    // Call handler word with request
+    vm.execute(bytecode).map_err(|e| format!("Init: {e}"))?;
     vm.data_stack.push(req);
     let call_handler = [whisper_core::opcode::Opcode::Call("handler".to_string())];
-    vm.execute(&call_handler).map_err(|e| format!("Handler error: {e}"))?;
+    vm.execute(&call_handler).map_err(|e| format!("Handler: {e}"))?;
 
-    // Get response
-    let response = match vm.data_stack.pop() {
-        Some(Value::List(items)) if items.len() >= 3 => {
-            let status = match &items[0] { Value::Str(s) => s.as_ref().clone(), _ => "200 OK".into() };
-            let ct = match &items[1] { Value::Str(s) => s.as_ref().clone(), _ => "text/plain".into() };
-            let body = match &items[2] { Value::Str(s) => s.as_ref().clone(), _ => String::new() };
-            (status, ct, body)
+    let (status, ct, body) = match vm.data_stack.pop() {
+        Some(Value::List(items)) if items.len() >= 3 => (
+            items[0].to_string().trim_matches('"').to_string(),
+            items[1].to_string().trim_matches('"').to_string(),
+            items[2].to_string().trim_matches('"').to_string(),
+        ),
+        other => {
+            eprintln!("Handler returned: {:?}", other);
+            ("200 OK".into(), "text/plain".into(), "".into())
         }
-        _ => ("200 OK".into(), "text/plain".into(), "".into()),
     };
 
-    // Write HTTP response
     let response_text = format!(
         "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-        response.0, response.1, response.2.len(), response.2
+        status, ct, body.len(), body
     );
     stream.write_all(response_text.as_bytes()).map_err(|e| e.to_string())?;
     Ok(())
