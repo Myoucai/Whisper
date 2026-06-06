@@ -1,13 +1,17 @@
 {
   "name": "whisper-language",
   "displayName": "Whisper Language Support",
-  "description": "Syntax highlighting for the Whisper programming language",
-  "version": "0.1.0",
+  "description": "Syntax highlighting and LSP support for the Whisper programming language",
+  "version": "0.2.0",
   "publisher": "myoucai",
   "license": "MIT",
   "engines": {
     "vscode": "^1.80.0"
   },
+  "activationEvents": [
+    "onLanguage:whisper"
+  ],
+  "main": "./extension.js",
   "categories": [
     "Programming Languages"
   ],
@@ -15,16 +19,9 @@
     "languages": [
       {
         "id": "whisper",
-        "aliases": [
-          "Whisper",
-          "whisper"
-        ],
-        "extensions": [
-          ".ws"
-        ],
-        "filenames": [
-          "package.ws"
-        ],
+        "aliases": ["Whisper", "whisper"],
+        "extensions": [".ws"],
+        "filenames": ["package.ws"],
         "configuration": "./language-configuration.json",
         "icon": {
           "dark": "./icons/whisper.svg",
@@ -38,7 +35,17 @@
         "scopeName": "source.whisper",
         "path": "./syntaxes/whisper.tmLanguage.json"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Whisper",
+      "properties": {
+        "whisper.lsp.path": {
+          "type": "string",
+          "default": "whisper-lsp",
+          "description": "Path to the whisper-lsp binary"
+        }
+      }
+    }
   },
   "repository": {
     "type": "git",

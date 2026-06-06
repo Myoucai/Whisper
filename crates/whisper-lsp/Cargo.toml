@@ -1,0 +1,14 @@
+[package]
+name = "whisper-lsp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+whisper-parser.workspace = true
+whisper-typecheck.workspace = true
+serde_json.workspace = true
+lsp-server.workspace = true
+lsp-types.workspace = true
+anyhow = "1"

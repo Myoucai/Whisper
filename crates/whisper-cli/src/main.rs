@@ -16,6 +16,7 @@ fn help() {
     println!("  whisper install <pkg>       Install a package");
     println!("  whisper serve   <file.ws>   Start HTTP server");
     println!("  whisper bootstrap <file.ws> Self-hosting compiler pipeline");
+    println!("  whisper lsp                 Start LSP language server");
     println!();
     println!("OPTIONS:");
     println!("  --target wbin|wasm          Build target (default: wbin)");
@@ -46,6 +47,7 @@ fn main() {
         "install" => cmd_install(&args),
         "serve" => cmd_serve(&args),
         "bootstrap" => cmd_bootstrap(&args),
+        "lsp" => cmd_lsp(),
         _ => {
             eprintln!("Unknown command: {cmd}");
             help();
@@ -150,4 +152,32 @@ fn cmd_install(args: &[String]) -> Result<(), String> {
 
     let pkg = args.get(2).ok_or("Expected: whisper install <github.com/user/repo>")?;
     installer.install(pkg, auto_yes)
+}
+
+fn cmd_lsp() -> Result<(), String> {
+    // Delegate to the whisper-lsp binary
+    let status = std::process::Command::new(
+        std::env::current_exe()
+            .map_err(|e| e.to_string())?
+            .parent()
+            .ok_or("no parent dir")?
+            .join("whisper-lsp"),
+    )
+    .stdin(std::process::Stdio::inherit())
+    .stdout(std::process::Stdio::inherit())
+    .stderr(std::process::Stdio::inherit())
+    .status();
+
+    match status {
+        Ok(s) if s.success() => Ok(()),
+        Ok(s) => Err(format!("LSP server exited with code: {:?}", s.code())),
+        Err(e) => {
+            // If whisper-lsp binary not found, try running directly via cargo
+            if e.kind() == std::io::ErrorKind::NotFound {
+                Err("whisper-lsp binary not found. Build with: cargo build -p whisper-lsp".into())
+            } else {
+                Err(format!("Failed to start LSP server: {e}"))
+            }
+        }
+    }
 }
