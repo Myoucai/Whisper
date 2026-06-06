@@ -14,6 +14,7 @@ fn help() {
     println!("  whisper repl               Start interactive REPL");
     println!("  whisper fmt    <file.ws>    Format a source file");
     println!("  whisper install <pkg>       Install a package");
+    println!("  whisper bootstrap <file.ws> Self-hosting compiler pipeline");
     println!();
     println!("OPTIONS:");
     println!("  --target wbin|wasm          Build target (default: wbin)");
@@ -42,6 +43,7 @@ fn main() {
         "repl" => commands::repl::start_repl(),
         "fmt" => cmd_fmt(&args),
         "install" => cmd_install(&args),
+        "bootstrap" => cmd_bootstrap(&args),
         _ => {
             eprintln!("Unknown command: {cmd}");
             help();
@@ -106,6 +108,13 @@ fn cmd_fmt(args: &[String]) -> Result<(), String> {
         }
         Err(e) => Err(format!("Parse error: {}", e.message)),
     }
+}
+
+fn cmd_bootstrap(args: &[String]) -> Result<(), String> {
+    let file = args.get(2).ok_or("Expected: whisper bootstrap <file.ws>")?;
+    let source = std::fs::read_to_string(file)
+        .map_err(|e| format!("Cannot read '{file}': {e}"))?;
+    commands::bootstrap::bootstrap_compile(&source)
 }
 
 fn cmd_install(args: &[String]) -> Result<(), String> {
