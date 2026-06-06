@@ -109,8 +109,9 @@ impl WasmGenerator {
         // Memory: 1 page
         wasm.extend_from_slice(&sec(5, &[1, 0, 1]));
 
-        // Exports
+        // Exports: 4 exports
         let mut exp = Vec::new();
+        uleb128(&mut exp, 4); // export count
         export(&mut exp, "whisper_run", 0x00, 0);
         export(&mut exp, "whisper_run_f64", 0x00, 1);
         export(&mut exp, "get_stack_ptr", 0x00, 2);
