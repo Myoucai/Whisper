@@ -197,6 +197,25 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     push_f64(&mut b);
     b.push(w::END);
 
+    // 0x32 PushStr — skip string data (advance ip past 4B len + N bytes)
+    if_op(&mut b, 0x32);
+    ld_i32(&mut b, 0x0004);
+    ci32(&mut b, 0x0010);
+    b.push(w::I32_ADD);
+    b.push(w::I32_LOAD); b.push(2); b.push(0); // read u32 length
+    ci32(&mut b, 0x0004);
+    b.push(w::I32_LOAD); b.push(2); b.push(0); // current ip
+    b.push(w::I32_ADD);                         // ip + len
+    ci32(&mut b, 4);
+    b.push(w::I32_ADD);                         // ip + len + 4
+    ci32(&mut b, 0x0004);
+    b.push(w::I32_STORE); b.push(2); b.push(0);
+    // Push placeholder (string pointer as i64)
+    ci32(&mut b, 0x5000);
+    b.push(w::I64_EXTEND_I32_S);
+    push(&mut b);
+    b.push(w::END);
+
     // 0x33 PushBool — 1 byte immediate
     if_op(&mut b, 0x33);
     ld_i32(&mut b, 0x0004);
