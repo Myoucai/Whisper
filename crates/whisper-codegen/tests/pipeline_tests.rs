@@ -1,6 +1,7 @@
 /// Integration tests for the full Whisper compilation pipeline:
 /// .ws → Parse → TypeCheck → Compile → VM Execute
 
+use whisper_core::opcode::Opcode;
 use whisper_core::value::Value;
 use whisper_core::vm::Vm;
 use whisper_codegen::bytecode_gen::BytecodeGenerator;
@@ -293,4 +294,38 @@ fn test_deep_stack() {
     source.push_str("+ + + + + + + + +"); // 10 numbers, 9 adds
     // Simpler: 1 2 3 4 5 + + + +
     assert_eval("1 2 3 4 5 + + + +", Value::I64(15));
+}
+
+#[test]
+fn debug_fib_bytecode() {
+    // Verify fib bytecode structure
+    let source = ": fib { _ 1 > ??_ 1 - fib ` 2 - fib +|] } ;";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (_bc, defs) = gen.compile(&ast);
+    let fib_code = defs.get("fib").unwrap();
+    // fib body: dup, 1, gt, cond, dup, 1, sub, call(fib), swap, 2, sub, call(fib), add, jump, drop
+    assert_eq!(fib_code[0], Opcode::Dup);
+    assert_eq!(fib_code[1], Opcode::PushI64(1));
+    assert_eq!(fib_code[2], Opcode::Gt);
+    // Cond offset points past then_branch + Jump
+    assert!(matches!(fib_code[3], Opcode::Cond(_)));
+    // The last opcode before implicit return should be Jump (no Drop needed)
+    // With empty else: Jump(0) or no Jump at all
+}
+
+#[test]
+fn test_fib_recursive_working() {
+    // Recursive fib WITHOUT drop in else (Cond already pops the bool)
+    let source = "
+        : fib { _ 1 > ??_ 1 - fib ` 2 - fib +|] } ;
+        6 fib
+    ";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bytecode, defs) = gen.compile(&ast);
+    let mut vm = Vm::new();
+    for (name, code) in defs { vm.define_word(name, code); }
+    let result = vm.execute(&bytecode).unwrap();
+    assert_eq!(result, Some(Value::I64(8))); // fib(6) = 8
 }
