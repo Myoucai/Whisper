@@ -1,0 +1,47 @@
+{
+  "name": "whisper-language",
+  "displayName": "Whisper Language Support",
+  "description": "Syntax highlighting for the Whisper programming language",
+  "version": "0.1.0",
+  "publisher": "myoucai",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "whisper",
+        "aliases": [
+          "Whisper",
+          "whisper"
+        ],
+        "extensions": [
+          ".ws"
+        ],
+        "filenames": [
+          "package.ws"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "dark": "./icons/whisper.svg",
+          "light": "./icons/whisper.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "whisper",
+        "scopeName": "source.whisper",
+        "path": "./syntaxes/whisper.tmLanguage.json"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Myoucai/Whisper"
+  }
+}

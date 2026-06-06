@@ -1,0 +1,184 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Whisper",
+  "scopeName": "source.whisper",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#booleans"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#atwords"
+    },
+    {
+      "include": "#definitions"
+    },
+    {
+      "include": "#capabilities"
+    },
+    {
+      "include": "#confidence"
+    },
+    {
+      "include": "#punctuation"
+    },
+    {
+      "include": "#wordrefs"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.whisper",
+          "match": "//.*$"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.whisper",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.whisper",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.whisper",
+          "match": "-?\\d+\\.\\d+"
+        },
+        {
+          "name": "constant.numeric.integer.whisper",
+          "match": "-?\\d+"
+        }
+      ]
+    },
+    "booleans": {
+      "name": "constant.language.boolean.whisper",
+      "match": "#[tf]"
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.stack.whisper",
+          "match": "[_`%@]"
+        },
+        {
+          "name": "keyword.operator.arithmetic.whisper",
+          "match": "[+\\-*/](?![>?])"
+        },
+        {
+          "name": "keyword.operator.comparison.whisper",
+          "match": "!=|<=|>=|[<>=]"
+        },
+        {
+          "name": "keyword.operator.logical.whisper",
+          "match": "[&|!]"
+        },
+        {
+          "name": "keyword.operator.io.whisper",
+          "match": "\\.\\.?|,"
+        },
+        {
+          "name": "keyword.operator.control.whisper",
+          "match": "\\?\\?|\\?->|\\?\\||#"
+        },
+        {
+          "name": "keyword.operator.pick.whisper",
+          "match": "\\$\\d+"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.import.whisper",
+          "match": "\\b(import|export)\\b"
+        },
+        {
+          "name": "keyword.control.list.whisper",
+          "match": "\\b(append|len)\\b"
+        },
+        {
+          "name": "keyword.operator.assign.whisper",
+          "match": ":"
+        }
+      ]
+    },
+    "atwords": {
+      "name": "support.function.builtin.whisper",
+      "match": "@(nth|map|each|fold|times)\\b"
+    },
+    "definitions": {
+      "name": "meta.definition.word.whisper",
+      "begin": "(^|\\s)(:)\\s+(\\w[\\w\\-]*)\\s*(\\{)",
+      "end": "(\\})\\s*(;)",
+      "beginCaptures": {
+        "2": { "name": "keyword.operator.assign.whisper" },
+        "3": { "name": "entity.name.function.whisper" },
+        "4": { "name": "punctuation.definition.block.whisper" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.block.whisper" },
+        "2": { "name": "punctuation.terminator.whisper" }
+      },
+      "patterns": [
+        { "include": "#comments" },
+        { "include": "#strings" },
+        { "include": "#numbers" },
+        { "include": "#booleans" },
+        { "include": "#operators" },
+        { "include": "#atwords" },
+        { "include": "#wordrefs" },
+        { "include": "#punctuation" }
+      ]
+    },
+    "capabilities": {
+      "name": "variable.other.capability.whisper",
+      "match": "@\\d+"
+    },
+    "confidence": {
+      "name": "constant.numeric.confidence.whisper",
+      "match": ":0\\.\\d+"
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.definition.list.whisper",
+          "match": "[\\[\\]]"
+        },
+        {
+          "name": "punctuation.definition.block.whisper",
+          "match": "[{}]"
+        },
+        {
+          "name": "punctuation.terminator.whisper",
+          "match": ";"
+        }
+      ]
+    },
+    "wordrefs": {
+      "name": "entity.name.function.whisper",
+      "match": "\\b[a-zA-Z][\\w\\-]*\\b"
+    }
+  }
+}
