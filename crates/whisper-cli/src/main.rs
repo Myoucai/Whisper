@@ -2,7 +2,7 @@
 
 mod commands;
 
-const VERSION: &str = "0.1.0";
+const VERSION: &str = "0.2.0";
 
 fn help() {
     println!("Whisper {VERSION} — AI-native, stack-based programming language");

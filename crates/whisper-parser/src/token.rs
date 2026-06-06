@@ -57,7 +57,8 @@ pub enum TokenKind {
     Minus,
     Star,
     Slash,
-    Percent,   // % (context: arithmetic)
+    Percent,   // % (modulo)
+    Mod,       // mod keyword (alias for %)
 
     // Comparison
     Eq,

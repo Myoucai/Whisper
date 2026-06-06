@@ -154,10 +154,17 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::Pick(p))))
             }
+            TokenKind::Drop => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Drop)))
+            }
             TokenKind::Percent => {
                 self.advance();
-                // Context-dependent: parser emits Drop, codegen may reinterpret
-                Ok(Some(AstNode::Op(Operator::Drop)))
+                Ok(Some(AstNode::Op(Operator::Mod)))
+            }
+            TokenKind::Mod => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Mod)))
             }
 
             // Arithmetic

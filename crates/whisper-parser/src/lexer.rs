@@ -377,6 +377,8 @@ impl Lexer {
             "export" => TokenKind::Export,
             "append" => TokenKind::Append,
             "len" => TokenKind::Len,
+            "drop" => TokenKind::Drop,
+            "mod" => TokenKind::Mod,
             _ => TokenKind::Word(name),
         }
     }

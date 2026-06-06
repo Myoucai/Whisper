@@ -223,7 +223,7 @@ fn test_even_odd_check() {
 fn test_recursive_factorial_deep() {
     // Recursive factorial with proper stack management
     let source = "
-        : factorial { _ 1 > ??_ 1 - factorial *|% 1] } ;
+        : factorial { _ 1 > ??_ 1 - factorial *|drop 1] } ;
         6 factorial
     ";
     let ast = Parser::parse_source(source).unwrap();
