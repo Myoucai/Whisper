@@ -1,0 +1,22 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# Whisper build artifacts
+*.wbin
+*.wasm
+*.wat
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Whisper package cache
+.whisper/

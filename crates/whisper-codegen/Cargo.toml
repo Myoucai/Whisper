@@ -1,0 +1,12 @@
+[package]
+name = "whisper-codegen"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+whisper-core.workspace = true
+whisper-parser.workspace = true
+whisper-typecheck.workspace = true
+thiserror.workspace = true
+leb128.workspace = true

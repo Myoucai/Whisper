@@ -1,0 +1,32 @@
+[workspace]
+members = [
+    "crates/whisper-core",
+    "crates/whisper-parser",
+    "crates/whisper-typecheck",
+    "crates/whisper-codegen",
+    "crates/whisper-package",
+    "crates/whisper-cli",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Whisper Language Team"]
+repository = "https://github.com/whisper-lang/whisper"
+
+[workspace.dependencies]
+# Core data types shared across crates
+whisper-core = { path = "crates/whisper-core" }
+whisper-parser = { path = "crates/whisper-parser" }
+whisper-typecheck = { path = "crates/whisper-typecheck" }
+whisper-codegen = { path = "crates/whisper-codegen" }
+whisper-package = { path = "crates/whisper-package" }
+
+# External dependencies (minimal set)
+clap = { version = "4", features = ["derive"] }
+thiserror = "2"
+leb128 = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

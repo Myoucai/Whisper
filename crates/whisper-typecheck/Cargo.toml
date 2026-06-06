@@ -1,0 +1,10 @@
+[package]
+name = "whisper-typecheck"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+whisper-core.workspace = true
+whisper-parser.workspace = true
+thiserror.workspace = true
