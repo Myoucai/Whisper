@@ -143,7 +143,7 @@ fn cmd_install(args: &[String]) -> Result<(), String> {
     }
 
     let auto_yes = get_flag(args, "-y") || get_flag(args, "--yes");
-    let installer = whisper_package::install::Installer::new();
+    let mut installer = whisper_package::install::Installer::new();
 
     if get_flag(args, "--local") {
         let path = args.get(3).ok_or("Expected: whisper install --local <path>")?;
