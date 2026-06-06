@@ -1,15 +1,15 @@
-/// WASM code generator: Whisper bytecode → standalone .wasm module.
-///
-/// Generates a complete WASM module with an embedded bytecode interpreter.
-/// The interpreter uses a fetch-decode-execute loop on a data stack in linear memory.
-///
-/// Memory layout (64KB, 1 page):
-///   0x0000: sp (i32) — data stack pointer. Starts at 0x2000
-///   0x0004: ip (i32) — instruction pointer into bytecode
-///   0x0008: bc_len (i32) — bytecode length
-///   0x0010..: bytecode data (max ~4KB fits in 0x0010..0x1000)
-///   0x1000: scratch area (opcode save, temp values)
-///   0x2000..: data stack (16 bytes/element: 8B value + 8B unused)
+//! WASM code generator: Whisper bytecode → standalone .wasm module.
+//!
+//! Generates a complete WASM module with an embedded bytecode interpreter.
+//! The interpreter uses a fetch-decode-execute loop on a data stack in linear memory.
+//!
+//! Memory layout (64KB, 1 page):
+//!   0x0000: sp (i32) — data stack pointer. Starts at 0x2000
+//!   0x0004: ip (i32) — instruction pointer into bytecode
+//!   0x0008: bc_len (i32) — bytecode length
+//!   0x0010..: bytecode data (max ~4KB fits in 0x0010..0x1000)
+//!   0x1000: scratch area (opcode save, temp values)
+//!   0x2000..: data stack (16 bytes/element: 8B value + 8B unused)
 
 use whisper_core::opcode::Opcode;
 

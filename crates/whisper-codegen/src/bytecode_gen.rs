@@ -1,8 +1,8 @@
-/// Bytecode generator: AST → Vec<Opcode>.
-///
-/// Two-pass compilation:
-///   Pass 1: Pre-scan all Def nodes, compile their bodies, build word_dict.
-///   Pass 2: Compile main program, resolving WordRef by inlining from word_dict.
+//! Bytecode generator: AST → Vec<Opcode>.
+//!
+//! Two-pass compilation:
+//!   Pass 1: Pre-scan all Def nodes, compile their bodies, build word_dict.
+//!   Pass 2: Compile main program, resolving WordRef by inlining from word_dict.
 
 use std::collections::HashMap;
 use whisper_core::opcode::Opcode;
@@ -186,7 +186,7 @@ impl BytecodeGenerator {
             self.emit(Opcode::Jump(jmp_off));
             self.bytecode.extend(else_c.clone());
         } else {
-            self.emit(Opcode::Cond(then_len as i32));
+            self.emit(Opcode::Cond(then_len));
             self.bytecode.extend(then_code);
         }
     }

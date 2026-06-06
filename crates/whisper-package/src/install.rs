@@ -1,13 +1,13 @@
-/// Package installation with capability review.
-///
-/// Install flow:
-///   1. Resolve package spec → Git URL
-///   2. Git clone to temp directory
-///   3. Parse package.ws for metadata + capabilities
-///   4. Show capabilities to user, ask confirmation
-///   5. Compile .ws files to .wbin
-///   6. Copy to ~/.whisper/packages/<name>/
-///   7. Generate lockfile entry
+//! Package installation with capability review.
+//!
+//! Install flow:
+//!   1. Resolve package spec → Git URL
+//!   2. Git clone to temp directory
+//!   3. Parse package.ws for metadata + capabilities
+//!   4. Show capabilities to user, ask confirmation
+//!   5. Compile .ws files to .wbin
+//!   6. Copy to ~/.whisper/packages/<name>/
+//!   7. Generate lockfile entry
 
 use crate::manifest::PackageManifest;
 use std::path::PathBuf;
@@ -198,6 +198,12 @@ impl Installer {
     }
 }
 
+impl Default for Installer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn copy_ws_files(src: &std::path::Path, dst: &std::path::Path) -> Result<(), String> {
     copy_ws_recursive(src, dst, src)
 }
@@ -208,7 +214,7 @@ fn copy_ws_recursive(base: &std::path::Path, dst: &std::path::Path, current: &st
         let path = entry.path();
         if path.is_dir() {
             copy_ws_recursive(base, dst, &path)?;
-        } else if path.extension().map_or(false, |e| e == "ws") {
+        } else if path.extension().is_some_and(|e| e == "ws") {
             let rel = path.strip_prefix(base).map_err(|e| e.to_string())?;
             let target = dst.join(rel);
             if let Some(parent) = target.parent() {

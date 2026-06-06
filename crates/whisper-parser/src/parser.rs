@@ -1,5 +1,5 @@
-/// Parser for Whisper source code.
-/// Converts a token stream into an AST (Vec<AstNode>).
+//! Parser for Whisper source code.
+//! Converts a token stream into an AST (Vec<AstNode>).
 
 use crate::ast::{AstNode, Operator};
 use crate::lexer::Lexer;

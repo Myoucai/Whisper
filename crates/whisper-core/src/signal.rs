@@ -1,10 +1,10 @@
-/// Signal / Confidence type for native probability support.
-///
-/// In Whisper, every value can carry a confidence score (0.0 to 1.0).
-/// Operations on Signal values automatically propagate confidence:
-/// - Arithmetic ops: confidence = product of input confidences
-/// - Logic ops: confidence = product of input confidences
-/// - Comparisons: confidence = product of input confidences
+//! Signal / Confidence type for native probability support.
+//!
+//! In Whisper, every value can carry a confidence score (0.0 to 1.0).
+//! Operations on Signal values automatically propagate confidence:
+//! - Arithmetic ops: confidence = product of input confidences
+//! - Logic ops: confidence = product of input confidences
+//! - Comparisons: confidence = product of input confidences
 
 /// A value tagged with a confidence score.
 ///

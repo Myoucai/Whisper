@@ -1,10 +1,10 @@
-/// Practical type checker for the Whisper compilation pipeline.
-///
-/// Walks the AST, tracks the conceptual type stack, and validates
-/// that each operation receives the expected input types.
-///
-/// Type representation at check time is lightweight:
-///   T: any type, N: number(i64|f64), I: i64, F: f64, B: bool, S: str, L: list, Q: ref
+//! Practical type checker for the Whisper compilation pipeline.
+//!
+//! Walks the AST, tracks the conceptual type stack, and validates
+//! that each operation receives the expected input types.
+//!
+//! Type representation at check time is lightweight:
+//!   T: any type, N: number(i64|f64), I: i64, F: f64, B: bool, S: str, L: list, Q: ref
 
 use whisper_parser::ast::{AstNode, Operator};
 use std::collections::HashMap;
@@ -322,6 +322,12 @@ impl TypeChecker {
                 });
             }
         }
+    }
+}
+
+impl Default for TypeChecker {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

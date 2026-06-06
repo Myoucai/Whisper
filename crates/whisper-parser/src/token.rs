@@ -1,5 +1,5 @@
-/// Token types for the Whisper lexer.
-/// Each token carries a Span for source-level error reporting.
+//! Token types for the Whisper lexer.
+//! Each token carries a Span for source-level error reporting.
 
 /// Source location information for error reporting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,5 +1,5 @@
-/// Lexer for Whisper source code (.ws format).
-/// Tokenizes source text into a stream of tokens.
+//! Lexer for Whisper source code (.ws format).
+//! Tokenizes source text into a stream of tokens.
 
 use crate::token::{Span, Token, TokenKind};
 
@@ -149,7 +149,7 @@ impl Lexer {
                 self.advance();
                 // Could be Colon (word definition) or ConfLabel
                 // Check for number after :
-                if self.peek().map_or(false, |c| c.is_ascii_digit() || c == '.') {
+                if self.peek().is_some_and(|c| c.is_ascii_digit() || c == '.') {
                     let conf = self.read_confidence_suffix();
                     TokenKind::ConfLabel(conf)
                 } else {
@@ -312,7 +312,7 @@ impl Lexer {
         let is_neg = self.current() == '-';
         if is_neg {
             self.advance();
-            if !self.peek().map_or(false, |c| c.is_ascii_digit()) {
+            if !self.peek().is_some_and(|c| c.is_ascii_digit()) {
                 return TokenKind::Minus;
             }
         }
@@ -384,7 +384,7 @@ impl Lexer {
     }
 
     fn read_at_word(&mut self) -> TokenKind {
-        if self.peek().map_or(false, |c| c.is_ascii_digit()) {
+        if self.peek().is_some_and(|c| c.is_ascii_digit()) {
             let num = self.read_digits();
             return TokenKind::CapCall(num.parse().unwrap_or(0));
         }

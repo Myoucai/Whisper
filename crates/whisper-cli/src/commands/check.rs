@@ -1,4 +1,4 @@
-/// whisper check — Type-check without executing
+//! whisper check — Type-check without executing
 
 use whisper_parser::Parser;
 use whisper_typecheck::TypeChecker;

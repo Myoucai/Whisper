@@ -1,10 +1,10 @@
-/// Direct WASM compiler: Whisper bytecode → WASM instructions.
-///
-/// Compiles a linear sequence of Whisper opcodes directly to WASM
-/// stack operations. The WASM operand stack is used as the data stack.
-///
-/// For programs without control flow or word definitions, this produces
-/// minimal, fast WASM that runs directly in the browser.
+//! Direct WASM compiler: Whisper bytecode → WASM instructions.
+//!
+//! Compiles a linear sequence of Whisper opcodes directly to WASM
+//! stack operations. The WASM operand stack is used as the data stack.
+//!
+//! For programs without control flow or word definitions, this produces
+//! minimal, fast WASM that runs directly in the browser.
 
 use whisper_core::opcode::Opcode;
 

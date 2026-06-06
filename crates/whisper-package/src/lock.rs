@@ -1,6 +1,6 @@
-/// Lockfile generation for reproducible builds.
-///
-/// Whisper uses a whisper.lock file to pin exact package versions.
+//! Lockfile generation for reproducible builds.
+//!
+//! Whisper uses a whisper.lock file to pin exact package versions.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

@@ -1,7 +1,7 @@
-/// whisper bootstrap — Self-hosting compiler pipeline
-///
-/// Pipeline: Rust Lexer → Whisper Compiler → VM Execute
-/// Demonstrates soft-bootstrapping where Whisper code compiles Whisper code.
+//! whisper bootstrap — Self-hosting compiler pipeline
+//!
+//! Pipeline: Rust Lexer → Whisper Compiler → VM Execute
+//! Demonstrates soft-bootstrapping where Whisper code compiles Whisper code.
 
 use whisper_core::opcode::Opcode;
 use whisper_core::value::Value;
@@ -51,7 +51,7 @@ fn ast_to_whisper_tokens(nodes: &[AstNode]) -> Value {
             AstNode::List(items) => {
                 // Emit element tokens, then a count marker (type 14)
                 for item in items {
-                    tokens.append(&mut ast_to_vec(&[item.clone()]));
+                    tokens.append(&mut ast_to_vec(std::slice::from_ref(item)));
                 }
                 // Count token: type 14 = "PushList with count"
                 tokens.push(Value::List(Rc::new(vec![

@@ -1,8 +1,8 @@
-/// .wbin binary format reader/writer.
-///
-/// Format specification (per design doc section 5.2):
-///   Header: 4 bytes magic "WHSP" + 4 bytes version (u32 LE)
-///   Body:   LEB128-encoded opcodes
+//! .wbin binary format reader/writer.
+//!
+//! Format specification (per design doc section 5.2):
+//!   Header: 4 bytes magic "WHSP" + 4 bytes version (u32 LE)
+//!   Body:   LEB128-encoded opcodes
 
 use whisper_core::opcode::Opcode;
 use std::io::{Cursor, Read};

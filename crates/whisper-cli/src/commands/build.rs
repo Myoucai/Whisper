@@ -1,4 +1,4 @@
-/// whisper build — Compile .ws to .wbin or .wasm
+//! whisper build — Compile .ws to .wbin or .wasm
 
 use whisper_codegen::bytecode_gen::BytecodeGenerator;
 use whisper_codegen::wbin::WbinWriter;

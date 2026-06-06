@@ -1,7 +1,7 @@
-/// Bytecode optimizer: constant folding, peephole optimization, dead code elimination.
-///
-/// Runs after bytecode generation, before execution.
-/// Each pass scans the opcode sequence and applies transformations.
+//! Bytecode optimizer: constant folding, peephole optimization, dead code elimination.
+//!
+//! Runs after bytecode generation, before execution.
+//! Each pass scans the opcode sequence and applies transformations.
 
 use whisper_core::opcode::Opcode;
 
@@ -40,28 +40,25 @@ fn constant_folding(ops: &[Opcode]) -> Vec<Opcode> {
     while i < ops.len() {
         // Look ahead for binary op patterns: PushI64(a), PushI64(b), BinOp
         if i + 2 < ops.len() {
-            match (&ops[i], &ops[i+1], &ops[i+2]) {
-                (Opcode::PushI64(a), Opcode::PushI64(b), binop) => {
-                    let folded = match binop {
-                        Opcode::Add => Some(Opcode::PushI64(a + b)),
-                        Opcode::Sub => Some(Opcode::PushI64(a - b)),
-                        Opcode::Mul => Some(Opcode::PushI64(a * b)),
-                        Opcode::Div if *b != 0 => Some(Opcode::PushI64(a / b)),
-                        Opcode::Eq => Some(Opcode::PushBool(a == b)),
-                        Opcode::Lt => Some(Opcode::PushBool(a < b)),
-                        Opcode::Gt => Some(Opcode::PushBool(a > b)),
-                        Opcode::Neq => Some(Opcode::PushBool(a != b)),
-                        Opcode::Le => Some(Opcode::PushBool(a <= b)),
-                        Opcode::Ge => Some(Opcode::PushBool(a >= b)),
-                        _ => None,
-                    };
-                    if let Some(op) = folded {
-                        result.push(op);
-                        i += 3;
-                        continue;
-                    }
+            if let (Opcode::PushI64(a), Opcode::PushI64(b), binop) = (&ops[i], &ops[i+1], &ops[i+2]) {
+                let folded = match binop {
+                    Opcode::Add => Some(Opcode::PushI64(a + b)),
+                    Opcode::Sub => Some(Opcode::PushI64(a - b)),
+                    Opcode::Mul => Some(Opcode::PushI64(a * b)),
+                    Opcode::Div if *b != 0 => Some(Opcode::PushI64(a / b)),
+                    Opcode::Eq => Some(Opcode::PushBool(a == b)),
+                    Opcode::Lt => Some(Opcode::PushBool(a < b)),
+                    Opcode::Gt => Some(Opcode::PushBool(a > b)),
+                    Opcode::Neq => Some(Opcode::PushBool(a != b)),
+                    Opcode::Le => Some(Opcode::PushBool(a <= b)),
+                    Opcode::Ge => Some(Opcode::PushBool(a >= b)),
+                    _ => None,
+                };
+                if let Some(op) = folded {
+                    result.push(op);
+                    i += 3;
+                    continue;
                 }
-                _ => {}
             }
         }
 

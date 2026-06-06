@@ -1,4 +1,4 @@
-/// whisper run — Execute a Whisper source file
+//! whisper run — Execute a Whisper source file
 
 use whisper_core::capability::{CapabilityTable, FileReadCap, FileWriteCap};
 use whisper_core::vm::Vm;

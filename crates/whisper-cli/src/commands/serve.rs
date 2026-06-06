@@ -1,14 +1,14 @@
-/// whisper serve — HTTP server with Whisper request handlers
-///
-/// Usage: whisper serve <handler.ws> [--port 8080]
-///
-/// The handler.ws file defines request handlers as Whisper words.
-/// On each HTTP request, the server calls the handler word with the
-/// request info on the stack and expects a response to be pushed back.
-///
-/// Handler word signature: request -> response
-///   request: [method, path, body] (list of 3 strings)
-///   response: [status, content_type, body] (list of 3 strings)
+//! whisper serve — HTTP server with Whisper request handlers
+//!
+//! Usage: whisper serve <handler.ws> [--port 8080]
+//!
+//! The handler.ws file defines request handlers as Whisper words.
+//! On each HTTP request, the server calls the handler word with the
+//! request info on the stack and expects a response to be pushed back.
+//!
+//! Handler word signature: request -> response
+//!   request: [method, path, body] (list of 3 strings)
+//!   response: [status, content_type, body] (list of 3 strings)
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};

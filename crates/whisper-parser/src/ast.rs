@@ -1,8 +1,8 @@
-/// AST node definitions for the Whisper language.
-///
-/// Whisper is inherently linear (stack-based), so the AST is a flat
-/// sequence of nodes rather than a deep tree. Quotations and lists
-/// introduce nesting.
+//! AST node definitions for the Whisper language.
+//!
+//! Whisper is inherently linear (stack-based), so the AST is a flat
+//! sequence of nodes rather than a deep tree. Quotations and lists
+//! introduce nesting.
 
 use whisper_core::value::Value;
 

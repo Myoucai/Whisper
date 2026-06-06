@@ -1,8 +1,8 @@
-/// Stack effect tracking for type checking.
-///
-/// In Whisper, every operation has a stack effect: it consumes N values
-/// from the top of the stack and produces M values. The type checker
-/// verifies that stack effects are consistent throughout the program.
+//! Stack effect tracking for type checking.
+//!
+//! In Whisper, every operation has a stack effect: it consumes N values
+//! from the top of the stack and produces M values. The type checker
+//! verifies that stack effects are consistent throughout the program.
 
 use crate::types::Type;
 

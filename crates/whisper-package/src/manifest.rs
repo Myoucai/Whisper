@@ -1,11 +1,11 @@
-/// Package manifest parser for package.ws files.
-///
-/// Format:
-///   name: "package-name"
-///   version: "1.0.0"
-///   capabilities: ["@file_read", "@http_post"]
-///   exports: ["func1", "func2"]
-///   dependencies: ["std/json", "std/io"]
+//! Package manifest parser for package.ws files.
+//!
+//! Format:
+//!   name: "package-name"
+//!   version: "1.0.0"
+//!   capabilities: ["@file_read", "@http_post"]
+//!   exports: ["func1", "func2"]
+//!   dependencies: ["std/json", "std/io"]
 
 use serde::{Deserialize, Serialize};
 

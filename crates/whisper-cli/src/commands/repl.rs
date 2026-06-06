@@ -1,4 +1,4 @@
-/// whisper repl — Interactive Read-Eval-Print Loop
+//! whisper repl — Interactive Read-Eval-Print Loop
 
 use std::io::{self, Write};
 

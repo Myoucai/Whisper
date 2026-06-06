@@ -1,10 +1,10 @@
-/// Type definitions for the Whisper type system.
-///
-/// Whisper uses a global constraint-solving approach:
-/// - Type variables are unified through Union-Find
-/// - Stack effects are tracked for every operation
-/// - Subtyping for Signal<T> <: T
-
+//! Type definitions for the Whisper type system.
+//!
+//! Whisper uses a global constraint-solving approach:
+//! - Type variables are unified through Union-Find
+//! - Stack effects are tracked for every operation
+//! - Subtyping for Signal<T> <: T
+//!
 /// A Whisper type.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Type {

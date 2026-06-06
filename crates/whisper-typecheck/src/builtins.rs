@@ -1,8 +1,8 @@
-/// Type signatures for built-in operators.
-///
-/// Each entry maps an operator name to its stack effect signature:
-/// (inputs, outputs) where each is a list of Type.
-/// Type::TypeVar(0) denotes a polymorphic type variable.
+//! Type signatures for built-in operators.
+//!
+//! Each entry maps an operator name to its stack effect signature:
+//! (inputs, outputs) where each is a list of Type.
+//! Type::TypeVar(0) denotes a polymorphic type variable.
 
 use crate::types::Type;
 

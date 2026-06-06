@@ -1,5 +1,5 @@
-/// Type inference engine for Whisper.
-/// Uses Union-Find for type variable unification and constraint solving.
+//! Type inference engine for Whisper.
+//! Uses Union-Find for type variable unification and constraint solving.
 
 use crate::types::Type;
 use std::collections::HashMap;

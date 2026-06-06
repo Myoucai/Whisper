@@ -8,7 +8,6 @@ use std::rc::Rc;
 /// 1. Compile time: Cap(u16) is a distinct type, cannot mix with data
 /// 2. Load time: Capability table is initialized once, immutable at runtime
 /// 3. Runtime: Capabilities run in restricted context (path/host whitelists)
-
 use crate::value::Value;
 use crate::VmError;
 
