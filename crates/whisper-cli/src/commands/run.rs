@@ -17,6 +17,16 @@ pub fn run_file(
         format!("Parse error at {}:{}: {}", e.token.span.line, e.token.span.column, e.message)
     })?;
 
+    // Phase 1b: Type check
+    let mut tc = whisper_typecheck::TypeChecker::new();
+    let type_errors = tc.check(&ast);
+    if !type_errors.is_empty() {
+        for err in &type_errors {
+            eprintln!("Type error: {} (in {})", err.message, err.context);
+        }
+        return Err(format!("{} type error(s) found", type_errors.len()));
+    }
+
     // Phase 2: Compile AST to bytecode
     let mut gen = BytecodeGenerator::new();
     let (bytecode, defs) = gen.compile(&ast);

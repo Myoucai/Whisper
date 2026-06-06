@@ -1,6 +1,7 @@
 /// whisper check — Type-check without executing
 
 use whisper_parser::Parser;
+use whisper_typecheck::TypeChecker;
 
 /// Type-check a Whisper source file.
 pub fn check_file(source: &str) -> Result<(), String> {
@@ -9,50 +10,34 @@ pub fn check_file(source: &str) -> Result<(), String> {
         format!("Parse error at {}:{}: {}", e.token.span.line, e.token.span.column, e.message)
     })?;
 
-    // Phase 2: Type check (basic structural validation for now)
-    println!("✓ Parsed successfully — {} nodes", ast.len());
-    println!("✓ No syntax errors detected");
+    println!("Parsed: {} nodes", ast.len());
 
-    // Basic validation: check for undefined word references
-    let mut defined_words = std::collections::HashSet::new();
-    for node in &ast {
-        if let whisper_parser::ast::AstNode::Def { name, .. } = node {
-            defined_words.insert(name.clone());
-        }
-    }
+    // Phase 2: Type check
+    let mut tc = TypeChecker::new();
+    let errors = tc.check(&ast);
 
-    for node in &ast {
-        if let whisper_parser::ast::AstNode::WordRef(name) = node {
-            if !defined_words.contains(name)
-                && !is_builtin(name)
-                && !is_operator(name)
-            {
-                println!("⚠ Warning: undefined word reference: '{name}'");
+    if errors.is_empty() {
+        println!("Type check: PASSED");
+        // Show inferred stack effect
+        let mut stack: Vec<&str> = Vec::new();
+        for node in &ast {
+            match node {
+                whisper_parser::ast::AstNode::Literal(_) => stack.push("T"),
+                whisper_parser::ast::AstNode::Op(_) => { stack.pop(); }
+                whisper_parser::ast::AstNode::Def { name, .. } => {
+                    println!("  word '{}' defined", name);
+                }
+                _ => {}
             }
         }
+        if !stack.is_empty() {
+            println!("  final stack: {} value(s)", stack.len());
+        }
+        Ok(())
+    } else {
+        for err in &errors {
+            eprintln!("  Error: {} (in {})", err.message, err.context);
+        }
+        Err(format!("Type check failed: {} error(s)", errors.len()))
     }
-
-    println!("✓ Check complete");
-    Ok(())
-}
-
-fn is_builtin(name: &str) -> bool {
-    matches!(
-        name,
-        "dup" | "swap" | "drop" | "rot" | "pick"
-            | "add" | "sub" | "mul" | "div" | "mod"
-            | "eq" | "lt" | "gt" | "neq" | "le" | "ge"
-            | "and" | "or" | "not"
-    )
-}
-
-fn is_operator(name: &str) -> bool {
-    matches!(
-        name,
-        "_" | "`" | "%" | "@" | "+" | "-" | "*" | "/"
-            | "=" | "<" | ">" | "!=" | "<=" | ">="
-            | "&" | "|" | "!" | "." | "," | ".."
-            | "@nth" | "@map" | "@each" | "@fold" | "@times"
-            | "append" | "len" | "#" | "!!"
-    )
 }
