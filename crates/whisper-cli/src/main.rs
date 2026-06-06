@@ -118,8 +118,28 @@ fn cmd_bootstrap(args: &[String]) -> Result<(), String> {
 }
 
 fn cmd_install(args: &[String]) -> Result<(), String> {
-    let pkg = args.get(2).ok_or("Expected: whisper install <package>")?;
-    println!("Installing: {pkg}...");
-    println!("Note: Package registry integration coming soon.");
-    Ok(())
+    if get_flag(args, "--list") || get_flag(args, "-l") {
+        let installer = whisper_package::install::Installer::new();
+        let packages = installer.list()?;
+        if packages.is_empty() {
+            println!("No packages installed.");
+        } else {
+            println!("Installed packages:");
+            for pkg in &packages {
+                println!("  {} v{}", pkg.name, pkg.version);
+            }
+        }
+        return Ok(());
+    }
+
+    let auto_yes = get_flag(args, "-y") || get_flag(args, "--yes");
+    let installer = whisper_package::install::Installer::new();
+
+    if get_flag(args, "--local") {
+        let path = args.get(3).ok_or("Expected: whisper install --local <path>")?;
+        return installer.install_local(path, auto_yes);
+    }
+
+    let pkg = args.get(2).ok_or("Expected: whisper install <github.com/user/repo>")?;
+    installer.install(pkg, auto_yes)
 }
