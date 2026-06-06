@@ -48,10 +48,31 @@ fn ast_to_whisper_tokens(nodes: &[AstNode]) -> Value {
                     Value::Str(Rc::new(name.clone())),
                 ])));
             }
+            AstNode::List(items) => {
+                // Flatten list: emit LBracket marker, then element tokens, then RBracket
+                // LBracket = type 9, RBracket = type 10
+                tokens.push(list_token(9));
+                for item in items {
+                    tokens.append(&mut ast_to_vec(&[item.clone()]));
+                }
+                tokens.push(list_token(10));
+            }
             _ => {}
         }
     }
     Value::List(Rc::new(tokens))
+}
+
+fn ast_to_vec(nodes: &[AstNode]) -> Vec<Value> {
+    let tokens = ast_to_whisper_tokens(nodes);
+    match tokens {
+        Value::List(v) => v.to_vec(),
+        _ => vec![],
+    }
+}
+
+fn list_token(ty: i64) -> Value {
+    Value::List(Rc::new(vec![Value::I64(ty), Value::I64(0)]))
 }
 
 pub fn bootstrap_compile(source: &str) -> Result<(), String> {
@@ -95,12 +116,105 @@ pub fn bootstrap_compile(source: &str) -> Result<(), String> {
 
     // Phase 6: Execute Rust-compiled reference bytecode
     let mut vm2 = Vm::new();
-    for (name, code) in ref_defs {
-        vm2.define_word(name, code);
+    for (name, code) in &ref_defs {
+        vm2.define_word(name.clone(), code.clone());
     }
-    print!("Rust VM output:  ");
+    print!("Rust VM output: ");
     vm2.execute(&ref_bytecode).map_err(|e| format!("VM: {e}"))?;
 
-    println!("\nSelf-hosting pipeline complete.");
+    // Phase 6: Convert whisperc output to Opcodes and execute
+    let whisperc_ops = match result {
+        Some(Value::List(vals)) => values_to_opcodes(vals.to_vec()),
+        _ => { println!("whisperc produced no bytecode"); return Ok(()); }
+    };
+
+    println!("\nwhisperc bytecode: {} opcodes", whisperc_ops.len());
+    for op in &whisperc_ops { print!("{:?} ", op); }
+    println!();
+
+    // Execute whisperc-compiled bytecode
+    let mut vm3 = Vm::new();
+    for (name, code) in &ref_defs {
+        vm3.define_word(name.clone(), code.clone());
+    }
+    print!("whisperc VM output: ");
+    vm3.execute(&whisperc_ops).map_err(|e| format!("whisperc VM: {e}"))?;
+    println!();
+
+    println!("Self-hosting pipeline complete.");
     Ok(())
+}
+
+/// Convert whisperc output Values to Opcodes.
+fn values_to_opcodes(vals: Vec<Value>) -> Vec<Opcode> {
+    let mut ops = Vec::new();
+    for val in vals {
+        match val {
+            Value::I64(n) => {
+                // Single byte opcode (for operators)
+                ops.push(byte_to_opcode(n as u8));
+            }
+            Value::List(ref items) if items.len() == 2 => {
+                // Two-element list: [opcode_byte, operand]
+                let byte = match &items[0] {
+                    Value::I64(n) => *n as u8,
+                    _ => continue,
+                };
+                match byte {
+                    0x30 => { // PushI64
+                        if let Value::I64(n) = &items[1] {
+                            ops.push(Opcode::PushI64(*n));
+                        }
+                    }
+                    0x31 => { // PushF64
+                        if let Value::I64(n) = &items[1] {
+                            ops.push(Opcode::PushF64(f64::from_bits(*n as u64)));
+                        }
+                    }
+                    0x32 => { // PushStr
+                        if let Value::Str(s) = &items[1] {
+                            ops.push(Opcode::PushStr(s.as_ref().clone()));
+                        }
+                    }
+                    0x33 => { // PushBool
+                        if let Value::I64(n) = &items[1] {
+                            ops.push(Opcode::PushBool(*n != 0));
+                        }
+                    }
+                    0x60 => { // Call
+                        if let Value::Str(s) = &items[1] {
+                            ops.push(Opcode::Call(s.as_ref().clone()));
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+    }
+    ops
+}
+
+fn byte_to_opcode(byte: u8) -> Opcode {
+    match byte {
+        0x00 => Opcode::Dup,
+        0x01 => Opcode::Swap,
+        0x02 => Opcode::Drop,
+        0x10 => Opcode::Add,
+        0x11 => Opcode::Sub,
+        0x12 => Opcode::Mul,
+        0x13 => Opcode::Div,
+        0x14 => Opcode::Mod,
+        0x18 => Opcode::Eq,
+        0x19 => Opcode::Lt,
+        0x1A => Opcode::Gt,
+        0x1B => Opcode::Neq,
+        0x20 => Opcode::And,
+        0x21 => Opcode::Or,
+        0x22 => Opcode::Not,
+        0x90 => Opcode::OutputTop,
+        0x91 => Opcode::OutputAll,
+        0x61 => Opcode::Return,
+        _ => Opcode::PushI64(byte as i64), // fallback
+    }
 }
