@@ -74,9 +74,9 @@ fn handle_request(
     vm.execute(bytecode).map_err(|e| format!("Init: {e}"))?;
     vm.data_stack.push(req);
     let call_handler = [whisper_core::opcode::Opcode::Call("handler".to_string())];
-    vm.execute(&call_handler).map_err(|e| format!("Handler: {e}"))?;
+    let handler_result = vm.execute(&call_handler).map_err(|e| format!("Handler: {e}"))?;
 
-    let (status, ct, body) = match vm.data_stack.pop() {
+    let (status, ct, body) = match handler_result {
         Some(Value::List(items)) if items.len() >= 3 => (
             items[0].to_string().trim_matches('"').to_string(),
             items[1].to_string().trim_matches('"').to_string(),
