@@ -126,6 +126,7 @@ pub enum Operator {
     StrChars,
     CharsStr,
     StrIter,
+    ListFind,
 
     // Float
     I64ToF64,

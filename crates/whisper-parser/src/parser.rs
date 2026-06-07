@@ -467,6 +467,10 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::StrIter)))
             }
+            TokenKind::ListFind => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::ListFind)))
+            }
 
             // Float operations
             TokenKind::I64ToF64 => {

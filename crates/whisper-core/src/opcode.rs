@@ -118,6 +118,8 @@ pub enum Opcode {
     CharsStr,
     /// Iterate: pop str, push (first_char_code, rest_str). Empty → (-1, "")
     StrIter,
+    /// Find key in assoc list: [[k v]…] key → [#t val] | [#f 0]
+    ListFind,
 
     // === Control flow (0x50-0x57) ===
     /// Conditional: if false, jump by offset
@@ -247,6 +249,7 @@ impl Opcode {
             Opcode::StrChars => 0xB8,
             Opcode::CharsStr => 0xB9,
             Opcode::StrIter => 0xBA,
+            Opcode::ListFind => 0xBB,
 
             // Control flow
             Opcode::Cond(_) => 0x50,
@@ -336,6 +339,7 @@ impl Opcode {
             Opcode::StrChars => "strchars",
             Opcode::CharsStr => "charsstr",
             Opcode::StrIter => "striter",
+            Opcode::ListFind => "listfind",
             Opcode::Cond(_) => "cond",
             Opcode::Jump(_) => "jump",
             Opcode::Loop(_) => "loop",

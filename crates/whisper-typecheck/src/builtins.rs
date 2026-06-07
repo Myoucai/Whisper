@@ -63,6 +63,13 @@ pub fn get_builtin_signature(name: &str) -> Option<(Vec<Type>, Vec<Type>)> {
         "strchars" => Some((vec![Type::Str], vec![Type::List(Box::new(Type::I64))])),
         "charsstr" => Some((vec![Type::List(Box::new(Type::I64))], vec![Type::Str])),
         "striter" => Some((vec![Type::Str], vec![Type::I64, Type::Str])),
+        "listfind" => Some((
+            vec![
+                Type::List(Box::new(Type::List(Box::new(Type::TypeVar(0))))),
+                Type::TypeVar(0),
+            ],
+            vec![Type::Bool, Type::TypeVar(0)],
+        )),
 
         // Float operations
         "i64tof64" => Some((vec![Type::I64], vec![Type::F64])),

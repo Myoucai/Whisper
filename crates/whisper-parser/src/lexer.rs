@@ -396,6 +396,7 @@ impl Lexer {
             "strchars" => TokenKind::StrChars,
             "charsstr" => TokenKind::CharsStr,
             "striter" => TokenKind::StrIter,
+            "listfind" => TokenKind::ListFind,
             "i64tof64" => TokenKind::I64ToF64,
             "f64toi64" => TokenKind::F64ToI64,
             "fsqrt" => TokenKind::FSqrt,

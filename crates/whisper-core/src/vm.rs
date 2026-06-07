@@ -448,6 +448,23 @@ impl Vm {
                     self.data_stack.push(Value::Str(Rc::new(rest)));
                 }
             }
+            Opcode::ListFind => {
+                let key = self.pop()?;
+                let list = self.pop_list()?;
+                let mut found = false;
+                let mut value = Value::I64(0);
+                for item in list.iter() {
+                    if let Value::List(pair) = item {
+                        if pair.len() == 2 && pair[0].equals(&key) {
+                            found = true;
+                            value = pair[1].clone();
+                            break;
+                        }
+                    }
+                }
+                self.data_stack.push(Value::Bool(found));
+                self.data_stack.push(value);
+            }
 
             // === Float operations ===
             Opcode::I64ToF64 => {

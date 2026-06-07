@@ -487,6 +487,19 @@ impl TypeChecker {
                 stack.push(Type::I64);
                 stack.push(Type::Str);
             }
+            Operator::ListFind => {
+                let v = self.inferer.fresh_var();
+                self.expect(stack, &v, errors, ctx, "listfind key");
+                self.expect(
+                    stack,
+                    &Type::List(Box::new(Type::List(Box::new(v.clone())))),
+                    errors,
+                    ctx,
+                    "listfind assoc-list",
+                );
+                stack.push(Type::Bool);
+                stack.push(v);
+            }
 
             // Float ops
             Operator::I64ToF64 => {
