@@ -448,6 +448,18 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::I64ToStr)))
             }
+            TokenKind::StrNth => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::StrNth)))
+            }
+            TokenKind::StrChars => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::StrChars)))
+            }
+            TokenKind::CharsStr => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::CharsStr)))
+            }
 
             // Float operations
             TokenKind::I64ToF64 => {

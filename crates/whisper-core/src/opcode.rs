@@ -110,6 +110,12 @@ pub enum Opcode {
     StrToI64,
     /// Format i64 to string: i64 → str
     I64ToStr,
+    /// Get character code at index: str i64 → i64
+    StrNth,
+    /// Convert string to list of char codes: str → [i64]
+    StrChars,
+    /// Convert list of char codes to string: [i64] → str
+    CharsStr,
 
     // === Control flow (0x50-0x57) ===
     /// Conditional: if false, jump by offset
@@ -235,6 +241,9 @@ impl Opcode {
             Opcode::StrReplace => 0x4C,
             Opcode::StrToI64 => 0x4D,
             Opcode::I64ToStr => 0x4E,
+            Opcode::StrNth => 0x4F,
+            Opcode::StrChars => 0xB8,
+            Opcode::CharsStr => 0xB9,
 
             // Control flow
             Opcode::Cond(_) => 0x50,
@@ -320,6 +329,9 @@ impl Opcode {
             Opcode::StrReplace => "strreplace",
             Opcode::StrToI64 => "strtoi64",
             Opcode::I64ToStr => "i64tostr",
+            Opcode::StrNth => "strnth",
+            Opcode::StrChars => "strchars",
+            Opcode::CharsStr => "charsstr",
             Opcode::Cond(_) => "cond",
             Opcode::Jump(_) => "jump",
             Opcode::Loop(_) => "loop",

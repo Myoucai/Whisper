@@ -129,6 +129,9 @@ pub enum Operator {
     StrReplace,
     StrToI64,
     I64ToStr,
+    StrNth,
+    StrChars,
+    CharsStr,
 
     // Float
     I64ToF64,

@@ -426,6 +426,19 @@ impl TypeChecker {
                 self.expect(stack, &Type::I64, errors, ctx, "i64tostr");
                 stack.push(Type::Str);
             }
+            Operator::StrNth => {
+                self.expect(stack, &Type::I64, errors, ctx, "strnth index");
+                self.expect(stack, &Type::Str, errors, ctx, "strnth string");
+                stack.push(Type::I64);
+            }
+            Operator::StrChars => {
+                self.expect(stack, &Type::Str, errors, ctx, "strchars");
+                stack.push(Type::List(Box::new(Type::I64)));
+            }
+            Operator::CharsStr => {
+                self.expect(stack, &Type::List(Box::new(Type::I64)), errors, ctx, "charsstr");
+                stack.push(Type::Str);
+            }
 
             // Float ops
             Operator::I64ToF64 => {

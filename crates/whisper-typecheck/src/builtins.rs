@@ -59,6 +59,9 @@ pub fn get_builtin_signature(name: &str) -> Option<(Vec<Type>, Vec<Type>)> {
         "strreplace" => Some((vec![Type::Str, Type::Str, Type::Str], vec![Type::Str])),
         "strtoi64" => Some((vec![Type::Str], vec![Type::I64])),
         "i64tostr" => Some((vec![Type::I64], vec![Type::Str])),
+        "strnth" => Some((vec![Type::Str, Type::I64], vec![Type::I64])),
+        "strchars" => Some((vec![Type::Str], vec![Type::List(Box::new(Type::I64))])),
+        "charsstr" => Some((vec![Type::List(Box::new(Type::I64))], vec![Type::Str])),
 
         // Float operations
         "i64tof64" => Some((vec![Type::I64], vec![Type::F64])),

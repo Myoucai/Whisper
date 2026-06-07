@@ -26,6 +26,7 @@ fn help() {
     println!("  --allow-file-write          Enable file write capability");
     println!("  --allow-env                 Enable env var capability");
     println!("  --allow-exec                Enable command execution capability");
+    println!("  --trace                     Enable VM execution tracing");
     println!("  --help, -h                  Show this help");
     println!("  --version, -V               Show version");
 }
@@ -73,21 +74,20 @@ fn get_opt(args: &[String], flag: &str) -> Option<String> {
 }
 
 fn cmd_run(args: &[String]) -> Result<(), String> {
-    // Find the first non-flag argument as the file path
     let file = args.iter().skip(2).find(|a| !a.starts_with('-'))
         .ok_or("Expected: whisper run <file.ws>")?;
     let source = std::fs::read_to_string(file)
         .map_err(|e| format!("Cannot read '{file}': {e}"))?;
     let source_dir = std::path::Path::new(file).parent().unwrap_or(std::path::Path::new("."));
-    commands::run::run_source(
-        &source,
-        source_dir,
-        get_flag(args, "--allow-file-read"),
-        get_flag(args, "--allow-file-write"),
-        get_flag(args, "--allow-http"),
-        get_flag(args, "--allow-env"),
-        get_flag(args, "--allow-exec"),
-    )
+    let config = commands::run::RunConfig {
+        allow_file_read: get_flag(args, "--allow-file-read"),
+        allow_file_write: get_flag(args, "--allow-file-write"),
+        allow_http: get_flag(args, "--allow-http"),
+        allow_env: get_flag(args, "--allow-env"),
+        allow_exec: get_flag(args, "--allow-exec"),
+        trace: get_flag(args, "--trace"),
+    };
+    commands::run::run_source(&source, source_dir, &config)
 }
 
 fn cmd_build(args: &[String]) -> Result<(), String> {

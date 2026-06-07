@@ -54,6 +54,9 @@ pub struct Vm {
     pub trace: bool,
     /// PRNG state for probabilistic choice (`?|`)
     rng_state: u64,
+    /// Single-entry word lookup cache: (last_name, last_code).
+    /// Avoids HashMap lookup on repeated calls to the same word.
+    word_cache: Option<(String, Vec<Opcode>)>,
 }
 
 impl Vm {
@@ -73,6 +76,7 @@ impl Vm {
             memory: Vec::new(),
             trace: false,
             rng_state: seed,
+            word_cache: None,
         }
     }
 
@@ -91,11 +95,13 @@ impl Vm {
             memory: Vec::new(),
             trace: false,
             rng_state: seed,
+            word_cache: None,
         }
     }
 
-    /// Define a word in the dictionary.
+    /// Define a word in the dictionary. Invalidate cache.
     pub fn define_word(&mut self, name: String, code: Vec<Opcode>) {
+        self.word_cache = None; // invalidate cache
         self.word_dict.insert(name, code);
     }
 
@@ -409,6 +415,27 @@ impl Vm {
                 let n = self.pop_i64()?;
                 self.data_stack.push(Value::Str(Rc::new(n.to_string())));
             }
+            Opcode::StrNth => {
+                let idx = self.pop_i64()? as usize;
+                let s = self.pop_str()?;
+                let ch = s.chars().nth(idx).map(|c| c as i64).unwrap_or(-1);
+                self.data_stack.push(Value::I64(ch));
+            }
+            Opcode::StrChars => {
+                let s = self.pop_str()?;
+                let chars: Vec<Value> = s.chars().map(|c| Value::I64(c as i64)).collect();
+                self.data_stack.push(Value::List(Rc::new(chars)));
+            }
+            Opcode::CharsStr => {
+                let list = self.pop_list()?;
+                let s: String = list.iter()
+                    .filter_map(|v| match v.unwrap_signal_ref() {
+                        Value::I64(n) => std::char::from_u32(*n as u32),
+                        _ => None,
+                    })
+                    .collect();
+                self.data_stack.push(Value::Str(Rc::new(s)));
+            }
 
             // === Float operations ===
             Opcode::I64ToF64 => {
@@ -483,11 +510,22 @@ impl Vm {
 
             // === Call/Return ===
             Opcode::Call(name) => {
-                let word_code = self
-                    .word_dict
-                    .get(name)
-                    .cloned()
-                    .ok_or_else(|| VmError::UndefinedWord(name.clone()))?;
+                // Check cache first
+                let word_code = if let Some((cached_name, cached_code)) = &self.word_cache {
+                    if cached_name == name {
+                        cached_code.clone()
+                    } else {
+                        let code = self.word_dict.get(name).cloned()
+                            .ok_or_else(|| VmError::UndefinedWord(name.clone()))?;
+                        self.word_cache = Some((name.clone(), code.clone()));
+                        code
+                    }
+                } else {
+                    let code = self.word_dict.get(name).cloned()
+                        .ok_or_else(|| VmError::UndefinedWord(name.clone()))?;
+                    self.word_cache = Some((name.clone(), code.clone()));
+                    code
+                };
                 let frame = CallFrame {
                     word_name: Some(name.clone()),
                     code: Rc::from(word_code.into_boxed_slice()),

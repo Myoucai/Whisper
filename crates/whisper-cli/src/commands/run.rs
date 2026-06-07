@@ -6,16 +6,18 @@ use whisper_core::vm::Vm;
 use whisper_codegen::bytecode_gen::BytecodeGenerator;
 use whisper_parser::Parser;
 
+/// Runtime configuration for source execution.
+pub struct RunConfig {
+    pub allow_file_read: bool,
+    pub allow_file_write: bool,
+    pub allow_http: bool,
+    pub allow_env: bool,
+    pub allow_exec: bool,
+    pub trace: bool,
+}
+
 /// Run a Whisper source file with optional capability bindings.
-pub fn run_source(
-    source: &str,
-    source_dir: &Path,
-    allow_file_read: bool,
-    allow_file_write: bool,
-    allow_http: bool,
-    allow_env: bool,
-    allow_exec: bool,
-) -> Result<(), String> {
+pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result<(), String> {
     // Phase 1: Parse source to AST
     let ast = Parser::parse_source(source).map_err(|e| {
         format!("Parse error at {}:{}: {}", e.token.span.line, e.token.span.column, e.message)
@@ -47,19 +49,19 @@ pub fn run_source(
     // Phase 4: Set up VM with requested capabilities
     let mut capability_table = CapabilityTable::new();
 
-    if allow_file_read {
+    if config.allow_file_read {
         capability_table.bind(Box::new(FileReadCap {
             id: 0,
             allowed_paths: vec![std::env::current_dir().unwrap_or_default()],
         }));
     }
-    if allow_file_write {
+    if config.allow_file_write {
         capability_table.bind(Box::new(FileWriteCap {
             id: 1,
             allowed_paths: vec![std::env::current_dir().unwrap_or_default()],
         }));
     }
-    if allow_http {
+    if config.allow_http {
         capability_table.bind(Box::new(whisper_core::capability::HttpGetCap {
             id: 2,
             allowed_hosts: vec!["api.github.com".into(), "jsonplaceholder.typicode.com".into()],
@@ -69,14 +71,18 @@ pub fn run_source(
             allowed_hosts: vec!["api.github.com".into(), "jsonplaceholder.typicode.com".into()],
         }));
     }
-    if allow_env {
+    if config.allow_env {
         capability_table.bind(Box::new(whisper_core::capability::EnvCap { id: 4 }));
     }
-    if allow_exec {
+    if config.allow_exec {
         capability_table.bind(Box::new(whisper_core::capability::ExecCap { id: 5 }));
     }
 
     let mut vm = Vm::with_capabilities(capability_table);
+    if config.trace {
+        vm.trace = true;
+        eprintln!("[trace] VM execution trace enabled");
+    }
 
     // Register optimized word definitions
     for (name, code) in &defs {

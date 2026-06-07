@@ -122,6 +122,9 @@ pub enum TokenKind {
     StrReplace,
     StrToI64,
     I64ToStr,
+    StrNth,
+    StrChars,
+    CharsStr,
 
     // Float operations
     I64ToF64,
