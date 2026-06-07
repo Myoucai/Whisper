@@ -1,13 +1,12 @@
-//! Practical type checker for the Whisper compilation pipeline.
+//! Type checker for the Whisper compilation pipeline.
 //!
-//! Walks the AST, tracks the conceptual type stack, and validates
-//! that each operation receives the expected input types.
+//! Walks the AST, tracks the type stack, and validates that each operation
+//! receives the expected input types. Uses the full Type system with the
+//! TypeInferer for constraint-solving across the entire program.
 //!
-//! Uses the TypeInferer for type variable unification and constraint
-//! solving when checking word definitions and calls.
-//!
-//! Type representation at check time is lightweight:
-//!   T: any type, N: number(i64|f64), I: i64, F: f64, B: bool, S: str, L: list, Q: ref
+//! Type representation: the full Type enum (I64, F64, Bool, Str, List, Ref,
+//! Cap, Signal, TypeVar, Union).  Type variables are resolved by the inferer
+//! which persists for the whole check() call.
 
 use whisper_parser::ast::{AstNode, Operator};
 use std::collections::HashMap;
@@ -16,61 +15,6 @@ use crate::builtins::get_builtin_signature;
 use crate::types::Type;
 use crate::TypeInferer;
 
-/// Simplified type for stack tracking.
-#[derive(Debug, Clone, PartialEq)]
-pub enum SType {
-    Any,     // T (unknown/polymorphic)
-    Num,     // i64 | f64
-    Int,     // i64
-    Float,   // f64
-    Bool,    // bool
-    Str,     // str
-    List,    // [T]
-    Ref,     // quotation block
-}
-
-impl SType {
-    pub fn name(&self) -> &str {
-        match self {
-            SType::Any => "T",
-            SType::Num => "num",
-            SType::Int => "i64",
-            SType::Float => "f64",
-            SType::Bool => "bool",
-            SType::Str => "str",
-            SType::List => "[T]",
-            SType::Ref => "ref",
-        }
-    }
-
-    /// Check if self can accept other (self is expected, other is actual).
-    pub fn accepts(&self, other: &SType) -> bool {
-        match (self, other) {
-            (SType::Any, _) => true,
-            (_, SType::Any) => true, // Unknown type is compatible with anything
-            (SType::Num, SType::Int | SType::Float | SType::Num) => true,
-            (a, b) => a == b,
-        }
-    }
-}
-
-/// Convert an SType to the full Type system using an inferer for fresh variables.
-fn stype_to_full_type(st: &SType, inferer: &mut TypeInferer) -> Type {
-    match st {
-        SType::Any => inferer.fresh_var(),
-        SType::Num => inferer.fresh_var(),
-        SType::Int => Type::I64,
-        SType::Float => Type::F64,
-        SType::Bool => Type::Bool,
-        SType::Str => Type::Str,
-        SType::List => Type::List(Box::new(inferer.fresh_var())),
-        SType::Ref => {
-            let t = inferer.fresh_var();
-            Type::Ref(vec![t.clone()], vec![t])
-        }
-    }
-}
-
 /// A type error with context.
 #[derive(Debug, Clone)]
 pub struct TypeError {
@@ -78,19 +22,19 @@ pub struct TypeError {
     pub context: String,
 }
 
-/// The type checker.
-pub struct TypeChecker {
-    /// Inferred stack signatures for user-defined words.
-    word_sigs: HashMap<String, WordSig>,
-    /// The type inference engine for constraint solving.
-    inferer: TypeInferer,
-}
-
 /// Stack effect signature: (inputs, outputs).
 #[derive(Debug, Clone)]
 pub struct WordSig {
-    pub inputs: Vec<SType>,
-    pub outputs: Vec<SType>,
+    pub inputs: Vec<Type>,
+    pub outputs: Vec<Type>,
+}
+
+/// The type checker.
+pub struct TypeChecker {
+    /// Inferred stack signatures for user-defined words.
+    pub word_sigs: HashMap<String, WordSig>,
+    /// The type inference engine, kept alive for the whole program.
+    pub inferer: TypeInferer,
 }
 
 impl TypeChecker {
@@ -114,7 +58,7 @@ impl TypeChecker {
         }
 
         // Pass 2: check main program body
-        let mut stack: Vec<SType> = Vec::new();
+        let mut stack: Vec<Type> = Vec::new();
         for node in nodes {
             if matches!(node, AstNode::Def { .. }) {
                 continue;
@@ -126,28 +70,18 @@ impl TypeChecker {
     }
 
     /// Infer the stack effect signature of a word body.
-    ///
-    /// Walks the word body, tracking stack changes and using the TypeInferer
-    /// to unify type variables. Returns the net stack effect.
     fn infer_sig(&mut self, body: &[AstNode]) -> WordSig {
         let mut errors = Vec::new();
-        let initial_depth = 0usize;
-        let mut stack: Vec<SType> = Vec::new();
+        let mut stack: Vec<Type> = Vec::new();
 
-        // Track stack before first node to detect inputs
         for node in body {
             self.check_node(node, &mut stack, &mut errors, "<word>");
         }
 
-        let depth = stack.len();
-        // Stack depth at end = outputs (if > initial) or consumed inputs (if < initial)
-        let inputs = if depth < initial_depth {
-            (0..initial_depth - depth)
-                .map(|_| SType::Any)
-                .collect()
-        } else {
-            vec![]
-        };
+        // The word starts with an unknown stack; any net producers become outputs,
+        // and any net consumers become inputs (in practice, simple words just
+        // produce outputs from their body).
+        let inputs = vec![];
         let outputs = stack;
 
         WordSig { inputs, outputs }
@@ -156,20 +90,28 @@ impl TypeChecker {
     fn check_node(
         &mut self,
         node: &AstNode,
-        stack: &mut Vec<SType>,
+        stack: &mut Vec<Type>,
         errors: &mut Vec<TypeError>,
         ctx: &str,
     ) {
         match node {
             AstNode::Literal(val) => {
                 let t = match val {
-                    whisper_core::value::Value::I64(_) => SType::Int,
-                    whisper_core::value::Value::F64(_) => SType::Float,
-                    whisper_core::value::Value::Bool(_) => SType::Bool,
-                    whisper_core::value::Value::Str(_) => SType::Str,
-                    whisper_core::value::Value::List(_) => SType::List,
-                    whisper_core::value::Value::Ref(_) => SType::Ref,
-                    _ => SType::Any,
+                    whisper_core::value::Value::I64(_) => Type::I64,
+                    whisper_core::value::Value::F64(_) => Type::F64,
+                    whisper_core::value::Value::Bool(_) => Type::Bool,
+                    whisper_core::value::Value::Str(_) => Type::Str,
+                    whisper_core::value::Value::List(items) => {
+                        let elem = items.first()
+                            .map(|v| value_to_type(v, &mut self.inferer))
+                            .unwrap_or_else(|| self.inferer.fresh_var());
+                        Type::List(Box::new(elem))
+                    }
+                    whisper_core::value::Value::Ref(_) => {
+                        let t = self.inferer.fresh_var();
+                        Type::Ref(vec![t.clone()], vec![t])
+                    }
+                    _ => self.inferer.fresh_var(),
                 };
                 stack.push(t);
             }
@@ -179,27 +121,19 @@ impl TypeChecker {
             }
 
             AstNode::WordRef(name) => {
-                // Resolve word signature: user-defined words first, then builtins
-                let resolved_sig: Option<(Vec<SType>, Vec<SType>)> =
+                let resolved_sig: Option<(Vec<Type>, Vec<Type>)> =
                     if let Some(sig) = self.word_sigs.get(name) {
                         Some((sig.inputs.clone(), sig.outputs.clone()))
                     } else if let Some((inputs, outputs)) = get_builtin_signature(name) {
-                        Some((
-                            inputs.iter().map(type_to_stype).collect(),
-                            outputs.iter().map(type_to_stype).collect(),
-                        ))
+                        Some((inputs, outputs))
                     } else {
                         None
                     };
 
                 if let Some((expected_inputs, expected_outputs)) = resolved_sig {
-                    // Validate inputs with the inferer for precise type unification
-                    self.inferer.reset();
-                    for expected_st in expected_inputs.iter().rev() {
-                        let expected_ty = stype_to_full_type(expected_st, &mut self.inferer);
+                    for expected in expected_inputs.iter().rev() {
                         if let Some(actual) = stack.pop() {
-                            let actual_ty = stype_to_full_type(&actual, &mut self.inferer);
-                            if let Err(e) = self.inferer.unify(&expected_ty, &actual_ty) {
+                            if let Err(e) = self.inferer.unify(expected, &actual) {
                                 errors.push(TypeError {
                                     message: format!(
                                         "Word '{}' type mismatch: {}",
@@ -207,8 +141,7 @@ impl TypeChecker {
                                     ),
                                     context: ctx.to_string(),
                                 });
-                                // Push back a dummy to maintain stack consistency
-                                stack.push(expected_st.clone());
+                                stack.push(expected.clone());
                             }
                         } else {
                             errors.push(TypeError {
@@ -218,34 +151,27 @@ impl TypeChecker {
                                 ),
                                 context: ctx.to_string(),
                             });
-                            // Push back dummies
                             for _ in 0..expected_inputs.len() {
-                                stack.push(SType::Any);
+                                stack.push(self.inferer.fresh_var());
                             }
                             break;
                         }
                     }
-                    // Push resolved outputs
                     for out in &expected_outputs {
                         stack.push(out.clone());
                     }
                 } else {
-                    // Unknown word: assume it produces Any
-                    stack.push(SType::Any);
+                    // Unknown word: assume it consumes nothing, produces Any
+                    stack.push(self.inferer.fresh_var());
                 }
             }
 
             AstNode::Quote(body) => {
-                // Check the quotation body. Start with a fresh type variable
-                // representing the input that will be on the stack at call time.
-                let mut quote_stack: Vec<SType> = vec![SType::Any];
+                let mut quote_stack: Vec<Type> = vec![self.inferer.fresh_var()];
                 let mut quote_errors = Vec::new();
                 for n in body {
                     self.check_node(n, &mut quote_stack, &mut quote_errors, &format!("{ctx}/quote"));
                 }
-                // The quotation consumes 1 value and may produce results.
-                // Report internal errors as warnings — don't fail the program,
-                // since the quotation may be used in different stack contexts.
                 for err in &quote_errors {
                     if !err.message.contains("Stack underflow") {
                         errors.push(TypeError {
@@ -254,39 +180,43 @@ impl TypeChecker {
                         });
                     }
                 }
-                stack.push(SType::Ref);
+                // Build a Ref type from the quote's consumed/produced stack effect
+                let input = self.inferer.fresh_var();
+                let output = if quote_stack.len() > 1 {
+                    quote_stack[1..].to_vec()
+                } else {
+                    vec![self.inferer.fresh_var()]
+                };
+                stack.push(Type::Ref(vec![input], output));
             }
 
             AstNode::List(items) => {
-                // Check list elements for type consistency
-                let mut elem_type: Option<SType> = None;
+                let mut elem_type: Option<Type> = None;
                 for item in items {
                     self.check_node(item, stack, errors, ctx);
                     if let Some(popped) = stack.pop() {
                         if let Some(ref expected) = elem_type {
-                            if !expected.accepts(&popped) {
+                            if let Err(_) = self.inferer.unify(expected, &popped) {
                                 errors.push(TypeError {
                                     message: format!(
-                                        "List element type mismatch: expected {:?}, got {}",
-                                        expected,
-                                        popped.name()
+                                        "List element type mismatch: expected {}, got {}",
+                                        self.inferer.resolve(expected),
+                                        self.inferer.resolve(&popped),
                                     ),
                                     context: ctx.to_string(),
                                 });
                             }
                         } else {
-                            elem_type = Some(popped.clone());
+                            elem_type = Some(popped);
                         }
                     }
                 }
-                stack.push(SType::List);
+                let elem = elem_type.unwrap_or_else(|| self.inferer.fresh_var());
+                stack.push(Type::List(Box::new(self.inferer.resolve(&elem))));
             }
 
-            AstNode::Cond {
-                then_branch,
-                else_branch,
-            } => {
-                self.expect(stack, &SType::Bool, errors, ctx, "condition");
+            AstNode::Cond { then_branch, else_branch } => {
+                self.expect(stack, &Type::Bool, errors, ctx, "condition");
                 let depth = stack.len();
                 let mut then_stack = stack.clone();
                 for n in then_branch {
@@ -298,18 +228,17 @@ impl TypeChecker {
                         self.check_node(n, &mut else_stack, errors, &format!("{ctx}/else"));
                     }
                 }
-                // Restore to original depth + push the unified result type
                 stack.truncate(depth);
-                // If both branches produce results, unify their types
-                let then_result = then_stack.get(then_stack.len().wrapping_sub(1));
-                let else_result = else_stack.get(else_stack.len().wrapping_sub(1));
-                match (then_result, else_result) {
-                    (Some(t), Some(e)) if t.accepts(e) || e.accepts(t) => {
-                        stack.push(t.clone());
-                    }
-                    _ => {
-                        stack.push(SType::Any);
-                    }
+                let then_result = then_stack.last().cloned().unwrap_or_else(|| self.inferer.fresh_var());
+                let else_result = else_stack.last().cloned().unwrap_or_else(|| self.inferer.fresh_var());
+                if self.inferer.unify(&then_result, &else_result).is_ok() {
+                    stack.push(self.inferer.resolve(&then_result));
+                } else {
+                    // Branches produce different types → union type
+                    stack.push(Type::Union(
+                        Box::new(self.inferer.resolve(&then_result)),
+                        Box::new(self.inferer.resolve(&else_result)),
+                    ));
                 }
             }
 
@@ -317,7 +246,7 @@ impl TypeChecker {
                 for n in body {
                     self.check_node(n, stack, errors, &format!("{ctx}/loop"));
                 }
-                self.expect(stack, &SType::Bool, errors, ctx, "loop condition");
+                self.expect(stack, &Type::Bool, errors, ctx, "loop condition");
                 for n in condition {
                     self.check_node(n, stack, errors, ctx);
                 }
@@ -326,12 +255,12 @@ impl TypeChecker {
             AstNode::Def { .. } | AstNode::Import(_) | AstNode::Export(_) => {}
 
             AstNode::Times { .. } => {
-                self.expect(stack, &SType::Int, errors, ctx, "@times count");
-                self.expect(stack, &SType::Ref, errors, ctx, "@times quot");
+                self.expect(stack, &Type::I64, errors, ctx, "@times count");
+                self.expect_ref(stack, errors, ctx, "@times quot");
             }
 
             AstNode::CondArrow { .. } => {
-                self.expect(stack, &SType::Bool, errors, ctx, "?-> condition");
+                self.expect(stack, &Type::Bool, errors, ctx, "?-> condition");
             }
 
             AstNode::ConfidenceLabel { body, confidence: _ } => {
@@ -341,7 +270,6 @@ impl TypeChecker {
             }
 
             AstNode::ProbChoice { alt1, alt2 } => {
-                // Both alternatives must produce the same type
                 let depth = stack.len();
                 let mut s1 = stack.clone();
                 for n in alt1 {
@@ -351,13 +279,16 @@ impl TypeChecker {
                 for n in alt2 {
                     self.check_node(n, &mut s2, errors, &format!("{ctx}/alt2"));
                 }
-                let r1 = s1.last().cloned().unwrap_or(SType::Any);
-                let r2 = s2.last().cloned().unwrap_or(SType::Any);
+                let r1 = s1.last().cloned().unwrap_or_else(|| self.inferer.fresh_var());
+                let r2 = s2.last().cloned().unwrap_or_else(|| self.inferer.fresh_var());
                 stack.truncate(depth);
-                if r1.accepts(&r2) {
-                    stack.push(r1);
+                if self.inferer.unify(&r1, &r2).is_ok() {
+                    stack.push(self.inferer.resolve(&r1));
                 } else {
-                    stack.push(SType::Any);
+                    stack.push(Type::Union(
+                        Box::new(self.inferer.resolve(&r1)),
+                        Box::new(self.inferer.resolve(&r2)),
+                    ));
                 }
             }
         }
@@ -366,18 +297,18 @@ impl TypeChecker {
     fn check_op(
         &mut self,
         op: Operator,
-        stack: &mut Vec<SType>,
+        stack: &mut Vec<Type>,
         errors: &mut Vec<TypeError>,
         ctx: &str,
     ) {
+        // Helper: num = i64 | f64
+        let num = || Type::Union(Box::new(Type::I64), Box::new(Type::F64));
+
         match op {
             // Stack ops
             Operator::Dup => {
                 if stack.is_empty() {
-                    errors.push(TypeError {
-                        message: "Dup: stack empty".into(),
-                        context: ctx.into(),
-                    });
+                    errors.push(TypeError { message: "Dup: stack empty".into(), context: ctx.into() });
                 } else {
                     let t = stack.last().unwrap().clone();
                     stack.push(t);
@@ -385,10 +316,7 @@ impl TypeChecker {
             }
             Operator::Swap => {
                 if stack.len() < 2 {
-                    errors.push(TypeError {
-                        message: "Swap: need 2 values".into(),
-                        context: ctx.into(),
-                    });
+                    errors.push(TypeError { message: "Swap: need 2 values".into(), context: ctx.into() });
                 } else {
                     let a = stack.pop().unwrap();
                     let b = stack.pop().unwrap();
@@ -398,117 +326,109 @@ impl TypeChecker {
             }
             Operator::Drop => {
                 if stack.is_empty() {
-                    errors.push(TypeError {
-                        message: "Drop: stack empty".into(),
-                        context: ctx.into(),
-                    });
+                    errors.push(TypeError { message: "Drop: stack empty".into(), context: ctx.into() });
                 } else {
                     stack.pop();
                 }
             }
             Operator::Rot => {
                 if stack.len() < 3 {
-                    errors.push(TypeError {
-                        message: "Rot: need 3 values".into(),
-                        context: ctx.into(),
-                    });
+                    errors.push(TypeError { message: "Rot: need 3 values".into(), context: ctx.into() });
                 }
             }
 
-            // Arithmetic: need Num, Num → Num
-            Operator::Add
-            | Operator::Sub
-            | Operator::Mul
-            | Operator::Div
-            | Operator::Mod => {
-                self.expect(stack, &SType::Num, errors, ctx, "arithmetic rhs");
-                self.expect(stack, &SType::Num, errors, ctx, "arithmetic lhs");
-                stack.push(SType::Num);
+            // Arithmetic: Num, Num → Num
+            Operator::Add | Operator::Sub | Operator::Mul | Operator::Div | Operator::Mod => {
+                let n = num();
+                self.expect(stack, &n, errors, ctx, "arithmetic rhs");
+                self.expect(stack, &n, errors, ctx, "arithmetic lhs");
+                stack.push(n);
             }
 
-            // Comparison: need Any, Any → Bool
-            Operator::Eq
-            | Operator::Lt
-            | Operator::Gt
-            | Operator::Neq
-            | Operator::Le
-            | Operator::Ge => {
-                self.expect(stack, &SType::Any, errors, ctx, "compare rhs");
-                self.expect(stack, &SType::Any, errors, ctx, "compare lhs");
-                stack.push(SType::Bool);
+            // Comparison: Any, Any → Bool
+            Operator::Eq | Operator::Lt | Operator::Gt
+            | Operator::Neq | Operator::Le | Operator::Ge => {
+                stack.pop();
+                stack.pop();
+                stack.push(Type::Bool);
             }
 
             // Logic: Bool, Bool → Bool
             Operator::And | Operator::Or => {
-                self.expect(stack, &SType::Bool, errors, ctx, "logic rhs");
-                self.expect(stack, &SType::Bool, errors, ctx, "logic lhs");
-                stack.push(SType::Bool);
+                self.expect(stack, &Type::Bool, errors, ctx, "logic rhs");
+                self.expect(stack, &Type::Bool, errors, ctx, "logic lhs");
+                stack.push(Type::Bool);
             }
             Operator::Not => {
-                self.expect(stack, &SType::Bool, errors, ctx, "not");
-                stack.push(SType::Bool);
+                self.expect(stack, &Type::Bool, errors, ctx, "not");
+                stack.push(Type::Bool);
             }
 
             // List ops
             Operator::Len => {
-                self.expect(stack, &SType::List, errors, ctx, "len");
-                stack.push(SType::Int);
+                let any_list = Type::List(Box::new(self.inferer.fresh_var()));
+                self.expect(stack, &any_list, errors, ctx, "len");
+                stack.push(Type::I64);
             }
 
             // String ops
             Operator::StrLen => {
-                self.expect(stack, &SType::Str, errors, ctx, "strlen");
-                stack.push(SType::Int);
+                self.expect(stack, &Type::Str, errors, ctx, "strlen");
+                stack.push(Type::I64);
             }
             Operator::StrCat => {
-                self.expect(stack, &SType::Str, errors, ctx, "strcat rhs");
-                self.expect(stack, &SType::Str, errors, ctx, "strcat lhs");
-                stack.push(SType::Str);
+                self.expect(stack, &Type::Str, errors, ctx, "strcat rhs");
+                self.expect(stack, &Type::Str, errors, ctx, "strcat lhs");
+                stack.push(Type::Str);
             }
             Operator::StrSlice => {
-                self.expect(stack, &SType::Int, errors, ctx, "strslice len");
-                self.expect(stack, &SType::Int, errors, ctx, "strslice start");
-                self.expect(stack, &SType::Str, errors, ctx, "strslice string");
-                stack.push(SType::Str);
+                self.expect(stack, &Type::I64, errors, ctx, "strslice len");
+                self.expect(stack, &Type::I64, errors, ctx, "strslice start");
+                self.expect(stack, &Type::Str, errors, ctx, "strslice string");
+                stack.push(Type::Str);
             }
 
             Operator::Nth => {
-                self.expect(stack, &SType::Int, errors, ctx, "@nth index");
-                self.expect(stack, &SType::List, errors, ctx, "@nth list");
-                stack.push(SType::Any);
+                let any_list = Type::List(Box::new(self.inferer.fresh_var()));
+                self.expect(stack, &Type::I64, errors, ctx, "@nth index");
+                self.expect(stack, &any_list, errors, ctx, "@nth list");
+                stack.push(self.inferer.fresh_var());
             }
             Operator::Append => {
-                self.expect(stack, &SType::Any, errors, ctx, "append element");
-                self.expect(stack, &SType::List, errors, ctx, "append list");
-                stack.push(SType::List);
+                let elem = self.inferer.fresh_var();
+                let list_ty = Type::List(Box::new(elem.clone()));
+                let any_list = Type::List(Box::new(self.inferer.fresh_var()));
+                stack.pop(); // element — accept anything
+                self.expect(stack, &any_list, errors, ctx, "append list");
+                stack.push(list_ty);
             }
             Operator::Map => {
-                self.expect(stack, &SType::Ref, errors, ctx, "@map quot");
-                self.expect(stack, &SType::List, errors, ctx, "@map list");
-                stack.push(SType::List);
+                let any_list = Type::List(Box::new(self.inferer.fresh_var()));
+                self.expect_ref(stack, errors, ctx, "@map quot");
+                self.expect(stack, &any_list, errors, ctx, "@map list");
+                stack.push(Type::List(Box::new(self.inferer.fresh_var())));
             }
             Operator::Each => {
-                self.expect(stack, &SType::Ref, errors, ctx, "@each quot");
-                self.expect(stack, &SType::List, errors, ctx, "@each list");
+                let any_list = Type::List(Box::new(self.inferer.fresh_var()));
+                self.expect_ref(stack, errors, ctx, "@each quot");
+                self.expect(stack, &any_list, errors, ctx, "@each list");
             }
             Operator::Fold => {
-                self.expect(stack, &SType::Ref, errors, ctx, "@fold quot");
-                self.expect(stack, &SType::Any, errors, ctx, "@fold init");
-                self.expect(stack, &SType::List, errors, ctx, "@fold list");
-                stack.push(SType::Any);
+                let any_list = Type::List(Box::new(self.inferer.fresh_var()));
+                self.expect_ref(stack, errors, ctx, "@fold quot");
+                stack.pop(); // init — accept anything
+                self.expect(stack, &any_list, errors, ctx, "@fold list");
+                stack.push(self.inferer.fresh_var());
             }
             Operator::AtTimes => {
-                self.expect(stack, &SType::Ref, errors, ctx, "@times body");
-                self.expect(stack, &SType::Int, errors, ctx, "@times count");
+                self.expect_ref(stack, errors, ctx, "@times body");
+                self.expect(stack, &Type::I64, errors, ctx, "@times count");
             }
 
             // IO
             Operator::OutputTop => {
                 if stack.is_empty() {
-                    errors.push(TypeError {
-                        message: ".: stack empty".into(),
-                        context: ctx.into(),
-                    });
+                    errors.push(TypeError { message: ".: stack empty".into(), context: ctx.into() });
                 } else {
                     stack.pop();
                 }
@@ -523,32 +443,46 @@ impl TypeChecker {
 
     fn expect(
         &mut self,
-        stack: &mut Vec<SType>,
-        expected: &SType,
+        stack: &mut Vec<Type>,
+        expected: &Type,
         errors: &mut Vec<TypeError>,
         ctx: &str,
         desc: &str,
     ) {
         match stack.pop() {
-            Some(actual) if expected.accepts(&actual) => {}
             Some(actual) => {
-                errors.push(TypeError {
-                    message: format!(
-                        "{}: expected {}, got {}",
-                        desc,
-                        expected.name(),
-                        actual.name()
-                    ),
-                    context: ctx.to_string(),
-                });
+                // Unify expected with actual; if it fails, report error but tolerate
+                if let Err(_) = self.inferer.unify(expected, &actual) {
+                    errors.push(TypeError {
+                        message: format!(
+                            "{}: expected {}, got {}",
+                            desc,
+                            self.inferer.resolve(expected),
+                            self.inferer.resolve(&actual),
+                        ),
+                        context: ctx.to_string(),
+                    });
+                }
             }
             None => {
                 errors.push(TypeError {
-                    message: format!("Stack underflow: {} needs {}", desc, expected.name()),
+                    message: format!("Stack underflow: {} needs {}", desc, expected),
                     context: ctx.to_string(),
                 });
             }
         }
+    }
+
+    fn expect_ref(
+        &mut self,
+        stack: &mut Vec<Type>,
+        errors: &mut Vec<TypeError>,
+        ctx: &str,
+        desc: &str,
+    ) {
+        let t = self.inferer.fresh_var();
+        let ref_ty = Type::Ref(vec![t.clone()], vec![t]);
+        self.expect(stack, &ref_ty, errors, ctx, desc);
     }
 }
 
@@ -558,19 +492,24 @@ impl Default for TypeChecker {
     }
 }
 
-/// Map a full Type to the simplified SType for the checker.
-fn type_to_stype(ty: &Type) -> SType {
-    match ty {
-        Type::I64 => SType::Int,
-        Type::F64 => SType::Float,
-        Type::Bool => SType::Bool,
-        Type::Str => SType::Str,
-        Type::List(_) => SType::List,
-        Type::Ref(_, _) => SType::Ref,
-        Type::TypeVar(_) => SType::Any,
-        Type::Signal(inner) => type_to_stype(inner),
-        Type::Union(a, _) => type_to_stype(a), // take the first branch for SType
-        Type::Cap(_) => SType::Any,
+/// Convert a Whisper Value to its corresponding Type.
+fn value_to_type(val: &whisper_core::value::Value, inferer: &mut TypeInferer) -> Type {
+    match val {
+        whisper_core::value::Value::I64(_) => Type::I64,
+        whisper_core::value::Value::F64(_) => Type::F64,
+        whisper_core::value::Value::Bool(_) => Type::Bool,
+        whisper_core::value::Value::Str(_) => Type::Str,
+        whisper_core::value::Value::List(items) => {
+            let elem = items.first()
+                .map(|v| value_to_type(v, inferer))
+                .unwrap_or_else(|| inferer.fresh_var());
+            Type::List(Box::new(elem))
+        }
+        whisper_core::value::Value::Ref(_) => {
+            let t = inferer.fresh_var();
+            Type::Ref(vec![t.clone()], vec![t])
+        }
+        _ => inferer.fresh_var(),
     }
 }
 
@@ -626,13 +565,11 @@ mod tests {
 
     #[test]
     fn test_word_sig_inference() {
-        // The checker should infer that 'sq' consumes 0 inputs, produces 1 output
         let mut tc = TypeChecker::new();
         let source = ": sq { _ * } ; 5 sq";
         let ast = Parser::parse_source(source).unwrap();
         let errors = tc.check(&ast);
         assert!(errors.is_empty(), "Unexpected errors: {errors:?}");
-        // Verify 'sq' was registered
         let sig = tc.word_sigs.get("sq").unwrap();
         assert!(
             sig.outputs.len() >= 1,
@@ -643,7 +580,6 @@ mod tests {
 
     #[test]
     fn test_builtin_signature_used() {
-        // 'len' builtin should be recognized and produce Int
         let source = "[1 2 3] len";
         let ast = Parser::parse_source(source).unwrap();
         let mut tc = TypeChecker::new();
@@ -653,21 +589,15 @@ mod tests {
 
     #[test]
     fn test_type_mismatch_in_list_elements() {
-        // Passing non-list to 'len' should be caught
-        // Actually, the checker compares SType::List expectation vs actual
         let source = "5 len";
         let ast = Parser::parse_source(source).unwrap();
         let mut tc = TypeChecker::new();
         let errors = tc.check(&ast);
-        // Pushing Int then calling 'len' — the builtin signature says List input
-        // type_to_stype(Type::List(_)) = SType::List
-        // stack has SType::Int → SType::Int != SType::List → error
         assert!(!errors.is_empty(), "Expected type error for '5 len'");
     }
 
     #[test]
     fn test_single_branch_conditional() {
-        // cond {then} ?-> should be recognized
         let source = "5 3 > ??100|0]";
         let ast = Parser::parse_source(source).unwrap();
         let mut tc = TypeChecker::new();
@@ -677,7 +607,6 @@ mod tests {
 
     #[test]
     fn test_quote_type_checking() {
-        // Quote bodies are checked for internal consistency
         let source = "[1 2 3] { _ * } @map";
         let ast = Parser::parse_source(source).unwrap();
         let mut tc = TypeChecker::new();
