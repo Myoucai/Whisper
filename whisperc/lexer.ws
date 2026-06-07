@@ -39,7 +39,6 @@
                 1 9999 strslice "" ` read-str-acc
                 @ drop @ @ append ` tokenize-loop
             |   _ 0 strnth is-ws ??
-                    striter ctos
                     @ @ append ` tokenize-loop
                 |   "" ` read-chunk-acc
                     @ @ append ` tokenize-loop
