@@ -125,18 +125,12 @@ fn ast_to_whisper_tokens(nodes: &[AstNode]) -> Value {
                 ])));
             }
             AstNode::Quote(body) => {
-                // Pre-compile quotation body with trailing Return.
-                // Token format: [18, [0x35, count, ...inners]]
-                // whisperc's op-ref emits the wrapped value as-is.
-                let inner_tokens = ast_to_vec(body);
-                let mut inner_bytecodes = simple_compile(&inner_tokens);
-                inner_bytecodes.push(Value::I64(0x61)); // Return
-                let mut wrapped: Vec<Value> =
-                    vec![Value::I64(0x35), Value::I64(inner_bytecodes.len() as i64)];
-                wrapped.extend(inner_bytecodes);
+                // Nested token: [5, [...inner_tokens...]]
+                // whisperc compiles recursively and wraps in PushRef
+                let inner = ast_to_whisper_tokens(body);
                 tokens.push(Value::List(Rc::new(vec![
-                    Value::I64(18),
-                    Value::List(Rc::new(wrapped)),
+                    Value::I64(5),
+                    inner,
                 ])));
             }
             // Word definitions, conds, loops, etc. are handled by the Rust
@@ -153,74 +147,6 @@ fn ast_to_vec(nodes: &[AstNode]) -> Vec<Value> {
         Value::List(v) => v.to_vec(),
         _ => vec![],
     }
-}
-
-/// Simple flat token compilation: maps token values directly to bytecode values.
-/// This is what whisperc does — we provide a Rust implementation as reference.
-fn simple_compile(tokens: &[Value]) -> Vec<Value> {
-    let mut result = Vec::new();
-    for token in tokens {
-        match token {
-            Value::List(ref items) if items.len() >= 2 => {
-                let ty = match &items[0] {
-                    Value::I64(t) => *t,
-                    _ => continue,
-                };
-                match ty {
-                    0 => {
-                        if let Value::I64(n) = &items[1] {
-                            result
-                                .push(Value::List(Rc::new(vec![Value::I64(0x30), Value::I64(*n)])));
-                        }
-                    }
-                    1 => {
-                        if let Value::I64(bits) = &items[1] {
-                            result.push(Value::List(Rc::new(vec![
-                                Value::I64(0x31),
-                                Value::I64(*bits),
-                            ])));
-                        }
-                    }
-                    2 => {
-                        result.push(Value::List(Rc::new(vec![
-                            Value::I64(0x32),
-                            items[1].clone(),
-                        ])));
-                    }
-                    3 => {
-                        if let Value::I64(byte) = &items[1] {
-                            result.push(Value::I64(*byte));
-                        }
-                    }
-                    4 => {
-                        result.push(Value::List(Rc::new(vec![
-                            Value::I64(0x60),
-                            items[1].clone(),
-                        ])));
-                    }
-                    13 => {
-                        if let Value::I64(n) = &items[1] {
-                            result
-                                .push(Value::List(Rc::new(vec![Value::I64(0x33), Value::I64(*n)])));
-                        }
-                    }
-                    14 => {
-                        if let Value::I64(n) = &items[1] {
-                            result
-                                .push(Value::List(Rc::new(vec![Value::I64(0x34), Value::I64(*n)])));
-                        }
-                    }
-                    18 => {
-                        // Pre-wrapped PushRef [0x35, count, ...inners] — emit as-is
-                        result.push(items[1].clone());
-                    }
-                    _ => {}
-                }
-            }
-            _ => {}
-        }
-    }
-    result
 }
 
 pub fn bootstrap_compile(source: &str) -> Result<(), String> {
@@ -376,12 +302,20 @@ fn values_to_opcodes(vals: Vec<Value>) -> Vec<Opcode> {
                         }
                     }
                     0x35 => {
-                        // PushRef: [0x35, count, inner_vals...]
-                        if items.len() >= 3 {
-                            if let Value::I64(_count) = &items[1] {
-                                let inner_vals: Vec<Value> = items[2..].to_vec();
-                                let inner_ops = values_to_opcodes(inner_vals);
+                        // PushRef: [0x35, [inner_ops...]]  (nested, from whisperc)
+                        // or legacy: [0x35, count, op1, op2...] (flat)
+                        if items.len() >= 2 {
+                            if let Value::List(inner) = &items[1] {
+                                // Nested format from whisperc recursive compile
+                                let inner_ops = values_to_opcodes(inner.to_vec());
                                 ops.push(Opcode::PushRef(inner_ops));
+                            } else if items.len() >= 3 {
+                                // Legacy flat format
+                                if let Value::I64(_count) = &items[1] {
+                                    let inner_vals: Vec<Value> = items[2..].to_vec();
+                                    let inner_ops = values_to_opcodes(inner_vals);
+                                    ops.push(Opcode::PushRef(inner_ops));
+                                }
                             }
                         }
                     }
@@ -501,5 +435,16 @@ mod tests {
     #[test]
     fn test_selfhost_fib() {
         assert!(bootstrap_compile(": fib { _ 1 > ??_ 1 - fib ` 2 - fib +|] } ; 10 fib").is_ok());
+    }
+
+    #[test]
+    fn test_selfhost_map_quote() {
+        // Tests whisperc recursive quote compilation
+        assert!(bootstrap_compile("[1 2 3] { _ * } @map").is_ok());
+    }
+
+    #[test]
+    fn test_selfhost_fold_quote() {
+        assert!(bootstrap_compile("[1 2 3 4 5] 0 { + } @fold").is_ok());
     }
 }
