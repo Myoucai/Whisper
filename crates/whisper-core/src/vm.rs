@@ -131,7 +131,8 @@ impl Vm {
                 continue;
             }
 
-            let op = frame.code[ip].clone();
+            // Clone the Rc (cheap refcount bump), not the Opcode (may allocate).
+            let code = Rc::clone(&frame.code);
             self.call_stack.last_mut().unwrap().ip = ip + 1;
 
             if self.trace {
@@ -141,12 +142,12 @@ impl Vm {
                         .last()
                         .and_then(|f| f.word_name.as_deref())
                         .unwrap_or("?"),
-                    op.name(),
+                    code[ip].name(),
                     self.data_stack
                 );
             }
 
-            self.step(&op)?;
+            self.step(&code[ip])?;
         }
 
         Ok(self.data_stack.pop())
@@ -831,18 +832,19 @@ impl Vm {
                 continue;
             }
 
-            let op = current_frame.code[ip].clone();
+            // Clone the Rc (cheap refcount bump), not the Opcode (may allocate).
+            let code = Rc::clone(&current_frame.code);
             self.call_stack.last_mut().unwrap().ip = ip + 1;
 
             if self.trace {
                 eprintln!(
                     "[trace] <block> op={:?} stack={:?}",
-                    op.name(),
+                    code[ip].name(),
                     self.data_stack
                 );
             }
 
-            self.step(&op)?;
+            self.step(&code[ip])?;
         }
 
         Ok(())
