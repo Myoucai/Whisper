@@ -127,6 +127,7 @@ pub enum TokenKind {
     CharsStr,
     StrIter,
     ListFind,
+    StrJoin,
 
     // Float operations
     I64ToF64,

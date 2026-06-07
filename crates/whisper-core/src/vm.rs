@@ -465,6 +465,17 @@ impl Vm {
                 self.data_stack.push(Value::Bool(found));
                 self.data_stack.push(value);
             }
+            Opcode::StrJoin => {
+                let list = self.pop_list()?;
+                let result: String = list
+                    .iter()
+                    .filter_map(|v| match v.unwrap_signal_ref() {
+                        Value::Str(s) => Some(s.as_ref().clone()),
+                        _ => None,
+                    })
+                    .collect();
+                self.data_stack.push(Value::Str(Rc::new(result)));
+            }
 
             // === Float operations ===
             Opcode::I64ToF64 => {

@@ -70,6 +70,7 @@ pub fn get_builtin_signature(name: &str) -> Option<(Vec<Type>, Vec<Type>)> {
             ],
             vec![Type::Bool, Type::TypeVar(0)],
         )),
+        "strjoin" => Some((vec![Type::List(Box::new(Type::Str))], vec![Type::Str])),
 
         // Float operations
         "i64tof64" => Some((vec![Type::I64], vec![Type::F64])),

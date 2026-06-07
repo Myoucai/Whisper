@@ -500,6 +500,16 @@ impl TypeChecker {
                 stack.push(Type::Bool);
                 stack.push(v);
             }
+            Operator::StrJoin => {
+                self.expect(
+                    stack,
+                    &Type::List(Box::new(Type::Str)),
+                    errors,
+                    ctx,
+                    "strjoin",
+                );
+                stack.push(Type::Str);
+            }
 
             // Float ops
             Operator::I64ToF64 => {

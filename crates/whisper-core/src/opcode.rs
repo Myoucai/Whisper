@@ -120,6 +120,8 @@ pub enum Opcode {
     StrIter,
     /// Find key in assoc list: [[k v]…] key → [#t val] | [#f 0]
     ListFind,
+    /// Join list of strings: [str…] → str
+    StrJoin,
 
     // === Control flow (0x50-0x57) ===
     /// Conditional: if false, jump by offset
@@ -250,6 +252,7 @@ impl Opcode {
             Opcode::CharsStr => 0xB9,
             Opcode::StrIter => 0xBA,
             Opcode::ListFind => 0xBB,
+            Opcode::StrJoin => 0xBC,
 
             // Control flow
             Opcode::Cond(_) => 0x50,
@@ -340,6 +343,7 @@ impl Opcode {
             Opcode::CharsStr => "charsstr",
             Opcode::StrIter => "striter",
             Opcode::ListFind => "listfind",
+            Opcode::StrJoin => "strjoin",
             Opcode::Cond(_) => "cond",
             Opcode::Jump(_) => "jump",
             Opcode::Loop(_) => "loop",
