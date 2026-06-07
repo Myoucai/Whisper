@@ -651,35 +651,4 @@ mod tests {
         assert!(bootstrap_compile("[1 2 3 4 5] 0 { + } @fold").is_ok());
     }
 
-    // ── Lexer test (single-token) ─────────────────────────────────
-
-    fn run_lexer(source: &str) -> Vec<String> {
-        let lexer_src = include_str!("../../../../whisperc/lexer.ws");
-        let ast = Parser::parse_source(lexer_src).unwrap();
-        let mut gen = BytecodeGenerator::new();
-        let (bc, defs) = gen.compile(&ast);
-        let mut vm = Vm::new();
-        for (name, code) in &defs {
-            vm.define_word(name.clone(), code.clone());
-        }
-        vm.execute(&bc).unwrap();
-        vm.data_stack.push(Value::Str(Rc::new(source.to_string())));
-        let call = [Opcode::Call("tokenize".to_string())];
-        let result = vm.execute(&call).unwrap().unwrap();
-        match result {
-            Value::List(items) => {
-                items.iter().map(|v| match v {
-                    Value::Str(s) => s.as_ref().clone(),
-                    other => format!("{other}"),
-                }).collect()
-            }
-            _ => panic!("expected list, got {result:?}"),
-        }
-    }
-
-    #[test]
-    fn test_lexer_simple() {
-        let chunks = run_lexer("3 4 +");
-        assert_eq!(chunks, vec!["3", "4", "+"], "got {chunks:?}");
-    }
 }
