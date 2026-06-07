@@ -206,13 +206,19 @@ impl Vm {
                     }
                 },
             )?,
-            Opcode::Mod => self.binary_int_op(|a, b| {
-                if b == 0 {
-                    Err(VmError::DivisionByZero)
-                } else {
-                    Ok(Value::I64(a % b))
-                }
-            })?,
+            Opcode::Mod => self.binary_num_op(
+                |a, b| {
+                    if b == 0 {
+                        Err(VmError::DivisionByZero)
+                    } else {
+                        Ok(Value::I64(a % b))
+                    }
+                },
+                |_a, _b| Err(VmError::TypeMismatch {
+                    expected: "i64".into(),
+                    actual: "f64".into(),
+                }),
+            )?,
 
             // === Comparison ===
             Opcode::Eq => {
@@ -655,18 +661,6 @@ impl Vm {
         Ok(())
     }
 
-    /// Binary operation on integer-only stack values.
-    fn binary_int_op(
-        &mut self,
-        op: impl FnOnce(i64, i64) -> Result<Value, VmError>,
-    ) -> Result<(), VmError> {
-        let b = self.pop_i64()?;
-        let a = self.pop_i64()?;
-        let result = op(a, b)?;
-        self.data_stack.push(result);
-        Ok(())
-    }
-
     /// Comparison operation.
     fn compare_op(
         &mut self,
@@ -1075,5 +1069,32 @@ mod tests {
         vm.data_stack.push(Value::I64(100)); // len exceeds string
         let r = vm.execute(&[Opcode::StrSlice]).unwrap();
         assert_eq!(r, Some(Value::Str(Rc::new("Hi".into()))), "should clamp to string length");
+    }
+
+    // === Mod confidence propagation ===
+
+    #[test]
+    fn test_mod_confidence() {
+        // 10:0.5 3 mod → Signal(1, 0.5)  (confidence propagates)
+        let mut vm = Vm::new();
+        let val = Value::Signal(Box::new(Value::I64(10)), 0.5);
+        vm.data_stack.push(val);
+        vm.data_stack.push(Value::I64(3));
+        let r = vm.execute(&[Opcode::Mod]).unwrap().unwrap();
+        // Check inner value: 10%3=1
+        assert_eq!(r.unwrap_signal_ref(), &Value::I64(1));
+        // Confidence should be 0.5 (0.5 from signal * 1.0 from literal)
+        let conf = r.confidence();
+        assert!((conf - 0.5).abs() < 0.001, "expected confidence 0.5, got {conf}");
+    }
+
+    #[test]
+    fn test_mod_division_by_zero_with_confidence() {
+        let mut vm = Vm::new();
+        let val = Value::Signal(Box::new(Value::I64(10)), 0.8);
+        vm.data_stack.push(val);
+        vm.data_stack.push(Value::I64(0));
+        let result = vm.execute(&[Opcode::Mod]);
+        assert!(result.is_err());
     }
 }
