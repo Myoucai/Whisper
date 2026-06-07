@@ -9,6 +9,7 @@ use crate::value::Value;
 use crate::VmError;
 /// Capability-based security model.
 ///
+use std::io::{Read, Write};
 use std::rc::Rc;
 
 /// Trait for capabilities that can be called by Whisper programs.
@@ -232,9 +233,8 @@ impl Capability for HttpGetCap {
             }
         };
 
-        let host = extract_host(&url_str).unwrap_or(&url_str);
-        let allowed = self.allowed_hosts.iter().any(|h| host.contains(h.as_str()));
-        if !allowed {
+        let host = parse_url(&url_str).map(|u| u.host).unwrap_or_else(|| url_str.clone());
+        if !host_allowed(&host, &self.allowed_hosts) {
             return Err(VmError::CapabilityDenied(format!(
                 "Host '{}' not in allowed hosts: {:?}",
                 host, self.allowed_hosts
@@ -293,9 +293,8 @@ impl Capability for HttpPostCap {
             }
         };
 
-        let host = extract_host(&url_str).unwrap_or(&url_str);
-        let allowed = self.allowed_hosts.iter().any(|h| host.contains(h.as_str()));
-        if !allowed {
+        let host = parse_url(&url_str).map(|u| u.host).unwrap_or_else(|| url_str.clone());
+        if !host_allowed(&host, &self.allowed_hosts) {
             return Err(VmError::CapabilityDenied(format!(
                 "Host '{}' not allowed",
                 host
@@ -312,65 +311,102 @@ impl Capability for HttpPostCap {
     }
 }
 
-fn extract_host(url: &str) -> Option<&str> {
-    let s = url
-        .strip_prefix("https://")
-        .or_else(|| url.strip_prefix("http://"))?;
-    s.split('/').next()
+/// Check whether a host is allowed by the whitelist.
+/// Exact match or the host is a subdomain of an allowed domain.
+fn host_allowed(host: &str, allowed: &[String]) -> bool {
+    let host_lower = host.to_lowercase();
+    allowed.iter().any(|h| {
+        let allow = h.to_lowercase();
+        host_lower == allow || host_lower.ends_with(&format!(".{allow}"))
+    })
 }
 
 fn http_get(url: &str) -> Result<String, String> {
-    let host = extract_host(url).ok_or_else(|| "Invalid URL".to_string())?;
-    let path = url
-        .find(host)
-        .map(|i| &url[i + host.len()..])
-        .unwrap_or("/");
-
-    let mut stream = std::net::TcpStream::connect((host, 80))
-        .or_else(|_| std::net::TcpStream::connect((host, 443)))
-        .map_err(|e| format!("Connect failed: {e}"))?;
-
-    use std::io::{Read, Write};
-    let request = format!("GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n");
-    stream
-        .write_all(request.as_bytes())
-        .map_err(|e| e.to_string())?;
-
-    let mut response = String::new();
-    stream
-        .read_to_string(&mut response)
-        .map_err(|e| e.to_string())?;
-
-    let body = response.split("\r\n\r\n").nth(1).unwrap_or(&response);
-    Ok(body.to_string())
+    let parsed = parse_url(url).ok_or_else(|| format!("Invalid URL: {url}"))?;
+    http_request("GET", &parsed, "")
 }
 
 fn http_post(url: &str, body: &str) -> Result<String, String> {
-    let host = extract_host(url).ok_or_else(|| "Invalid URL".to_string())?;
-    let path = url
-        .find(host)
-        .map(|i| &url[i + host.len()..])
-        .unwrap_or("/");
+    let parsed = parse_url(url).ok_or_else(|| format!("Invalid URL: {url}"))?;
+    http_request("POST", &parsed, body)
+}
 
-    let mut stream =
-        std::net::TcpStream::connect((host, 80)).map_err(|e| format!("Connect failed: {e}"))?;
+struct ParsedUrl {
+    use_tls: bool,
+    host: String,
+    port: u16,
+    path: String,
+}
 
-    use std::io::{Read, Write};
+fn parse_url(url: &str) -> Option<ParsedUrl> {
+    let (use_tls, rest) = if let Some(r) = url.strip_prefix("https://") {
+        (true, r)
+    } else if let Some(r) = url.strip_prefix("http://") {
+        (false, r)
+    } else {
+        return None;
+    };
+
+    let (host_port, path) = rest.split_once('/').unwrap_or((rest, ""));
+    let (host, port) = if let Some((h, p)) = host_port.rsplit_once(':') {
+        (h.to_string(), p.parse::<u16>().ok()?)
+    } else {
+        let default_port = if use_tls { 443 } else { 80 };
+        (host_port.to_string(), default_port)
+    };
+
+    Some(ParsedUrl {
+        use_tls,
+        host,
+        port,
+        path: format!("/{path}"),
+    })
+}
+
+fn http_request(method: &str, parsed: &ParsedUrl, body: &str) -> Result<String, String> {
+    if parsed.use_tls {
+        return Err(
+            "HTTPS is not yet supported. Use http:// URLs or enable the 'native-tls' feature. \
+             Plain TCP to port 443 cannot carry TLS traffic."
+                .into(),
+        );
+    }
+
+    let mut stream = std::net::TcpStream::connect((parsed.host.as_str(), parsed.port))
+        .map_err(|e| format!("Connect to {}:{} failed: {e}", parsed.host, parsed.port))?;
+
     let request = format!(
-        "POST {path} HTTP/1.1\r\nHost: {host}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-        body.len()
+        "{method} {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n{extra_headers}\r\n{body}",
+        method = method,
+        path = parsed.path,
+        host = parsed.host,
+        extra_headers = if body.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "Content-Type: application/json\r\nContent-Length: {}\r\n",
+                body.len()
+            )
+        },
+        body = if body.is_empty() { "" } else { body }
     );
+
     stream
         .write_all(request.as_bytes())
         .map_err(|e| e.to_string())?;
-
     let mut response = String::new();
     stream
         .read_to_string(&mut response)
         .map_err(|e| e.to_string())?;
+    Ok(extract_body(&response))
+}
 
-    let body = response.split("\r\n\r\n").nth(1).unwrap_or(&response);
-    Ok(body.to_string())
+fn extract_body(response: &str) -> String {
+    response
+        .split("\r\n\r\n")
+        .nth(1)
+        .unwrap_or(response)
+        .to_string()
 }
 
 /// Environment variable capability.
