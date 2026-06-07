@@ -839,7 +839,7 @@ fn whisper_to_json(v: &Value) -> Result<serde_json::Value, VmError> {
                 Ok(serde_json::Value::Object(map))
             } else {
                 let arr: Result<Vec<_>, _> =
-                    items.iter().map(|i| whisper_to_json(i)).collect();
+                    items.iter().map(whisper_to_json).collect();
                 Ok(serde_json::Value::Array(arr?))
             }
         }

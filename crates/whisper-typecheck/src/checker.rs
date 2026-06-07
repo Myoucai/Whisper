@@ -211,7 +211,7 @@ impl TypeChecker {
                     self.check_node(item, stack, errors, ctx);
                     if let Some(popped) = stack.pop() {
                         if let Some(ref expected) = elem_type {
-                            if let Err(_) = self.inferer.unify(expected, &popped) {
+                            if self.inferer.unify(expected, &popped).is_err() {
                                 errors.push(TypeError {
                                     message: format!(
                                         "List element type mismatch: expected {}, got {}",
@@ -515,7 +515,7 @@ impl TypeChecker {
         match stack.pop() {
             Some(actual) => {
                 // Unify expected with actual; if it fails, report error but tolerate
-                if let Err(_) = self.inferer.unify(expected, &actual) {
+                if self.inferer.unify(expected, &actual).is_err() {
                     errors.push(TypeError {
                         message: format!(
                             "{}: expected {}, got {}",
