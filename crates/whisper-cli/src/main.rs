@@ -19,7 +19,7 @@ fn help() {
     println!("  whisper lsp                 Start LSP language server");
     println!();
     println!("OPTIONS:");
-    println!("  --target wbin|wasm          Build target (default: wbin)");
+    println!("  --target wbin|wasm|c         Build target (default: wbin)");
     println!("  -o <file>                   Output file path");
     println!("  --allow-http                Enable HTTP capabilities");
     println!("  --allow-file-read           Enable file read capability");

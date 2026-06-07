@@ -43,9 +43,17 @@ pub fn build_file(source: &str, source_dir: &Path, target: &str, output: &str) -
             let size = std::fs::metadata(output).map(|m| m.len()).unwrap_or(0);
             println!("Compiled {} bytes → {}", size, output);
         }
+        "c" => {
+            let c_code = whisper_codegen::compile_to_c(&bytecode);
+            std::fs::write(output, &c_code)
+                .map_err(|e| format!("Failed to write C: {e}"))?;
+            let size = std::fs::metadata(output).map(|m| m.len()).unwrap_or(0);
+            println!("Compiled {} bytes → {}", size, output);
+            println!("Build with: gcc {output} -o program && ./program");
+        }
         other => {
             return Err(format!(
-                "Unknown target: {other}. Supported: wbin, wasm"
+                "Unknown target: {other}. Supported: wbin, wasm, c"
             ));
         }
     }
