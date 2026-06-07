@@ -21,7 +21,7 @@
     read-chunk-acc
 } ;
 
-: read-chunk { .. "" ` read-chunk-acc } ;
+: read-chunk { "" ` read-chunk-acc } ;
 
 // ── String reader: acc src → content rest ──
 : read-str-acc {
