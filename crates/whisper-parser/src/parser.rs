@@ -135,15 +135,11 @@ impl Parser {
         while !self.is_at_end() {
             // Pop out of any open delimiters as we synchronize
             match &self.current().kind {
-                TokenKind::RBrace => {
-                    if self.brace_depth > 0 {
-                        self.brace_depth -= 1;
-                    }
+                TokenKind::RBrace if self.brace_depth > 0 => {
+                    self.brace_depth -= 1;
                 }
-                TokenKind::RBracket => {
-                    if self.bracket_depth > 0 {
-                        self.bracket_depth -= 1;
-                    }
+                TokenKind::RBracket if self.bracket_depth > 0 => {
+                    self.bracket_depth -= 1;
                 }
                 _ => {}
             }
