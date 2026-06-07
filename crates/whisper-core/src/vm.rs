@@ -14,6 +14,17 @@ use crate::opcode::Opcode;
 use crate::value::Value;
 use crate::VmError;
 
+/// Simple xorshift64* PRNG for probabilistic choice (`?|`).
+/// Returns a random f64 in [0.0, 1.0).
+fn xorshift64_next(state: &mut u64) -> f64 {
+    *state ^= *state >> 12;
+    *state ^= *state << 25;
+    *state ^= *state >> 27;
+    // Use the upper 53 bits to get a uniformly distributed f64 in [0, 1)
+    let bits = state.wrapping_mul(0x2545F4914F6CDD1D) >> 11;
+    bits as f64 / (1u64 << 53) as f64
+}
+
 /// A call frame representing an active word/block invocation.
 #[derive(Debug, Clone)]
 pub struct CallFrame {
@@ -41,11 +52,19 @@ pub struct Vm {
     pub memory: Vec<Value>,
     /// Whether to trace execution (debug mode)
     pub trace: bool,
+    /// PRNG state for probabilistic choice (`?|`)
+    rng_state: u64,
 }
 
 impl Vm {
     /// Create a new VM with empty stacks and default settings.
     pub fn new() -> Self {
+        // Seed PRNG with system time for probabilistic choice
+        let seed = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(0xDEAD_BEEF)
+            .wrapping_mul(0x2545F4914F6CDD1D);
         Vm {
             data_stack: Vec::new(),
             call_stack: Vec::new(),
@@ -53,11 +72,17 @@ impl Vm {
             capability_table: CapabilityTable::new(),
             memory: Vec::new(),
             trace: false,
+            rng_state: seed,
         }
     }
 
     /// Create a VM with a pre-bound capability table.
     pub fn with_capabilities(capability_table: CapabilityTable) -> Self {
+        let seed = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos() as u64)
+            .unwrap_or(0xDEAD_BEEF)
+            .wrapping_mul(0x2545F4914F6CDD1D);
         Vm {
             data_stack: Vec::new(),
             call_stack: Vec::new(),
@@ -65,6 +90,7 @@ impl Vm {
             capability_table,
             memory: Vec::new(),
             trace: false,
+            rng_state: seed,
         }
     }
 
@@ -406,12 +432,23 @@ impl Vm {
                     .push(Value::Signal(Box::new(v), confidence));
             }
             Opcode::ProbChoice => {
-                // {alt2} {alt1} ?|  — choose alt1 or alt2 randomly by confidence
-                let _alt2 = self.pop_ref()?;
-                let alt1 = self.pop_ref()?;
-                // Simple: use alt1 (deterministic fallback)
-                // In probability mode, would use confidence-weighted random choice
-                self.execute_ref(&alt1)?;
+                // Stack: ... value {alt2} {alt1}
+                // Pop both alternatives (alt1 on top, pushed second by codegen)
+                let branch_true = self.pop_ref()?;  // alt1 (preferred branch)
+                let branch_false = self.pop_ref()?; // alt2 (fallback branch)
+                // Peek confidence from the value below (don't pop — branch uses it)
+                let confidence = self
+                    .data_stack
+                    .last()
+                    .map(|v| v.confidence())
+                    .unwrap_or(1.0);
+                // Choose branch probabilistically
+                let r = xorshift64_next(&mut self.rng_state);
+                if r < confidence {
+                    self.execute_ref(&branch_true)?;
+                } else {
+                    self.execute_ref(&branch_false)?;
+                }
             }
 
             // === IO ===
@@ -862,5 +899,82 @@ mod tests {
         vm.data_stack.push(token);
         let r = vm.execute(&[Opcode::Call("check".to_string())]).unwrap();
         assert_eq!(r, Some(Value::Bool(true)), "check([0,42]) should be true, got {:?}", r);
+    }
+
+    // === ProbChoice tests ===
+
+    fn make_ref(opcodes: Vec<Opcode>) -> Value {
+        Value::Ref(Rc::from(opcodes.into_boxed_slice()))
+    }
+
+    /// Confidence 1.0 always chooses the preferred branch (alt1).
+    #[test]
+    fn test_prob_choice_full_confidence() {
+        let mut vm = Vm::new();
+        // Stack: value {alt2} {alt1}
+        // alt1 doubles the value, alt2 multiplies by 3
+        let alt1 = make_ref(vec![Opcode::PushI64(2), Opcode::Mul, Opcode::Return]);
+        let alt2 = make_ref(vec![Opcode::PushI64(3), Opcode::Mul, Opcode::Return]);
+        vm.data_stack.push(Value::I64(10));       // value with implicit conf 1.0
+        vm.data_stack.push(alt2);                   // alt2 deeper
+        vm.data_stack.push(alt1);                   // alt1 on top
+        let r = vm.execute(&[Opcode::ProbChoice]).unwrap();
+        // 10 * 2 = 20 (always alt1 when confidence is 1.0)
+        assert_eq!(r, Some(Value::I64(20)), "confidence 1.0 → always alt1");
+    }
+
+    /// Confidence 0.0 always chooses the fallback branch (alt2).
+    #[test]
+    fn test_prob_choice_zero_confidence() {
+        let mut vm = Vm::new();
+        let alt1 = make_ref(vec![Opcode::PushI64(2), Opcode::Mul, Opcode::Return]);
+        let alt2 = make_ref(vec![Opcode::PushI64(3), Opcode::Mul, Opcode::Return]);
+        let conf_val = Value::Signal(Box::new(Value::I64(10)), 0.0);
+        vm.data_stack.push(conf_val);
+        vm.data_stack.push(alt2);
+        vm.data_stack.push(alt1);
+        let val = vm.execute(&[Opcode::ProbChoice]).unwrap().unwrap();
+        // 10 * 3 = 30, wrapped in Signal since confidence propagates
+        assert_eq!(val.unwrap_signal(), Value::I64(30), "confidence 0.0 → always alt2");
+    }
+
+    /// Confidence 0.5 should exercise both branches over many trials.
+    #[test]
+    fn test_prob_choice_even_confidence() {
+        let mut saw_alt1 = false;
+        let mut saw_alt2 = false;
+        for _ in 0..100 {
+            let mut vm = Vm::new();
+            let alt1 = make_ref(vec![Opcode::PushI64(2), Opcode::Mul, Opcode::Return]);
+            let alt2 = make_ref(vec![Opcode::PushI64(3), Opcode::Mul, Opcode::Return]);
+            let conf_val = Value::Signal(Box::new(Value::I64(10)), 0.5);
+            vm.data_stack.push(conf_val);
+            vm.data_stack.push(alt2);
+            vm.data_stack.push(alt1);
+            let r = vm.execute(&[Opcode::ProbChoice]).unwrap();
+            match r.map(|v| v.unwrap_signal()) {
+                Some(Value::I64(20)) => saw_alt1 = true, // 10 * 2
+                Some(Value::I64(30)) => saw_alt2 = true, // 10 * 3
+                _ => {}
+            }
+            if saw_alt1 && saw_alt2 {
+                break;
+            }
+        }
+        assert!(saw_alt1, "ProbChoice with c=0.5 should produce alt1 sometimes");
+        assert!(saw_alt2, "ProbChoice with c=0.5 should produce alt2 sometimes");
+    }
+
+    /// Non-Signal values have implicit confidence 1.0 → always alt1.
+    #[test]
+    fn test_prob_choice_no_signal_value() {
+        let mut vm = Vm::new();
+        let alt1 = make_ref(vec![Opcode::PushI64(2), Opcode::Mul, Opcode::Return]);
+        let alt2 = make_ref(vec![Opcode::PushI64(3), Opcode::Mul, Opcode::Return]);
+        vm.data_stack.push(Value::I64(7)); // implicit conf 1.0
+        vm.data_stack.push(alt2);
+        vm.data_stack.push(alt1);
+        let r = vm.execute(&[Opcode::ProbChoice]).unwrap();
+        assert_eq!(r, Some(Value::I64(14)), "implicit confidence 1.0 → alt1: 7*2=14");
     }
 }
