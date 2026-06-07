@@ -145,45 +145,46 @@ impl Server {
         let diagnostics = if let Some(doc) = self.get_document(uri) {
             let mut diags = Vec::new();
 
-            // Parse diagnostics
-            match Parser::parse_source(&doc.text) {
-                Ok(ast) => {
-                    // Type check
-                    let mut tc = whisper_typecheck::TypeChecker::new();
-                    let type_errors = tc.check(&ast);
-                    for err in &type_errors {
-                        diags.push(Diagnostic {
-                            range: Range {
-                                start: Position::new(0, 0),
-                                end: Position::new(0, 0),
-                            },
-                            severity: Some(DiagnosticSeverity::ERROR),
-                            message: format!("Type error: {}", err.message),
-                            source: Some("whisper".into()),
-                            ..Default::default()
-                        });
-                    }
-                }
-                Err(e) => {
-                    diags.push(Diagnostic {
-                        range: Range {
-                            start: Position::new(
-                                e.token.span.line.saturating_sub(1) as u32,
-                                e.token.span.column.saturating_sub(1) as u32,
-                            ),
-                            end: Position::new(
-                                e.token.span.line.saturating_sub(1) as u32,
-                                (e.token.span.column + e.token.lexeme.len().max(1))
-                                    .saturating_sub(1) as u32,
-                            ),
-                        },
-                        severity: Some(DiagnosticSeverity::ERROR),
-                        message: format!("Parse error: {}", e.message),
-                        source: Some("whisper".into()),
-                        ..Default::default()
-                    });
-                }
+            // Parse with recovery — always get an AST + all errors
+            let (ast, parse_errors) = Parser::parse_source_recovering(&doc.text);
+
+            // Report all parse errors with source locations
+            for err in &parse_errors {
+                diags.push(Diagnostic {
+                    range: Range {
+                        start: Position::new(
+                            err.token.span.line.saturating_sub(1) as u32,
+                            err.token.span.column.saturating_sub(1) as u32,
+                        ),
+                        end: Position::new(
+                            err.token.span.line.saturating_sub(1) as u32,
+                            (err.token.span.column + err.token.lexeme.len().max(1))
+                                .saturating_sub(1) as u32,
+                        ),
+                    },
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    message: format!("Parse error: {}", err.message),
+                    source: Some("whisper".into()),
+                    ..Default::default()
+                });
             }
+
+            // Type-check the best-effort AST
+            let mut tc = whisper_typecheck::TypeChecker::new();
+            let type_errors = tc.check(&ast);
+            for err in &type_errors {
+                diags.push(Diagnostic {
+                    range: Range {
+                        start: Position::new(0, 0),
+                        end: Position::new(0, 0),
+                    },
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    message: format!("Type error: {}", err.message),
+                    source: Some("whisper".into()),
+                    ..Default::default()
+                });
+            }
+
             diags
         } else {
             vec![]

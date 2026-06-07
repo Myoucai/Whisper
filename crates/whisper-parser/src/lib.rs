@@ -8,4 +8,4 @@ pub mod token;
 
 pub use ast::AstNode;
 pub use lexer::Lexer;
-pub use parser::Parser;
+pub use parser::{ParseError, Parser};
