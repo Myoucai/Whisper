@@ -259,6 +259,7 @@ impl BytecodeGenerator {
             Operator::BytesPush => Opcode::BytesPush,
             Operator::BytesLen => Opcode::BytesLen,
             Operator::BytesWriteFile => Opcode::BytesWriteFile,
+            Operator::Try => Opcode::Try,
             Operator::I64ToF64 => Opcode::I64ToF64,
             Operator::F64ToI64 => Opcode::F64ToI64,
             Operator::FSqrt => Opcode::FSqrt,

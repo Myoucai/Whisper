@@ -132,6 +132,8 @@ pub enum Opcode {
     BytesLen,
     /// Write buffer to file: handle filename →
     BytesWriteFile,
+    /// Try-catch: {body} → [#t result] | [#f "error"]
+    Try,
 
     // === Control flow (0x50-0x57) ===
     /// Conditional: if false, jump by offset
@@ -267,6 +269,7 @@ impl Opcode {
             Opcode::BytesPush => 0xBE,
             Opcode::BytesLen => 0xBF,
             Opcode::BytesWriteFile => 0xC0,
+            Opcode::Try => 0xC1,
 
             // Control flow
             Opcode::Cond(_) => 0x50,
@@ -362,6 +365,7 @@ impl Opcode {
             Opcode::BytesPush => "bytes_push",
             Opcode::BytesLen => "bytes_len",
             Opcode::BytesWriteFile => "bytes_write",
+            Opcode::Try => "try",
             Opcode::Cond(_) => "cond",
             Opcode::Jump(_) => "jump",
             Opcode::Loop(_) => "loop",

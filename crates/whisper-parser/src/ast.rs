@@ -132,6 +132,7 @@ pub enum Operator {
     BytesPush,
     BytesLen,
     BytesWriteFile,
+    Try,
 
     // Float
     I64ToF64,

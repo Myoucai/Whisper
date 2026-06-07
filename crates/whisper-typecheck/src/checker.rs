@@ -526,6 +526,11 @@ impl TypeChecker {
                 self.expect(stack, &Type::Str, errors, ctx, "bytes-write filename");
                 self.expect(stack, &Type::I64, errors, ctx, "bytes-write handle");
             }
+            Operator::Try => {
+                self.expect_ref(stack, errors, ctx, "try quot");
+                stack.push(Type::Bool);
+                stack.push(self.inferer.fresh_var());
+            }
 
             // Float ops
             Operator::I64ToF64 => {

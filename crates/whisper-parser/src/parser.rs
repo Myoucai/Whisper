@@ -491,6 +491,10 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::BytesWriteFile)))
             }
+            TokenKind::Try => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Try)))
+            }
 
             // Float operations
             TokenKind::I64ToF64 => {

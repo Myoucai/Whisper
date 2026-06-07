@@ -132,6 +132,7 @@ pub enum TokenKind {
     BytesPush,
     BytesLen,
     BytesWriteFile,
+    Try,
 
     // Float operations
     I64ToF64,

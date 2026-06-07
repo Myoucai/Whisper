@@ -520,6 +520,21 @@ impl Vm {
                 std::fs::write(filename.as_ref(), &data)
                     .map_err(|e| VmError::IoError(e.to_string()))?;
             }
+            Opcode::Try => {
+                let quot = self.pop_ref()?;
+                match self.execute_ref(&quot) {
+                    Ok(()) => {
+                        let val = self.data_stack.pop().unwrap_or(Value::I64(0));
+                        self.data_stack.push(Value::Bool(true));
+                        self.data_stack.push(val);
+                    }
+                    Err(e) => {
+                        self.data_stack.push(Value::Bool(false));
+                        self.data_stack
+                            .push(Value::Str(Rc::new(e.to_string())));
+                    }
+                }
+            }
 
             // === Float operations ===
             Opcode::I64ToF64 => {
