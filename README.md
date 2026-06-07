@@ -18,7 +18,9 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.0.0-7cffc4" alt="version">
-  <img src="https://img.shields.io/badge/tests-50%20passed-brightgreen" alt="tests">
+  <img src="https://img.shields.io/badge/tests-152%20passed-brightgreen" alt="tests">
+<img src="https://img.shields.io/badge/stdlib-9%20modules-blue" alt="stdlib">
+<img src="https://img.shields.io/badge/opcodes-72-orange" alt="opcodes">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
 </p>
 
@@ -125,17 +127,25 @@ whisper run hello.ws
 
 | 功能 | 状态 |
 |------|------|
-| 栈式虚拟机 (56+ opcodes) | ✅ |
-| 静态类型推导 | ✅ |
-| 能力安全沙箱 | ✅ |
-| 置信度系统 | ✅ |
+| 栈式虚拟机 (72 opcodes) | ✅ |
+| 静态类型推导 + 完整类型系统 | ✅ |
+| 能力安全沙箱 (6 caps) | ✅ |
+| 置信度系统 + 概率选择 | ✅ |
 | .wbin 二进制格式 | ✅ |
 | WASM 编译目标 | ✅ |
 | 自举编译器 (whisperc) | ✅ |
-| 包管理器 | ✅ |
+| 包管理器 (传递依赖) | ✅ |
+| 模块/导入系统 | ✅ |
 | VS Code 语法高亮 | ✅ |
+| LSP 语言服务器 | ✅ |
 | 在线 Playground | ✅ |
 | 性能优化器 | ✅ |
+| 错误恢复解析器 | ✅ |
+| 改进 REPL (多行/历史/补全) | ✅ |
+| JSON 解析/序列化 | ✅ |
+| 浮点数学 (三角函数) | ✅ |
+| 字符串操作 (9 ops) | ✅ |
+| 标准库 (9 模块, 48 函数) | ✅ |
 
 ## CLI 命令
 
