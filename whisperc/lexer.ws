@@ -16,6 +16,7 @@
     _ 0 strnth is-ws ??|]             // ws/delim → return acc src
     _ 0 strnth ctos                   // acc src → acc src ch_str
     @ ` strcat                        // rot→src ch_str acc; swap→src acc ch_str; strcat→src new_acc
+    `                                  // new_acc src  (swap to bring src to top)
     striter drop                       // new_acc src[1:]
     read-chunk-acc
 } ;
@@ -30,6 +31,7 @@
     |]
     _ 0 strnth ctos
     @ ` strcat
+    `
     striter drop
     read-str-acc
 } ;
