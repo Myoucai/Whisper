@@ -1,15 +1,21 @@
 //! whisper build — Compile .ws to .wbin or .wasm
 
+use std::path::Path;
 use whisper_codegen::bytecode_gen::BytecodeGenerator;
 use whisper_codegen::wbin::WbinWriter;
 use whisper_parser::Parser;
 
 /// Build a Whisper source file to the specified target format.
-pub fn build_file(source: &str, target: &str, output: &str) -> Result<(), String> {
+pub fn build_file(source: &str, source_dir: &Path, target: &str, output: &str) -> Result<(), String> {
     // Phase 1: Parse
     let ast = Parser::parse_source(source).map_err(|e| {
         format!("Parse error at {}:{}: {}", e.token.span.line, e.token.span.column, e.message)
     })?;
+
+    // Phase 1a: Resolve imports
+    let resolved = whisper_parser::resolve_imports(ast, source_dir)
+        .map_err(|e| format!("Import error: {e}"))?;
+    let ast = resolved.ast;
 
     // Phase 2: Compile to bytecode
     let mut gen = BytecodeGenerator::new();

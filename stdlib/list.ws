@@ -6,4 +6,10 @@
 : sum     { 0 { + } @fold } ;
 : product { 1 { * } @fold } ;
 
-export length push map each fold sum product
+export length
+export push
+export map
+export each
+export fold
+export sum
+export product

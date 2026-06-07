@@ -535,6 +535,10 @@ impl Parser {
                 self.advance();
                 Ok(n)
             }
+            // Builtin operators that can also be used as definition/export names
+            TokenKind::StrLen => { self.advance(); Ok("strlen".into()) }
+            TokenKind::StrCat => { self.advance(); Ok("strcat".into()) }
+            TokenKind::StrSlice => { self.advance(); Ok("strslice".into()) }
             _ => Err(ParseError {
                 message: format!("Expected word, got {:?}", token.kind),
                 token,

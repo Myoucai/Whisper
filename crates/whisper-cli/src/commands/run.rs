@@ -1,13 +1,15 @@
 //! whisper run — Execute a Whisper source file
 
+use std::path::Path;
 use whisper_core::capability::{CapabilityTable, FileReadCap, FileWriteCap};
 use whisper_core::vm::Vm;
 use whisper_codegen::bytecode_gen::BytecodeGenerator;
 use whisper_parser::Parser;
 
 /// Run a Whisper source file with optional capability bindings.
-pub fn run_file(
+pub fn run_source(
     source: &str,
+    source_dir: &Path,
     allow_file_read: bool,
     allow_file_write: bool,
     allow_http: bool,
@@ -16,6 +18,11 @@ pub fn run_file(
     let ast = Parser::parse_source(source).map_err(|e| {
         format!("Parse error at {}:{}: {}", e.token.span.line, e.token.span.column, e.message)
     })?;
+
+    // Phase 1a: Resolve imports
+    let resolved = whisper_parser::resolve_imports(ast, source_dir)
+        .map_err(|e| format!("Import error: {e}"))?;
+    let ast = resolved.ast;
 
     // Phase 1b: Type check
     let mut tc = whisper_typecheck::TypeChecker::new();

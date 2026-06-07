@@ -4,8 +4,10 @@
 pub mod ast;
 pub mod lexer;
 pub mod parser;
+pub mod resolver;
 pub mod token;
 
 pub use ast::AstNode;
 pub use lexer::Lexer;
 pub use parser::{ParseError, Parser};
+pub use resolver::resolve_imports;

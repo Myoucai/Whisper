@@ -1,5 +1,7 @@
 : strlen   { strlen } ;
 : strcat   { strcat } ;
-: strdup   { _ strcat } ;   # dup string then concatenate
+: strdup   { _ strcat } ;
 
-export strlen strcat strdup
+export strlen
+export strcat
+export strdup

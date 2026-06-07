@@ -6,4 +6,10 @@
 : even      { 2 % 0 = } ;
 : odd       { 2 % 0 != } ;
 
-export sq cube abs factorial fib even odd
+export sq
+export cube
+export abs
+export factorial
+export fib
+export even
+export odd

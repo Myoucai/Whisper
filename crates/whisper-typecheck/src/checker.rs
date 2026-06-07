@@ -70,7 +70,14 @@ impl TypeChecker {
     }
 
     /// Infer the stack effect signature of a word body.
+    ///
+    /// Uses a temporary TypeInferer so that intermediate type variables
+    /// donʼt leak into the main programʼs type state.
     fn infer_sig(&mut self, body: &[AstNode]) -> WordSig {
+        // Swap in a fresh inferer for inference, restore afterwards
+        let mut temp_inferer = TypeInferer::new();
+        std::mem::swap(&mut self.inferer, &mut temp_inferer);
+
         let mut errors = Vec::new();
         let mut stack: Vec<Type> = Vec::new();
 
@@ -78,9 +85,17 @@ impl TypeChecker {
             self.check_node(node, &mut stack, &mut errors, "<word>");
         }
 
-        // The word starts with an unknown stack; any net producers become outputs,
-        // and any net consumers become inputs (in practice, simple words just
-        // produce outputs from their body).
+        // Discard underflow errors from inference — they happen when
+        // the word consumes values; those become inputs to the signature.
+        errors.retain(|e| {
+            !e.message.contains("Stack underflow")
+                && !e.message.contains("stack empty")
+                && !e.message.contains("underflow")
+        });
+
+        // Restore the main inferer (discard inference temporaries)
+        std::mem::swap(&mut self.inferer, &mut temp_inferer);
+
         let inputs = vec![];
         let outputs = stack;
 

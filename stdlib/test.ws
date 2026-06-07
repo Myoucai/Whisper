@@ -2,4 +2,6 @@
 : assert-false { ! assert-true } ;
 : assert-eq    { = assert-true } ;
 
-export assert-true assert-false assert-eq
+export assert-true
+export assert-false
+export assert-eq

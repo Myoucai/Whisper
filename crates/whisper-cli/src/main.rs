@@ -74,8 +74,10 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
     let file = args.get(2).ok_or("Expected: whisper run <file.ws>")?;
     let source = std::fs::read_to_string(file)
         .map_err(|e| format!("Cannot read '{file}': {e}"))?;
-    commands::run::run_file(
+    let source_dir = std::path::Path::new(file).parent().unwrap_or(std::path::Path::new("."));
+    commands::run::run_source(
         &source,
+        source_dir,
         get_flag(args, "--allow-file-read"),
         get_flag(args, "--allow-file-write"),
         get_flag(args, "--allow-http"),
@@ -91,7 +93,8 @@ fn cmd_build(args: &[String]) -> Result<(), String> {
     });
     let source = std::fs::read_to_string(file)
         .map_err(|e| format!("Cannot read '{file}': {e}"))?;
-    commands::build::build_file(&source, &target, &output)
+    let source_dir = std::path::Path::new(file).parent().unwrap_or(std::path::Path::new("."));
+    commands::build::build_file(&source, source_dir, &target, &output)
 }
 
 fn cmd_check(args: &[String]) -> Result<(), String> {
