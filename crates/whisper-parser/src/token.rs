@@ -128,6 +128,10 @@ pub enum TokenKind {
     StrIter,
     ListFind,
     StrJoin,
+    BytesNew,
+    BytesPush,
+    BytesLen,
+    BytesWriteFile,
 
     // Float operations
     I64ToF64,

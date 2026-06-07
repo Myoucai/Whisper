@@ -128,6 +128,10 @@ pub enum Operator {
     StrIter,
     ListFind,
     StrJoin,
+    BytesNew,
+    BytesPush,
+    BytesLen,
+    BytesWriteFile,
 
     // Float
     I64ToF64,

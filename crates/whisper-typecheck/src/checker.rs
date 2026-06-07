@@ -510,6 +510,22 @@ impl TypeChecker {
                 );
                 stack.push(Type::Str);
             }
+            Operator::BytesNew => {
+                stack.push(Type::I64); // returns handle
+            }
+            Operator::BytesPush => {
+                self.expect(stack, &Type::I64, errors, ctx, "bytes-push byte");
+                self.expect(stack, &Type::I64, errors, ctx, "bytes-push handle");
+                stack.push(Type::I64);
+            }
+            Operator::BytesLen => {
+                self.expect(stack, &Type::I64, errors, ctx, "bytes-len handle");
+                stack.push(Type::I64);
+            }
+            Operator::BytesWriteFile => {
+                self.expect(stack, &Type::Str, errors, ctx, "bytes-write filename");
+                self.expect(stack, &Type::I64, errors, ctx, "bytes-write handle");
+            }
 
             // Float ops
             Operator::I64ToF64 => {

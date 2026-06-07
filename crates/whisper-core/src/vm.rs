@@ -57,6 +57,8 @@ pub struct Vm {
     /// Single-entry word lookup cache: (last_name, last_code).
     /// Avoids HashMap lookup on repeated calls to the same word.
     word_cache: Option<(String, Vec<Opcode>)>,
+    /// Byte buffers for binary output (BytesNew, BytesPush, etc.).
+    byte_buffers: Vec<Vec<u8>>,
 }
 
 impl Vm {
@@ -77,6 +79,7 @@ impl Vm {
             trace: false,
             rng_state: seed,
             word_cache: None,
+            byte_buffers: Vec::new(),
         }
     }
 
@@ -96,6 +99,7 @@ impl Vm {
             trace: false,
             rng_state: seed,
             word_cache: None,
+            byte_buffers: Vec::new(),
         }
     }
 
@@ -475,6 +479,46 @@ impl Vm {
                     })
                     .collect();
                 self.data_stack.push(Value::Str(Rc::new(result)));
+            }
+
+            // === Binary output ===
+            Opcode::BytesNew => {
+                self.byte_buffers.push(Vec::new());
+                let handle = (self.byte_buffers.len() - 1) as i64;
+                self.data_stack.push(Value::I64(handle));
+            }
+            Opcode::BytesPush => {
+                let byte = self.pop_i64()? as u8;
+                let handle = self.pop_i64()? as usize;
+                if handle >= self.byte_buffers.len() {
+                    return Err(VmError::ProgramError(format!(
+                        "BytesPush: invalid handle {handle}"
+                    )));
+                }
+                self.byte_buffers[handle].push(byte);
+                self.data_stack.push(Value::I64(handle as i64));
+            }
+            Opcode::BytesLen => {
+                let handle = self.pop_i64()? as usize;
+                if handle >= self.byte_buffers.len() {
+                    return Err(VmError::ProgramError(format!(
+                        "BytesLen: invalid handle {handle}"
+                    )));
+                }
+                let len = self.byte_buffers[handle].len() as i64;
+                self.data_stack.push(Value::I64(len));
+            }
+            Opcode::BytesWriteFile => {
+                let filename = self.pop_str()?;
+                let handle = self.pop_i64()? as usize;
+                if handle >= self.byte_buffers.len() {
+                    return Err(VmError::ProgramError(format!(
+                        "BytesWriteFile: invalid handle {handle}"
+                    )));
+                }
+                let data = std::mem::take(&mut self.byte_buffers[handle]);
+                std::fs::write(filename.as_ref(), &data)
+                    .map_err(|e| VmError::IoError(e.to_string()))?;
             }
 
             // === Float operations ===

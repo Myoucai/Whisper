@@ -235,6 +235,10 @@ impl WbinReader {
             0xBA => Ok(Opcode::StrIter),
             0xBB => Ok(Opcode::ListFind),
             0xBC => Ok(Opcode::StrJoin),
+            0xBD => Ok(Opcode::BytesNew),
+            0xBE => Ok(Opcode::BytesPush),
+            0xBF => Ok(Opcode::BytesLen),
+            0xC0 => Ok(Opcode::BytesWriteFile),
 
             // Float ops
             0xB0 => Ok(Opcode::I64ToF64),

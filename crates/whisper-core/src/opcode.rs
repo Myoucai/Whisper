@@ -123,6 +123,16 @@ pub enum Opcode {
     /// Join list of strings: [str…] → str
     StrJoin,
 
+    // === Binary output (0xBD-0xC0) ===
+    /// Create new byte buffer: → handle(i64)
+    BytesNew,
+    /// Push byte to buffer: handle byte → handle
+    BytesPush,
+    /// Get buffer length: handle → i64
+    BytesLen,
+    /// Write buffer to file: handle filename →
+    BytesWriteFile,
+
     // === Control flow (0x50-0x57) ===
     /// Conditional: if false, jump by offset
     Cond(i32),
@@ -253,6 +263,10 @@ impl Opcode {
             Opcode::StrIter => 0xBA,
             Opcode::ListFind => 0xBB,
             Opcode::StrJoin => 0xBC,
+            Opcode::BytesNew => 0xBD,
+            Opcode::BytesPush => 0xBE,
+            Opcode::BytesLen => 0xBF,
+            Opcode::BytesWriteFile => 0xC0,
 
             // Control flow
             Opcode::Cond(_) => 0x50,
@@ -344,6 +358,10 @@ impl Opcode {
             Opcode::StrIter => "striter",
             Opcode::ListFind => "listfind",
             Opcode::StrJoin => "strjoin",
+            Opcode::BytesNew => "bytes_new",
+            Opcode::BytesPush => "bytes_push",
+            Opcode::BytesLen => "bytes_len",
+            Opcode::BytesWriteFile => "bytes_write",
             Opcode::Cond(_) => "cond",
             Opcode::Jump(_) => "jump",
             Opcode::Loop(_) => "loop",

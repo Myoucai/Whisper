@@ -475,6 +475,22 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::StrJoin)))
             }
+            TokenKind::BytesNew => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::BytesNew)))
+            }
+            TokenKind::BytesPush => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::BytesPush)))
+            }
+            TokenKind::BytesLen => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::BytesLen)))
+            }
+            TokenKind::BytesWriteFile => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::BytesWriteFile)))
+            }
 
             // Float operations
             TokenKind::I64ToF64 => {
