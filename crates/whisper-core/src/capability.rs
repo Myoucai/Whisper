@@ -327,3 +327,78 @@ fn http_post(url: &str, body: &str) -> Result<String, String> {
     Ok(body.to_string())
 }
 
+/// Environment variable capability.
+pub struct EnvCap {
+    pub id: u16,
+}
+
+impl Capability for EnvCap {
+    fn id(&self) -> u16 { self.id }
+    fn name(&self) -> &str { "env" }
+    fn description(&self) -> &str { "Read environment variables" }
+
+    fn call(&self, data_stack: &mut Vec<Value>, args: &[Value]) -> Result<(), VmError> {
+        if args.is_empty() {
+            return Err(VmError::ProgramError("env: expected variable name".into()));
+        }
+        let name = match &args[0] {
+            Value::Str(s) => s.as_ref().clone(),
+            other => return Err(VmError::TypeMismatch {
+                expected: "str".into(), actual: other.type_name().into(),
+            }),
+        };
+        let value = std::env::var(&name).unwrap_or_default();
+        data_stack.push(Value::Str(std::rc::Rc::new(value)));
+        Ok(())
+    }
+}
+
+/// Shell command execution capability.
+pub struct ExecCap {
+    pub id: u16,
+}
+
+impl Capability for ExecCap {
+    fn id(&self) -> u16 { self.id }
+    fn name(&self) -> &str { "exec" }
+    fn description(&self) -> &str { "Execute shell commands" }
+
+    fn call(&self, data_stack: &mut Vec<Value>, args: &[Value]) -> Result<(), VmError> {
+        if args.is_empty() {
+            return Err(VmError::ProgramError("exec: expected command string".into()));
+        }
+        let cmd = match &args[0] {
+            Value::Str(s) => s.as_ref().clone(),
+            other => return Err(VmError::TypeMismatch {
+                expected: "str".into(), actual: other.type_name().into(),
+            }),
+        };
+
+        #[cfg(windows)]
+        let output = std::process::Command::new("cmd")
+            .args(["/C", &cmd])
+            .output();
+        #[cfg(not(windows))]
+        let output = std::process::Command::new("sh")
+            .args(["-c", &cmd])
+            .output();
+
+        match output {
+            Ok(out) => {
+                let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+                let status = out.status.code().unwrap_or(-1) as i64;
+                // Push [status, stdout, stderr]
+                use std::rc::Rc;
+                data_stack.push(Value::List(Rc::new(vec![
+                    Value::I64(status),
+                    Value::Str(Rc::new(stdout)),
+                    Value::Str(Rc::new(stderr)),
+                ])));
+                Ok(())
+            }
+            Err(e) => Err(VmError::IoError(e.to_string())),
+        }
+    }
+}
+

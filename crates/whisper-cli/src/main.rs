@@ -24,6 +24,8 @@ fn help() {
     println!("  --allow-http                Enable HTTP capabilities");
     println!("  --allow-file-read           Enable file read capability");
     println!("  --allow-file-write          Enable file write capability");
+    println!("  --allow-env                 Enable env var capability");
+    println!("  --allow-exec                Enable command execution capability");
     println!("  --help, -h                  Show this help");
     println!("  --version, -V               Show version");
 }
@@ -71,7 +73,9 @@ fn get_opt(args: &[String], flag: &str) -> Option<String> {
 }
 
 fn cmd_run(args: &[String]) -> Result<(), String> {
-    let file = args.get(2).ok_or("Expected: whisper run <file.ws>")?;
+    // Find the first non-flag argument as the file path
+    let file = args.iter().skip(2).find(|a| !a.starts_with('-'))
+        .ok_or("Expected: whisper run <file.ws>")?;
     let source = std::fs::read_to_string(file)
         .map_err(|e| format!("Cannot read '{file}': {e}"))?;
     let source_dir = std::path::Path::new(file).parent().unwrap_or(std::path::Path::new("."));
@@ -81,11 +85,14 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
         get_flag(args, "--allow-file-read"),
         get_flag(args, "--allow-file-write"),
         get_flag(args, "--allow-http"),
+        get_flag(args, "--allow-env"),
+        get_flag(args, "--allow-exec"),
     )
 }
 
 fn cmd_build(args: &[String]) -> Result<(), String> {
-    let file = args.get(2).ok_or("Expected: whisper build <file.ws>")?;
+    let file = args.iter().skip(2).find(|a| !a.starts_with('-'))
+        .ok_or("Expected: whisper build <file.ws>")?;
     let target = get_opt(args, "--target").unwrap_or_else(|| "wbin".into());
     let output = get_opt(args, "-o").unwrap_or_else(|| {
         let ext = if target == "wasm" { "wasm" } else { "wbin" };

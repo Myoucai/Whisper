@@ -13,6 +13,8 @@ pub fn run_source(
     allow_file_read: bool,
     allow_file_write: bool,
     allow_http: bool,
+    allow_env: bool,
+    allow_exec: bool,
 ) -> Result<(), String> {
     // Phase 1: Parse source to AST
     let ast = Parser::parse_source(source).map_err(|e| {
@@ -66,6 +68,12 @@ pub fn run_source(
             id: 3,
             allowed_hosts: vec!["api.github.com".into(), "jsonplaceholder.typicode.com".into()],
         }));
+    }
+    if allow_env {
+        capability_table.bind(Box::new(whisper_core::capability::EnvCap { id: 4 }));
+    }
+    if allow_exec {
+        capability_table.bind(Box::new(whisper_core::capability::ExecCap { id: 5 }));
     }
 
     let mut vm = Vm::with_capabilities(capability_table);
