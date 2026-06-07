@@ -208,9 +208,33 @@ impl Server {
         let uri = &params.text_document_position_params.text_document.uri;
         let doc = self.get_document(uri)?;
 
-        // Find the word/operator at the cursor position
         let word = word_at_position(&doc.text, pos)?;
-        let contents = hover_info(&word);
+
+        // Build enhanced hover with type signature
+        let mut contents = hover_info(&word);
+
+        // If this is a user-defined word, append its type signature
+        if let Ok(ast) = Parser::parse_source(&doc.text) {
+            let mut tc = whisper_typecheck::TypeChecker::new();
+            let _ = tc.check(&ast);
+            if let Some(sig) = tc.word_sigs.get(&word) {
+                let in_str: Vec<String> = sig.inputs.iter().map(|t| format!("{}", tc.inferer.resolve(t))).collect();
+                let out_str: Vec<String> = sig.outputs.iter().map(|t| format!("{}", tc.inferer.resolve(t))).collect();
+                contents.push_str(&format!(
+                    "\n\n**Type:** `[{}] → [{}]`",
+                    in_str.join(" "),
+                    out_str.join(" ")
+                ));
+            } else if let Some((inputs, outputs)) = whisper_typecheck::builtins::get_builtin_signature(&word) {
+                let in_str: Vec<String> = inputs.iter().map(|t| format!("{t}")).collect();
+                let out_str: Vec<String> = outputs.iter().map(|t| format!("{t}")).collect();
+                contents.push_str(&format!(
+                    "\n\n**Type:** `[{}] → [{}]`",
+                    in_str.join(" "),
+                    out_str.join(" ")
+                ));
+            }
+        }
 
         Some(Hover {
             contents: HoverContents::Markup(MarkupContent {
@@ -228,27 +252,18 @@ impl Server {
         let uri = &params.text_document_position_params.text_document.uri;
         let doc = self.get_document(uri)?;
 
-        // Find the word at cursor and locate its definition
         let word = word_at_position(&doc.text, pos)?;
 
-        // Search for word definition in the document
-        if let Ok(ast) = Parser::parse_source(&doc.text) {
-            for node in &ast {
-                if let AstNode::Def { name, .. } = node {
-                    if name == &word {
-                        // Return the same document location for now
-                        return Some(GotoDefinitionResponse::Scalar(Location {
-                            uri: uri.clone(),
-                            range: Range {
-                                start: Position::new(0, 0),
-                                end: Position::new(0, 0),
-                            },
-                        }));
-                    }
-                }
-            }
-        }
-        None
+        // Search for actual source position of ': wordname'
+        let def_pos = find_definition_position(&doc.text, &word)?;
+
+        Some(GotoDefinitionResponse::Scalar(Location {
+            uri: uri.clone(),
+            range: Range {
+                start: Position::new(def_pos.line, def_pos.col),
+                end: Position::new(def_pos.line, def_pos.col + word.len() as u32 + 2),
+            },
+        }))
     }
 
     fn document_symbols(&self, req: &Request) -> Option<DocumentSymbolResponse> {
@@ -260,17 +275,19 @@ impl Server {
         if let Ok(ast) = Parser::parse_source(&doc.text) {
             for node in &ast {
                 if let AstNode::Def { name, body } = node {
+                    let def_pos = find_definition_position(&doc.text, name)
+                        .unwrap_or(DefPosition { line: 0, col: 0 });
                     symbols.push(DocumentSymbol {
                         name: name.clone(),
-                        detail: Some(format!("Word definition ({} nodes)", body.len())),
+                        detail: Some(format!("({} nodes)", body.len())),
                         kind: SymbolKind::FUNCTION,
                         range: Range {
-                            start: Position::new(0, 0),
-                            end: Position::new(0, 0),
+                            start: Position::new(def_pos.line, def_pos.col),
+                            end: Position::new(def_pos.line, def_pos.col + 1),
                         },
                         selection_range: Range {
-                            start: Position::new(0, 0),
-                            end: Position::new(0, 0),
+                            start: Position::new(def_pos.line, def_pos.col + 2),
+                            end: Position::new(def_pos.line, def_pos.col + 2 + name.len() as u32),
                         },
                         children: None,
                         tags: None,
@@ -291,61 +308,67 @@ impl Server {
 
         let mut items = Vec::new();
 
-        // Builtin operators
-        let builtins = [
-            ("dup", "_ — duplicate top of stack"),
-            ("swap", "` — swap top two elements"),
-            ("drop", "drop — discard top of stack"),
-            ("rot", "@ — rotate top three elements"),
-            ("+", "Add: a b → a+b"),
-            ("-", "Subtract: a b → a−b"),
-            ("*", "Multiply: a b → a×b"),
-            ("/", "Divide: a b → a÷b"),
-            ("mod", "Modulo: a b → a%b"),
-            ("=", "Equal: a b → a==b"),
-            ("<", "Less than: a b → a<b"),
-            (">", "Greater than: a b → a>b"),
-            ("!=", "Not equal: a b → a!=b"),
-            ("<=", "Less/equal: a b → a≤b"),
-            (">=", "Greater/equal: a b → a≥b"),
-            ("&", "AND: a b → a&&b"),
-            ("|", "OR: a b → a||b"),
-            ("!", "NOT: a → !a"),
-            ("@nth", "Take nth element: list n → elem"),
-            ("append", "Append: list elem → new-list"),
-            ("len", "Length: list → count"),
-            ("@map", "Map: list quot → new-list"),
-            ("@each", "Each: list quot →"),
-            ("@fold", "Fold: list init quot → result"),
-            ("@times", "Times: n quot →"),
-            ("strlen", "String length: str → count"),
-            ("strcat", "String concat: str1 str2 → str3"),
-            ("strslice", "Substring: str start len → substr"),
-            ("streq", "String equality: str1 str2 → bool"),
-            ("strlt", "String less-than: str1 str2 → bool"),
-            ("strfind", "Find substring: str pattern → index"),
-            ("strreplace", "Replace: str old new → str"),
-            ("strtoi64", "Parse string to i64: str → i64"),
-            ("i64tostr", "Format i64 to string: i64 → str"),
-            ("i64tof64", "Convert i64 to f64: i64 → f64"),
-            ("f64toi64", "Convert f64 to i64 (truncate)"),
-            ("fsqrt", "Square root: f64 → f64"),
-            ("fsin", "Sine (radians): f64 → f64"),
-            ("fcos", "Cosine (radians): f64 → f64"),
-            ("ftan", "Tangent (radians): f64 → f64"),
-            ("json-parse", "Parse JSON string → Whisper value"),
-            ("json-stringify", "Serialize value → JSON string"),
-            (".", "Output top of stack"),
-            ("..", "Output entire stack"),
-            (",", "Read input"),
-            ("import", "Import module"),
-            ("export", "Export word"),
+        // Builtin operators with type signatures
+        let builtins: Vec<(&str, &str, Option<&str>)> = vec![
+            // (name, description, optional type signature)
+            ("dup", "_ — duplicate top of stack",     Some("a → a a")),
+            ("swap", "` — swap top two elements",     Some("a b → b a")),
+            ("drop", "drop — discard top of stack",   Some("a →")),
+            ("rot", "@ — rotate top three elements",  Some("a b c → b c a")),
+            ("+", "Add: a b → a+b",                   Some("num num → num")),
+            ("-", "Subtract: a b → a−b",              Some("num num → num")),
+            ("*", "Multiply: a b → a×b",              Some("num num → num")),
+            ("/", "Divide: a b → a÷b",                Some("num num → num")),
+            ("mod", "Modulo: a b → a%b",              Some("i64 i64 → i64")),
+            ("=", "Equal: a b → a==b",                Some("a b → bool")),
+            ("<", "Less than: a b → a<b",             Some("num num → bool")),
+            (">", "Greater than: a b → a>b",          Some("num num → bool")),
+            ("!=", "Not equal: a b → a!=b",           Some("a b → bool")),
+            ("<=", "Less/equal: a b → a≤b",           Some("num num → bool")),
+            (">=", "Greater/equal: a b → a≥b",        Some("num num → bool")),
+            ("&", "AND: a b → a&&b",                  Some("bool bool → bool")),
+            ("|", "OR: a b → a||b",                   Some("bool bool → bool")),
+            ("!", "NOT: a → !a",                      Some("bool → bool")),
+            ("@nth", "list n → element",              Some("[T] i64 → T")),
+            ("append", "list elem → new-list",        Some("[T] T → [T]")),
+            ("len", "list → count",                   Some("[T] → i64")),
+            ("@map", "list quot → new-list",          Some("[T] ref → [U]")),
+            ("@each", "list quot →",                  Some("[T] ref →")),
+            ("@fold", "list init quot → result",      Some("[T] T ref → T")),
+            ("@times", "n quot →",                    Some("i64 ref →")),
+            ("strlen", "str → count",                 Some("str → i64")),
+            ("strcat", "str1 str2 → str3",            Some("str str → str")),
+            ("strslice", "str start len → substr",    Some("str i64 i64 → str")),
+            ("streq", "str1 str2 → bool",             Some("str str → bool")),
+            ("strlt", "str1 str2 → bool",             Some("str str → bool")),
+            ("strfind", "str pattern → index",        Some("str str → i64")),
+            ("strreplace", "str old new → str",       Some("str str str → str")),
+            ("strtoi64", "str → i64",                 Some("str → i64")),
+            ("i64tostr", "i64 → str",                 Some("i64 → str")),
+            ("i64tof64", "i64 → f64",                 Some("i64 → f64")),
+            ("f64toi64", "f64 → i64 (truncate)",      Some("f64 → i64")),
+            ("fsqrt", "√: f64 → f64",                 Some("f64 → f64")),
+            ("fsin", "sin: f64 → f64",                Some("f64 → f64")),
+            ("fcos", "cos: f64 → f64",                Some("f64 → f64")),
+            ("ftan", "tan: f64 → f64",                Some("f64 → f64")),
+            ("json-parse", "Parse JSON: str → value", Some("str → value")),
+            ("json-stringify", "To JSON: value → str",Some("value → str")),
+            (".", "Output top of stack",             Some("a →")),
+            ("..", "Output entire stack",            None),
+            (",", "Read input",                      Some("→ str")),
+            ("import", "Import module",              None),
+            ("export", "Export word",                None),
         ];
 
-        for (name, desc) in &builtins {
+        for (name, desc, type_sig) in &builtins {
+            let detail = if let Some(sig) = type_sig {
+                format!("{desc}  |  {sig}")
+            } else {
+                desc.to_string()
+            };
             items.push(CompletionItem {
                 label: name.to_string(),
-                detail: Some(desc.to_string()),
+                detail: Some(detail),
                 kind: Some(if name.starts_with('@') {
                     CompletionItemKind::METHOD
                 } else if name.chars().all(|c| c.is_ascii_punctuation()) {
@@ -357,13 +380,22 @@ impl Server {
             });
         }
 
-        // User-defined words
+        // User-defined words with inferred type signatures
         if let Ok(ast) = Parser::parse_source(&doc.text) {
+            let mut tc = whisper_typecheck::TypeChecker::new();
+            let _ = tc.check(&ast);
             for node in &ast {
                 if let AstNode::Def { name, body } = node {
+                    let type_info = if let Some(sig) = tc.word_sigs.get(name) {
+                        let in_str: Vec<String> = sig.inputs.iter().map(|t| format!("{}", tc.inferer.resolve(t))).collect();
+                        let out_str: Vec<String> = sig.outputs.iter().map(|t| format!("{}", tc.inferer.resolve(t))).collect();
+                        format!(" | [{}] → [{}]", in_str.join(" "), out_str.join(" "))
+                    } else {
+                        format!(" | ({} nodes)", body.len())
+                    };
                     items.push(CompletionItem {
                         label: name.clone(),
-                        detail: Some(format!("User word ({} nodes)", body.len())),
+                        detail: Some(type_info),
                         kind: Some(CompletionItemKind::FUNCTION),
                         ..Default::default()
                     });
@@ -494,6 +526,26 @@ fn hover_info(word: &str) -> String {
 
         _ => format!("**{word}** — no documentation available"),
     }
+}
+
+/// Source position of a definition.
+struct DefPosition {
+    line: u32,
+    col: u32,
+}
+
+/// Find the source position of `: wordname` in the document text.
+fn find_definition_position(text: &str, word: &str) -> Option<DefPosition> {
+    let pattern = format!(": {}", word);
+    for (line_idx, line) in text.lines().enumerate() {
+        if let Some(col) = line.find(&pattern) {
+            return Some(DefPosition {
+                line: line_idx as u32,
+                col: col as u32,
+            });
+        }
+    }
+    None
 }
 
 /// Run the LSP server over stdio.
