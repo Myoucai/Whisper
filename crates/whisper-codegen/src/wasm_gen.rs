@@ -434,7 +434,7 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     b.push(w::I32_LOAD);
     b.push(2);
     b.push(0); // inner_len
-    // ip += 4 + inner_len  (skip len field + inner ops)
+               // ip += 4 + inner_len  (skip len field + inner ops)
     ld_i32(&mut b, 0x0004);
     b.push(w::I32_ADD);
     ci32(&mut b, 4);
@@ -735,13 +735,13 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     b.push(w::I64_STORE);
     b.push(3);
     b.push(0); // scratch[0x1060] = count (i64)
-    // Pop ref_ptr (i64) from data stack
+               // Pop ref_ptr (i64) from data stack
     pop(&mut b);
     ci32(&mut b, 0x1068);
     b.push(w::I64_STORE);
     b.push(3);
     b.push(0); // scratch[0x1068] = ref_ptr (i64)
-    // Check count > 0; if not, skip
+               // Check count > 0; if not, skip
     ci32(&mut b, 0x1060);
     b.push(w::I64_LOAD);
     b.push(3);
@@ -756,7 +756,7 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     b.push(w::I32_LOAD);
     b.push(2);
     b.push(0); // low 32 bits of ref_ptr
-    // Read inner_len from [ref_ptr]
+               // Read inner_len from [ref_ptr]
     b.push(w::I32_LOAD);
     b.push(2);
     b.push(0); // inner_len
@@ -764,7 +764,7 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     b.push(w::I32_STORE);
     b.push(2);
     b.push(0); // scratch[0x1070] = inner_len
-    // inner_start = ref_ptr + 4
+               // inner_start = ref_ptr + 4
     ci32(&mut b, 0x1068);
     b.push(w::I32_LOAD);
     b.push(2);
@@ -775,7 +775,7 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     b.push(w::I32_STORE);
     b.push(2);
     b.push(0); // scratch[0x1074] = inner_start
-    // inner_end = inner_start + inner_len
+               // inner_end = inner_start + inner_len
     ci32(&mut b, 0x1074);
     b.push(w::I32_LOAD);
     b.push(2);
@@ -789,20 +789,20 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     b.push(w::I32_STORE);
     b.push(2);
     b.push(0); // scratch[0x1078] = inner_end
-    // count_i32 = (i32)(count_i64) for iteration counter
+               // count_i32 = (i32)(count_i64) for iteration counter
     ci32(&mut b, 0x1060);
     b.push(w::I32_LOAD);
     b.push(2);
     b.push(0); // low 32 bits of count
-    // remaining = count_i32 - 1 (first iteration starts now)
+               // remaining = count_i32 - 1 (first iteration starts now)
     ci32(&mut b, 1);
     b.push(w::I32_SUB);
     ci32(&mut b, 0x107C);
     b.push(w::I32_STORE);
     b.push(2);
     b.push(0); // scratch[0x107C] = remaining
-    // Save context onto call stack
-    // depth = load(0x1050)
+               // Save context onto call stack
+               // depth = load(0x1050)
     ci32(&mut b, 0x1050);
     b.push(w::I32_LOAD);
     b.push(2);
@@ -811,7 +811,7 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     b.push(w::I32_STORE);
     b.push(2);
     b.push(0); // scratch[0x1080] = depth
-    // frame = 0x1054 + depth * 20
+               // frame = 0x1054 + depth * 20
     ci32(&mut b, 0x1080);
     b.push(w::I32_LOAD);
     b.push(2);
@@ -824,7 +824,7 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     b.push(w::I32_STORE);
     b.push(2);
     b.push(0); // scratch[0x1084] = frame_addr
-    // frame[0] = current_ip (saved_ip)
+               // frame[0] = current_ip (saved_ip)
     ld_i32(&mut b, 0x0004);
     ci32(&mut b, 0x1084);
     b.push(w::I32_LOAD);

@@ -233,7 +233,9 @@ impl Capability for HttpGetCap {
             }
         };
 
-        let host = parse_url(&url_str).map(|u| u.host).unwrap_or_else(|| url_str.clone());
+        let host = parse_url(&url_str)
+            .map(|u| u.host)
+            .unwrap_or_else(|| url_str.clone());
         if !host_allowed(&host, &self.allowed_hosts) {
             return Err(VmError::CapabilityDenied(format!(
                 "Host '{}' not in allowed hosts: {:?}",
@@ -293,7 +295,9 @@ impl Capability for HttpPostCap {
             }
         };
 
-        let host = parse_url(&url_str).map(|u| u.host).unwrap_or_else(|| url_str.clone());
+        let host = parse_url(&url_str)
+            .map(|u| u.host)
+            .unwrap_or_else(|| url_str.clone());
         if !host_allowed(&host, &self.allowed_hosts) {
             return Err(VmError::CapabilityDenied(format!(
                 "Host '{}' not allowed",
