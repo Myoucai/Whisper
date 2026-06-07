@@ -133,12 +133,215 @@ fn ast_to_whisper_tokens(nodes: &[AstNode]) -> Value {
                     inner,
                 ])));
             }
-            // Word definitions, conds, loops, etc. are handled by the Rust
-            // compiler separately — whisperc only sees the main program body.
             _ => {}
         }
     }
     Value::List(Rc::new(tokens))
+}
+
+/// Classify a flat list of chunk strings (from whisperc lexer) into
+/// numeric token Values with nested grouping for { } blocks.
+fn classify_chunks(chunks: &[String]) -> Vec<Value> {
+    let mut tokens = Vec::new();
+    let mut i = 0;
+    while i < chunks.len() {
+        let chunk = &chunks[i];
+        match chunk.as_str() {
+            // Delimiters for grouping
+            "{" => {
+                // Collect inner chunks until matching }
+                let (inner, next) = collect_until(chunks, i + 1, "}");
+                tokens.push(Value::List(Rc::new(vec![
+                    Value::I64(5),
+                    Value::List(Rc::new(classify_chunks(&inner))),
+                ])));
+                i = next;
+            }
+            "}" => {
+                // Stray closing brace — emit as marker (shouldn't happen normally)
+                i += 1;
+            }
+            // Bool literals
+            "#t" => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(13), Value::I64(1)])));
+                i += 1;
+            }
+            "#f" => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(13), Value::I64(0)])));
+                i += 1;
+            }
+            // Operators
+            "+" => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x10)])));
+                i += 1;
+            }
+            "-" => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x11)])));
+                i += 1;
+            }
+            "*" => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x12)])));
+                i += 1;
+            }
+            "/" => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x13)])));
+                i += 1;
+            }
+            "=" => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x18)])));
+                i += 1;
+            }
+            "<" => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x19)])));
+                i += 1;
+            }
+            ">" => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1A)])));
+                i += 1;
+            }
+            "!=" => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1B)])));
+                i += 1;
+            }
+            "<=" => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1C)])));
+                i += 1;
+            }
+            ">=" => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1D)])));
+                i += 1;
+            }
+            "&" => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x20)])));
+                i += 1;
+            }
+            "|" => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x21)])));
+                i += 1;
+            }
+            "!" => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x22)])));
+                i += 1;
+            }
+            "_" => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x00)])));
+                i += 1;
+            }
+            "`" => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x01)])));
+                i += 1;
+            }
+            "@" => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x03)])));
+                i += 1;
+            }
+            "." => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x90)])));
+                i += 1;
+            }
+            "," => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x92)])));
+                i += 1;
+            }
+            ".." => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x91)])));
+                i += 1;
+            }
+            "%" => {
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x14)])));
+                i += 1;
+            }
+            ":" | ";" | "[" | "]" => {
+                // Structural markers — skip for now (handled by Rust AST)
+                i += 1;
+            }
+            // Known multi-char operators
+            "dup" | "drop" | "swap" | "rot" | "mod" | "len" | "append"
+            | "strlen" | "strcat" | "strslice" | "streq" | "strlt"
+            | "strfind" | "strreplace" | "strtoi64" | "i64tostr"
+            | "strnth" | "strchars" | "charsstr" | "striter"
+            | "listfind" | "strjoin" | "output" | "return" | "times" => {
+                let byte = word_to_op_byte(chunk);
+                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(byte as i64)])));
+                i += 1;
+            }
+            // Numbers
+            _ if chunk.starts_with(|c: char| c.is_ascii_digit())
+                || (chunk.starts_with('-') && chunk.len() > 1 && chunk[1..].starts_with(|c: char| c.is_ascii_digit())) =>
+            {
+                if chunk.contains('.') {
+                    if let Ok(f) = chunk.parse::<f64>() {
+                        tokens.push(Value::List(Rc::new(vec![
+                            Value::I64(1),
+                            Value::I64(f.to_bits() as i64),
+                        ])));
+                    }
+                } else if let Ok(n) = chunk.parse::<i64>() {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(0), Value::I64(n)])));
+                }
+                i += 1;
+            }
+            // Default: word reference
+            _ => {
+                tokens.push(Value::List(Rc::new(vec![
+                    Value::I64(4),
+                    Value::Str(Rc::new(chunk.clone())),
+                ])));
+                i += 1;
+            }
+        }
+    }
+    tokens
+}
+
+/// Collect chunks until a matching end delimiter, handling nested blocks.
+fn collect_until(chunks: &[String], start: usize, end: &str) -> (Vec<String>, usize) {
+    let mut result = Vec::new();
+    let mut depth = 1;
+    let mut i = start;
+    while i < chunks.len() && depth > 0 {
+        match chunks[i].as_str() {
+            "{" => depth += 1,
+            "}" if end == "}" => depth -= 1,
+            _ => {}
+        }
+        if depth > 0 {
+            result.push(chunks[i].clone());
+        }
+        i += 1;
+    }
+    (result, i)
+}
+
+/// Map known operator words to their opcode bytes.
+fn word_to_op_byte(word: &str) -> u8 {
+    match word {
+        "dup" => 0x00,
+        "swap" => 0x01,
+        "drop" => 0x02,
+        "rot" => 0x03,
+        "mod" => 0x14,
+        "len" => 0x42,
+        "append" => 0x41,
+        "strlen" => 0x46,
+        "strcat" => 0x47,
+        "strslice" => 0x48,
+        "streq" => 0x49,
+        "strlt" => 0x4A,
+        "strfind" => 0x4B,
+        "strreplace" => 0x4C,
+        "strtoi64" => 0x4D,
+        "i64tostr" => 0x4E,
+        "strnth" => 0x4F,
+        "strchars" => 0xB8,
+        "charsstr" => 0xB9,
+        "striter" => 0xBA,
+        "listfind" => 0xBB,
+        "strjoin" => 0xBC,
+        "times" => 0x53,
+        "return" => 0x61,
+        _ => 0x00,
+    }
 }
 
 fn ast_to_vec(nodes: &[AstNode]) -> Vec<Value> {
@@ -446,5 +649,72 @@ mod tests {
     #[test]
     fn test_selfhost_fold_quote() {
         assert!(bootstrap_compile("[1 2 3 4 5] 0 { + } @fold").is_ok());
+    }
+
+    // ── Lexer tests ─────────────────────────────────────────────────
+
+    /// Run the whisperc lexer on source, return chunk list
+    fn run_lexer(source: &str) -> Vec<String> {
+        let lexer_src = include_str!("../../../../whisperc/lexer.ws");
+        let ast = Parser::parse_source(lexer_src).unwrap();
+        let mut gen = BytecodeGenerator::new();
+        let (bc, defs) = gen.compile(&ast);
+        let mut vm = Vm::new();
+        for (name, code) in &defs {
+            vm.define_word(name.clone(), code.clone());
+        }
+        vm.execute(&bc).unwrap();
+        vm.data_stack
+            .push(Value::Str(Rc::new(source.to_string())));
+        let call = [Opcode::Call("tokenize".to_string())];
+        let result = vm.execute(&call).unwrap().unwrap();
+        match result {
+            Value::List(items) => items.iter().map(|v| match v {
+                Value::Str(s) => s.as_ref().clone(),
+                _ => format!("{v}"),
+            }).collect(),
+            _ => panic!("expected list, got {result:?}"),
+        }
+    }
+
+    #[test]
+    fn test_lexer_simple() {
+        let chunks = run_lexer("3 4 +");
+        assert_eq!(chunks, vec!["3", "4", "+"]);
+    }
+
+    #[test]
+    fn test_lexer_delimiters() {
+        let chunks = run_lexer(": sq { _ * } ;");
+        assert_eq!(chunks, vec![":", "sq", "{", "_", "*", "}", ";"]);
+    }
+
+    #[test]
+    fn test_lexer_string() {
+        let chunks = run_lexer("\"hello\" .");
+        assert_eq!(chunks, vec!["hello", "."]);
+    }
+
+    #[test]
+    fn test_lexer_complex() {
+        let chunks = run_lexer("[1 2] { + } @fold");
+        assert!(chunks.len() >= 6, "got {chunks:?}");
+    }
+
+    /// Full pipeline: lexer → classify → compile → execute
+    #[test]
+    fn test_lexer_classify_pipeline() {
+        let source = "\"Hello\" .";
+        let chunks = run_lexer(source);
+        let tokens = classify_chunks(&chunks);
+        // Tokens should be: str("Hello"), op(OutputTop)
+        assert_eq!(tokens.len(), 2);
+        // Verify token types
+        match &tokens[0] {
+            Value::List(items) => {
+                assert_eq!(items[0], Value::I64(2)); // type 2 = str
+            }
+            _ => panic!("expected list token"),
+        }
     }
 }
