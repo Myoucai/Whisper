@@ -21,6 +21,7 @@ mod w {
     pub const BR: u8 = 0x0C;
     pub const BR_IF: u8 = 0x0D;
     pub const IF: u8 = 0x04;
+    pub const ELSE: u8 = 0x05;
     pub const I32_CONST: u8 = 0x41;
     pub const I64_CONST: u8 = 0x42;
     pub const I32_LOAD: u8 = 0x28;
@@ -32,6 +33,7 @@ mod w {
     pub const F64_STORE: u8 = 0x39;
     pub const I32_ADD: u8 = 0x6A;
     pub const I32_SUB: u8 = 0x6B;
+    pub const I32_MUL: u8 = 0x6C;
     pub const I64_ADD: u8 = 0x7C;
     pub const I64_SUB: u8 = 0x7D;
     pub const I64_MUL: u8 = 0x7E;
@@ -184,12 +186,134 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     b.push(w::LOOP);
     b.push(0x40);
 
-    // if ip >= bc_len → br $done
+    // if ip >= bc_len → check call stack, then br $done
     ld_i32(&mut b, 0x0004);
     ld_i32(&mut b, 0x0008);
     b.push(w::I32_GE_U);
-    b.push(w::BR_IF);
-    b.push(1);
+    b.push(w::IF);
+    b.push(0x40);
+    // ip >= bc_len: check for nested call return
+    // depth = load(0x1050)
+    ci32(&mut b, 0x1050);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::IF);
+    b.push(0x40);
+    // depth > 0: pop frame, handle iterations
+    // frame = 0x1054 + (depth-1)*20 — use 0x1058 as temp for frame addr
+    ci32(&mut b, 0x1050);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 1);
+    b.push(w::I32_SUB);
+    ci32(&mut b, 20);
+    b.push(w::I32_MUL);
+    ci32(&mut b, 0x1054);
+    b.push(w::I32_ADD);
+    ci32(&mut b, 0x1058);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    // remaining = load(frame+16)
+    ci32(&mut b, 0x1058);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 16);
+    b.push(w::I32_ADD);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x105C);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    // if remaining > 0: decrement, set ip = inner_start, continue
+    ci32(&mut b, 0x105C);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::IF);
+    b.push(0x40);
+    // remaining -= 1
+    ci32(&mut b, 0x105C);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 1);
+    b.push(w::I32_SUB);
+    ci32(&mut b, 0x1058);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 16);
+    b.push(w::I32_ADD);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    // ip = load(frame+8) — inner_start
+    ci32(&mut b, 0x1058);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 8);
+    b.push(w::I32_ADD);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x0004);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    b.push(w::BR);
+    b.push(0); // br $continue
+    b.push(w::ELSE);
+    // remaining == 0: restore outer context
+    // depth -= 1
+    ci32(&mut b, 0x1050);
+    ld_i32(&mut b, 0x1050);
+    ci32(&mut b, 1);
+    b.push(w::I32_SUB);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    // ip = load(frame+0) — saved_ip
+    ci32(&mut b, 0x1058);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x0004);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    // bc_len = load(frame+4) — saved_bc_len
+    ci32(&mut b, 0x1058);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 4);
+    b.push(w::I32_ADD);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x0008);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    b.push(w::BR);
+    b.push(0); // br $continue
+    b.push(w::END); // end if remaining
+    b.push(w::ELSE);
+    // depth == 0: exit program
+    b.push(w::BR);
+    b.push(1); // br $done
+    b.push(w::END); // end if depth
+    b.push(w::END); // end if ip>=bc_len
 
     // read opcode byte from [0x0010 + ip]
     ld_i32(&mut b, 0x0004);
@@ -290,6 +414,35 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     b.push(0);
     b.push(w::I64_EXTEND_I32_S);
     push(&mut b);
+    b.push(w::END);
+
+    // 0x35 PushRef — skip past inline bytecode, push ref pointer
+    // Format: [0x35][len:4][inner_ops:len]
+    // IP points to len field right now (already advanced past 0x35)
+    if_op(&mut b, 0x35);
+    // ref_ptr = 0x0010 + ip  (points to len field)
+    ld_i32(&mut b, 0x0004);
+    ci32(&mut b, 0x0010);
+    b.push(w::I32_ADD);
+    // Push ref_ptr as i64 onto data stack
+    b.push(w::I64_EXTEND_I32_S);
+    push(&mut b);
+    // Read len at [ref_ptr]
+    ld_i32(&mut b, 0x0004);
+    ci32(&mut b, 0x0010);
+    b.push(w::I32_ADD);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0); // inner_len
+    // ip += 4 + inner_len  (skip len field + inner ops)
+    ld_i32(&mut b, 0x0004);
+    b.push(w::I32_ADD);
+    ci32(&mut b, 4);
+    b.push(w::I32_ADD);
+    ci32(&mut b, 0x0004);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
     b.push(w::END);
 
     // 0x00 Dup
@@ -574,12 +727,192 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     b.push(w::END);
 
     // 0x53 Times — n {body} @times: repeat body n times
+    // Stack: ref_ptr(i64) n(i64) → execution happens, no result left
     if_op(&mut b, 0x53);
-    // TODO: Full Times requires executing a quotation n times
-    // For now, just pop the count and move on
-    add_sp(&mut b, 0xFFF0u32 as i32); // pop count (i64)
-    add_sp(&mut b, 0xFFF0u32 as i32); // pop ref (skip)
-    b.push(w::END);
+    // Pop count (i64) from data stack
+    pop(&mut b);
+    ci32(&mut b, 0x1060);
+    b.push(w::I64_STORE);
+    b.push(3);
+    b.push(0); // scratch[0x1060] = count (i64)
+    // Pop ref_ptr (i64) from data stack
+    pop(&mut b);
+    ci32(&mut b, 0x1068);
+    b.push(w::I64_STORE);
+    b.push(3);
+    b.push(0); // scratch[0x1068] = ref_ptr (i64)
+    // Check count > 0; if not, skip
+    ci32(&mut b, 0x1060);
+    b.push(w::I64_LOAD);
+    b.push(3);
+    b.push(0);
+    b.push(w::I64_CONST);
+    leb128_s(&mut b, 0);
+    b.push(w::I64_GT_S);
+    b.push(w::IF);
+    b.push(0x40);
+    // ref_ptr_i32 = (i32)ref_ptr_i64
+    ci32(&mut b, 0x1068);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0); // low 32 bits of ref_ptr
+    // Read inner_len from [ref_ptr]
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0); // inner_len
+    ci32(&mut b, 0x1070);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0); // scratch[0x1070] = inner_len
+    // inner_start = ref_ptr + 4
+    ci32(&mut b, 0x1068);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 4);
+    b.push(w::I32_ADD);
+    ci32(&mut b, 0x1074);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0); // scratch[0x1074] = inner_start
+    // inner_end = inner_start + inner_len
+    ci32(&mut b, 0x1074);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x1070);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I32_ADD);
+    ci32(&mut b, 0x1078);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0); // scratch[0x1078] = inner_end
+    // count_i32 = (i32)(count_i64) for iteration counter
+    ci32(&mut b, 0x1060);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0); // low 32 bits of count
+    // remaining = count_i32 - 1 (first iteration starts now)
+    ci32(&mut b, 1);
+    b.push(w::I32_SUB);
+    ci32(&mut b, 0x107C);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0); // scratch[0x107C] = remaining
+    // Save context onto call stack
+    // depth = load(0x1050)
+    ci32(&mut b, 0x1050);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x1080);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0); // scratch[0x1080] = depth
+    // frame = 0x1054 + depth * 20
+    ci32(&mut b, 0x1080);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 20);
+    b.push(w::I32_MUL);
+    ci32(&mut b, 0x1054);
+    b.push(w::I32_ADD);
+    ci32(&mut b, 0x1084);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0); // scratch[0x1084] = frame_addr
+    // frame[0] = current_ip (saved_ip)
+    ld_i32(&mut b, 0x0004);
+    ci32(&mut b, 0x1084);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    // frame[4] = bc_len (saved_bc_len)
+    ld_i32(&mut b, 0x0008);
+    ci32(&mut b, 0x1084);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 4);
+    b.push(w::I32_ADD);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    // frame[8] = inner_start
+    ci32(&mut b, 0x1084);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 8);
+    b.push(w::I32_ADD);
+    ci32(&mut b, 0x1074);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    // frame[12] = inner_end
+    ci32(&mut b, 0x1084);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 12);
+    b.push(w::I32_ADD);
+    ci32(&mut b, 0x1078);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    // frame[16] = remaining
+    ci32(&mut b, 0x1084);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 16);
+    b.push(w::I32_ADD);
+    ci32(&mut b, 0x107C);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    // depth += 1
+    ci32(&mut b, 0x1050);
+    ld_i32(&mut b, 0x1050);
+    ci32(&mut b, 1);
+    b.push(w::I32_ADD);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    // Set up for first iteration: bc_len = inner_end, ip = inner_start
+    ci32(&mut b, 0x1078);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x0008);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x1074);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x0004);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    b.push(w::END); // end if count>0
+    b.push(w::END); // end 0x53 handler
 
     // 0xB0 I64ToF64
     if_op(&mut b, 0xB0);
