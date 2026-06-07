@@ -421,6 +421,9 @@ impl Lexer {
             return TokenKind::CapCall(num.parse().unwrap_or(0));
         }
         let name = self.read_identifier();
+        if name.is_empty() {
+            return TokenKind::Rot;
+        }
         match name.as_str() {
             "nth" => TokenKind::AtNth,
             "map" => TokenKind::AtMap,
