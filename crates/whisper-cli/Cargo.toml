@@ -14,3 +14,4 @@ whisper-parser.workspace = true
 whisper-typecheck.workspace = true
 whisper-codegen.workspace = true
 whisper-package.workspace = true
+whisper-lsp.workspace = true

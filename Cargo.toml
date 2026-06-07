@@ -24,6 +24,7 @@ whisper-parser = { path = "crates/whisper-parser" }
 whisper-typecheck = { path = "crates/whisper-typecheck" }
 whisper-codegen = { path = "crates/whisper-codegen" }
 whisper-package = { path = "crates/whisper-package" }
+whisper-lsp = { path = "crates/whisper-lsp" }
 
 # External dependencies (minimal set)
 clap = { version = "4", features = ["derive"] }

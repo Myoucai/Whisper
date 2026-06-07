@@ -5,6 +5,14 @@ edition.workspace = true
 license.workspace = true
 authors.workspace = true
 
+[lib]
+name = "whisper_lsp"
+path = "src/lib.rs"
+
+[[bin]]
+name = "whisper-lsp"
+path = "src/main.rs"
+
 [dependencies]
 whisper-parser.workspace = true
 whisper-typecheck.workspace = true

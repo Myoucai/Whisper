@@ -155,29 +155,5 @@ fn cmd_install(args: &[String]) -> Result<(), String> {
 }
 
 fn cmd_lsp() -> Result<(), String> {
-    // Delegate to the whisper-lsp binary
-    let status = std::process::Command::new(
-        std::env::current_exe()
-            .map_err(|e| e.to_string())?
-            .parent()
-            .ok_or("no parent dir")?
-            .join("whisper-lsp"),
-    )
-    .stdin(std::process::Stdio::inherit())
-    .stdout(std::process::Stdio::inherit())
-    .stderr(std::process::Stdio::inherit())
-    .status();
-
-    match status {
-        Ok(s) if s.success() => Ok(()),
-        Ok(s) => Err(format!("LSP server exited with code: {:?}", s.code())),
-        Err(e) => {
-            // If whisper-lsp binary not found, try running directly via cargo
-            if e.kind() == std::io::ErrorKind::NotFound {
-                Err("whisper-lsp binary not found. Build with: cargo build -p whisper-lsp".into())
-            } else {
-                Err(format!("Failed to start LSP server: {e}"))
-            }
-        }
-    }
+    whisper_lsp::run_lsp_server().map_err(|e| format!("LSP server error: {e}"))
 }
