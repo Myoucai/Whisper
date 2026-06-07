@@ -128,13 +128,13 @@ fn cmd_check(args: &[String]) -> Result<(), String> {
 fn cmd_fmt(args: &[String]) -> Result<(), String> {
     let file = args.get(2).ok_or("Expected: whisper fmt <file.ws>")?;
     let source = std::fs::read_to_string(file).map_err(|e| format!("Cannot read '{file}': {e}"))?;
-    match whisper_parser::Parser::parse_source(&source) {
-        Ok(ast) => {
-            println!("Formatted: {file} ({} nodes, no errors)", ast.len());
-            Ok(())
-        }
-        Err(e) => Err(format!("Parse error: {}", e.message)),
-    }
+    let ast = whisper_parser::Parser::parse_source(&source)
+        .map_err(|e| format!("Parse error: {}", e.message))?;
+    let formatted = whisper_codegen::formatter::format_ast(&ast);
+    std::fs::write(file, &formatted)
+        .map_err(|e| format!("Cannot write '{file}': {e}"))?;
+    println!("Formatted: {file} ({} nodes)", ast.len());
+    Ok(())
 }
 
 fn cmd_bootstrap(args: &[String]) -> Result<(), String> {
