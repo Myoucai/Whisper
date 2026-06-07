@@ -13,7 +13,11 @@ pub fn build_file(source: &str, target: &str, output: &str) -> Result<(), String
 
     // Phase 2: Compile to bytecode
     let mut gen = BytecodeGenerator::new();
-    let (bytecode, _defs) = gen.compile(&ast);
+    let (bytecode, defs) = gen.compile(&ast);
+
+    // Phase 2b: Optimize bytecode
+    let bytecode = whisper_codegen::optimize(&bytecode);
+    let _defs: Vec<_> = defs.into_iter().map(|(k, v)| (k, whisper_codegen::optimize(&v))).collect();
 
     // Phase 3: Output in target format
     match target {
