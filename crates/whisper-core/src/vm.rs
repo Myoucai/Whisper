@@ -271,7 +271,9 @@ impl Vm {
             Opcode::PushI64(n) => self.data_stack.push(Value::I64(*n)),
             Opcode::PushF64(n) => self.data_stack.push(Value::F64(*n)),
             Opcode::PushStr(s) => {
-                self.data_stack.push(Value::Str(Rc::new(s.clone())));
+                // Rc<str> → Rc<String> (one allocation at runtime;
+                // Opcode::clone is now cheaper since PushStr is Rc<str>)
+                self.data_stack.push(Value::Str(Rc::new(s.to_string())));
             }
             Opcode::PushBool(b) => self.data_stack.push(Value::Bool(*b)),
             Opcode::PushList => {

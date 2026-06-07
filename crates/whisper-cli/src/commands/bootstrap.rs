@@ -334,7 +334,7 @@ fn values_to_opcodes(vals: Vec<Value>) -> Vec<Opcode> {
                     0x32 => {
                         if items.len() >= 2 {
                             if let Value::Str(s) = &items[1] {
-                                ops.push(Opcode::PushStr(s.as_ref().clone()));
+                                ops.push(Opcode::PushStr(Rc::from(s.as_str())));
                             }
                         }
                     }

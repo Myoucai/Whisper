@@ -1,6 +1,7 @@
 /// Fuzz testing for the Whisper VM.
 /// Generates random opcode sequences and verifies the VM handles them gracefully
 /// (no panics, only returns Err or Ok with reasonable stack state).
+use std::rc::Rc;
 use whisper_core::opcode::Opcode;
 use whisper_core::value::Value;
 use whisper_core::vm::Vm;
@@ -39,7 +40,7 @@ fn random_op_safe(seed: &mut u64) -> Opcode {
         19 => Opcode::PushI64(rand_i64(seed) % 1000),
         20 => Opcode::PushF64((rand_i64(seed) % 1000) as f64),
         21 => Opcode::PushBool(rand_i64(seed) % 2 == 0),
-        22 => Opcode::PushStr(format!("s{}", rand_i64(seed) % 100)),
+        22 => Opcode::PushStr(Rc::from(format!("s{}", rand_i64(seed) % 100))),
         23 => Opcode::Nth,
         24 => Opcode::Append,
         25 => Opcode::Len,
@@ -79,7 +80,7 @@ fn random_op_with_cf(seed: &mut u64) -> Opcode {
         19 => Opcode::PushI64(rand_i64(seed) % 1000),
         20 => Opcode::PushF64((rand_i64(seed) % 1000) as f64),
         21 => Opcode::PushBool(rand_i64(seed) % 2 == 0),
-        22 => Opcode::PushStr(format!("s{}", rand_i64(seed) % 100)),
+        22 => Opcode::PushStr(Rc::from(format!("s{}", rand_i64(seed) % 100))),
         23 => Opcode::Nth,
         24 => Opcode::Append,
         25 => Opcode::Len,

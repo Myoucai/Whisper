@@ -3,6 +3,7 @@
 //! Runs after bytecode generation, before execution.
 //! Each pass scans the opcode sequence and applies transformations.
 
+use std::rc::Rc;
 use whisper_core::opcode::Opcode;
 
 /// Optimize a bytecode sequence. Returns optimized bytecode.
@@ -75,7 +76,7 @@ fn constant_folding(ops: &[Opcode]) -> Vec<Opcode> {
             }
             // PushI64(x) I64ToStr → PushStr(x.to_string())
             if let (Opcode::PushI64(x), Opcode::I64ToStr) = (&ops[i], &ops[i + 1]) {
-                result.push(Opcode::PushStr(x.to_string()));
+                result.push(Opcode::PushStr(Rc::from(x.to_string())));
                 i += 2;
                 continue;
             }
@@ -335,19 +336,19 @@ mod tests {
     fn test_constant_folding_i64tostr() {
         let ops = vec![Opcode::PushI64(42), Opcode::I64ToStr];
         let opt = optimize(&ops);
-        assert_eq!(opt, vec![Opcode::PushStr("42".into())]);
+        assert_eq!(opt, vec![Opcode::PushStr(Rc::from("42"))]);
     }
 
     #[test]
     fn test_constant_folding_strlen() {
-        let ops = vec![Opcode::PushStr("hello".into()), Opcode::StrLen];
+        let ops = vec![Opcode::PushStr(Rc::from("hello")), Opcode::StrLen];
         let opt = optimize(&ops);
         assert_eq!(opt, vec![Opcode::PushI64(5)]);
     }
 
     #[test]
     fn test_constant_folding_strtoi64() {
-        let ops = vec![Opcode::PushStr("99".into()), Opcode::StrToI64];
+        let ops = vec![Opcode::PushStr(Rc::from("99")), Opcode::StrToI64];
         let opt = optimize(&ops);
         assert_eq!(opt, vec![Opcode::PushI64(99)]);
     }
@@ -441,7 +442,7 @@ mod tests {
     #[test]
     fn test_dead_store_push_str_drop() {
         let ops = vec![
-            Opcode::PushStr("unused".into()),
+            Opcode::PushStr(Rc::from("unused")),
             Opcode::Drop,
             Opcode::PushI64(0),
         ];

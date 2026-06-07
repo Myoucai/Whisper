@@ -5,6 +5,7 @@
 //!   Pass 2: Compile main program, resolving WordRef by inlining from word_dict.
 
 use std::collections::HashMap;
+use std::rc::Rc;
 use whisper_core::opcode::Opcode;
 use whisper_parser::ast::{AstNode, Operator};
 
@@ -132,7 +133,7 @@ impl BytecodeGenerator {
             whisper_core::value::Value::I64(n) => self.emit(Opcode::PushI64(*n)),
             whisper_core::value::Value::F64(n) => self.emit(Opcode::PushF64(*n)),
             whisper_core::value::Value::Bool(b) => self.emit(Opcode::PushBool(*b)),
-            whisper_core::value::Value::Str(s) => self.emit(Opcode::PushStr(s.as_ref().clone())),
+            whisper_core::value::Value::Str(s) => self.emit(Opcode::PushStr(Rc::from(s.as_str()))),
             whisper_core::value::Value::List(items) => {
                 // Push elements first, then count, then PushList
                 // Count goes LAST so PushList pops it first (LIFO)

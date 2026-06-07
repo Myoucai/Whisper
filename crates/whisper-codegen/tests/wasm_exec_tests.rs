@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use whisper_codegen::wasm_gen::WasmGenerator;
 /// WASM end-to-end verification tests.
 ///
@@ -115,7 +116,7 @@ fn decode_bytecode(raw: &[u8]) -> Vec<Opcode> {
                 let len = u32::from_le_bytes(raw[i..i + 4].try_into().unwrap()) as usize;
                 i += 4;
                 let s = String::from_utf8_lossy(&raw[i..i + len]).to_string();
-                ops.push(Opcode::PushStr(s));
+                ops.push(Opcode::PushStr(Rc::from(s)));
                 i += len;
             }
             0x50 => {
@@ -197,7 +198,7 @@ fn test_wasm_bytecode_roundtrip() {
 fn test_wasm_hello_world_structure() {
     // hello.ws: "Hello, World!" OutputTop
     let ops = vec![
-        Opcode::PushStr("Hello, World!".to_string()),
+        Opcode::PushStr(Rc::from("Hello, World!")),
         Opcode::OutputTop,
     ];
     let gen = WasmGenerator::new(ops);

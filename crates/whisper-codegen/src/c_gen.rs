@@ -230,7 +230,7 @@ mod tests {
 
     #[test]
     fn test_c_compile_hello() {
-        let ops = vec![Opcode::PushStr("Hello, World!".into()), Opcode::OutputTop];
+        let ops = vec![Opcode::PushStr(std::rc::Rc::from("Hello, World!")), Opcode::OutputTop];
         let c_code = compile_to_c(&ops);
         // String literals are in bytecode hex, not directly in C source
         assert!(c_code.contains("int main(void)"));

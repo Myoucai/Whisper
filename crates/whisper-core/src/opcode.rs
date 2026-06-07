@@ -15,6 +15,8 @@
 ///   0x90-0x93: IO
 ///   0xA0-0xA3: definitions
 
+use std::rc::Rc;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Opcode {
     // === Stack operations (0x00-0x0F) ===
@@ -69,7 +71,7 @@ pub enum Opcode {
     /// Push f64 literal onto stack
     PushF64(f64),
     /// Push string literal onto stack
-    PushStr(String),
+    PushStr(Rc<str>),
     /// Push bool literal onto stack
     PushBool(bool),
     /// Push list (followed by element count and elements)
