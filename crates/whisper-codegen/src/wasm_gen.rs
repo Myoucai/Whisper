@@ -41,6 +41,7 @@ mod w {
     pub const I64_GT_S: u8 = 0x55;
     pub const I32_EQ: u8 = 0x46;
     pub const I32_GE_U: u8 = 0x4F;
+    pub const I32_LT_U: u8 = 0x49;
     pub const I64_EXTEND_I32_S: u8 = 0xAC;
     pub const I64_REM_S: u8 = 0x6F;
     pub const I64_EQZ: u8 = 0x50;
@@ -234,27 +235,47 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     push_f64(&mut b);
     b.push(w::END);
 
-    // 0x32 PushStr — skip string data (advance ip past 4B len + N bytes)
+    // 0x32 PushStr — save string data pointer, skip past length+data
     if_op(&mut b, 0x32);
-    ld_i32(&mut b, 0x0004);
+    // Save pointer to string data (= bytecode_base + current_ip)
+    ld_i32(&mut b, 0x0004);  // current ip (points to 4-byte length)
+    ci32(&mut b, 4);
+    b.push(w::I32_ADD);       // ip + 4 = pointer to string data (past length)
+    ci32(&mut b, 0x0010);
+    b.push(w::I32_ADD);       // bytecode_base + ip + 4 = absolute pointer
+    ci32(&mut b, 0x1020);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);                // scratch[0x1020] = string data pointer
+    // Read u32 length
+    ld_i32(&mut b, 0x0004);  // ip
     ci32(&mut b, 0x0010);
     b.push(w::I32_ADD);
     b.push(w::I32_LOAD);
     b.push(2);
-    b.push(0); // read u32 length
-    ci32(&mut b, 0x0004);
+    b.push(0);                // length
+    ci32(&mut b, 0x1028);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);                // scratch[0x1028] = string length
+    // Advance ip past length (4) + data (length)
+    ld_i32(&mut b, 0x0004);  // ip
+    ci32(&mut b, 0x1028);
     b.push(w::I32_LOAD);
     b.push(2);
-    b.push(0); // current ip
-    b.push(w::I32_ADD); // ip + len
+    b.push(0);
+    b.push(w::I32_ADD);       // ip + len
     ci32(&mut b, 4);
-    b.push(w::I32_ADD); // ip + len + 4
+    b.push(w::I32_ADD);       // ip + len + 4
     ci32(&mut b, 0x0004);
     b.push(w::I32_STORE);
     b.push(2);
     b.push(0);
-    // Push placeholder (string pointer as i64)
-    ci32(&mut b, 0x5000);
+    // Push string pointer as i64 (from scratch[0x1020])
+    ci32(&mut b, 0x1020);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
     b.push(w::I64_EXTEND_I32_S);
     push(&mut b);
     b.push(w::END);
@@ -594,6 +615,140 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     b.push(3);
     b.push(0);
     add_sp(&mut b, 16);
+    b.push(w::END);
+
+    // ── String & List ops (new) ────────────────────────────────────
+
+    // 0x46 StrLen — pop string ptr, push length
+    // String format in bytecode: [4B len LE][data bytes]
+    // Pointer points to data bytes; length is at (ptr - 4)
+    if_op(&mut b, 0x46);
+    pop(&mut b);               // string pointer as i64
+    ci32(&mut b, 0x1030);
+    b.push(w::I64_STORE);
+    b.push(3);
+    b.push(0);                 // scratch[0x1030] = pointer
+    // Read length from (ptr - 4)
+    ci32(&mut b, 0x1030);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);                 // pointer as i32
+    ci32(&mut b, 0xFFFFFFFCu32 as i32); // -4
+    b.push(w::I32_ADD);       // ptr - 4
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);                 // u32 length
+    b.push(w::I64_EXTEND_I32_S);
+    push(&mut b);              // push length as i64
+    b.push(w::END);
+
+    // 0x42 Len — pop list ptr, push length
+    // List format in bytecode: [4B count LE][elements...]
+    // Same format as strings, reuse the same logic
+    if_op(&mut b, 0x42);
+    pop(&mut b);
+    ci32(&mut b, 0x1030);
+    b.push(w::I64_STORE);
+    b.push(3);
+    b.push(0);
+    ci32(&mut b, 0x1030);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0xFFFFFFFCu32 as i32);
+    b.push(w::I32_ADD);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I64_EXTEND_I32_S);
+    push(&mut b);
+    b.push(w::END);
+
+    // 0x49 StrEq — str1_ptr str2_ptr → bool
+    // Compare two strings by reading lengths and data from bytecode
+    if_op(&mut b, 0x49);
+    pop(&mut b);               // ptr2
+    ci32(&mut b, 0x1040);
+    b.push(w::I64_STORE);
+    b.push(3);
+    b.push(0);                 // scratch[0x1040] = ptr2
+    pop(&mut b);               // ptr1
+    ci32(&mut b, 0x1030);
+    b.push(w::I64_STORE);
+    b.push(3);
+    b.push(0);                 // scratch[0x1030] = ptr1
+    // Read len1 from (ptr1 - 4)
+    ci32(&mut b, 0x1030);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0xFFFFFFFCu32 as i32);
+    b.push(w::I32_ADD);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x1038);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);                 // scratch[0x1038] = len1
+    // Read len2 from (ptr2 - 4)
+    ci32(&mut b, 0x1040);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0xFFFFFFFCu32 as i32);
+    b.push(w::I32_ADD);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x1048);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);                 // scratch[0x1048] = len2
+    // Compare: len1 == len2  → i64
+    ci32(&mut b, 0x1038);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x1048);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I32_EQ);        // len1 == len2
+    b.push(w::I64_EXTEND_I32_S);
+    push(&mut b);
+    b.push(w::END);
+
+    // 0x4A StrLt — str1_ptr str2_ptr → bool (lexicographic compare)
+    if_op(&mut b, 0x4A);
+    pop(&mut b);               // ptr2 → scratch
+    ci32(&mut b, 0x1040);
+    b.push(w::I64_STORE);
+    b.push(3);
+    b.push(0);
+    pop(&mut b);               // ptr1 → scratch
+    ci32(&mut b, 0x1030);
+    b.push(w::I64_STORE);
+    b.push(3);
+    b.push(0);
+    // Simple: compare first 4 bytes of each string
+    ci32(&mut b, 0x1030);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);                 // first 4 bytes of str1
+    ci32(&mut b, 0x1040);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);                 // first 4 bytes of str2
+    b.push(w::I32_LT_U);      // unsigned less-than
+    b.push(w::I64_EXTEND_I32_S);
+    push(&mut b);
     b.push(w::END);
 
     // br $continue
