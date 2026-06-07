@@ -592,7 +592,8 @@ impl Vm {
     }
 
     /// Execute a quotation (ref block) by pushing a new call frame.
-    fn execute_ref(&mut self, code: &Rc<[Opcode]>) -> Result<(), VmError> {
+    pub fn execute_ref(&mut self, code: &Rc<[Opcode]>) -> Result<(), VmError> {
+        let initial_depth = self.call_stack.len();
         let frame = CallFrame {
             word_name: Some("<block>".into()),
             code: Rc::clone(code),
@@ -601,8 +602,11 @@ impl Vm {
         };
         self.call_stack.push(frame);
 
-        // Execute until this frame completes
-        while let Some(current_frame) = self.call_stack.last() {
+        // Execute only until the ref frame completes (back to initial depth).
+        // Must not continue executing the parent frame — that belongs to the
+        // caller (e.g. execute, Map, Fold, etc.).
+        while self.call_stack.len() > initial_depth {
+            let current_frame = self.call_stack.last_mut().unwrap();
             let ip = current_frame.ip;
             let code_len = current_frame.code.len();
 
