@@ -42,6 +42,24 @@ mod w {
     pub const I32_EQ: u8 = 0x46;
     pub const I32_GE_U: u8 = 0x4F;
     pub const I64_EXTEND_I32_S: u8 = 0xAC;
+    pub const I64_REM_S: u8 = 0x6F;
+    pub const I64_EQZ: u8 = 0x50;
+    pub const I64_LE_S: u8 = 0x57;
+    pub const I64_GE_S: u8 = 0x59;
+    pub const I64_NE: u8 = 0x52;
+    pub const I64_AND: u8 = 0x83;
+    pub const I64_OR: u8 = 0x84;
+    pub const I64_EXTEND32_S: u8 = 0xB8;
+    pub const F64_CONVERT_I32_S: u8 = 0xBB;
+    pub const I32_TRUNC_F64_S: u8 = 0xA9;
+    pub const F64_SQRT: u8 = 0x9F;
+    pub const F64_NEG: u8 = 0x9A;
+    pub const F64_ADD: u8 = 0xA0;
+    pub const F64_SUB: u8 = 0xA1;
+    pub const F64_MUL: u8 = 0xA2;
+    pub const F64_DIV: u8 = 0xA3;
+    pub const F64_SIN: u8 = 0;  // not available as single WASM op
+    pub const F64_COS: u8 = 0;  // not available as single WASM op
 }
 
 pub struct WasmGenerator { bytecode: Vec<Opcode> }
@@ -364,6 +382,123 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     ld_i32(&mut b, 0x0008);
     ci32(&mut b, 0x0004);
     b.push(w::I32_STORE); b.push(2); b.push(0);
+    b.push(w::END);
+
+    // ── New opcodes ───────────────────────────────────────────────
+
+    // 0x14 Mod
+    if_op(&mut b, 0x14);
+    pop(&mut b); pop(&mut b);
+    b.push(w::I64_REM_S);
+    push(&mut b);
+    b.push(w::END);
+
+    // 0x1B Neq
+    if_op(&mut b, 0x1B);
+    pop(&mut b); pop(&mut b);
+    b.push(w::I64_EQ);
+    b.push(w::I64_EQZ);       // invert to not-equal
+    b.push(w::I64_EXTEND_I32_S);
+    push(&mut b);
+    b.push(w::END);
+
+    // 0x1C Le
+    if_op(&mut b, 0x1C);
+    pop(&mut b); pop(&mut b);
+    b.push(w::I64_LE_S);
+    b.push(w::I64_EXTEND_I32_S);
+    push(&mut b);
+    b.push(w::END);
+
+    // 0x1D Ge
+    if_op(&mut b, 0x1D);
+    pop(&mut b); pop(&mut b);
+    b.push(w::I64_GE_S);
+    b.push(w::I64_EXTEND_I32_S);
+    push(&mut b);
+    b.push(w::END);
+
+    // 0x20 And
+    if_op(&mut b, 0x20);
+    pop(&mut b); pop(&mut b);
+    b.push(w::I64_AND);
+    push(&mut b);
+    b.push(w::END);
+
+    // 0x21 Or
+    if_op(&mut b, 0x21);
+    pop(&mut b); pop(&mut b);
+    b.push(w::I64_OR);
+    push(&mut b);
+    b.push(w::END);
+
+    // 0x22 Not
+    if_op(&mut b, 0x22);
+    pop(&mut b);
+    b.push(w::I64_CONST); leb128_s(&mut b, 0);
+    b.push(w::I64_EQ);
+    b.push(w::I64_EXTEND_I32_S);
+    push(&mut b);
+    b.push(w::END);
+
+    // 0x52 Loop — check bool at top of stack; if true, jump back
+    if_op(&mut b, 0x52);
+    pop(&mut b); // pop the condition bool
+    ci32(&mut b, 0x1030); b.push(w::I64_STORE); b.push(3); b.push(0);
+    ci32(&mut b, 0x1030); b.push(w::I64_LOAD); b.push(3); b.push(0);
+    b.push(w::I64_CONST); leb128_s(&mut b, 0);
+    b.push(w::I64_NE);
+    b.push(w::IF); b.push(0x40);
+    // Read i32 offset from bytecode and jump back (negative offset)
+    ld_i32(&mut b, 0x0004); // ip
+    ci32(&mut b, 0x0010);
+    b.push(w::I32_ADD);
+    b.push(w::I32_LOAD); b.push(2); b.push(0); // load offset
+    ld_i32(&mut b, 0x0004);
+    b.push(w::I32_ADD); // ip + offset
+    ci32(&mut b, 4);
+    b.push(w::I32_ADD); // ip + offset + 4
+    ci32(&mut b, 0x0004);
+    b.push(w::I32_STORE); b.push(2); b.push(0);
+    b.push(w::END);
+    b.push(w::END);
+
+    // 0x53 Times — n {body} @times: repeat body n times
+    if_op(&mut b, 0x53);
+    // TODO: Full Times requires executing a quotation n times
+    // For now, just pop the count and move on
+    add_sp(&mut b, 0xFFF0u32 as i32); // pop count (i64)
+    add_sp(&mut b, 0xFFF0u32 as i32); // pop ref (skip)
+    b.push(w::END);
+
+    // 0xB0 I64ToF64
+    if_op(&mut b, 0xB0);
+    pop(&mut b);
+    b.push(w::I64_EXTEND32_S);   // i64.extend_i32_s
+    b.push(w::F64_CONVERT_I32_S); // f64.convert_i32_s
+    push_f64(&mut b);
+    b.push(w::END);
+
+    // 0xB1 F64ToI64
+    if_op(&mut b, 0xB1);
+    add_sp(&mut b, 0xFFF0u32 as i32);
+    ld_i32(&mut b, 0x0000);
+    b.push(w::F64_LOAD); b.push(3); b.push(0);
+    b.push(w::I32_TRUNC_F64_S);  // i32.trunc_f64_s (truncate toward zero)
+    b.push(w::I64_EXTEND_I32_S);
+    push(&mut b);
+    b.push(w::END);
+
+    // 0xB2 FSqrt
+    if_op(&mut b, 0xB2);
+    add_sp(&mut b, 0xFFF0u32 as i32);
+    ld_i32(&mut b, 0x0000);
+    b.push(w::F64_LOAD); b.push(3); b.push(0);
+    b.push(w::F64_SQRT); // f64.sqrt
+    ci32(&mut b, 0x0000);
+    ld_i32(&mut b, 0x0000);
+    b.push(w::F64_STORE); b.push(3); b.push(0);
+    add_sp(&mut b, 16);
     b.push(w::END);
 
     // br $continue
