@@ -123,6 +123,12 @@ pub enum Operator {
     StrLen,
     StrCat,
     StrSlice,
+    StrEq,
+    StrLt,
+    StrFind,
+    StrReplace,
+    StrToI64,
+    I64ToStr,
 
     // Control flow (runtime)
     CondQ,

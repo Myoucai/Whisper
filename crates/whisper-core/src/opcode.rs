@@ -91,13 +91,25 @@ pub enum Opcode {
     /// Fold over list: list init {fn} → result
     Fold,
 
-    // === String operations (0x46-0x48) ===
+    // === String operations (0x46-0x4E) ===
     /// String length: str → i64
     StrLen,
     /// String concatenation: str1 str2 → str3
     StrCat,
     /// Substring: str start len → substr
     StrSlice,
+    /// String equality: str1 str2 → bool
+    StrEq,
+    /// String less-than (lexicographic): str1 str2 → bool
+    StrLt,
+    /// Find substring: str pattern → i64  (index, or -1 if not found)
+    StrFind,
+    /// Replace all occurrences: str old new → str
+    StrReplace,
+    /// Parse string to i64: str → i64
+    StrToI64,
+    /// Format i64 to string: i64 → str
+    I64ToStr,
 
     // === Control flow (0x50-0x57) ===
     /// Conditional: if false, jump by offset
@@ -197,6 +209,12 @@ impl Opcode {
             Opcode::StrLen => 0x46,
             Opcode::StrCat => 0x47,
             Opcode::StrSlice => 0x48,
+            Opcode::StrEq => 0x49,
+            Opcode::StrLt => 0x4A,
+            Opcode::StrFind => 0x4B,
+            Opcode::StrReplace => 0x4C,
+            Opcode::StrToI64 => 0x4D,
+            Opcode::I64ToStr => 0x4E,
 
             // Control flow
             Opcode::Cond(_) => 0x50,
@@ -266,6 +284,12 @@ impl Opcode {
             Opcode::StrLen => "strlen",
             Opcode::StrCat => "strcat",
             Opcode::StrSlice => "strslice",
+            Opcode::StrEq => "streq",
+            Opcode::StrLt => "strlt",
+            Opcode::StrFind => "strfind",
+            Opcode::StrReplace => "strreplace",
+            Opcode::StrToI64 => "strtoi64",
+            Opcode::I64ToStr => "i64tostr",
             Opcode::Cond(_) => "cond",
             Opcode::Jump(_) => "jump",
             Opcode::Loop(_) => "loop",

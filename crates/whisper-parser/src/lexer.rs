@@ -256,7 +256,7 @@ impl Lexer {
             match self.source[self.pos] {
                 ' ' | '\t' | '\r' | '\n' => self.advance(),
                 '/' if self.peek_at(1) == Some('/') => {
-                    // Line comment
+                    // Line comment: // ...
                     while self.pos < self.source.len() && self.source[self.pos] != '\n' {
                         self.advance();
                     }
@@ -382,6 +382,12 @@ impl Lexer {
             "strlen" => TokenKind::StrLen,
             "strcat" => TokenKind::StrCat,
             "strslice" => TokenKind::StrSlice,
+            "streq" => TokenKind::StrEq,
+            "strlt" => TokenKind::StrLt,
+            "strfind" => TokenKind::StrFind,
+            "strreplace" => TokenKind::StrReplace,
+            "strtoi64" => TokenKind::StrToI64,
+            "i64tostr" => TokenKind::I64ToStr,
             _ => TokenKind::Word(name),
         }
     }

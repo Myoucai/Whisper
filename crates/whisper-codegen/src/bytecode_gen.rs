@@ -240,6 +240,12 @@ impl BytecodeGenerator {
             Operator::StrLen => Opcode::StrLen,
             Operator::StrCat => Opcode::StrCat,
             Operator::StrSlice => Opcode::StrSlice,
+            Operator::StrEq => Opcode::StrEq,
+            Operator::StrLt => Opcode::StrLt,
+            Operator::StrFind => Opcode::StrFind,
+            Operator::StrReplace => Opcode::StrReplace,
+            Operator::StrToI64 => Opcode::StrToI64,
+            Operator::I64ToStr => Opcode::I64ToStr,
             Operator::CondQ => Opcode::Cond(0), // placeholder
             Operator::CondArrow => Opcode::Cond(0),
             Operator::Hash => Opcode::Loop(0),

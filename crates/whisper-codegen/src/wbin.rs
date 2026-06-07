@@ -224,6 +224,12 @@ impl WbinReader {
             0x46 => Ok(Opcode::StrLen),
             0x47 => Ok(Opcode::StrCat),
             0x48 => Ok(Opcode::StrSlice),
+            0x49 => Ok(Opcode::StrEq),
+            0x4A => Ok(Opcode::StrLt),
+            0x4B => Ok(Opcode::StrFind),
+            0x4C => Ok(Opcode::StrReplace),
+            0x4D => Ok(Opcode::StrToI64),
+            0x4E => Ok(Opcode::I64ToStr),
 
             // Control flow
             0x50 => {

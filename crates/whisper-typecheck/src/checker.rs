@@ -402,6 +402,30 @@ impl TypeChecker {
                 self.expect(stack, &Type::Str, errors, ctx, "strslice string");
                 stack.push(Type::Str);
             }
+            Operator::StrEq | Operator::StrLt => {
+                self.expect(stack, &Type::Str, errors, ctx, "strcmp rhs");
+                self.expect(stack, &Type::Str, errors, ctx, "strcmp lhs");
+                stack.push(Type::Bool);
+            }
+            Operator::StrFind => {
+                self.expect(stack, &Type::Str, errors, ctx, "strfind pattern");
+                self.expect(stack, &Type::Str, errors, ctx, "strfind haystack");
+                stack.push(Type::I64);
+            }
+            Operator::StrReplace => {
+                self.expect(stack, &Type::Str, errors, ctx, "strreplace new");
+                self.expect(stack, &Type::Str, errors, ctx, "strreplace old");
+                self.expect(stack, &Type::Str, errors, ctx, "strreplace string");
+                stack.push(Type::Str);
+            }
+            Operator::StrToI64 => {
+                self.expect(stack, &Type::Str, errors, ctx, "strtoi64");
+                stack.push(Type::I64);
+            }
+            Operator::I64ToStr => {
+                self.expect(stack, &Type::I64, errors, ctx, "i64tostr");
+                stack.push(Type::Str);
+            }
 
             Operator::Nth => {
                 let any_list = Type::List(Box::new(self.inferer.fresh_var()));

@@ -374,6 +374,41 @@ impl Vm {
                 let substr: String = s[start..end].to_string();
                 self.data_stack.push(Value::Str(Rc::new(substr)));
             }
+            Opcode::StrEq => {
+                let s2 = self.pop_str()?;
+                let s1 = self.pop_str()?;
+                self.data_stack.push(Value::Bool(s1.as_ref() == s2.as_ref()));
+            }
+            Opcode::StrLt => {
+                let s2 = self.pop_str()?;
+                let s1 = self.pop_str()?;
+                self.data_stack.push(Value::Bool(s1.as_ref() < s2.as_ref()));
+            }
+            Opcode::StrFind => {
+                let pat = self.pop_str()?;
+                let s = self.pop_str()?;
+                let idx = s.find(pat.as_ref())
+                    .map(|i| i as i64)
+                    .unwrap_or(-1);
+                self.data_stack.push(Value::I64(idx));
+            }
+            Opcode::StrReplace => {
+                let new = self.pop_str()?;
+                let old = self.pop_str()?;
+                let s = self.pop_str()?;
+                let result = s.replace(old.as_ref(), new.as_ref());
+                self.data_stack.push(Value::Str(Rc::new(result)));
+            }
+            Opcode::StrToI64 => {
+                let s = self.pop_str()?;
+                let n = s.trim().parse::<i64>()
+                    .map_err(|_| VmError::ProgramError(format!("Cannot parse '{}' as i64", s)))?;
+                self.data_stack.push(Value::I64(n));
+            }
+            Opcode::I64ToStr => {
+                let n = self.pop_i64()?;
+                self.data_stack.push(Value::Str(Rc::new(n.to_string())));
+            }
 
             // === Control flow ===
             Opcode::Cond(offset) => {
@@ -1100,5 +1135,102 @@ mod tests {
         vm.data_stack.push(Value::I64(0));
         let result = vm.execute(&[Opcode::Mod]);
         assert!(result.is_err());
+    }
+
+    // === New string op tests ===
+
+    #[test]
+    fn test_streq_true() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("abc".into())));
+        vm.data_stack.push(Value::Str(Rc::new("abc".into())));
+        let r = vm.execute(&[Opcode::StrEq]).unwrap();
+        assert_eq!(r, Some(Value::Bool(true)));
+    }
+
+    #[test]
+    fn test_streq_false() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("abc".into())));
+        vm.data_stack.push(Value::Str(Rc::new("xyz".into())));
+        let r = vm.execute(&[Opcode::StrEq]).unwrap();
+        assert_eq!(r, Some(Value::Bool(false)));
+    }
+
+    #[test]
+    fn test_strlt() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("abc".into())));
+        vm.data_stack.push(Value::Str(Rc::new("xyz".into())));
+        let r = vm.execute(&[Opcode::StrLt]).unwrap();
+        assert_eq!(r, Some(Value::Bool(true)));
+    }
+
+    #[test]
+    fn test_strfind_found() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("hello world".into())));
+        vm.data_stack.push(Value::Str(Rc::new("world".into())));
+        let r = vm.execute(&[Opcode::StrFind]).unwrap();
+        assert_eq!(r, Some(Value::I64(6)));
+    }
+
+    #[test]
+    fn test_strfind_not_found() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("hello".into())));
+        vm.data_stack.push(Value::Str(Rc::new("xyz".into())));
+        let r = vm.execute(&[Opcode::StrFind]).unwrap();
+        assert_eq!(r, Some(Value::I64(-1)));
+    }
+
+    #[test]
+    fn test_strreplace() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("a-b-c".into())));
+        vm.data_stack.push(Value::Str(Rc::new("-".into())));
+        vm.data_stack.push(Value::Str(Rc::new(":".into())));
+        let r = vm.execute(&[Opcode::StrReplace]).unwrap();
+        assert_eq!(r, Some(Value::Str(Rc::new("a:b:c".into()))));
+    }
+
+    #[test]
+    fn test_strtoi64() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("42".into())));
+        let r = vm.execute(&[Opcode::StrToI64]).unwrap();
+        assert_eq!(r, Some(Value::I64(42)));
+    }
+
+    #[test]
+    fn test_strtoi64_negative() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("-7".into())));
+        let r = vm.execute(&[Opcode::StrToI64]).unwrap();
+        assert_eq!(r, Some(Value::I64(-7)));
+    }
+
+    #[test]
+    fn test_strtoi64_invalid() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("notanumber".into())));
+        let r = vm.execute(&[Opcode::StrToI64]);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn test_i64tostr() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(99));
+        let r = vm.execute(&[Opcode::I64ToStr]).unwrap();
+        assert_eq!(r, Some(Value::Str(Rc::new("99".into()))));
+    }
+
+    #[test]
+    fn test_i64tostr_zero() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(0));
+        let r = vm.execute(&[Opcode::I64ToStr]).unwrap();
+        assert_eq!(r, Some(Value::Str(Rc::new("0".into()))));
     }
 }

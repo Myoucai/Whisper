@@ -116,6 +116,12 @@ pub enum TokenKind {
     StrLen,
     StrCat,
     StrSlice,
+    StrEq,
+    StrLt,
+    StrFind,
+    StrReplace,
+    StrToI64,
+    I64ToStr,
 
     // Word reference (any identifier not matching keywords)
     Word(String),

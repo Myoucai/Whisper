@@ -53,6 +53,12 @@ pub fn get_builtin_signature(name: &str) -> Option<(Vec<Type>, Vec<Type>)> {
         "strlen" => Some((vec![Type::Str], vec![Type::I64])),
         "strcat" => Some((vec![Type::Str, Type::Str], vec![Type::Str])),
         "strslice" => Some((vec![Type::Str, Type::I64, Type::I64], vec![Type::Str])),
+        "streq" => Some((vec![Type::Str, Type::Str], vec![Type::Bool])),
+        "strlt" => Some((vec![Type::Str, Type::Str], vec![Type::Bool])),
+        "strfind" => Some((vec![Type::Str, Type::Str], vec![Type::I64])),
+        "strreplace" => Some((vec![Type::Str, Type::Str, Type::Str], vec![Type::Str])),
+        "strtoi64" => Some((vec![Type::Str], vec![Type::I64])),
+        "i64tostr" => Some((vec![Type::I64], vec![Type::Str])),
 
         _ => None,
     }

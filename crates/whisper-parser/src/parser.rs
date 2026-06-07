@@ -424,6 +424,30 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::StrSlice)))
             }
+            TokenKind::StrEq => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::StrEq)))
+            }
+            TokenKind::StrLt => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::StrLt)))
+            }
+            TokenKind::StrFind => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::StrFind)))
+            }
+            TokenKind::StrReplace => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::StrReplace)))
+            }
+            TokenKind::StrToI64 => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::StrToI64)))
+            }
+            TokenKind::I64ToStr => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::I64ToStr)))
+            }
 
             // Capability
             TokenKind::CapCall(n) => {
@@ -539,6 +563,12 @@ impl Parser {
             TokenKind::StrLen => { self.advance(); Ok("strlen".into()) }
             TokenKind::StrCat => { self.advance(); Ok("strcat".into()) }
             TokenKind::StrSlice => { self.advance(); Ok("strslice".into()) }
+            TokenKind::StrEq => { self.advance(); Ok("streq".into()) }
+            TokenKind::StrLt => { self.advance(); Ok("strlt".into()) }
+            TokenKind::StrFind => { self.advance(); Ok("strfind".into()) }
+            TokenKind::StrReplace => { self.advance(); Ok("strreplace".into()) }
+            TokenKind::StrToI64 => { self.advance(); Ok("strtoi64".into()) }
+            TokenKind::I64ToStr => { self.advance(); Ok("i64tostr".into()) }
             _ => Err(ParseError {
                 message: format!("Expected word, got {:?}", token.kind),
                 token,
