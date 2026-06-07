@@ -237,13 +237,11 @@ fn strength_reduction(ops: &[Opcode]) -> Vec<Opcode> {
                     i += 2;
                     continue;
                 }
-                // PushI64(2) Mul → Dup Add (dup is often cheaper than const+multiply)
-                (Opcode::PushI64(2), Opcode::Mul) => {
-                    result.push(Opcode::Dup);
-                    result.push(Opcode::Add);
-                    i += 2;
-                    continue;
-                }
+                // NOTE: PushI64(2) Mul → Dup Add is NOT semantics-preserving
+                // when the value carries a Signal (confidence < 1.0).
+                // Dup duplicates the Signal, so confidence becomes c²
+                // instead of c × 1.0.  Omitted until a confidence-aware
+                // variant can be added.
                 _ => {}
             }
         }
@@ -419,18 +417,17 @@ mod tests {
 
     // Strength reduction
     #[test]
-    fn test_strength_mul2_to_dup_add() {
-        // PushI64(2) Mul → Dup Add when the other operand is not a constant.
-        // With two constants, folding takes priority (PushI64(10) is better).
-        // Test: PushF64(x) PushI64(2) Mul — can't fold across types,
-        // but Mul auto-coerces. Strength reduction still applies.
+    fn test_strength_mul2_preserved() {
+        // PushI64(2) Mul is NOT reduced to Dup Add (confidence-semantics
+        // violation — see comment in strength_reduction).  The Mul opcode
+        // is preserved as-is.
         let ops = vec![Opcode::PushF64(5.0), Opcode::PushI64(2), Opcode::Mul];
         let opt = optimize(&ops);
-        // After strength reduction: PushF64(5), Dup, Add
+        // No transformation: all three opcodes kept
         assert_eq!(opt.len(), 3);
         assert_eq!(opt[0], Opcode::PushF64(5.0));
-        assert_eq!(opt[1], Opcode::Dup);
-        assert_eq!(opt[2], Opcode::Add);
+        assert_eq!(opt[1], Opcode::PushI64(2));
+        assert_eq!(opt[2], Opcode::Mul);
     }
 
     // Dead store
@@ -455,7 +452,9 @@ mod tests {
     // Composite
     #[test]
     fn test_complex_expression() {
-        // (3+4)*2 → PushI64(7) Dup Add  (fold 3+4=7, strength-reduce *2 to dup+add)
+        // (3+4)*2 → PushI64(14)  (fold 3+4=7 by const-folding,
+        // then 7*2=14 in next iteration — strength reduction skipped
+        // for confidence safety, but const-folding still converges)
         let ops = vec![
             Opcode::PushI64(3),
             Opcode::PushI64(4),
@@ -464,7 +463,7 @@ mod tests {
             Opcode::Mul,
         ];
         let opt = optimize(&ops);
-        assert_eq!(opt, vec![Opcode::PushI64(7), Opcode::Dup, Opcode::Add]);
+        assert_eq!(opt, vec![Opcode::PushI64(14)]);
     }
 
     #[test]
