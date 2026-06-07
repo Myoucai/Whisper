@@ -116,6 +116,8 @@ pub enum Opcode {
     StrChars,
     /// Convert list of char codes to string: [i64] → str
     CharsStr,
+    /// Iterate: pop str, push (first_char_code, rest_str). Empty → (-1, "")
+    StrIter,
 
     // === Control flow (0x50-0x57) ===
     /// Conditional: if false, jump by offset
@@ -244,6 +246,7 @@ impl Opcode {
             Opcode::StrNth => 0x4F,
             Opcode::StrChars => 0xB8,
             Opcode::CharsStr => 0xB9,
+            Opcode::StrIter => 0xBA,
 
             // Control flow
             Opcode::Cond(_) => 0x50,
@@ -332,6 +335,7 @@ impl Opcode {
             Opcode::StrNth => "strnth",
             Opcode::StrChars => "strchars",
             Opcode::CharsStr => "charsstr",
+            Opcode::StrIter => "striter",
             Opcode::Cond(_) => "cond",
             Opcode::Jump(_) => "jump",
             Opcode::Loop(_) => "loop",

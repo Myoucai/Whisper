@@ -232,6 +232,7 @@ impl WbinReader {
             0x4F => Ok(Opcode::StrNth),
             0xB8 => Ok(Opcode::StrChars),
             0xB9 => Ok(Opcode::CharsStr),
+            0xBA => Ok(Opcode::StrIter),
 
             // Float ops
             0xB0 => Ok(Opcode::I64ToF64),

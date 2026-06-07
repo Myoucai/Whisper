@@ -482,6 +482,11 @@ impl TypeChecker {
                 );
                 stack.push(Type::Str);
             }
+            Operator::StrIter => {
+                self.expect(stack, &Type::Str, errors, ctx, "striter");
+                stack.push(Type::I64);
+                stack.push(Type::Str);
+            }
 
             // Float ops
             Operator::I64ToF64 => {

@@ -125,6 +125,7 @@ pub enum TokenKind {
     StrNth,
     StrChars,
     CharsStr,
+    StrIter,
 
     // Float operations
     I64ToF64,

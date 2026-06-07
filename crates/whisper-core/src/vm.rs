@@ -435,6 +435,19 @@ impl Vm {
                     .collect();
                 self.data_stack.push(Value::Str(Rc::new(s)));
             }
+            Opcode::StrIter => {
+                let s = self.pop_str()?;
+                if s.is_empty() {
+                    self.data_stack.push(Value::I64(-1));
+                    self.data_stack.push(Value::Str(Rc::new(String::new())));
+                } else {
+                    let mut chars = s.chars();
+                    let first = chars.next().unwrap() as i64;
+                    let rest: String = chars.collect();
+                    self.data_stack.push(Value::I64(first));
+                    self.data_stack.push(Value::Str(Rc::new(rest)));
+                }
+            }
 
             // === Float operations ===
             Opcode::I64ToF64 => {

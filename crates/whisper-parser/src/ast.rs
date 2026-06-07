@@ -125,6 +125,7 @@ pub enum Operator {
     StrNth,
     StrChars,
     CharsStr,
+    StrIter,
 
     // Float
     I64ToF64,
