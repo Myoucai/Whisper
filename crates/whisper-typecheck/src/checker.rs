@@ -454,6 +454,24 @@ impl TypeChecker {
                 self.expect(stack, &SType::List, errors, ctx, "len");
                 stack.push(SType::Int);
             }
+
+            // String ops
+            Operator::StrLen => {
+                self.expect(stack, &SType::Str, errors, ctx, "strlen");
+                stack.push(SType::Int);
+            }
+            Operator::StrCat => {
+                self.expect(stack, &SType::Str, errors, ctx, "strcat rhs");
+                self.expect(stack, &SType::Str, errors, ctx, "strcat lhs");
+                stack.push(SType::Str);
+            }
+            Operator::StrSlice => {
+                self.expect(stack, &SType::Int, errors, ctx, "strslice len");
+                self.expect(stack, &SType::Int, errors, ctx, "strslice start");
+                self.expect(stack, &SType::Str, errors, ctx, "strslice string");
+                stack.push(SType::Str);
+            }
+
             Operator::Nth => {
                 self.expect(stack, &SType::Int, errors, ctx, "@nth index");
                 self.expect(stack, &SType::List, errors, ctx, "@nth list");

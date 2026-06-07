@@ -220,6 +220,11 @@ impl WbinReader {
             0x44 => Ok(Opcode::Each),
             0x45 => Ok(Opcode::Fold),
 
+            // String ops
+            0x46 => Ok(Opcode::StrLen),
+            0x47 => Ok(Opcode::StrCat),
+            0x48 => Ok(Opcode::StrSlice),
+
             // Control flow
             0x50 => {
                 let offset = leb128::read::signed(cursor).map_err(|e| {

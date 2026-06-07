@@ -255,6 +255,20 @@ impl Parser {
                 Ok(Some(AstNode::Op(Operator::AtTimes)))
             }
 
+            // String operations
+            TokenKind::StrLen => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::StrLen)))
+            }
+            TokenKind::StrCat => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::StrCat)))
+            }
+            TokenKind::StrSlice => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::StrSlice)))
+            }
+
             // Capability
             TokenKind::CapCall(n) => {
                 let id = *n;

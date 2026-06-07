@@ -49,6 +49,11 @@ pub fn get_builtin_signature(name: &str) -> Option<(Vec<Type>, Vec<Type>)> {
         )),
         "len" => Some((vec![Type::List(Box::new(tv()))], vec![i64.clone()])),
 
+        // String operations
+        "strlen" => Some((vec![Type::Str], vec![Type::I64])),
+        "strcat" => Some((vec![Type::Str, Type::Str], vec![Type::Str])),
+        "strslice" => Some((vec![Type::Str, Type::I64, Type::I64], vec![Type::Str])),
+
         _ => None,
     }
 }

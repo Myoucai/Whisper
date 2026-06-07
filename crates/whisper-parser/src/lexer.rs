@@ -379,6 +379,9 @@ impl Lexer {
             "len" => TokenKind::Len,
             "drop" => TokenKind::Drop,
             "mod" => TokenKind::Mod,
+            "strlen" => TokenKind::StrLen,
+            "strcat" => TokenKind::StrCat,
+            "strslice" => TokenKind::StrSlice,
             _ => TokenKind::Word(name),
         }
     }

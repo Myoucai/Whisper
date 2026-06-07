@@ -1,5 +1,5 @@
-: strlen { } ;  # TODO: requires VM string-length opcode
-: strcat { } ;  # TODO: requires VM string-concat opcode
-: strdup { } ;  # TODO: requires VM string-repeat opcode
+: strlen   { strlen } ;
+: strcat   { strcat } ;
+: strdup   { _ strcat } ;   # dup string then concatenate
 
 export strlen strcat strdup

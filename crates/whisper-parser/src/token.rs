@@ -112,6 +112,11 @@ pub enum TokenKind {
     Append,
     Len,
 
+    // String operations
+    StrLen,
+    StrCat,
+    StrSlice,
+
     // Word reference (any identifier not matching keywords)
     Word(String),
 

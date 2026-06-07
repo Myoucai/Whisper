@@ -237,6 +237,9 @@ impl BytecodeGenerator {
             Operator::Map => Opcode::Map,
             Operator::Each => Opcode::Each,
             Operator::Fold => Opcode::Fold,
+            Operator::StrLen => Opcode::StrLen,
+            Operator::StrCat => Opcode::StrCat,
+            Operator::StrSlice => Opcode::StrSlice,
             Operator::CondQ => Opcode::Cond(0), // placeholder
             Operator::CondArrow => Opcode::Cond(0),
             Operator::Hash => Opcode::Loop(0),

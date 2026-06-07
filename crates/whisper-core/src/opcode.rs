@@ -91,6 +91,14 @@ pub enum Opcode {
     /// Fold over list: list init {fn} → result
     Fold,
 
+    // === String operations (0x46-0x48) ===
+    /// String length: str → i64
+    StrLen,
+    /// String concatenation: str1 str2 → str3
+    StrCat,
+    /// Substring: str start len → substr
+    StrSlice,
+
     // === Control flow (0x50-0x57) ===
     /// Conditional: if false, jump by offset
     Cond(i32),
@@ -185,6 +193,11 @@ impl Opcode {
             Opcode::Each => 0x44,
             Opcode::Fold => 0x45,
 
+            // String ops
+            Opcode::StrLen => 0x46,
+            Opcode::StrCat => 0x47,
+            Opcode::StrSlice => 0x48,
+
             // Control flow
             Opcode::Cond(_) => 0x50,
             Opcode::Jump(_) => 0x51,
@@ -250,6 +263,9 @@ impl Opcode {
             Opcode::Map => "map",
             Opcode::Each => "each",
             Opcode::Fold => "fold",
+            Opcode::StrLen => "strlen",
+            Opcode::StrCat => "strcat",
+            Opcode::StrSlice => "strslice",
             Opcode::Cond(_) => "cond",
             Opcode::Jump(_) => "jump",
             Opcode::Loop(_) => "loop",

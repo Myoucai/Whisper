@@ -346,6 +346,29 @@ impl Vm {
                 self.data_stack.push(acc);
             }
 
+            // === String operations ===
+            Opcode::StrLen => {
+                let s = self.pop_str()?;
+                self.data_stack.push(Value::I64(s.len() as i64));
+            }
+            Opcode::StrCat => {
+                let s2 = self.pop_str()?;
+                let s1 = self.pop_str()?;
+                let result = format!("{s1}{s2}");
+                self.data_stack.push(Value::Str(Rc::new(result)));
+            }
+            Opcode::StrSlice => {
+                let len = self.pop_i64()?;
+                let start = self.pop_i64()?;
+                let s = self.pop_str()?;
+                let start = start.max(0) as usize;
+                let len = len.max(0) as usize;
+                let end = (start + len).min(s.len());
+                let start = start.min(s.len());
+                let substr: String = s[start..end].to_string();
+                self.data_stack.push(Value::Str(Rc::new(substr)));
+            }
+
             // === Control flow ===
             Opcode::Cond(offset) => {
                 let cond = self.pop_bool()?;
@@ -530,6 +553,16 @@ impl Vm {
             },
             other => Err(VmError::TypeMismatch {
                 expected: "[T]".into(),
+                actual: other.type_name().into(),
+            }),
+        }
+    }
+
+    fn pop_str(&mut self) -> Result<Rc<String>, VmError> {
+        match self.pop()?.unwrap_signal() {
+            Value::Str(s) => Ok(s),
+            other => Err(VmError::TypeMismatch {
+                expected: "str".into(),
                 actual: other.type_name().into(),
             }),
         }
@@ -976,5 +1009,71 @@ mod tests {
         vm.data_stack.push(alt1);
         let r = vm.execute(&[Opcode::ProbChoice]).unwrap();
         assert_eq!(r, Some(Value::I64(14)), "implicit confidence 1.0 → alt1: 7*2=14");
+    }
+
+    // === String operation tests ===
+
+    #[test]
+    fn test_strlen() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("Hello".into())));
+        let r = vm.execute(&[Opcode::StrLen]).unwrap();
+        assert_eq!(r, Some(Value::I64(5)));
+    }
+
+    #[test]
+    fn test_strlen_empty() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("".into())));
+        let r = vm.execute(&[Opcode::StrLen]).unwrap();
+        assert_eq!(r, Some(Value::I64(0)));
+    }
+
+    #[test]
+    fn test_strcat() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("Hello, ".into())));
+        vm.data_stack.push(Value::Str(Rc::new("World!".into())));
+        let r = vm.execute(&[Opcode::StrCat]).unwrap();
+        assert_eq!(r, Some(Value::Str(Rc::new("Hello, World!".into()))));
+    }
+
+    #[test]
+    fn test_strcat_empty() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("".into())));
+        vm.data_stack.push(Value::Str(Rc::new("Hi".into())));
+        let r = vm.execute(&[Opcode::StrCat]).unwrap();
+        assert_eq!(r, Some(Value::Str(Rc::new("Hi".into()))));
+    }
+
+    #[test]
+    fn test_strslice() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("Hello, World!".into())));
+        vm.data_stack.push(Value::I64(0));
+        vm.data_stack.push(Value::I64(5));
+        let r = vm.execute(&[Opcode::StrSlice]).unwrap();
+        assert_eq!(r, Some(Value::Str(Rc::new("Hello".into()))));
+    }
+
+    #[test]
+    fn test_strslice_middle() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("abcdef".into())));
+        vm.data_stack.push(Value::I64(2));
+        vm.data_stack.push(Value::I64(3));
+        let r = vm.execute(&[Opcode::StrSlice]).unwrap();
+        assert_eq!(r, Some(Value::Str(Rc::new("cde".into()))));
+    }
+
+    #[test]
+    fn test_strslice_clamp_bounds() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("Hi".into())));
+        vm.data_stack.push(Value::I64(0));
+        vm.data_stack.push(Value::I64(100)); // len exceeds string
+        let r = vm.execute(&[Opcode::StrSlice]).unwrap();
+        assert_eq!(r, Some(Value::Str(Rc::new("Hi".into()))), "should clamp to string length");
     }
 }

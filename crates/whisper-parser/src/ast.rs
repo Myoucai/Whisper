@@ -119,6 +119,11 @@ pub enum Operator {
     Each,
     Fold,
 
+    // String
+    StrLen,
+    StrCat,
+    StrSlice,
+
     // Control flow (runtime)
     CondQ,
     CondArrow,
