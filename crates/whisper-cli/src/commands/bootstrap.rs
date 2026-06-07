@@ -88,59 +88,81 @@ fn op_to_byte(op: Operator) -> u8 {
     }
 }
 
-/// Convert AST nodes to flat token Values, pre-compiling structural nodes.
+/// Convert AST nodes to nested token Values with string type tags.
+/// Format: [type_str, value] where type_str is "int","float","str","bool","op","word","{"
+/// Quote blocks are recursive: ["{", [inner_token_list...]]
 fn ast_to_whisper_tokens(nodes: &[AstNode]) -> Value {
     let mut tokens = Vec::new();
     for node in nodes {
         match node {
             AstNode::Literal(val) => {
                 let (ty, inner) = match val {
-                    Value::I64(n) => (0i64, Value::I64(*n)),
-                    Value::F64(n) => (1i64, Value::I64(n.to_bits() as i64)),
-                    Value::Str(s) => (2i64, Value::Str(s.clone())),
-                    Value::Bool(b) => (13i64, Value::I64(if *b { 1 } else { 0 })),
+                    Value::I64(n) => (
+                        Value::Str(Rc::new("int".into())),
+                        Value::I64(*n),
+                    ),
+                    Value::F64(n) => (
+                        Value::Str(Rc::new("float".into())),
+                        Value::I64(n.to_bits() as i64),
+                    ),
+                    Value::Str(s) => (
+                        Value::Str(Rc::new("str".into())),
+                        Value::Str(s.clone()),
+                    ),
+                    Value::Bool(b) => (
+                        Value::Str(Rc::new("bool".into())),
+                        Value::I64(if *b { 1 } else { 0 }),
+                    ),
                     _ => continue,
                 };
-                tokens.push(Value::List(Rc::new(vec![Value::I64(ty), inner])));
+                tokens.push(Value::List(Rc::new(vec![ty, inner])));
             }
             AstNode::Op(op) => {
                 tokens.push(Value::List(Rc::new(vec![
-                    Value::I64(3),
+                    Value::Str(Rc::new("op".into())),
                     Value::I64(op_to_byte(*op) as i64),
                 ])));
             }
             AstNode::WordRef(name) => {
                 tokens.push(Value::List(Rc::new(vec![
-                    Value::I64(4),
+                    Value::Str(Rc::new("word".into())),
                     Value::Str(Rc::new(name.clone())),
                 ])));
             }
             AstNode::List(items) => {
+                // Push items, then list count
                 for item in items {
                     tokens.append(&mut ast_to_vec(std::slice::from_ref(item)));
                 }
                 tokens.push(Value::List(Rc::new(vec![
-                    Value::I64(14),
+                    Value::Str(Rc::new("op".into())),
+                    Value::I64(0x34), // PushList opcode
+                ])));
+                tokens.push(Value::List(Rc::new(vec![
+                    Value::Str(Rc::new("int".into())),
                     Value::I64(items.len() as i64),
                 ])));
             }
             AstNode::Quote(body) => {
-                // Pre-compile quotation body with trailing Return.
-                // Token format: [18, [0x35, count, ...inners]]
-                // whisperc's op-ref emits the wrapped value as-is.
-                let inner_tokens = ast_to_vec(body);
-                let mut inner_bytecodes = simple_compile(&inner_tokens);
-                inner_bytecodes.push(Value::I64(0x61)); // Return
-                let mut wrapped: Vec<Value> =
-                    vec![Value::I64(0x35), Value::I64(inner_bytecodes.len() as i64)];
-                wrapped.extend(inner_bytecodes);
+                // Nested token: ["{", [inner_tokens...]]
+                let inner = ast_to_whisper_tokens(body);
                 tokens.push(Value::List(Rc::new(vec![
-                    Value::I64(18),
-                    Value::List(Rc::new(wrapped)),
+                    Value::Str(Rc::new("{".into())),
+                    inner,
                 ])));
             }
-            // Word definitions, conds, loops, etc. are handled by the Rust
-            // compiler separately — whisperc only sees the main program body.
+            // Word definitions: [":", [name_str, [body_tokens...]]]
+            AstNode::Def { name, body } => {
+                let body_tokens = ast_to_whisper_tokens(body);
+                tokens.push(Value::List(Rc::new(vec![
+                    Value::Str(Rc::new(":".into())),
+                    Value::List(Rc::new(vec![
+                        Value::Str(Rc::new(name.clone())),
+                        body_tokens,
+                    ])),
+                ])));
+            }
+            // Other node types: skip for now (cond, loop, etc.)
             _ => {}
         }
     }
@@ -153,74 +175,6 @@ fn ast_to_vec(nodes: &[AstNode]) -> Vec<Value> {
         Value::List(v) => v.to_vec(),
         _ => vec![],
     }
-}
-
-/// Simple flat token compilation: maps token values directly to bytecode values.
-/// This is what whisperc does — we provide a Rust implementation as reference.
-fn simple_compile(tokens: &[Value]) -> Vec<Value> {
-    let mut result = Vec::new();
-    for token in tokens {
-        match token {
-            Value::List(ref items) if items.len() >= 2 => {
-                let ty = match &items[0] {
-                    Value::I64(t) => *t,
-                    _ => continue,
-                };
-                match ty {
-                    0 => {
-                        if let Value::I64(n) = &items[1] {
-                            result
-                                .push(Value::List(Rc::new(vec![Value::I64(0x30), Value::I64(*n)])));
-                        }
-                    }
-                    1 => {
-                        if let Value::I64(bits) = &items[1] {
-                            result.push(Value::List(Rc::new(vec![
-                                Value::I64(0x31),
-                                Value::I64(*bits),
-                            ])));
-                        }
-                    }
-                    2 => {
-                        result.push(Value::List(Rc::new(vec![
-                            Value::I64(0x32),
-                            items[1].clone(),
-                        ])));
-                    }
-                    3 => {
-                        if let Value::I64(byte) = &items[1] {
-                            result.push(Value::I64(*byte));
-                        }
-                    }
-                    4 => {
-                        result.push(Value::List(Rc::new(vec![
-                            Value::I64(0x60),
-                            items[1].clone(),
-                        ])));
-                    }
-                    13 => {
-                        if let Value::I64(n) = &items[1] {
-                            result
-                                .push(Value::List(Rc::new(vec![Value::I64(0x33), Value::I64(*n)])));
-                        }
-                    }
-                    14 => {
-                        if let Value::I64(n) = &items[1] {
-                            result
-                                .push(Value::List(Rc::new(vec![Value::I64(0x34), Value::I64(*n)])));
-                        }
-                    }
-                    18 => {
-                        // Pre-wrapped PushRef [0x35, count, ...inners] — emit as-is
-                        result.push(items[1].clone());
-                    }
-                    _ => {}
-                }
-            }
-            _ => {}
-        }
-    }
-    result
 }
 
 pub fn bootstrap_compile(source: &str) -> Result<(), String> {
@@ -354,11 +308,10 @@ fn values_to_opcodes(vals: Vec<Value>) -> Vec<Opcode> {
                         }
                     }
                     0x35 => {
-                        // PushRef: [0x35, count, inner_vals...]
-                        if items.len() >= 3 {
-                            if let Value::I64(_count) = &items[1] {
-                                let inner_vals: Vec<Value> = items[2..].to_vec();
-                                let inner_ops = values_to_opcodes(inner_vals);
+                        // PushRef: [0x35, [inner_bytecodes...]]
+                        if items.len() >= 2 {
+                            if let Value::List(inner) = &items[1] {
+                                let inner_ops = values_to_opcodes(inner.to_vec());
                                 ops.push(Opcode::PushRef(inner_ops));
                             }
                         }
