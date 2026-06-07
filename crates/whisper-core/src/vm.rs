@@ -436,6 +436,21 @@ impl Vm {
                 self.data_stack.push(Value::F64(f.tan()));
             }
 
+            // === JSON ===
+            Opcode::JsonParse => {
+                let s = self.pop_str()?;
+                let v: serde_json::Value = serde_json::from_str(&s)
+                    .map_err(|e| VmError::ProgramError(format!("JSON parse: {e}")))?;
+                self.data_stack.push(json_to_whisper(&v));
+            }
+            Opcode::JsonStringify => {
+                let val = self.pop()?.unwrap_signal();
+                let j = whisper_to_json(&val)?;
+                let s = serde_json::to_string(&j)
+                    .map_err(|e| VmError::ProgramError(format!("JSON stringify: {e}")))?;
+                self.data_stack.push(Value::Str(Rc::new(s)));
+            }
+
             // === Control flow ===
             Opcode::Cond(offset) => {
                 let cond = self.pop_bool()?;
@@ -753,6 +768,83 @@ impl Vm {
 impl Default for Vm {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ── JSON conversion helpers ──────────────────────────────────────────
+
+/// Convert a serde_json Value to a Whisper Value.
+fn json_to_whisper(v: &serde_json::Value) -> Value {
+    match v {
+        serde_json::Value::Null => Value::I64(0),
+        serde_json::Value::Bool(b) => Value::Bool(*b),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Value::I64(i)
+            } else if let Some(f) = n.as_f64() {
+                Value::F64(f)
+            } else {
+                Value::I64(0)
+            }
+        }
+        serde_json::Value::String(s) => Value::Str(Rc::new(s.clone())),
+        serde_json::Value::Array(arr) => {
+            let items: Vec<Value> = arr.iter().map(json_to_whisper).collect();
+            Value::List(Rc::new(items))
+        }
+        serde_json::Value::Object(obj) => {
+            let items: Vec<Value> = obj
+                .iter()
+                .map(|(k, v)| {
+                    Value::List(Rc::new(vec![
+                        Value::Str(Rc::new(k.clone())),
+                        json_to_whisper(v),
+                    ]))
+                })
+                .collect();
+            Value::List(Rc::new(items))
+        }
+    }
+}
+
+/// Convert a Whisper Value to a serde_json Value.
+fn whisper_to_json(v: &Value) -> Result<serde_json::Value, VmError> {
+    match v {
+        Value::I64(n) => Ok(serde_json::Value::Number((*n).into())),
+        Value::F64(n) => {
+            // serde_json doesn't support f64 directly as Number, use as_f64
+            Ok(serde_json::json!(*n))
+        }
+        Value::Bool(b) => Ok(serde_json::Value::Bool(*b)),
+        Value::Str(s) => Ok(serde_json::Value::String(s.as_ref().clone())),
+        Value::List(items) => {
+            // Heuristic: if all elements are 2-element lists starting with Str,
+            // treat as JSON object; otherwise treat as JSON array.
+            let is_object = items.iter().all(|item| match item {
+                Value::List(pair) if pair.len() == 2 => {
+                    matches!(&pair[0], Value::Str(_))
+                }
+                _ => false,
+            });
+            if is_object && !items.is_empty() {
+                let mut map = serde_json::Map::new();
+                for item in items.iter() {
+                    if let Value::List(pair) = item {
+                        if let Value::Str(k) = &pair[0] {
+                            let val = whisper_to_json(&pair[1])?;
+                            map.insert(k.as_ref().clone(), val);
+                        }
+                    }
+                }
+                Ok(serde_json::Value::Object(map))
+            } else {
+                let arr: Result<Vec<_>, _> =
+                    items.iter().map(|i| whisper_to_json(i)).collect();
+                Ok(serde_json::Value::Array(arr?))
+            }
+        }
+        Value::Signal(inner, _) => whisper_to_json(inner),
+        _ => Ok(serde_json::Value::Null),
     }
 }
 
@@ -1307,5 +1399,101 @@ mod tests {
         vm.data_stack.push(Value::F64(0.0));
         let r = vm.execute(&[Opcode::FTan]).unwrap();
         assert_eq!(r, Some(Value::F64(0.0)));
+    }
+
+    // === JSON tests ===
+
+    #[test]
+    fn test_json_parse_number() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("42".into())));
+        let r = vm.execute(&[Opcode::JsonParse]).unwrap();
+        assert_eq!(r, Some(Value::I64(42)));
+    }
+
+    #[test]
+    fn test_json_parse_string() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("\"hello\"".into())));
+        let r = vm.execute(&[Opcode::JsonParse]).unwrap();
+        assert_eq!(r, Some(Value::Str(Rc::new("hello".into()))));
+    }
+
+    #[test]
+    fn test_json_parse_array() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("[1,2,3]".into())));
+        let r = vm.execute(&[Opcode::JsonParse]).unwrap();
+        assert_eq!(
+            r,
+            Some(Value::List(Rc::new(vec![
+                Value::I64(1),
+                Value::I64(2),
+                Value::I64(3),
+            ])))
+        );
+    }
+
+    #[test]
+    fn test_json_parse_object() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("{\"a\":1}".into())));
+        let r = vm.execute(&[Opcode::JsonParse]).unwrap();
+        // Object becomes list of [key, value] pairs
+        match r {
+            Some(Value::List(items)) => {
+                assert_eq!(items.len(), 1);
+                match &items[0] {
+                    Value::List(pair) => {
+                        assert_eq!(pair[0], Value::Str(Rc::new("a".into())));
+                        assert_eq!(pair[1], Value::I64(1));
+                    }
+                    _ => panic!("expected pair"),
+                }
+            }
+            _ => panic!("expected list"),
+        }
+    }
+
+    #[test]
+    fn test_json_parse_bool() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("true".into())));
+        let r = vm.execute(&[Opcode::JsonParse]).unwrap();
+        assert_eq!(r, Some(Value::Bool(true)));
+    }
+
+    #[test]
+    fn test_json_stringify_number() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(42));
+        let r = vm.execute(&[Opcode::JsonStringify]).unwrap();
+        assert_eq!(r, Some(Value::Str(Rc::new("42".into()))));
+    }
+
+    #[test]
+    fn test_json_stringify_array() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::List(Rc::new(vec![
+            Value::I64(1),
+            Value::I64(2),
+            Value::I64(3),
+        ])));
+        let r = vm.execute(&[Opcode::JsonStringify]).unwrap();
+        assert_eq!(r, Some(Value::Str(Rc::new("[1,2,3]".into()))));
+    }
+
+    #[test]
+    fn test_json_roundtrip() {
+        let original = r#"{"x":1,"y":[2,3]}"#;
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new(original.into())));
+        let val = vm.execute(&[Opcode::JsonParse]).unwrap().unwrap();
+        vm.data_stack.push(val);
+        let json = vm.execute(&[Opcode::JsonStringify]).unwrap().unwrap();
+        // Re-parse to verify
+        vm.data_stack.push(json);
+        let reparsed = vm.execute(&[Opcode::JsonParse]).unwrap();
+        assert!(reparsed.is_some());
     }
 }

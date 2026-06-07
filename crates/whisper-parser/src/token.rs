@@ -131,6 +131,10 @@ pub enum TokenKind {
     FCos,
     FTan,
 
+    // JSON
+    JsonParse,
+    JsonStringify,
+
     // Word reference (any identifier not matching keywords)
     Word(String),
 

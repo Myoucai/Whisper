@@ -147,6 +147,12 @@ pub enum Opcode {
     /// Tangent: f64 → f64
     FTan,
 
+    // === JSON (0xB6-0xB7) ===
+    /// Parse JSON string to Whisper value: str → value
+    JsonParse,
+    /// Serialize Whisper value to JSON string: value → str
+    JsonStringify,
+
     // === Confidence (0x80-0x83) ===
     /// Label following value with confidence
     ConfLabel(f64),
@@ -251,6 +257,8 @@ impl Opcode {
             Opcode::FSin => 0xB3,
             Opcode::FCos => 0xB4,
             Opcode::FTan => 0xB5,
+            Opcode::JsonParse => 0xB6,
+            Opcode::JsonStringify => 0xB7,
 
             // Confidence
             Opcode::ConfLabel(_) => 0x80,
@@ -326,6 +334,8 @@ impl Opcode {
             Opcode::FSin => "fsin",
             Opcode::FCos => "fcos",
             Opcode::FTan => "ftan",
+            Opcode::JsonParse => "json_parse",
+            Opcode::JsonStringify => "json_stringify",
             Opcode::ConfLabel(_) => "conf_label",
             Opcode::ProbChoice => "prob_choice",
             Opcode::OutputTop => "output_top",

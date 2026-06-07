@@ -475,6 +475,16 @@ impl Parser {
                 Ok(Some(AstNode::Op(Operator::FTan)))
             }
 
+            // JSON
+            TokenKind::JsonParse => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::JsonParse)))
+            }
+            TokenKind::JsonStringify => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::JsonStringify)))
+            }
+
             // Capability
             TokenKind::CapCall(n) => {
                 let id = *n;
@@ -601,6 +611,8 @@ impl Parser {
             TokenKind::FSin => { self.advance(); Ok("fsin".into()) }
             TokenKind::FCos => { self.advance(); Ok("fcos".into()) }
             TokenKind::FTan => { self.advance(); Ok("ftan".into()) }
+            TokenKind::JsonParse => { self.advance(); Ok("json-parse".into()) }
+            TokenKind::JsonStringify => { self.advance(); Ok("json-stringify".into()) }
             _ => Err(ParseError {
                 message: format!("Expected word, got {:?}", token.kind),
                 token,

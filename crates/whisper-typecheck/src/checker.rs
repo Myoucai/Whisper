@@ -441,6 +441,16 @@ impl TypeChecker {
                 stack.push(Type::F64);
             }
 
+            // JSON
+            Operator::JsonParse => {
+                self.expect(stack, &Type::Str, errors, ctx, "json-parse");
+                stack.push(self.inferer.fresh_var());
+            }
+            Operator::JsonStringify => {
+                stack.pop(); // accept any value
+                stack.push(Type::Str);
+            }
+
             Operator::Nth => {
                 let any_list = Type::List(Box::new(self.inferer.fresh_var()));
                 self.expect(stack, &Type::I64, errors, ctx, "@nth index");

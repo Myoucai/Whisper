@@ -333,6 +333,8 @@ impl Server {
             ("fsin", "Sine (radians): f64 → f64"),
             ("fcos", "Cosine (radians): f64 → f64"),
             ("ftan", "Tangent (radians): f64 → f64"),
+            ("json-parse", "Parse JSON string → Whisper value"),
+            ("json-stringify", "Serialize value → JSON string"),
             (".", "Output top of stack"),
             ("..", "Output entire stack"),
             (",", "Read input"),
@@ -470,6 +472,10 @@ fn hover_info(word: &str) -> String {
         "fsin" => "**fsin** — sine (radians)\n\nStack: `f64 → f64`".into(),
         "fcos" => "**fcos** — cosine (radians)\n\nStack: `f64 → f64`".into(),
         "ftan" => "**ftan** — tangent (radians)\n\nStack: `f64 → f64`".into(),
+
+        // JSON
+        "json-parse" => "**json-parse** — parse JSON string to value\n\nStack: `str → value`".into(),
+        "json-stringify" => "**json-stringify** — serialize value to JSON\n\nStack: `value → str`".into(),
 
         // IO
         "." => "**Output** — print top of stack\n\nStack: `a →`".into(),

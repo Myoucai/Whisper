@@ -238,6 +238,8 @@ impl WbinReader {
             0xB3 => Ok(Opcode::FSin),
             0xB4 => Ok(Opcode::FCos),
             0xB5 => Ok(Opcode::FTan),
+            0xB6 => Ok(Opcode::JsonParse),
+            0xB7 => Ok(Opcode::JsonStringify),
 
             // Control flow
             0x50 => {

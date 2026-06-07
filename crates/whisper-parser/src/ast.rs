@@ -138,6 +138,10 @@ pub enum Operator {
     FCos,
     FTan,
 
+    // JSON
+    JsonParse,
+    JsonStringify,
+
     // Control flow (runtime)
     CondQ,
     CondArrow,

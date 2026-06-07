@@ -68,6 +68,10 @@ pub fn get_builtin_signature(name: &str) -> Option<(Vec<Type>, Vec<Type>)> {
         "fcos" => Some((vec![Type::F64], vec![Type::F64])),
         "ftan" => Some((vec![Type::F64], vec![Type::F64])),
 
+        // JSON
+        "json-parse" => Some((vec![Type::Str], vec![Type::TypeVar(0)])),
+        "json-stringify" => Some((vec![Type::TypeVar(0)], vec![Type::Str])),
+
         _ => None,
     }
 }

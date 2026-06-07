@@ -252,6 +252,8 @@ impl BytecodeGenerator {
             Operator::FSin => Opcode::FSin,
             Operator::FCos => Opcode::FCos,
             Operator::FTan => Opcode::FTan,
+            Operator::JsonParse => Opcode::JsonParse,
+            Operator::JsonStringify => Opcode::JsonStringify,
             Operator::CondQ => Opcode::Cond(0), // placeholder
             Operator::CondArrow => Opcode::Cond(0),
             Operator::Hash => Opcode::Loop(0),

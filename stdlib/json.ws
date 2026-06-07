@@ -1,5 +1,5 @@
-: json-parse     { } ;  // TODO: requires JSON parser in VM or as capability
-: json-stringify { } ;  // TODO: requires JSON serializer
+: json-parse     { json-parse } ;
+: json-stringify { json-stringify } ;
 
 export json-parse
 export json-stringify

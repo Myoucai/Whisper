@@ -394,6 +394,8 @@ impl Lexer {
             "fsin" => TokenKind::FSin,
             "fcos" => TokenKind::FCos,
             "ftan" => TokenKind::FTan,
+            "json-parse" => TokenKind::JsonParse,
+            "json-stringify" => TokenKind::JsonStringify,
             _ => TokenKind::Word(name),
         }
     }
