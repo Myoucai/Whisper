@@ -14,6 +14,8 @@ fn help() {
     println!("  whisper repl               Start interactive REPL");
     println!("  whisper fmt    <file.ws>    Format a source file");
     println!("  whisper install <pkg>       Install a package");
+    println!("  whisper uninstall <name>    Remove a package");
+    println!("  whisper search [query]      Search installed packages");
     println!("  whisper serve   <file.ws>   Start HTTP server");
     println!("  whisper bootstrap <file.ws> Self-hosting compiler pipeline");
     println!("  whisper lsp                 Start LSP language server");
@@ -54,6 +56,8 @@ fn main() {
         "repl" => commands::repl::start_repl(),
         "fmt" => cmd_fmt(&args),
         "install" => cmd_install(&args),
+        "uninstall" => cmd_uninstall(&args),
+        "search" => cmd_search(&args),
         "serve" => cmd_serve(&args),
         "bootstrap" => cmd_bootstrap(&args),
         "lsp" => cmd_lsp(),
@@ -180,6 +184,35 @@ fn cmd_install(args: &[String]) -> Result<(), String> {
         .get(2)
         .ok_or("Expected: whisper install <github.com/user/repo>")?;
     installer.install(pkg, auto_yes)
+}
+
+fn cmd_uninstall(args: &[String]) -> Result<(), String> {
+    let name = args.get(2).ok_or("Expected: whisper uninstall <name>")?;
+    let installer = whisper_package::install::Installer::new();
+    installer.uninstall(name)
+}
+
+fn cmd_search(args: &[String]) -> Result<(), String> {
+    let query = args.get(2).map(|s| s.as_str()).unwrap_or("");
+    let installer = whisper_package::install::Installer::new();
+    let packages = installer.list()?;
+    let filtered: Vec<_> = packages
+        .iter()
+        .filter(|p| query.is_empty() || p.name.contains(query))
+        .collect();
+    if filtered.is_empty() {
+        let suffix = if query.is_empty() { String::new() } else { format!(" matching '{query}'") };
+        println!("No packages found{suffix}");
+    } else {
+        println!("Installed packages:");
+        for pkg in &filtered {
+            println!("  {} v{}", pkg.name, pkg.version);
+            if !pkg.manifest.exports.is_empty() {
+                println!("    exports: {}", pkg.manifest.exports.join(", "));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn cmd_lsp() -> Result<(), String> {

@@ -364,6 +364,26 @@ impl Installer {
         Ok(())
     }
 
+    /// Uninstall a package by name.
+    pub fn uninstall(&self, name: &str) -> Result<(), String> {
+        let pkg_dir = self.cache_dir.join(name);
+        if !pkg_dir.exists() {
+            return Err(format!("Package '{name}' is not installed"));
+        }
+        std::fs::remove_dir_all(&pkg_dir)
+            .map_err(|e| format!("Failed to remove '{name}': {e}"))?;
+        // Update lockfile
+        let lockfile_path = dirs_home().join("whisper.lock");
+        if lockfile_path.exists() {
+            if let Ok(mut lockfile) = crate::lock::Lockfile::read(&lockfile_path) {
+                lockfile.packages.remove(name);
+                let _ = lockfile.write(&lockfile_path);
+            }
+        }
+        println!("Uninstalled: {name}");
+        Ok(())
+    }
+
     /// List installed packages.
     pub fn list(&self) -> Result<Vec<InstalledPackage>, String> {
         if !self.cache_dir.exists() {
