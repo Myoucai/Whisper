@@ -370,8 +370,7 @@ impl Installer {
         if !pkg_dir.exists() {
             return Err(format!("Package '{name}' is not installed"));
         }
-        std::fs::remove_dir_all(&pkg_dir)
-            .map_err(|e| format!("Failed to remove '{name}': {e}"))?;
+        std::fs::remove_dir_all(&pkg_dir).map_err(|e| format!("Failed to remove '{name}': {e}"))?;
         // Update lockfile
         let lockfile_path = dirs_home().join("whisper.lock");
         if lockfile_path.exists() {

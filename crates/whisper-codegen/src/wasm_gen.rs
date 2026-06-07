@@ -238,35 +238,35 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     // 0x32 PushStr — save string data pointer, skip past length+data
     if_op(&mut b, 0x32);
     // Save pointer to string data (= bytecode_base + current_ip)
-    ld_i32(&mut b, 0x0004);  // current ip (points to 4-byte length)
+    ld_i32(&mut b, 0x0004); // current ip (points to 4-byte length)
     ci32(&mut b, 4);
-    b.push(w::I32_ADD);       // ip + 4 = pointer to string data (past length)
+    b.push(w::I32_ADD); // ip + 4 = pointer to string data (past length)
     ci32(&mut b, 0x0010);
-    b.push(w::I32_ADD);       // bytecode_base + ip + 4 = absolute pointer
+    b.push(w::I32_ADD); // bytecode_base + ip + 4 = absolute pointer
     ci32(&mut b, 0x1020);
     b.push(w::I32_STORE);
     b.push(2);
-    b.push(0);                // scratch[0x1020] = string data pointer
-    // Read u32 length
-    ld_i32(&mut b, 0x0004);  // ip
+    b.push(0); // scratch[0x1020] = string data pointer
+               // Read u32 length
+    ld_i32(&mut b, 0x0004); // ip
     ci32(&mut b, 0x0010);
     b.push(w::I32_ADD);
     b.push(w::I32_LOAD);
     b.push(2);
-    b.push(0);                // length
+    b.push(0); // length
     ci32(&mut b, 0x1028);
     b.push(w::I32_STORE);
     b.push(2);
-    b.push(0);                // scratch[0x1028] = string length
-    // Advance ip past length (4) + data (length)
-    ld_i32(&mut b, 0x0004);  // ip
+    b.push(0); // scratch[0x1028] = string length
+               // Advance ip past length (4) + data (length)
+    ld_i32(&mut b, 0x0004); // ip
     ci32(&mut b, 0x1028);
     b.push(w::I32_LOAD);
     b.push(2);
     b.push(0);
-    b.push(w::I32_ADD);       // ip + len
+    b.push(w::I32_ADD); // ip + len
     ci32(&mut b, 4);
-    b.push(w::I32_ADD);       // ip + len + 4
+    b.push(w::I32_ADD); // ip + len + 4
     ci32(&mut b, 0x0004);
     b.push(w::I32_STORE);
     b.push(2);
@@ -623,23 +623,23 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     // String format in bytecode: [4B len LE][data bytes]
     // Pointer points to data bytes; length is at (ptr - 4)
     if_op(&mut b, 0x46);
-    pop(&mut b);               // string pointer as i64
+    pop(&mut b); // string pointer as i64
     ci32(&mut b, 0x1030);
     b.push(w::I64_STORE);
     b.push(3);
-    b.push(0);                 // scratch[0x1030] = pointer
-    // Read length from (ptr - 4)
+    b.push(0); // scratch[0x1030] = pointer
+               // Read length from (ptr - 4)
     ci32(&mut b, 0x1030);
     b.push(w::I32_LOAD);
     b.push(2);
-    b.push(0);                 // pointer as i32
+    b.push(0); // pointer as i32
     ci32(&mut b, 0xFFFFFFFCu32 as i32); // -4
-    b.push(w::I32_ADD);       // ptr - 4
+    b.push(w::I32_ADD); // ptr - 4
     b.push(w::I32_LOAD);
     b.push(2);
-    b.push(0);                 // u32 length
+    b.push(0); // u32 length
     b.push(w::I64_EXTEND_I32_S);
-    push(&mut b);              // push length as i64
+    push(&mut b); // push length as i64
     b.push(w::END);
 
     // 0x42 Len — pop list ptr, push length
@@ -667,17 +667,17 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     // 0x49 StrEq — str1_ptr str2_ptr → bool
     // Compare two strings by reading lengths and data from bytecode
     if_op(&mut b, 0x49);
-    pop(&mut b);               // ptr2
+    pop(&mut b); // ptr2
     ci32(&mut b, 0x1040);
     b.push(w::I64_STORE);
     b.push(3);
-    b.push(0);                 // scratch[0x1040] = ptr2
-    pop(&mut b);               // ptr1
+    b.push(0); // scratch[0x1040] = ptr2
+    pop(&mut b); // ptr1
     ci32(&mut b, 0x1030);
     b.push(w::I64_STORE);
     b.push(3);
-    b.push(0);                 // scratch[0x1030] = ptr1
-    // Read len1 from (ptr1 - 4)
+    b.push(0); // scratch[0x1030] = ptr1
+               // Read len1 from (ptr1 - 4)
     ci32(&mut b, 0x1030);
     b.push(w::I32_LOAD);
     b.push(2);
@@ -690,8 +690,8 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     ci32(&mut b, 0x1038);
     b.push(w::I32_STORE);
     b.push(2);
-    b.push(0);                 // scratch[0x1038] = len1
-    // Read len2 from (ptr2 - 4)
+    b.push(0); // scratch[0x1038] = len1
+               // Read len2 from (ptr2 - 4)
     ci32(&mut b, 0x1040);
     b.push(w::I32_LOAD);
     b.push(2);
@@ -704,8 +704,8 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     ci32(&mut b, 0x1048);
     b.push(w::I32_STORE);
     b.push(2);
-    b.push(0);                 // scratch[0x1048] = len2
-    // Compare: len1 == len2  → i64
+    b.push(0); // scratch[0x1048] = len2
+               // Compare: len1 == len2  → i64
     ci32(&mut b, 0x1038);
     b.push(w::I32_LOAD);
     b.push(2);
@@ -714,19 +714,19 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     b.push(w::I32_LOAD);
     b.push(2);
     b.push(0);
-    b.push(w::I32_EQ);        // len1 == len2
+    b.push(w::I32_EQ); // len1 == len2
     b.push(w::I64_EXTEND_I32_S);
     push(&mut b);
     b.push(w::END);
 
     // 0x4A StrLt — str1_ptr str2_ptr → bool (lexicographic compare)
     if_op(&mut b, 0x4A);
-    pop(&mut b);               // ptr2 → scratch
+    pop(&mut b); // ptr2 → scratch
     ci32(&mut b, 0x1040);
     b.push(w::I64_STORE);
     b.push(3);
     b.push(0);
-    pop(&mut b);               // ptr1 → scratch
+    pop(&mut b); // ptr1 → scratch
     ci32(&mut b, 0x1030);
     b.push(w::I64_STORE);
     b.push(3);
@@ -738,15 +738,15 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     b.push(0);
     b.push(w::I32_LOAD);
     b.push(2);
-    b.push(0);                 // first 4 bytes of str1
+    b.push(0); // first 4 bytes of str1
     ci32(&mut b, 0x1040);
     b.push(w::I32_LOAD);
     b.push(2);
     b.push(0);
     b.push(w::I32_LOAD);
     b.push(2);
-    b.push(0);                 // first 4 bytes of str2
-    b.push(w::I32_LT_U);      // unsigned less-than
+    b.push(0); // first 4 bytes of str2
+    b.push(w::I32_LT_U); // unsigned less-than
     b.push(w::I64_EXTEND_I32_S);
     push(&mut b);
     b.push(w::END);

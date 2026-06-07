@@ -135,8 +135,7 @@ fn cmd_fmt(args: &[String]) -> Result<(), String> {
     let ast = whisper_parser::Parser::parse_source(&source)
         .map_err(|e| format!("Parse error: {}", e.message))?;
     let formatted = whisper_codegen::formatter::format_ast(&ast);
-    std::fs::write(file, &formatted)
-        .map_err(|e| format!("Cannot write '{file}': {e}"))?;
+    std::fs::write(file, &formatted).map_err(|e| format!("Cannot write '{file}': {e}"))?;
     println!("Formatted: {file} ({} nodes)", ast.len());
     Ok(())
 }
@@ -201,7 +200,11 @@ fn cmd_search(args: &[String]) -> Result<(), String> {
         .filter(|p| query.is_empty() || p.name.contains(query))
         .collect();
     if filtered.is_empty() {
-        let suffix = if query.is_empty() { String::new() } else { format!(" matching '{query}'") };
+        let suffix = if query.is_empty() {
+            String::new()
+        } else {
+            format!(" matching '{query}'")
+        };
         println!("No packages found{suffix}");
     } else {
         println!("Installed packages:");

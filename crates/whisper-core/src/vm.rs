@@ -530,8 +530,7 @@ impl Vm {
                     }
                     Err(e) => {
                         self.data_stack.push(Value::Bool(false));
-                        self.data_stack
-                            .push(Value::Str(Rc::new(e.to_string())));
+                        self.data_stack.push(Value::Str(Rc::new(e.to_string())));
                     }
                 }
             }

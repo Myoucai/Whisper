@@ -23,22 +23,37 @@ fn bench(name: &str, mut f: impl FnMut() -> u64) {
 fn make_vm() -> Vm {
     let mut vm = Vm::new();
     vm.define_word("sq".into(), vec![Opcode::Dup, Opcode::Mul, Opcode::Return]);
-    vm.define_word("fib".into(), vec![
-        Opcode::Dup, Opcode::PushI64(1), Opcode::Gt,
-        Opcode::Cond(11),  // if false, skip to Return
-        Opcode::Dup, Opcode::PushI64(1), Opcode::Sub, Opcode::Call("fib".into()),
-        Opcode::Swap, Opcode::PushI64(2), Opcode::Sub, Opcode::Call("fib".into()),
-        Opcode::Add,
-        Opcode::Return,
-        Opcode::Return,
-    ]);
+    vm.define_word(
+        "fib".into(),
+        vec![
+            Opcode::Dup,
+            Opcode::PushI64(1),
+            Opcode::Gt,
+            Opcode::Cond(11), // if false, skip to Return
+            Opcode::Dup,
+            Opcode::PushI64(1),
+            Opcode::Sub,
+            Opcode::Call("fib".into()),
+            Opcode::Swap,
+            Opcode::PushI64(2),
+            Opcode::Sub,
+            Opcode::Call("fib".into()),
+            Opcode::Add,
+            Opcode::Return,
+            Opcode::Return,
+        ],
+    );
     vm
 }
 
 #[test]
 fn bench_arithmetic() {
     println!("\n=== Arithmetic ===");
-    bench("push_i64", || { let mut vm = Vm::new(); vm.data_stack.push(Value::I64(42)); 42 });
+    bench("push_i64", || {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(42));
+        42
+    });
     bench("add", || {
         let mut vm = Vm::new();
         vm.data_stack.push(Value::I64(3));
@@ -56,9 +71,13 @@ fn bench_arithmetic() {
     bench("complex (3+4)*2", || {
         let mut vm = Vm::new();
         vm.execute(&[
-            Opcode::PushI64(3), Opcode::PushI64(4), Opcode::Add,
-            Opcode::PushI64(2), Opcode::Mul,
-        ]).unwrap();
+            Opcode::PushI64(3),
+            Opcode::PushI64(4),
+            Opcode::Add,
+            Opcode::PushI64(2),
+            Opcode::Mul,
+        ])
+        .unwrap();
         14
     });
 }
@@ -126,7 +145,11 @@ fn bench_word_calls() {
 fn bench_list_ops() {
     println!("\n=== List Ops ===");
     let list = Value::List(Rc::new(vec![
-        Value::I64(1), Value::I64(2), Value::I64(3), Value::I64(4), Value::I64(5),
+        Value::I64(1),
+        Value::I64(2),
+        Value::I64(3),
+        Value::I64(4),
+        Value::I64(5),
     ]));
     bench("len [1..5]", || {
         let mut vm = Vm::new();
