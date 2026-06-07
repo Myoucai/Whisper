@@ -24,10 +24,16 @@ pub fn resolve_package(spec: &str) -> Result<PackageInfo, String> {
 
     let parts: Vec<&str> = path.split('/').collect();
     if parts.len() < 2 {
-        return Err(format!("Invalid package spec: {spec}. Expected: github.com/user/repo"));
+        return Err(format!(
+            "Invalid package spec: {spec}. Expected: github.com/user/repo"
+        ));
     }
 
-    let host = if parts.len() >= 3 { parts[0] } else { "github.com" };
+    let host = if parts.len() >= 3 {
+        parts[0]
+    } else {
+        "github.com"
+    };
     let user = if parts.len() >= 3 { parts[1] } else { parts[0] };
     let repo = if parts.len() >= 3 { parts[2] } else { parts[1] };
 

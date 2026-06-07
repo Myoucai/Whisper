@@ -3,8 +3,8 @@
 //! Features: multi-line input, history file, completion helper.
 
 use std::io::{self, BufRead, Write};
-use whisper_core::vm::Vm;
 use whisper_codegen::bytecode_gen::BytecodeGenerator;
+use whisper_core::vm::Vm;
 use whisper_parser::Parser;
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -87,30 +87,69 @@ fn append_history(line: &str) {
 fn builtin_completions() -> Vec<&'static str> {
     vec![
         // Stack
-        "_", "`", "drop", "rot",
+        "_",
+        "`",
+        "drop",
+        "rot",
         // Arithmetic
-        "+", "-", "*", "/", "mod",
+        "+",
+        "-",
+        "*",
+        "/",
+        "mod",
         // Comparison
-        "=", "<", ">", "!=", "<=", ">=",
+        "=",
+        "<",
+        ">",
+        "!=",
+        "<=",
+        ">=",
         // Logic
-        "&", "|", "!",
+        "&",
+        "|",
+        "!",
         // List
-        "@nth", "append", "len", "@map", "@each", "@fold", "@times",
+        "@nth",
+        "append",
+        "len",
+        "@map",
+        "@each",
+        "@fold",
+        "@times",
         // String
-        "strlen", "strcat", "strslice", "streq", "strlt",
-        "strfind", "strreplace", "strtoi64", "i64tostr",
+        "strlen",
+        "strcat",
+        "strslice",
+        "streq",
+        "strlt",
+        "strfind",
+        "strreplace",
+        "strtoi64",
+        "i64tostr",
         // Float
-        "i64tof64", "f64toi64", "fsqrt", "fsin", "fcos", "ftan",
+        "i64tof64",
+        "f64toi64",
+        "fsqrt",
+        "fsin",
+        "fcos",
+        "ftan",
         // JSON
-        "json-parse", "json-stringify",
+        "json-parse",
+        "json-stringify",
         // IO
-        ".", "..", ",",
+        ".",
+        "..",
+        ",",
         // Control
-        "??", "?->", "#",
+        "??",
+        "?->",
+        "#",
         // Definition
-        "import", "export",
+        "import",
+        "export",
         // Boolean
-        "#t", "#f",
+        "#t",
+        "#f",
         // Confidence
         "?|",
     ]
@@ -150,9 +189,7 @@ fn show_completions(prefix: &str, vm: &Vm) {
 }
 
 /// Parse a word definition from REPL input.
-fn parse_definition(
-    line: &str,
-) -> Result<(String, Vec<whisper_core::opcode::Opcode>), String> {
+fn parse_definition(line: &str) -> Result<(String, Vec<whisper_core::opcode::Opcode>), String> {
     let line = line
         .strip_prefix(": ")
         .ok_or("Expected ': name { body } ;'")?;
@@ -169,8 +206,8 @@ fn parse_definition(
 
     let body_str = body_str.ok_or("Expected { body }")?.trim();
 
-    let ast =
-        Parser::parse_source(body_str).map_err(|e| format!("Parse error in body: {}", e.message))?;
+    let ast = Parser::parse_source(body_str)
+        .map_err(|e| format!("Parse error in body: {}", e.message))?;
     let mut gen = BytecodeGenerator::new();
     let (bytecode, _defs) = gen.compile(&ast);
 
@@ -354,10 +391,7 @@ pub fn start_repl() -> Result<(), String> {
                 }
             }
             Err(e) => {
-                eprintln!(
-                    "Parse error at line {}: {}",
-                    e.token.span.line, e.message
-                );
+                eprintln!("Parse error at line {}: {}", e.token.span.line, e.message);
             }
         }
     }

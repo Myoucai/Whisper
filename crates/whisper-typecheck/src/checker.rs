@@ -8,8 +8,8 @@
 //! Cap, Signal, TypeVar, Union).  Type variables are resolved by the inferer
 //! which persists for the whole check() call.
 
-use whisper_parser::ast::{AstNode, Operator};
 use std::collections::HashMap;
+use whisper_parser::ast::{AstNode, Operator};
 
 use crate::builtins::get_builtin_signature;
 use crate::types::Type;
@@ -117,7 +117,8 @@ impl TypeChecker {
                     whisper_core::value::Value::Bool(_) => Type::Bool,
                     whisper_core::value::Value::Str(_) => Type::Str,
                     whisper_core::value::Value::List(items) => {
-                        let elem = items.first()
+                        let elem = items
+                            .first()
                             .map(|v| value_to_type(v, &mut self.inferer))
                             .unwrap_or_else(|| self.inferer.fresh_var());
                         Type::List(Box::new(elem))
@@ -150,10 +151,7 @@ impl TypeChecker {
                         if let Some(actual) = stack.pop() {
                             if let Err(e) = self.inferer.unify(expected, &actual) {
                                 errors.push(TypeError {
-                                    message: format!(
-                                        "Word '{}' type mismatch: {}",
-                                        name, e
-                                    ),
+                                    message: format!("Word '{}' type mismatch: {}", name, e),
                                     context: ctx.to_string(),
                                 });
                                 stack.push(expected.clone());
@@ -185,7 +183,12 @@ impl TypeChecker {
                 let mut quote_stack: Vec<Type> = vec![self.inferer.fresh_var()];
                 let mut quote_errors = Vec::new();
                 for n in body {
-                    self.check_node(n, &mut quote_stack, &mut quote_errors, &format!("{ctx}/quote"));
+                    self.check_node(
+                        n,
+                        &mut quote_stack,
+                        &mut quote_errors,
+                        &format!("{ctx}/quote"),
+                    );
                 }
                 for err in &quote_errors {
                     if !err.message.contains("Stack underflow") {
@@ -230,7 +233,10 @@ impl TypeChecker {
                 stack.push(Type::List(Box::new(self.inferer.resolve(&elem))));
             }
 
-            AstNode::Cond { then_branch, else_branch } => {
+            AstNode::Cond {
+                then_branch,
+                else_branch,
+            } => {
                 self.expect(stack, &Type::Bool, errors, ctx, "condition");
                 let depth = stack.len();
                 let mut then_stack = stack.clone();
@@ -244,8 +250,14 @@ impl TypeChecker {
                     }
                 }
                 stack.truncate(depth);
-                let then_result = then_stack.last().cloned().unwrap_or_else(|| self.inferer.fresh_var());
-                let else_result = else_stack.last().cloned().unwrap_or_else(|| self.inferer.fresh_var());
+                let then_result = then_stack
+                    .last()
+                    .cloned()
+                    .unwrap_or_else(|| self.inferer.fresh_var());
+                let else_result = else_stack
+                    .last()
+                    .cloned()
+                    .unwrap_or_else(|| self.inferer.fresh_var());
                 if self.inferer.unify(&then_result, &else_result).is_ok() {
                     stack.push(self.inferer.resolve(&then_result));
                 } else {
@@ -278,7 +290,10 @@ impl TypeChecker {
                 self.expect(stack, &Type::Bool, errors, ctx, "?-> condition");
             }
 
-            AstNode::ConfidenceLabel { body, confidence: _ } => {
+            AstNode::ConfidenceLabel {
+                body,
+                confidence: _,
+            } => {
                 for n in body {
                     self.check_node(n, stack, errors, ctx);
                 }
@@ -294,8 +309,14 @@ impl TypeChecker {
                 for n in alt2 {
                     self.check_node(n, &mut s2, errors, &format!("{ctx}/alt2"));
                 }
-                let r1 = s1.last().cloned().unwrap_or_else(|| self.inferer.fresh_var());
-                let r2 = s2.last().cloned().unwrap_or_else(|| self.inferer.fresh_var());
+                let r1 = s1
+                    .last()
+                    .cloned()
+                    .unwrap_or_else(|| self.inferer.fresh_var());
+                let r2 = s2
+                    .last()
+                    .cloned()
+                    .unwrap_or_else(|| self.inferer.fresh_var());
                 stack.truncate(depth);
                 if self.inferer.unify(&r1, &r2).is_ok() {
                     stack.push(self.inferer.resolve(&r1));
@@ -323,7 +344,10 @@ impl TypeChecker {
             // Stack ops
             Operator::Dup => {
                 if stack.is_empty() {
-                    errors.push(TypeError { message: "Dup: stack empty".into(), context: ctx.into() });
+                    errors.push(TypeError {
+                        message: "Dup: stack empty".into(),
+                        context: ctx.into(),
+                    });
                 } else {
                     let t = stack.last().unwrap().clone();
                     stack.push(t);
@@ -331,7 +355,10 @@ impl TypeChecker {
             }
             Operator::Swap => {
                 if stack.len() < 2 {
-                    errors.push(TypeError { message: "Swap: need 2 values".into(), context: ctx.into() });
+                    errors.push(TypeError {
+                        message: "Swap: need 2 values".into(),
+                        context: ctx.into(),
+                    });
                 } else {
                     let a = stack.pop().unwrap();
                     let b = stack.pop().unwrap();
@@ -341,14 +368,20 @@ impl TypeChecker {
             }
             Operator::Drop => {
                 if stack.is_empty() {
-                    errors.push(TypeError { message: "Drop: stack empty".into(), context: ctx.into() });
+                    errors.push(TypeError {
+                        message: "Drop: stack empty".into(),
+                        context: ctx.into(),
+                    });
                 } else {
                     stack.pop();
                 }
             }
             Operator::Rot => {
                 if stack.len() < 3 {
-                    errors.push(TypeError { message: "Rot: need 3 values".into(), context: ctx.into() });
+                    errors.push(TypeError {
+                        message: "Rot: need 3 values".into(),
+                        context: ctx.into(),
+                    });
                 }
             }
 
@@ -361,8 +394,12 @@ impl TypeChecker {
             }
 
             // Comparison: Any, Any → Bool
-            Operator::Eq | Operator::Lt | Operator::Gt
-            | Operator::Neq | Operator::Le | Operator::Ge => {
+            Operator::Eq
+            | Operator::Lt
+            | Operator::Gt
+            | Operator::Neq
+            | Operator::Le
+            | Operator::Ge => {
                 stack.pop();
                 stack.pop();
                 stack.push(Type::Bool);
@@ -436,7 +473,13 @@ impl TypeChecker {
                 stack.push(Type::List(Box::new(Type::I64)));
             }
             Operator::CharsStr => {
-                self.expect(stack, &Type::List(Box::new(Type::I64)), errors, ctx, "charsstr");
+                self.expect(
+                    stack,
+                    &Type::List(Box::new(Type::I64)),
+                    errors,
+                    ctx,
+                    "charsstr",
+                );
                 stack.push(Type::Str);
             }
 
@@ -504,7 +547,10 @@ impl TypeChecker {
             // IO
             Operator::OutputTop => {
                 if stack.is_empty() {
-                    errors.push(TypeError { message: ".: stack empty".into(), context: ctx.into() });
+                    errors.push(TypeError {
+                        message: ".: stack empty".into(),
+                        context: ctx.into(),
+                    });
                 } else {
                     stack.pop();
                 }
@@ -576,7 +622,8 @@ fn value_to_type(val: &whisper_core::value::Value, inferer: &mut TypeInferer) ->
         whisper_core::value::Value::Bool(_) => Type::Bool,
         whisper_core::value::Value::Str(_) => Type::Str,
         whisper_core::value::Value::List(items) => {
-            let elem = items.first()
+            let elem = items
+                .first()
                 .map(|v| value_to_type(v, inferer))
                 .unwrap_or_else(|| inferer.fresh_var());
             Type::List(Box::new(elem))
@@ -608,10 +655,7 @@ mod tests {
         let ast = Parser::parse_source(source).unwrap();
         let mut tc = TypeChecker::new();
         let errors = tc.check(&ast);
-        assert!(
-            !errors.is_empty(),
-            "Expected errors for: {source}"
-        );
+        assert!(!errors.is_empty(), "Expected errors for: {source}");
     }
 
     #[test]

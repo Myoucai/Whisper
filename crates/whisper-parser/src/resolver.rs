@@ -114,13 +114,15 @@ fn resolve_imports_inner(
 
     for node in &ast {
         if let AstNode::Import(path) = node {
-            let resolved = resolve_module(path, source_dir)
-                .ok_or_else(|| format!("Module not found: {path}\n  Searched: {:?}", search_paths(source_dir)))?;
+            let resolved = resolve_module(path, source_dir).ok_or_else(|| {
+                format!(
+                    "Module not found: {path}\n  Searched: {:?}",
+                    search_paths(source_dir)
+                )
+            })?;
 
             // Canonicalise to detect cycles
-            let canonical = resolved
-                .canonicalize()
-                .unwrap_or_else(|_| resolved.clone());
+            let canonical = resolved.canonicalize().unwrap_or_else(|_| resolved.clone());
 
             if visited.contains(&canonical) {
                 continue; // Already loaded — skip
@@ -180,7 +182,10 @@ mod tests {
     fn test_resolve_math_stdlib() {
         // Load math.ws from the stdlib directory.
         let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent().unwrap().parent().unwrap();
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap();
         let stdlib_dir = repo_root.join("stdlib");
         // Import "math" relative to the stdlib dir
         let ast = vec![AstNode::Import("math".into())];
@@ -188,10 +193,21 @@ mod tests {
         assert!(result.is_ok(), "resolve failed: {:?}", result.err());
         let resolved = result.unwrap();
         // math.ws should provide 'sq', 'cube', 'factorial', 'fib', 'even', 'odd'
-        let def_names: Vec<String> = resolved.ast.iter().filter_map(|n| {
-            if let AstNode::Def { name, .. } = n { Some(name.clone()) } else { None }
-        }).collect();
-        assert!(def_names.contains(&"sq".into()), "should contain sq, got {def_names:?}");
+        let def_names: Vec<String> = resolved
+            .ast
+            .iter()
+            .filter_map(|n| {
+                if let AstNode::Def { name, .. } = n {
+                    Some(name.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert!(
+            def_names.contains(&"sq".into()),
+            "should contain sq, got {def_names:?}"
+        );
         assert!(def_names.contains(&"factorial".into()));
         assert!(!resolved.loaded.is_empty());
     }
@@ -208,18 +224,30 @@ mod tests {
     #[test]
     fn test_import_cycle_detection() {
         let dir = make_temp_dir("whisper-cycle-test");
-        write_file(&dir, "cycle.ws", r#"
+        write_file(
+            &dir,
+            "cycle.ws",
+            r#"
             import "cycle"
             : foo { 42 } ;
             export foo
-        "#);
+        "#,
+        );
         let ast = vec![AstNode::Import("cycle".into())];
         let result = resolve_imports(ast, &dir);
         assert!(result.is_ok(), "cycle should not crash");
         let resolved = result.unwrap();
-        let def_names: Vec<String> = resolved.ast.iter().filter_map(|n| {
-            if let AstNode::Def { name, .. } = n { Some(name.clone()) } else { None }
-        }).collect();
+        let def_names: Vec<String> = resolved
+            .ast
+            .iter()
+            .filter_map(|n| {
+                if let AstNode::Def { name, .. } = n {
+                    Some(name.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
         // 'foo' should appear exactly once
         assert_eq!(def_names.iter().filter(|n| *n == "foo").count(), 1);
         let _ = std::fs::remove_dir_all(&dir);

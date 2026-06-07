@@ -7,8 +7,8 @@
 use crate::ast::{AstNode, Operator};
 use crate::lexer::Lexer;
 use crate::token::{Token, TokenKind};
-use whisper_core::value::Value;
 use std::rc::Rc;
+use whisper_core::value::Value;
 
 /// Error type for parser errors.
 #[derive(Debug, Clone, PartialEq)]
@@ -217,7 +217,10 @@ impl Parser {
                 // Expect { body }
                 if !matches!(self.current().kind, TokenKind::LBrace) {
                     self.errors.push(ParseError {
-                        message: format!("Expected '{{' after word name '{name}', got {:?}", self.current().kind),
+                        message: format!(
+                            "Expected '{{' after word name '{name}', got {:?}",
+                            self.current().kind
+                        ),
                         token: self.current().clone(),
                     });
                     self.synchronize();
@@ -608,23 +611,74 @@ impl Parser {
                 Ok(n)
             }
             // Builtin operators that can also be used as definition/export names
-            TokenKind::StrLen => { self.advance(); Ok("strlen".into()) }
-            TokenKind::StrCat => { self.advance(); Ok("strcat".into()) }
-            TokenKind::StrSlice => { self.advance(); Ok("strslice".into()) }
-            TokenKind::StrEq => { self.advance(); Ok("streq".into()) }
-            TokenKind::StrLt => { self.advance(); Ok("strlt".into()) }
-            TokenKind::StrFind => { self.advance(); Ok("strfind".into()) }
-            TokenKind::StrReplace => { self.advance(); Ok("strreplace".into()) }
-            TokenKind::StrToI64 => { self.advance(); Ok("strtoi64".into()) }
-            TokenKind::I64ToStr => { self.advance(); Ok("i64tostr".into()) }
-            TokenKind::I64ToF64 => { self.advance(); Ok("i64tof64".into()) }
-            TokenKind::F64ToI64 => { self.advance(); Ok("f64toi64".into()) }
-            TokenKind::FSqrt => { self.advance(); Ok("fsqrt".into()) }
-            TokenKind::FSin => { self.advance(); Ok("fsin".into()) }
-            TokenKind::FCos => { self.advance(); Ok("fcos".into()) }
-            TokenKind::FTan => { self.advance(); Ok("ftan".into()) }
-            TokenKind::JsonParse => { self.advance(); Ok("json-parse".into()) }
-            TokenKind::JsonStringify => { self.advance(); Ok("json-stringify".into()) }
+            TokenKind::StrLen => {
+                self.advance();
+                Ok("strlen".into())
+            }
+            TokenKind::StrCat => {
+                self.advance();
+                Ok("strcat".into())
+            }
+            TokenKind::StrSlice => {
+                self.advance();
+                Ok("strslice".into())
+            }
+            TokenKind::StrEq => {
+                self.advance();
+                Ok("streq".into())
+            }
+            TokenKind::StrLt => {
+                self.advance();
+                Ok("strlt".into())
+            }
+            TokenKind::StrFind => {
+                self.advance();
+                Ok("strfind".into())
+            }
+            TokenKind::StrReplace => {
+                self.advance();
+                Ok("strreplace".into())
+            }
+            TokenKind::StrToI64 => {
+                self.advance();
+                Ok("strtoi64".into())
+            }
+            TokenKind::I64ToStr => {
+                self.advance();
+                Ok("i64tostr".into())
+            }
+            TokenKind::I64ToF64 => {
+                self.advance();
+                Ok("i64tof64".into())
+            }
+            TokenKind::F64ToI64 => {
+                self.advance();
+                Ok("f64toi64".into())
+            }
+            TokenKind::FSqrt => {
+                self.advance();
+                Ok("fsqrt".into())
+            }
+            TokenKind::FSin => {
+                self.advance();
+                Ok("fsin".into())
+            }
+            TokenKind::FCos => {
+                self.advance();
+                Ok("fcos".into())
+            }
+            TokenKind::FTan => {
+                self.advance();
+                Ok("ftan".into())
+            }
+            TokenKind::JsonParse => {
+                self.advance();
+                Ok("json-parse".into())
+            }
+            TokenKind::JsonStringify => {
+                self.advance();
+                Ok("json-stringify".into())
+            }
             _ => Err(ParseError {
                 message: format!("Expected word, got {:?}", token.kind),
                 token,
@@ -694,7 +748,10 @@ impl Parser {
         let mut nodes = Vec::new();
         while !self.is_at_end() {
             let current_disc = std::mem::discriminant(&self.current().kind);
-            if ends.iter().any(|e| std::mem::discriminant(e) == current_disc) {
+            if ends
+                .iter()
+                .any(|e| std::mem::discriminant(e) == current_disc)
+            {
                 return nodes;
             }
             match self.parse_node() {

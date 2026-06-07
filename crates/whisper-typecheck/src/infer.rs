@@ -65,9 +65,7 @@ impl TypeInferer {
                 Ok(())
             }
             // Signal(T) unifies with T
-            (Type::Signal(inner), other) | (other, Type::Signal(inner)) => {
-                self.unify(inner, other)
-            }
+            (Type::Signal(inner), other) | (other, Type::Signal(inner)) => self.unify(inner, other),
             // List covariance
             (Type::List(a_inner), Type::List(b_inner)) => self.unify(a_inner, b_inner),
             // Union types
@@ -89,7 +87,11 @@ impl TypeInferer {
                 Ok(())
             }
             // Incompatible
-            _ => Err(format!("Type mismatch: cannot unify {} and {}", a.name(), b.name())),
+            _ => Err(format!(
+                "Type mismatch: cannot unify {} and {}",
+                a.name(),
+                b.name()
+            )),
         }
     }
 
@@ -112,17 +114,12 @@ impl TypeInferer {
         let resolved = self.find(ty.clone());
         match &resolved {
             Type::List(inner) => Type::List(Box::new(self.resolve(inner))),
-            Type::Ref(inputs, outputs) => {
-                Type::Ref(
-                    inputs.iter().map(|t| self.resolve(t)).collect(),
-                    outputs.iter().map(|t| self.resolve(t)).collect(),
-                )
-            }
-            Type::Signal(inner) => Type::Signal(Box::new(self.resolve(inner))),
-            Type::Union(a, b) => Type::Union(
-                Box::new(self.resolve(a)),
-                Box::new(self.resolve(b)),
+            Type::Ref(inputs, outputs) => Type::Ref(
+                inputs.iter().map(|t| self.resolve(t)).collect(),
+                outputs.iter().map(|t| self.resolve(t)).collect(),
             ),
+            Type::Signal(inner) => Type::Signal(Box::new(self.resolve(inner))),
+            Type::Union(a, b) => Type::Union(Box::new(self.resolve(a)), Box::new(self.resolve(b))),
             other => other.clone(),
         }
     }

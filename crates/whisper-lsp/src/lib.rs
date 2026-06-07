@@ -13,8 +13,8 @@ use lsp_server::{Connection, Message, Request, Response};
 use lsp_types::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use whisper_parser::Parser;
 use whisper_parser::ast::AstNode;
+use whisper_parser::Parser;
 
 /// In-memory document store.
 #[derive(Clone)]
@@ -114,7 +114,11 @@ impl Server {
             "textDocument/didChange" => {
                 let params: DidChangeTextDocumentParams =
                     serde_json::from_value(notif.params.clone()).unwrap();
-                if let Some(doc) = self.documents.borrow_mut().get_mut(&params.text_document.uri) {
+                if let Some(doc) = self
+                    .documents
+                    .borrow_mut()
+                    .get_mut(&params.text_document.uri)
+                {
                     if let Some(change) = params.content_changes.into_iter().last() {
                         doc.text = change.text;
                         doc.version = params.text_document.version;
@@ -130,7 +134,9 @@ impl Server {
             "textDocument/didClose" => {
                 let params: DidCloseTextDocumentParams =
                     serde_json::from_value(notif.params.clone()).unwrap();
-                self.documents.borrow_mut().remove(&params.text_document.uri);
+                self.documents
+                    .borrow_mut()
+                    .remove(&params.text_document.uri);
             }
             _ => {}
         }
@@ -218,14 +224,24 @@ impl Server {
             let mut tc = whisper_typecheck::TypeChecker::new();
             let _ = tc.check(&ast);
             if let Some(sig) = tc.word_sigs.get(&word) {
-                let in_str: Vec<String> = sig.inputs.iter().map(|t| format!("{}", tc.inferer.resolve(t))).collect();
-                let out_str: Vec<String> = sig.outputs.iter().map(|t| format!("{}", tc.inferer.resolve(t))).collect();
+                let in_str: Vec<String> = sig
+                    .inputs
+                    .iter()
+                    .map(|t| format!("{}", tc.inferer.resolve(t)))
+                    .collect();
+                let out_str: Vec<String> = sig
+                    .outputs
+                    .iter()
+                    .map(|t| format!("{}", tc.inferer.resolve(t)))
+                    .collect();
                 contents.push_str(&format!(
                     "\n\n**Type:** `[{}] → [{}]`",
                     in_str.join(" "),
                     out_str.join(" ")
                 ));
-            } else if let Some((inputs, outputs)) = whisper_typecheck::builtins::get_builtin_signature(&word) {
+            } else if let Some((inputs, outputs)) =
+                whisper_typecheck::builtins::get_builtin_signature(&word)
+            {
                 let in_str: Vec<String> = inputs.iter().map(|t| format!("{t}")).collect();
                 let out_str: Vec<String> = outputs.iter().map(|t| format!("{t}")).collect();
                 contents.push_str(&format!(
@@ -246,8 +262,7 @@ impl Server {
     }
 
     fn definition(&self, req: &Request) -> Option<GotoDefinitionResponse> {
-        let params: GotoDefinitionParams =
-            serde_json::from_value(req.params.clone()).ok()?;
+        let params: GotoDefinitionParams = serde_json::from_value(req.params.clone()).ok()?;
         let pos = params.text_document_position_params.position;
         let uri = &params.text_document_position_params.text_document.uri;
         let doc = self.get_document(uri)?;
@@ -267,8 +282,7 @@ impl Server {
     }
 
     fn document_symbols(&self, req: &Request) -> Option<DocumentSymbolResponse> {
-        let params: DocumentSymbolParams =
-            serde_json::from_value(req.params.clone()).ok()?;
+        let params: DocumentSymbolParams = serde_json::from_value(req.params.clone()).ok()?;
         let doc = self.get_document(&params.text_document.uri)?;
 
         let mut symbols = Vec::new();
@@ -302,8 +316,7 @@ impl Server {
     }
 
     fn completion(&self, req: &Request) -> Option<CompletionResponse> {
-        let params: CompletionParams =
-            serde_json::from_value(req.params.clone()).ok()?;
+        let params: CompletionParams = serde_json::from_value(req.params.clone()).ok()?;
         let doc = self.get_document(&params.text_document_position.text_document.uri)?;
 
         let mut items = Vec::new();
@@ -311,53 +324,65 @@ impl Server {
         // Builtin operators with type signatures
         let builtins: Vec<(&str, &str, Option<&str>)> = vec![
             // (name, description, optional type signature)
-            ("dup", "_ — duplicate top of stack",     Some("a → a a")),
-            ("swap", "` — swap top two elements",     Some("a b → b a")),
-            ("drop", "drop — discard top of stack",   Some("a →")),
-            ("rot", "@ — rotate top three elements",  Some("a b c → b c a")),
-            ("+", "Add: a b → a+b",                   Some("num num → num")),
-            ("-", "Subtract: a b → a−b",              Some("num num → num")),
-            ("*", "Multiply: a b → a×b",              Some("num num → num")),
-            ("/", "Divide: a b → a÷b",                Some("num num → num")),
-            ("mod", "Modulo: a b → a%b",              Some("i64 i64 → i64")),
-            ("=", "Equal: a b → a==b",                Some("a b → bool")),
-            ("<", "Less than: a b → a<b",             Some("num num → bool")),
-            (">", "Greater than: a b → a>b",          Some("num num → bool")),
-            ("!=", "Not equal: a b → a!=b",           Some("a b → bool")),
-            ("<=", "Less/equal: a b → a≤b",           Some("num num → bool")),
-            (">=", "Greater/equal: a b → a≥b",        Some("num num → bool")),
-            ("&", "AND: a b → a&&b",                  Some("bool bool → bool")),
-            ("|", "OR: a b → a||b",                   Some("bool bool → bool")),
-            ("!", "NOT: a → !a",                      Some("bool → bool")),
-            ("@nth", "list n → element",              Some("[T] i64 → T")),
-            ("append", "list elem → new-list",        Some("[T] T → [T]")),
-            ("len", "list → count",                   Some("[T] → i64")),
-            ("@map", "list quot → new-list",          Some("[T] ref → [U]")),
-            ("@each", "list quot →",                  Some("[T] ref →")),
-            ("@fold", "list init quot → result",      Some("[T] T ref → T")),
-            ("@times", "n quot →",                    Some("i64 ref →")),
-            ("strlen", "str → count",                 Some("str → i64")),
-            ("strcat", "str1 str2 → str3",            Some("str str → str")),
-            ("strslice", "str start len → substr",    Some("str i64 i64 → str")),
-            ("streq", "str1 str2 → bool",             Some("str str → bool")),
-            ("strlt", "str1 str2 → bool",             Some("str str → bool")),
-            ("strfind", "str pattern → index",        Some("str str → i64")),
-            ("strreplace", "str old new → str",       Some("str str str → str")),
-            ("strtoi64", "str → i64",                 Some("str → i64")),
-            ("i64tostr", "i64 → str",                 Some("i64 → str")),
-            ("i64tof64", "i64 → f64",                 Some("i64 → f64")),
-            ("f64toi64", "f64 → i64 (truncate)",      Some("f64 → i64")),
-            ("fsqrt", "√: f64 → f64",                 Some("f64 → f64")),
-            ("fsin", "sin: f64 → f64",                Some("f64 → f64")),
-            ("fcos", "cos: f64 → f64",                Some("f64 → f64")),
-            ("ftan", "tan: f64 → f64",                Some("f64 → f64")),
+            ("dup", "_ — duplicate top of stack", Some("a → a a")),
+            ("swap", "` — swap top two elements", Some("a b → b a")),
+            ("drop", "drop — discard top of stack", Some("a →")),
+            (
+                "rot",
+                "@ — rotate top three elements",
+                Some("a b c → b c a"),
+            ),
+            ("+", "Add: a b → a+b", Some("num num → num")),
+            ("-", "Subtract: a b → a−b", Some("num num → num")),
+            ("*", "Multiply: a b → a×b", Some("num num → num")),
+            ("/", "Divide: a b → a÷b", Some("num num → num")),
+            ("mod", "Modulo: a b → a%b", Some("i64 i64 → i64")),
+            ("=", "Equal: a b → a==b", Some("a b → bool")),
+            ("<", "Less than: a b → a<b", Some("num num → bool")),
+            (">", "Greater than: a b → a>b", Some("num num → bool")),
+            ("!=", "Not equal: a b → a!=b", Some("a b → bool")),
+            ("<=", "Less/equal: a b → a≤b", Some("num num → bool")),
+            (">=", "Greater/equal: a b → a≥b", Some("num num → bool")),
+            ("&", "AND: a b → a&&b", Some("bool bool → bool")),
+            ("|", "OR: a b → a||b", Some("bool bool → bool")),
+            ("!", "NOT: a → !a", Some("bool → bool")),
+            ("@nth", "list n → element", Some("[T] i64 → T")),
+            ("append", "list elem → new-list", Some("[T] T → [T]")),
+            ("len", "list → count", Some("[T] → i64")),
+            ("@map", "list quot → new-list", Some("[T] ref → [U]")),
+            ("@each", "list quot →", Some("[T] ref →")),
+            ("@fold", "list init quot → result", Some("[T] T ref → T")),
+            ("@times", "n quot →", Some("i64 ref →")),
+            ("strlen", "str → count", Some("str → i64")),
+            ("strcat", "str1 str2 → str3", Some("str str → str")),
+            (
+                "strslice",
+                "str start len → substr",
+                Some("str i64 i64 → str"),
+            ),
+            ("streq", "str1 str2 → bool", Some("str str → bool")),
+            ("strlt", "str1 str2 → bool", Some("str str → bool")),
+            ("strfind", "str pattern → index", Some("str str → i64")),
+            ("strreplace", "str old new → str", Some("str str str → str")),
+            ("strtoi64", "str → i64", Some("str → i64")),
+            ("i64tostr", "i64 → str", Some("i64 → str")),
+            ("i64tof64", "i64 → f64", Some("i64 → f64")),
+            ("f64toi64", "f64 → i64 (truncate)", Some("f64 → i64")),
+            ("fsqrt", "√: f64 → f64", Some("f64 → f64")),
+            ("fsin", "sin: f64 → f64", Some("f64 → f64")),
+            ("fcos", "cos: f64 → f64", Some("f64 → f64")),
+            ("ftan", "tan: f64 → f64", Some("f64 → f64")),
             ("json-parse", "Parse JSON: str → value", Some("str → value")),
-            ("json-stringify", "To JSON: value → str",Some("value → str")),
-            (".", "Output top of stack",             Some("a →")),
-            ("..", "Output entire stack",            None),
-            (",", "Read input",                      Some("→ str")),
-            ("import", "Import module",              None),
-            ("export", "Export word",                None),
+            (
+                "json-stringify",
+                "To JSON: value → str",
+                Some("value → str"),
+            ),
+            (".", "Output top of stack", Some("a →")),
+            ("..", "Output entire stack", None),
+            (",", "Read input", Some("→ str")),
+            ("import", "Import module", None),
+            ("export", "Export word", None),
         ];
 
         for (name, desc, type_sig) in &builtins {
@@ -387,8 +412,16 @@ impl Server {
             for node in &ast {
                 if let AstNode::Def { name, body } = node {
                     let type_info = if let Some(sig) = tc.word_sigs.get(name) {
-                        let in_str: Vec<String> = sig.inputs.iter().map(|t| format!("{}", tc.inferer.resolve(t))).collect();
-                        let out_str: Vec<String> = sig.outputs.iter().map(|t| format!("{}", tc.inferer.resolve(t))).collect();
+                        let in_str: Vec<String> = sig
+                            .inputs
+                            .iter()
+                            .map(|t| format!("{}", tc.inferer.resolve(t)))
+                            .collect();
+                        let out_str: Vec<String> = sig
+                            .outputs
+                            .iter()
+                            .map(|t| format!("{}", tc.inferer.resolve(t)))
+                            .collect();
                         format!(" | [{}] → [{}]", in_str.join(" "), out_str.join(" "))
                     } else {
                         format!(" | ({} nodes)", body.len())

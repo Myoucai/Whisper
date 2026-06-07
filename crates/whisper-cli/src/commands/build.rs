@@ -6,10 +6,18 @@ use whisper_codegen::wbin::WbinWriter;
 use whisper_parser::Parser;
 
 /// Build a Whisper source file to the specified target format.
-pub fn build_file(source: &str, source_dir: &Path, target: &str, output: &str) -> Result<(), String> {
+pub fn build_file(
+    source: &str,
+    source_dir: &Path,
+    target: &str,
+    output: &str,
+) -> Result<(), String> {
     // Phase 1: Parse
     let ast = Parser::parse_source(source).map_err(|e| {
-        format!("Parse error at {}:{}: {}", e.token.span.line, e.token.span.column, e.message)
+        format!(
+            "Parse error at {}:{}: {}",
+            e.token.span.line, e.token.span.column, e.message
+        )
     })?;
 
     // Phase 1a: Resolve imports
@@ -23,7 +31,10 @@ pub fn build_file(source: &str, source_dir: &Path, target: &str, output: &str) -
 
     // Phase 2b: Optimize bytecode
     let bytecode = whisper_codegen::optimize(&bytecode);
-    let _defs: Vec<_> = defs.into_iter().map(|(k, v)| (k, whisper_codegen::optimize(&v))).collect();
+    let _defs: Vec<_> = defs
+        .into_iter()
+        .map(|(k, v)| (k, whisper_codegen::optimize(&v)))
+        .collect();
 
     // Phase 3: Output in target format
     match target {
@@ -31,30 +42,24 @@ pub fn build_file(source: &str, source_dir: &Path, target: &str, output: &str) -
             let output_path = std::path::Path::new(output);
             WbinWriter::write_to_file(&bytecode, output_path)
                 .map_err(|e| format!("Failed to write .wbin: {e}"))?;
-            let size = std::fs::metadata(output_path)
-                .map(|m| m.len())
-                .unwrap_or(0);
+            let size = std::fs::metadata(output_path).map(|m| m.len()).unwrap_or(0);
             println!("Compiled {} bytes → {}", size, output);
         }
         "wasm" => {
             let wasm = whisper_codegen::compile_direct(&bytecode);
-            std::fs::write(output, wasm)
-                .map_err(|e| format!("Failed to write WASM: {e}"))?;
+            std::fs::write(output, wasm).map_err(|e| format!("Failed to write WASM: {e}"))?;
             let size = std::fs::metadata(output).map(|m| m.len()).unwrap_or(0);
             println!("Compiled {} bytes → {}", size, output);
         }
         "c" => {
             let c_code = whisper_codegen::compile_to_c(&bytecode);
-            std::fs::write(output, &c_code)
-                .map_err(|e| format!("Failed to write C: {e}"))?;
+            std::fs::write(output, &c_code).map_err(|e| format!("Failed to write C: {e}"))?;
             let size = std::fs::metadata(output).map(|m| m.len()).unwrap_or(0);
             println!("Compiled {} bytes → {}", size, output);
             println!("Build with: gcc {output} -o program && ./program");
         }
         other => {
-            return Err(format!(
-                "Unknown target: {other}. Supported: wbin, wasm, c"
-            ));
+            return Err(format!("Unknown target: {other}. Supported: wbin, wasm, c"));
         }
     }
 

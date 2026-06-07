@@ -271,7 +271,11 @@ impl Lexer {
     }
 
     fn make_token(&self, kind: TokenKind, lexeme: String) -> Token {
-        Token::new(kind, Span::new(self.pos, self.pos, self.line, self.column), lexeme)
+        Token::new(
+            kind,
+            Span::new(self.pos, self.pos, self.line, self.column),
+            lexeme,
+        )
     }
 
     fn read_string(&mut self) -> TokenKind {

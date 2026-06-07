@@ -292,9 +292,7 @@ fn dead_store_elimination(ops: &[Opcode]) -> Vec<Opcode> {
 fn optimize_refs(ops: &[Opcode]) -> Vec<Opcode> {
     ops.iter()
         .map(|op| match op {
-            Opcode::PushRef(inner) => {
-                Opcode::PushRef(optimize(inner))
-            }
+            Opcode::PushRef(inner) => Opcode::PushRef(optimize(inner)),
             other => other.clone(),
         })
         .collect()
@@ -366,7 +364,12 @@ mod tests {
 
     #[test]
     fn test_peephole_swap_swap() {
-        let ops = vec![Opcode::PushI64(1), Opcode::PushI64(2), Opcode::Swap, Opcode::Swap];
+        let ops = vec![
+            Opcode::PushI64(1),
+            Opcode::PushI64(2),
+            Opcode::Swap,
+            Opcode::Swap,
+        ];
         let opt = optimize(&ops);
         assert_eq!(opt, vec![Opcode::PushI64(1), Opcode::PushI64(2)]);
     }
@@ -461,10 +464,7 @@ mod tests {
             Opcode::Mul,
         ];
         let opt = optimize(&ops);
-        assert_eq!(
-            opt,
-            vec![Opcode::PushI64(7), Opcode::Dup, Opcode::Add]
-        );
+        assert_eq!(opt, vec![Opcode::PushI64(7), Opcode::Dup, Opcode::Add]);
     }
 
     #[test]
@@ -500,17 +500,14 @@ mod tests {
         let ops = vec![
             Opcode::PushI64(1),
             Opcode::Dup,
-            Opcode::Drop,     // removed (dup+drop)
+            Opcode::Drop, // removed (dup+drop)
             Opcode::Swap,
-            Opcode::Swap,     // removed (swap+swap)
+            Opcode::Swap, // removed (swap+swap)
             Opcode::PushI64(3),
             Opcode::PushI64(4),
-            Opcode::Add,      // folded to 7
+            Opcode::Add, // folded to 7
         ];
         let opt = optimize(&ops);
-        assert_eq!(
-            opt,
-            vec![Opcode::PushI64(1), Opcode::PushI64(7)]
-        );
+        assert_eq!(opt, vec![Opcode::PushI64(1), Opcode::PushI64(7)]);
     }
 }

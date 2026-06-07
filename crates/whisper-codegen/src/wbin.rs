@@ -4,8 +4,8 @@
 //!   Header: 4 bytes magic "WHSP" + 4 bytes version (u32 LE)
 //!   Body:   LEB128-encoded opcodes
 
-use whisper_core::opcode::Opcode;
 use std::io::{Cursor, Read};
+use whisper_core::opcode::Opcode;
 
 /// Magic bytes for .wbin files.
 pub const WBIN_MAGIC: &[u8; 4] = b"WHSP";
@@ -172,9 +172,8 @@ impl WbinReader {
 
             // Literals
             0x30 => {
-                let n = leb128::read::unsigned(cursor).map_err(|e| {
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, e)
-                })?;
+                let n = leb128::read::unsigned(cursor)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
                 Ok(Opcode::PushI64(n as i64))
             }
             0x31 => {
@@ -184,9 +183,9 @@ impl WbinReader {
                 Ok(Opcode::PushF64(n))
             }
             0x32 => {
-                let len = leb128::read::unsigned(cursor).map_err(|e| {
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, e)
-                })? as usize;
+                let len = leb128::read::unsigned(cursor)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
+                    as usize;
                 let mut buf = vec![0u8; len];
                 cursor.read_exact(&mut buf)?;
                 let s = String::from_utf8(buf)
@@ -200,9 +199,9 @@ impl WbinReader {
             }
             0x34 => Ok(Opcode::PushList),
             0x35 => {
-                let count = leb128::read::unsigned(cursor).map_err(|e| {
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, e)
-                })? as usize;
+                let count = leb128::read::unsigned(cursor)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
+                    as usize;
                 let mut inner = Vec::with_capacity(count);
                 for _ in 0..count {
                     let mut byte_buf = [0u8; 1];
@@ -246,30 +245,27 @@ impl WbinReader {
 
             // Control flow
             0x50 => {
-                let offset = leb128::read::signed(cursor).map_err(|e| {
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, e)
-                })?;
+                let offset = leb128::read::signed(cursor)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
                 Ok(Opcode::Cond(offset as i32))
             }
             0x51 => {
-                let offset = leb128::read::signed(cursor).map_err(|e| {
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, e)
-                })?;
+                let offset = leb128::read::signed(cursor)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
                 Ok(Opcode::Jump(offset as i32))
             }
             0x52 => {
-                let offset = leb128::read::signed(cursor).map_err(|e| {
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, e)
-                })?;
+                let offset = leb128::read::signed(cursor)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
                 Ok(Opcode::Loop(offset as i32))
             }
             0x53 => Ok(Opcode::Times),
 
             // Call/Return
             0x60 => {
-                let len = leb128::read::unsigned(cursor).map_err(|e| {
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, e)
-                })? as usize;
+                let len = leb128::read::unsigned(cursor)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
+                    as usize;
                 let mut name_buf = vec![0u8; len];
                 cursor.read_exact(&mut name_buf)?;
                 let name = String::from_utf8(name_buf)

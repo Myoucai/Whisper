@@ -5,10 +5,10 @@
 //! strings, lists, control flow, words, confidence, quotations, error cases.
 
 use std::rc::Rc;
+use whisper_codegen::bytecode_gen::BytecodeGenerator;
 use whisper_core::opcode::Opcode;
 use whisper_core::value::Value;
 use whisper_core::vm::Vm;
-use whisper_codegen::bytecode_gen::BytecodeGenerator;
 use whisper_parser::Parser;
 use whisper_typecheck::TypeChecker;
 
@@ -48,21 +48,13 @@ fn run(source: &str) -> Result<Option<Value>, String> {
 /// Run and expect a specific I64 result.
 fn assert_run_i64(source: &str, expected: i64) {
     let r = run(source).expect("execution failed").expect("no result");
-    assert_eq!(
-        r.unwrap_signal(),
-        Value::I64(expected),
-        "source: {source}"
-    );
+    assert_eq!(r.unwrap_signal(), Value::I64(expected), "source: {source}");
 }
 
 /// Run and expect a specific Bool result.
 fn assert_run_bool(source: &str, expected: bool) {
     let r = run(source).expect("execution failed").expect("no result");
-    assert_eq!(
-        r.unwrap_signal(),
-        Value::Bool(expected),
-        "source: {source}"
-    );
+    assert_eq!(r.unwrap_signal(), Value::Bool(expected), "source: {source}");
 }
 
 /// Run and expect a specific Str result.
@@ -78,7 +70,10 @@ fn assert_run_str(source: &str, expected: &str) {
 /// Run and expect a runtime error.
 fn assert_run_err(source: &str) {
     let result = run(source);
-    assert!(result.is_err(), "expected error for: {source}, got {result:?}");
+    assert!(
+        result.is_err(),
+        "expected error for: {source}, got {result:?}"
+    );
 }
 
 /// Run and expect a type error.
@@ -92,117 +87,211 @@ fn assert_type_err(source: &str) {
 // ── Arithmetic ────────────────────────────────────────────────────────
 
 #[test]
-fn int_add()        { assert_run_i64("3 4 +", 7); }
+fn int_add() {
+    assert_run_i64("3 4 +", 7);
+}
 #[test]
-fn int_sub()        { assert_run_i64("10 3 -", 7); }
+fn int_sub() {
+    assert_run_i64("10 3 -", 7);
+}
 #[test]
-fn int_mul()        { assert_run_i64("5 6 *", 30); }
+fn int_mul() {
+    assert_run_i64("5 6 *", 30);
+}
 #[test]
-fn int_div()        { assert_run_i64("42 6 /", 7); }
+fn int_div() {
+    assert_run_i64("42 6 /", 7);
+}
 #[test]
-fn int_mod()        { assert_run_i64("10 3 mod", 1); }
+fn int_mod() {
+    assert_run_i64("10 3 mod", 1);
+}
 #[test]
-fn complex_expr()   { assert_run_i64("3 4 + 2 *", 14); }
+fn complex_expr() {
+    assert_run_i64("3 4 + 2 *", 14);
+}
 #[test]
-fn div_by_zero()    { assert_run_err("10 0 /"); }
+fn div_by_zero() {
+    assert_run_err("10 0 /");
+}
 #[test]
-fn mod_by_zero()    { assert_run_err("10 0 mod"); }
+fn mod_by_zero() {
+    assert_run_err("10 0 mod");
+}
 
 // ── Stack operations ──────────────────────────────────────────────────
 
 #[test]
-fn dup_sq()         { assert_run_i64("5 _ *", 25); }
+fn dup_sq() {
+    assert_run_i64("5 _ *", 25);
+}
 #[test]
-fn swap_sub()       { assert_run_i64("3 4 ` -", 1); }
+fn swap_sub() {
+    assert_run_i64("3 4 ` -", 1);
+}
 #[test]
-fn drop_op()        { assert_run_i64("42 99 drop", 42); }
+fn drop_op() {
+    assert_run_i64("42 99 drop", 42);
+}
 #[test]
-fn nested_dup()     { assert_run_i64("3 _ _ * *", 27); }  // 3 dup dup mul mul = 27
+fn nested_dup() {
+    assert_run_i64("3 _ _ * *", 27);
+} // 3 dup dup mul mul = 27
 #[test]
-fn stack_underflow() { assert_run_err("+"); }
+fn stack_underflow() {
+    assert_run_err("+");
+}
 
 // ── Comparison ────────────────────────────────────────────────────────
 
 #[test]
-fn eq_true()        { assert_run_bool("5 5 =", true); }
+fn eq_true() {
+    assert_run_bool("5 5 =", true);
+}
 #[test]
-fn eq_false()       { assert_run_bool("3 4 =", false); }
+fn eq_false() {
+    assert_run_bool("3 4 =", false);
+}
 #[test]
-fn lt_true()        { assert_run_bool("3 5 <", true); }
+fn lt_true() {
+    assert_run_bool("3 5 <", true);
+}
 #[test]
-fn lt_false()       { assert_run_bool("5 3 <", false); }
+fn lt_false() {
+    assert_run_bool("5 3 <", false);
+}
 #[test]
-fn gt_true()        { assert_run_bool("5 3 >", true); }
+fn gt_true() {
+    assert_run_bool("5 3 >", true);
+}
 #[test]
-fn neq_true()       { assert_run_bool("3 4 !=", true); }
+fn neq_true() {
+    assert_run_bool("3 4 !=", true);
+}
 #[test]
-fn le_true()        { assert_run_bool("3 3 <=", true); }
+fn le_true() {
+    assert_run_bool("3 3 <=", true);
+}
 #[test]
-fn ge_true()        { assert_run_bool("5 5 >=", true); }
+fn ge_true() {
+    assert_run_bool("5 5 >=", true);
+}
 
 // ── Logic ─────────────────────────────────────────────────────────────
 
 #[test]
-fn and_true()       { assert_run_bool("#t #t &", true); }
+fn and_true() {
+    assert_run_bool("#t #t &", true);
+}
 #[test]
-fn and_false()      { assert_run_bool("#t #f &", false); }
+fn and_false() {
+    assert_run_bool("#t #f &", false);
+}
 #[test]
-fn or_true()        { assert_run_bool("#f #t |", true); }
+fn or_true() {
+    assert_run_bool("#f #t |", true);
+}
 #[test]
-fn or_false()       { assert_run_bool("#f #f |", false); }
+fn or_false() {
+    assert_run_bool("#f #f |", false);
+}
 #[test]
-fn not_true()       { assert_run_bool("#f !", true); }
+fn not_true() {
+    assert_run_bool("#f !", true);
+}
 #[test]
-fn not_false()      { assert_run_bool("#t !", false); }
+fn not_false() {
+    assert_run_bool("#t !", false);
+}
 
 // ── String operations ─────────────────────────────────────────────────
 
 #[test]
-fn strlen_hello()   { assert_run_i64("\"Hello\" strlen", 5); }
+fn strlen_hello() {
+    assert_run_i64("\"Hello\" strlen", 5);
+}
 #[test]
-fn strlen_empty()   { assert_run_i64("\"\" strlen", 0); }
+fn strlen_empty() {
+    assert_run_i64("\"\" strlen", 0);
+}
 #[test]
-fn strcat_basic()   { assert_run_str("\"Hello, \" \"World!\" strcat", "Hello, World!"); }
+fn strcat_basic() {
+    assert_run_str("\"Hello, \" \"World!\" strcat", "Hello, World!");
+}
 #[test]
-fn strcat_empty()   { assert_run_str("\"\" \"Hi\" strcat", "Hi"); }
+fn strcat_empty() {
+    assert_run_str("\"\" \"Hi\" strcat", "Hi");
+}
 #[test]
-fn strslice_hello() { assert_run_str("\"Hello, World!\" 0 5 strslice", "Hello"); }
+fn strslice_hello() {
+    assert_run_str("\"Hello, World!\" 0 5 strslice", "Hello");
+}
 #[test]
-fn strslice_mid()   { assert_run_str("\"abcdef\" 2 3 strslice", "cde"); }
+fn strslice_mid() {
+    assert_run_str("\"abcdef\" 2 3 strslice", "cde");
+}
 
 // ── List operations ───────────────────────────────────────────────────
 
 #[test]
-fn list_len()       { assert_run_i64("[1 2 3 4 5] len", 5); }
+fn list_len() {
+    assert_run_i64("[1 2 3 4 5] len", 5);
+}
 #[test]
-fn list_empty_len() { assert_run_i64("[] len", 0); }
+fn list_empty_len() {
+    assert_run_i64("[] len", 0);
+}
 #[test]
-fn list_nth_first() { assert_run_i64("[10 20 30] 0 @nth", 10); }
+fn list_nth_first() {
+    assert_run_i64("[10 20 30] 0 @nth", 10);
+}
 #[test]
-fn list_nth_last()  { assert_run_i64("[10 20 30] 2 @nth", 30); }
+fn list_nth_last() {
+    assert_run_i64("[10 20 30] 2 @nth", 30);
+}
 #[test]
-fn list_nth_oob()   { assert_run_err("[10 20] 5 @nth"); }
+fn list_nth_oob() {
+    assert_run_err("[10 20] 5 @nth");
+}
 #[test]
-fn list_append()    { assert_run_i64("[1 2] 3 append len", 3); }
+fn list_append() {
+    assert_run_i64("[1 2] 3 append len", 3);
+}
 #[test]
-fn list_map()       { assert_run_i64("[1 2 3] { _ * } @map 2 @nth", 9); }  // [1,4,9], nth 2 = 9
+fn list_map() {
+    assert_run_i64("[1 2 3] { _ * } @map 2 @nth", 9);
+} // [1,4,9], nth 2 = 9
 #[test]
-fn list_map_len()   { assert_run_i64("[1 2 3 4] { 1 + } @map len", 4); }
+fn list_map_len() {
+    assert_run_i64("[1 2 3 4] { 1 + } @map len", 4);
+}
 #[test]
-fn list_fold_sum()  { assert_run_i64("[1 2 3 4 5] 0 { + } @fold", 15); }
+fn list_fold_sum() {
+    assert_run_i64("[1 2 3 4 5] 0 { + } @fold", 15);
+}
 #[test]
-fn list_fold_product() { assert_run_i64("[1 2 3 4] 1 { * } @fold", 24); }
+fn list_fold_product() {
+    assert_run_i64("[1 2 3 4] 1 { * } @fold", 24);
+}
 
 // ── Control flow ──────────────────────────────────────────────────────
 
 #[test]
-fn cond_true()      { assert_run_i64("5 3 > ??100|0]", 100); }
+fn cond_true() {
+    assert_run_i64("5 3 > ??100|0]", 100);
+}
 #[test]
-fn cond_false()     { assert_run_i64("2 3 > ??100|0]", 0); }
+fn cond_false() {
+    assert_run_i64("2 3 > ??100|0]", 0);
+}
 #[test]
-fn cond_true_then_false_else()  { assert_run_i64("#t ??100|0]", 100); }
+fn cond_true_then_false_else() {
+    assert_run_i64("#t ??100|0]", 100);
+}
 #[test]
-fn cond_false_then_false_else() { assert_run_i64("#f ??100|0]", 0); }
+fn cond_false_then_false_else() {
+    assert_run_i64("#f ??100|0]", 0);
+}
 
 #[test]
 fn cond_without_else() {
@@ -216,9 +305,13 @@ fn cond_without_else() {
 // ── Word definitions ──────────────────────────────────────────────────
 
 #[test]
-fn simple_word()    { assert_run_i64(": sq { _ * } ; 5 sq", 25); }
+fn simple_word() {
+    assert_run_i64(": sq { _ * } ; 5 sq", 25);
+}
 #[test]
-fn multi_word()     { assert_run_i64(": double { 2 * } ; : sq { _ * } ; 5 double sq", 100); }
+fn multi_word() {
+    assert_run_i64(": double { 2 * } ; : sq { _ * } ; 5 double sq", 100);
+}
 #[test]
 fn factorial_word() {
     // 5! = 120 using recursive definition
@@ -236,9 +329,8 @@ fn fib_word() {
 #[test]
 fn quote_double() {
     let mut vm = Vm::new();
-    let block: Rc<[Opcode]> = Rc::from(
-        vec![Opcode::PushI64(2), Opcode::Mul, Opcode::Return].into_boxed_slice(),
-    );
+    let block: Rc<[Opcode]> =
+        Rc::from(vec![Opcode::PushI64(2), Opcode::Mul, Opcode::Return].into_boxed_slice());
     vm.data_stack.push(Value::I64(7));
     vm.execute_ref(&block).unwrap();
     assert_eq!(vm.data_stack.pop().unwrap(), Value::I64(14));
@@ -291,9 +383,13 @@ fn type_check_ok() {
     assert!(tc.check(&ast).is_empty());
 }
 #[test]
-fn type_check_bad_len() { assert_type_err("5 len"); }
+fn type_check_bad_len() {
+    assert_type_err("5 len");
+}
 #[test]
-fn type_check_bad_arith() { assert_type_err("\"hi\" 3 +"); }
+fn type_check_bad_arith() {
+    assert_type_err("\"hi\" 3 +");
+}
 
 // ── Edge cases ────────────────────────────────────────────────────────
 
@@ -371,13 +467,19 @@ fn capability_bound_executes() {
     let mut vm = Vm::with_capabilities(cap_table);
     // Stack: str → push file path
     vm.data_stack.push(Value::Str(Rc::new(
-        std::env::temp_dir().join("nonexistent.txt").display().to_string(),
+        std::env::temp_dir()
+            .join("nonexistent.txt")
+            .display()
+            .to_string(),
     )));
     let r = vm.execute(&bc);
     // Should fail with IO error (file not found) not capability error
     assert!(r.is_err());
     let err_msg = format!("{r:?}");
-    assert!(!err_msg.contains("CapabilityNotBound"), "cap should be bound");
+    assert!(
+        !err_msg.contains("CapabilityNotBound"),
+        "cap should be bound"
+    );
 }
 
 // ── WASM compilation ──────────────────────────────────────────────────

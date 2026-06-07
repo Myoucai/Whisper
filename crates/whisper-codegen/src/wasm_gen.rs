@@ -58,14 +58,18 @@ mod w {
     pub const F64_SUB: u8 = 0xA1;
     pub const F64_MUL: u8 = 0xA2;
     pub const F64_DIV: u8 = 0xA3;
-    pub const F64_SIN: u8 = 0;  // not available as single WASM op
-    pub const F64_COS: u8 = 0;  // not available as single WASM op
+    pub const F64_SIN: u8 = 0; // not available as single WASM op
+    pub const F64_COS: u8 = 0; // not available as single WASM op
 }
 
-pub struct WasmGenerator { bytecode: Vec<Opcode> }
+pub struct WasmGenerator {
+    bytecode: Vec<Opcode>,
+}
 
 impl WasmGenerator {
-    pub fn new(bytecode: Vec<Opcode>) -> Self { WasmGenerator { bytecode } }
+    pub fn new(bytecode: Vec<Opcode>) -> Self {
+        WasmGenerator { bytecode }
+    }
 
     fn raw_bytecode(&self) -> Vec<u8> {
         let mut b = Vec::new();
@@ -80,8 +84,9 @@ impl WasmGenerator {
                     b.extend_from_slice(s.as_bytes());
                 }
                 Opcode::PushBool(v) => b.push(if *v { 1 } else { 0 }),
-                Opcode::Cond(o) | Opcode::Jump(o) | Opcode::Loop(o) =>
-                    b.extend_from_slice(&o.to_le_bytes()),
+                Opcode::Cond(o) | Opcode::Jump(o) | Opcode::Loop(o) => {
+                    b.extend_from_slice(&o.to_le_bytes())
+                }
                 Opcode::Call(_) => b.extend_from_slice(&0u32.to_le_bytes()),
                 Opcode::CapCall(i) => b.extend_from_slice(&i.to_le_bytes()),
                 Opcode::ConfLabel(c) => b.extend_from_slice(&c.to_le_bytes()),
@@ -118,7 +123,9 @@ impl WasmGenerator {
         let bc_len = raw.len();
 
         // Type section: 4 types
-        let types = [4u8, 0x60,0,0, 0x60,0,1,0x7E, 0x60,0,1,0x7C, 0x60,0,1,0x7F];
+        let types = [
+            4u8, 0x60, 0, 0, 0x60, 0, 1, 0x7E, 0x60, 0, 1, 0x7C, 0x60, 0, 1, 0x7F,
+        ];
         wasm.extend_from_slice(&sec(1, &types));
 
         // Function section: 3 functions
@@ -170,25 +177,32 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     uleb128(&mut b, 0); // 0 locals
 
     // block $done
-    b.push(w::BLOCK); b.push(0x40);
+    b.push(w::BLOCK);
+    b.push(0x40);
     // loop $continue
-    b.push(w::LOOP); b.push(0x40);
+    b.push(w::LOOP);
+    b.push(0x40);
 
     // if ip >= bc_len → br $done
     ld_i32(&mut b, 0x0004);
     ld_i32(&mut b, 0x0008);
     b.push(w::I32_GE_U);
-    b.push(w::BR_IF); b.push(1);
+    b.push(w::BR_IF);
+    b.push(1);
 
     // read opcode byte from [0x0010 + ip]
     ld_i32(&mut b, 0x0004);
     ci32(&mut b, 0x0010);
     b.push(w::I32_ADD);
-    b.push(w::I32_LOAD8_U); b.push(0); b.push(0);
+    b.push(w::I32_LOAD8_U);
+    b.push(0);
+    b.push(0);
 
     // save opcode to scratch[0x1000]
     ci32(&mut b, 0x1000);
-    b.push(w::I32_STORE); b.push(2); b.push(0);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
 
     // default: ip += 1
     add_ip(&mut b, 1);
@@ -202,7 +216,9 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     ld_i32(&mut b, 0x0004);
     ci32(&mut b, 0x0010 - 8);
     b.push(w::I32_ADD);
-    b.push(w::I64_LOAD); b.push(3); b.push(0);
+    b.push(w::I64_LOAD);
+    b.push(3);
+    b.push(0);
     push(&mut b);
     b.push(w::END);
 
@@ -212,7 +228,9 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     ld_i32(&mut b, 0x0004);
     ci32(&mut b, 0x0010 - 8);
     b.push(w::I32_ADD);
-    b.push(w::F64_LOAD); b.push(3); b.push(0);
+    b.push(w::F64_LOAD);
+    b.push(3);
+    b.push(0);
     push_f64(&mut b);
     b.push(w::END);
 
@@ -221,14 +239,20 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     ld_i32(&mut b, 0x0004);
     ci32(&mut b, 0x0010);
     b.push(w::I32_ADD);
-    b.push(w::I32_LOAD); b.push(2); b.push(0); // read u32 length
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0); // read u32 length
     ci32(&mut b, 0x0004);
-    b.push(w::I32_LOAD); b.push(2); b.push(0); // current ip
-    b.push(w::I32_ADD);                         // ip + len
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0); // current ip
+    b.push(w::I32_ADD); // ip + len
     ci32(&mut b, 4);
-    b.push(w::I32_ADD);                         // ip + len + 4
+    b.push(w::I32_ADD); // ip + len + 4
     ci32(&mut b, 0x0004);
-    b.push(w::I32_STORE); b.push(2); b.push(0);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
     // Push placeholder (string pointer as i64)
     ci32(&mut b, 0x5000);
     b.push(w::I64_EXTEND_I32_S);
@@ -240,7 +264,9 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     ld_i32(&mut b, 0x0004);
     ci32(&mut b, 0x0010 - 1);
     b.push(w::I32_ADD);
-    b.push(w::I32_LOAD8_U); b.push(0); b.push(0);
+    b.push(w::I32_LOAD8_U);
+    b.push(0);
+    b.push(0);
     b.push(w::I64_EXTEND_I32_S);
     push(&mut b);
     b.push(w::END);
@@ -250,7 +276,9 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     ld_i32(&mut b, 0x0000);
     ci32(&mut b, 0xFFF0); // -16 as unsigned
     b.push(w::I32_ADD);
-    b.push(w::I64_LOAD); b.push(3); b.push(0);
+    b.push(w::I64_LOAD);
+    b.push(3);
+    b.push(0);
     push(&mut b);
     b.push(w::END);
 
@@ -261,35 +289,40 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
 
     // 0x10 Add
     if_op(&mut b, 0x10);
-    pop(&mut b); pop(&mut b);
+    pop(&mut b);
+    pop(&mut b);
     b.push(w::I64_ADD);
     push(&mut b);
     b.push(w::END);
 
     // 0x11 Sub
     if_op(&mut b, 0x11);
-    pop(&mut b); pop(&mut b);
+    pop(&mut b);
+    pop(&mut b);
     b.push(w::I64_SUB);
     push(&mut b);
     b.push(w::END);
 
     // 0x12 Mul
     if_op(&mut b, 0x12);
-    pop(&mut b); pop(&mut b);
+    pop(&mut b);
+    pop(&mut b);
     b.push(w::I64_MUL);
     push(&mut b);
     b.push(w::END);
 
     // 0x13 Div
     if_op(&mut b, 0x13);
-    pop(&mut b); pop(&mut b);
+    pop(&mut b);
+    pop(&mut b);
     b.push(w::I64_DIV_S);
     push(&mut b);
     b.push(w::END);
 
     // 0x18 Eq
     if_op(&mut b, 0x18);
-    pop(&mut b); pop(&mut b);
+    pop(&mut b);
+    pop(&mut b);
     b.push(w::I64_EQ);
     b.push(w::I64_EXTEND_I32_S);
     push(&mut b);
@@ -297,7 +330,8 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
 
     // 0x19 Lt
     if_op(&mut b, 0x19);
-    pop(&mut b); pop(&mut b);
+    pop(&mut b);
+    pop(&mut b);
     b.push(w::I64_LT_S);
     b.push(w::I64_EXTEND_I32_S);
     push(&mut b);
@@ -305,7 +339,8 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
 
     // 0x1A Gt
     if_op(&mut b, 0x1A);
-    pop(&mut b); pop(&mut b);
+    pop(&mut b);
+    pop(&mut b);
     b.push(w::I64_GT_S);
     b.push(w::I64_EXTEND_I32_S);
     push(&mut b);
@@ -315,12 +350,24 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     if_op(&mut b, 0x01);
     // pop a, pop b, push a, push b (using scratch)
     pop(&mut b); // a
-    ci32(&mut b, 0x1010); b.push(w::I64_STORE); b.push(3); b.push(0); // scratch1 = a
+    ci32(&mut b, 0x1010);
+    b.push(w::I64_STORE);
+    b.push(3);
+    b.push(0); // scratch1 = a
     pop(&mut b); // b
-    ci32(&mut b, 0x1020); b.push(w::I64_STORE); b.push(3); b.push(0); // scratch2 = b
-    ci32(&mut b, 0x1010); b.push(w::I64_LOAD); b.push(3); b.push(0); // load a
+    ci32(&mut b, 0x1020);
+    b.push(w::I64_STORE);
+    b.push(3);
+    b.push(0); // scratch2 = b
+    ci32(&mut b, 0x1010);
+    b.push(w::I64_LOAD);
+    b.push(3);
+    b.push(0); // load a
     push(&mut b); // push a
-    ci32(&mut b, 0x1020); b.push(w::I64_LOAD); b.push(3); b.push(0); // load b
+    ci32(&mut b, 0x1020);
+    b.push(w::I64_LOAD);
+    b.push(3);
+    b.push(0); // load b
     push(&mut b); // push b
     b.push(w::END);
 
@@ -329,31 +376,48 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     if_op(&mut b, 0x50);
     // Pop condition from data stack
     pop(&mut b); // cond value (i64, 0 or non-zero)
-    ci32(&mut b, 0x1030); b.push(w::I64_STORE); b.push(3); b.push(0); // save cond to scratch
-    // cond == 0 means false → jump
-    ci32(&mut b, 0x1030); b.push(w::I64_LOAD); b.push(3); b.push(0);
-    b.push(w::I64_CONST); leb128_s(&mut b, 0);
+    ci32(&mut b, 0x1030);
+    b.push(w::I64_STORE);
+    b.push(3);
+    b.push(0); // save cond to scratch
+               // cond == 0 means false → jump
+    ci32(&mut b, 0x1030);
+    b.push(w::I64_LOAD);
+    b.push(3);
+    b.push(0);
+    b.push(w::I64_CONST);
+    leb128_s(&mut b, 0);
     b.push(w::I64_EQ); // cond == 0?
-    b.push(w::IF); b.push(0x40);
+    b.push(w::IF);
+    b.push(0x40);
     // Read i32 offset from bytecode[ip], add to ip
     // ip currently points to offset bytes; advance ip past them + apply offset
     ld_i32(&mut b, 0x0004); // ip
     ci32(&mut b, 0x0010);
     b.push(w::I32_ADD); // bytecode + ip = addr of offset
-    b.push(w::I32_LOAD); b.push(2); b.push(0); // load i32 offset
-    // ip += 4 + offset
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0); // load i32 offset
+               // ip += 4 + offset
     ld_i32(&mut b, 0x0004);
     b.push(w::I32_ADD); // ip + offset
     ci32(&mut b, 4);
     b.push(w::I32_ADD); // ip + offset + 4
     ci32(&mut b, 0x0004);
-    b.push(w::I32_STORE); b.push(2); b.push(0); // store new ip
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0); // store new ip
     b.push(w::END); // end if
-    // If true (cond != 0): just advance ip past the 4 offset bytes
-    ci32(&mut b, 0x1030); b.push(w::I64_LOAD); b.push(3); b.push(0);
-    b.push(w::I64_CONST); leb128_s(&mut b, 0);
+                    // If true (cond != 0): just advance ip past the 4 offset bytes
+    ci32(&mut b, 0x1030);
+    b.push(w::I64_LOAD);
+    b.push(3);
+    b.push(0);
+    b.push(w::I64_CONST);
+    leb128_s(&mut b, 0);
     b.push(w::I64_GT_S); // cond > 0
-    b.push(w::IF); b.push(0x40);
+    b.push(w::IF);
+    b.push(0x40);
     add_ip(&mut b, 4); // skip offset bytes
     b.push(w::END);
     b.push(w::END);
@@ -363,13 +427,17 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     ld_i32(&mut b, 0x0004);
     ci32(&mut b, 0x0010);
     b.push(w::I32_ADD);
-    b.push(w::I32_LOAD); b.push(2); b.push(0); // load offset
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0); // load offset
     ld_i32(&mut b, 0x0004);
     b.push(w::I32_ADD); // ip + offset
     ci32(&mut b, 4);
     b.push(w::I32_ADD); // ip + offset + 4 (skip offset bytes)
     ci32(&mut b, 0x0004);
-    b.push(w::I32_STORE); b.push(2); b.push(0);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
     b.push(w::END);
 
     // 0x90 OutputTop
@@ -381,30 +449,35 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     if_op(&mut b, 0x61);
     ld_i32(&mut b, 0x0008);
     ci32(&mut b, 0x0004);
-    b.push(w::I32_STORE); b.push(2); b.push(0);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
     b.push(w::END);
 
     // ── New opcodes ───────────────────────────────────────────────
 
     // 0x14 Mod
     if_op(&mut b, 0x14);
-    pop(&mut b); pop(&mut b);
+    pop(&mut b);
+    pop(&mut b);
     b.push(w::I64_REM_S);
     push(&mut b);
     b.push(w::END);
 
     // 0x1B Neq
     if_op(&mut b, 0x1B);
-    pop(&mut b); pop(&mut b);
+    pop(&mut b);
+    pop(&mut b);
     b.push(w::I64_EQ);
-    b.push(w::I64_EQZ);       // invert to not-equal
+    b.push(w::I64_EQZ); // invert to not-equal
     b.push(w::I64_EXTEND_I32_S);
     push(&mut b);
     b.push(w::END);
 
     // 0x1C Le
     if_op(&mut b, 0x1C);
-    pop(&mut b); pop(&mut b);
+    pop(&mut b);
+    pop(&mut b);
     b.push(w::I64_LE_S);
     b.push(w::I64_EXTEND_I32_S);
     push(&mut b);
@@ -412,7 +485,8 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
 
     // 0x1D Ge
     if_op(&mut b, 0x1D);
-    pop(&mut b); pop(&mut b);
+    pop(&mut b);
+    pop(&mut b);
     b.push(w::I64_GE_S);
     b.push(w::I64_EXTEND_I32_S);
     push(&mut b);
@@ -420,14 +494,16 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
 
     // 0x20 And
     if_op(&mut b, 0x20);
-    pop(&mut b); pop(&mut b);
+    pop(&mut b);
+    pop(&mut b);
     b.push(w::I64_AND);
     push(&mut b);
     b.push(w::END);
 
     // 0x21 Or
     if_op(&mut b, 0x21);
-    pop(&mut b); pop(&mut b);
+    pop(&mut b);
+    pop(&mut b);
     b.push(w::I64_OR);
     push(&mut b);
     b.push(w::END);
@@ -435,7 +511,8 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     // 0x22 Not
     if_op(&mut b, 0x22);
     pop(&mut b);
-    b.push(w::I64_CONST); leb128_s(&mut b, 0);
+    b.push(w::I64_CONST);
+    leb128_s(&mut b, 0);
     b.push(w::I64_EQ);
     b.push(w::I64_EXTEND_I32_S);
     push(&mut b);
@@ -444,22 +521,34 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     // 0x52 Loop — check bool at top of stack; if true, jump back
     if_op(&mut b, 0x52);
     pop(&mut b); // pop the condition bool
-    ci32(&mut b, 0x1030); b.push(w::I64_STORE); b.push(3); b.push(0);
-    ci32(&mut b, 0x1030); b.push(w::I64_LOAD); b.push(3); b.push(0);
-    b.push(w::I64_CONST); leb128_s(&mut b, 0);
+    ci32(&mut b, 0x1030);
+    b.push(w::I64_STORE);
+    b.push(3);
+    b.push(0);
+    ci32(&mut b, 0x1030);
+    b.push(w::I64_LOAD);
+    b.push(3);
+    b.push(0);
+    b.push(w::I64_CONST);
+    leb128_s(&mut b, 0);
     b.push(w::I64_NE);
-    b.push(w::IF); b.push(0x40);
+    b.push(w::IF);
+    b.push(0x40);
     // Read i32 offset from bytecode and jump back (negative offset)
     ld_i32(&mut b, 0x0004); // ip
     ci32(&mut b, 0x0010);
     b.push(w::I32_ADD);
-    b.push(w::I32_LOAD); b.push(2); b.push(0); // load offset
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0); // load offset
     ld_i32(&mut b, 0x0004);
     b.push(w::I32_ADD); // ip + offset
     ci32(&mut b, 4);
     b.push(w::I32_ADD); // ip + offset + 4
     ci32(&mut b, 0x0004);
-    b.push(w::I32_STORE); b.push(2); b.push(0);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
     b.push(w::END);
     b.push(w::END);
 
@@ -474,7 +563,7 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     // 0xB0 I64ToF64
     if_op(&mut b, 0xB0);
     pop(&mut b);
-    b.push(w::I64_EXTEND32_S);   // i64.extend_i32_s
+    b.push(w::I64_EXTEND32_S); // i64.extend_i32_s
     b.push(w::F64_CONVERT_I32_S); // f64.convert_i32_s
     push_f64(&mut b);
     b.push(w::END);
@@ -483,8 +572,10 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     if_op(&mut b, 0xB1);
     add_sp(&mut b, 0xFFF0u32 as i32);
     ld_i32(&mut b, 0x0000);
-    b.push(w::F64_LOAD); b.push(3); b.push(0);
-    b.push(w::I32_TRUNC_F64_S);  // i32.trunc_f64_s (truncate toward zero)
+    b.push(w::F64_LOAD);
+    b.push(3);
+    b.push(0);
+    b.push(w::I32_TRUNC_F64_S); // i32.trunc_f64_s (truncate toward zero)
     b.push(w::I64_EXTEND_I32_S);
     push(&mut b);
     b.push(w::END);
@@ -493,16 +584,21 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     if_op(&mut b, 0xB2);
     add_sp(&mut b, 0xFFF0u32 as i32);
     ld_i32(&mut b, 0x0000);
-    b.push(w::F64_LOAD); b.push(3); b.push(0);
+    b.push(w::F64_LOAD);
+    b.push(3);
+    b.push(0);
     b.push(w::F64_SQRT); // f64.sqrt
     ci32(&mut b, 0x0000);
     ld_i32(&mut b, 0x0000);
-    b.push(w::F64_STORE); b.push(3); b.push(0);
+    b.push(w::F64_STORE);
+    b.push(3);
+    b.push(0);
     add_sp(&mut b, 16);
     b.push(w::END);
 
     // br $continue
-    b.push(w::BR); b.push(0);
+    b.push(w::BR);
+    b.push(0);
 
     // end loop, end block
     b.push(w::END);
@@ -513,9 +609,13 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     ci32(&mut b, 0xFFF0u32 as i32);
     b.push(w::I32_ADD);
     if i64_result {
-        b.push(w::I64_LOAD); b.push(3); b.push(0);
+        b.push(w::I64_LOAD);
+        b.push(3);
+        b.push(0);
     } else {
-        b.push(w::F64_LOAD); b.push(3); b.push(0);
+        b.push(w::F64_LOAD);
+        b.push(3);
+        b.push(0);
     }
 
     b.push(w::END);
@@ -538,7 +638,9 @@ fn ci32(b: &mut Vec<u8>, n: i32) {
 
 fn ld_i32(b: &mut Vec<u8>, addr: u32) {
     ci32(b, addr as i32);
-    b.push(w::I32_LOAD); b.push(2); b.push(0);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
 }
 
 fn add_ip(b: &mut Vec<u8>, delta: i32) {
@@ -546,7 +648,9 @@ fn add_ip(b: &mut Vec<u8>, delta: i32) {
     ld_i32(b, 0x0004);
     ci32(b, delta);
     b.push(w::I32_ADD);
-    b.push(w::I32_STORE); b.push(2); b.push(0);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
 }
 
 fn add_sp(b: &mut Vec<u8>, delta: i32) {
@@ -554,30 +658,41 @@ fn add_sp(b: &mut Vec<u8>, delta: i32) {
     ld_i32(b, 0x0000);
     ci32(b, delta);
     b.push(w::I32_ADD);
-    b.push(w::I32_STORE); b.push(2); b.push(0);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
 }
 
 /// Emit: if (scratch[0x1000] == opcode) {
 fn if_op(b: &mut Vec<u8>, opcode: u8) {
     ci32(b, 0x1000);
-    b.push(w::I32_LOAD); b.push(2); b.push(0);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
     ci32(b, opcode as i32);
     b.push(w::I32_EQ);
-    b.push(w::IF); b.push(0x40);
+    b.push(w::IF);
+    b.push(0x40);
 }
 
 /// Push i64 from WASM stack to data stack.
 fn push(b: &mut Vec<u8>) {
     // store value to scratch[0x1008]
     ci32(b, 0x1008);
-    b.push(w::I64_STORE); b.push(3); b.push(0);
+    b.push(w::I64_STORE);
+    b.push(3);
+    b.push(0);
     // load sp
     ld_i32(b, 0x0000);
     // load value back
     ci32(b, 0x1008);
-    b.push(w::I64_LOAD); b.push(3); b.push(0);
+    b.push(w::I64_LOAD);
+    b.push(3);
+    b.push(0);
     // store at [sp]
-    b.push(w::I64_STORE); b.push(3); b.push(0);
+    b.push(w::I64_STORE);
+    b.push(3);
+    b.push(0);
     // sp += 16
     add_sp(b, 16);
 }
@@ -586,23 +701,33 @@ fn push(b: &mut Vec<u8>) {
 fn pop(b: &mut Vec<u8>) {
     add_sp(b, 0xFFF0u32 as i32); // sp -= 16
     ld_i32(b, 0x0000);
-    b.push(w::I64_LOAD); b.push(3); b.push(0);
+    b.push(w::I64_LOAD);
+    b.push(3);
+    b.push(0);
 }
 
 /// Push f64 from WASM stack to data stack.
 fn push_f64(b: &mut Vec<u8>) {
     ci32(b, 0x1008);
-    b.push(w::F64_STORE); b.push(3); b.push(0);
+    b.push(w::F64_STORE);
+    b.push(3);
+    b.push(0);
     ld_i32(b, 0x0000);
     ci32(b, 0x1008);
-    b.push(w::F64_LOAD); b.push(3); b.push(0);
-    b.push(w::F64_STORE); b.push(3); b.push(0);
+    b.push(w::F64_LOAD);
+    b.push(3);
+    b.push(0);
+    b.push(w::F64_STORE);
+    b.push(3);
+    b.push(0);
     add_sp(b, 16);
 }
 
 // === WASM binary format helpers ===
 
-use crate::wasm_utils::{section as sec, vec_u8, leb128_u as uleb128, leb128_s, export_entry as export};
+use crate::wasm_utils::{
+    export_entry as export, leb128_s, leb128_u as uleb128, section as sec, vec_u8,
+};
 
 fn data_seg(buf: &mut Vec<u8>, addr: u32, payload: &[u8]) {
     buf.push(0x00); // active, memory 0

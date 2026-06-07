@@ -187,15 +187,15 @@ impl Vm {
             }
 
             // === Arithmetic ===
-            Opcode::Add => self.binary_num_op(|a, b| Ok(Value::I64(a + b)), |a, b| {
-                Ok(Value::F64(a + b))
-            })?,
-            Opcode::Sub => self.binary_num_op(|a, b| Ok(Value::I64(a - b)), |a, b| {
-                Ok(Value::F64(a - b))
-            })?,
-            Opcode::Mul => self.binary_num_op(|a, b| Ok(Value::I64(a * b)), |a, b| {
-                Ok(Value::F64(a * b))
-            })?,
+            Opcode::Add => {
+                self.binary_num_op(|a, b| Ok(Value::I64(a + b)), |a, b| Ok(Value::F64(a + b)))?
+            }
+            Opcode::Sub => {
+                self.binary_num_op(|a, b| Ok(Value::I64(a - b)), |a, b| Ok(Value::F64(a - b)))?
+            }
+            Opcode::Mul => {
+                self.binary_num_op(|a, b| Ok(Value::I64(a * b)), |a, b| Ok(Value::F64(a * b)))?
+            }
             Opcode::Div => self.binary_num_op(
                 |a, b| {
                     if b == 0 {
@@ -220,10 +220,12 @@ impl Vm {
                         Ok(Value::I64(a % b))
                     }
                 },
-                |_a, _b| Err(VmError::TypeMismatch {
-                    expected: "i64".into(),
-                    actual: "f64".into(),
-                }),
+                |_a, _b| {
+                    Err(VmError::TypeMismatch {
+                        expected: "i64".into(),
+                        actual: "f64".into(),
+                    })
+                },
             )?,
 
             // === Comparison ===
@@ -238,9 +240,8 @@ impl Vm {
             Opcode::Neq => {
                 let a = self.pop()?;
                 let b = self.pop()?;
-                self.data_stack.push(Value::Bool(
-                    !a.unwrap_signal().equals(&b.unwrap_signal()),
-                ));
+                self.data_stack
+                    .push(Value::Bool(!a.unwrap_signal().equals(&b.unwrap_signal())));
             }
             Opcode::Le => self.compare_op(|a, b| a <= b)?,
             Opcode::Ge => self.compare_op(|a, b| a >= b)?,
@@ -265,8 +266,7 @@ impl Vm {
             Opcode::PushI64(n) => self.data_stack.push(Value::I64(*n)),
             Opcode::PushF64(n) => self.data_stack.push(Value::F64(*n)),
             Opcode::PushStr(s) => {
-                self.data_stack
-                    .push(Value::Str(Rc::new(s.clone())));
+                self.data_stack.push(Value::Str(Rc::new(s.clone())));
             }
             Opcode::PushBool(b) => self.data_stack.push(Value::Bool(*b)),
             Opcode::PushList => {
@@ -290,13 +290,11 @@ impl Vm {
                     items.push(self.pop()?);
                 }
                 items.reverse(); // elements were pushed in order
-                self.data_stack
-                    .push(Value::List(Rc::new(items)));
+                self.data_stack.push(Value::List(Rc::new(items)));
             }
             Opcode::PushRef(ref code) => {
-                self.data_stack.push(Value::Ref(Rc::from(
-                    code.clone().into_boxed_slice(),
-                )));
+                self.data_stack
+                    .push(Value::Ref(Rc::from(code.clone().into_boxed_slice())));
             }
 
             // === List operations ===
@@ -333,8 +331,7 @@ impl Vm {
                         results.push(result);
                     }
                 }
-                self.data_stack
-                    .push(Value::List(Rc::new(results)));
+                self.data_stack.push(Value::List(Rc::new(results)));
             }
             Opcode::Each => {
                 let quot = self.pop_ref()?;
@@ -383,7 +380,8 @@ impl Vm {
             Opcode::StrEq => {
                 let s2 = self.pop_str()?;
                 let s1 = self.pop_str()?;
-                self.data_stack.push(Value::Bool(s1.as_ref() == s2.as_ref()));
+                self.data_stack
+                    .push(Value::Bool(s1.as_ref() == s2.as_ref()));
             }
             Opcode::StrLt => {
                 let s2 = self.pop_str()?;
@@ -393,9 +391,7 @@ impl Vm {
             Opcode::StrFind => {
                 let pat = self.pop_str()?;
                 let s = self.pop_str()?;
-                let idx = s.find(pat.as_ref())
-                    .map(|i| i as i64)
-                    .unwrap_or(-1);
+                let idx = s.find(pat.as_ref()).map(|i| i as i64).unwrap_or(-1);
                 self.data_stack.push(Value::I64(idx));
             }
             Opcode::StrReplace => {
@@ -407,7 +403,9 @@ impl Vm {
             }
             Opcode::StrToI64 => {
                 let s = self.pop_str()?;
-                let n = s.trim().parse::<i64>()
+                let n = s
+                    .trim()
+                    .parse::<i64>()
                     .map_err(|_| VmError::ProgramError(format!("Cannot parse '{}' as i64", s)))?;
                 self.data_stack.push(Value::I64(n));
             }
@@ -428,7 +426,8 @@ impl Vm {
             }
             Opcode::CharsStr => {
                 let list = self.pop_list()?;
-                let s: String = list.iter()
+                let s: String = list
+                    .iter()
                     .filter_map(|v| match v.unwrap_signal_ref() {
                         Value::I64(n) => std::char::from_u32(*n as u32),
                         _ => None,
@@ -515,13 +514,19 @@ impl Vm {
                     if cached_name == name {
                         cached_code.clone()
                     } else {
-                        let code = self.word_dict.get(name).cloned()
+                        let code = self
+                            .word_dict
+                            .get(name)
+                            .cloned()
                             .ok_or_else(|| VmError::UndefinedWord(name.clone()))?;
                         self.word_cache = Some((name.clone(), code.clone()));
                         code
                     }
                 } else {
-                    let code = self.word_dict.get(name).cloned()
+                    let code = self
+                        .word_dict
+                        .get(name)
+                        .cloned()
                         .ok_or_else(|| VmError::UndefinedWord(name.clone()))?;
                     self.word_cache = Some((name.clone(), code.clone()));
                     code
@@ -571,15 +576,14 @@ impl Vm {
             Opcode::ConfLabel(conf) => {
                 let v = self.pop()?;
                 let confidence = conf.clamp(0.0, 1.0);
-                self.data_stack
-                    .push(Value::Signal(Box::new(v), confidence));
+                self.data_stack.push(Value::Signal(Box::new(v), confidence));
             }
             Opcode::ProbChoice => {
                 // Stack: ... value {alt2} {alt1}
                 // Pop both alternatives (alt1 on top, pushed second by codegen)
-                let branch_true = self.pop_ref()?;  // alt1 (preferred branch)
+                let branch_true = self.pop_ref()?; // alt1 (preferred branch)
                 let branch_false = self.pop_ref()?; // alt2 (fallback branch)
-                // Peek confidence from the value below (don't pop — branch uses it)
+                                                    // Peek confidence from the value below (don't pop — branch uses it)
                 let confidence = self
                     .data_stack
                     .last()
@@ -732,7 +736,11 @@ impl Vm {
             self.call_stack.last_mut().unwrap().ip = ip + 1;
 
             if self.trace {
-                eprintln!("[trace] <block> op={:?} stack={:?}", op.name(), self.data_stack);
+                eprintln!(
+                    "[trace] <block> op={:?} stack={:?}",
+                    op.name(),
+                    self.data_stack
+                );
             }
 
             self.step(&op)?;
@@ -770,8 +778,7 @@ impl Vm {
 
         let conf = (a_conf * b_conf).clamp(0.0, 1.0);
         if conf < 1.0 {
-            self.data_stack
-                .push(Value::Signal(Box::new(result), conf));
+            self.data_stack.push(Value::Signal(Box::new(result), conf));
         } else {
             self.data_stack.push(result);
         }
@@ -779,10 +786,7 @@ impl Vm {
     }
 
     /// Comparison operation.
-    fn compare_op(
-        &mut self,
-        cmp: impl FnOnce(f64, f64) -> bool,
-    ) -> Result<(), VmError> {
+    fn compare_op(&mut self, cmp: impl FnOnce(f64, f64) -> bool) -> Result<(), VmError> {
         let b_val = self.pop()?;
         let a_val = self.pop()?;
 
@@ -792,10 +796,8 @@ impl Vm {
 
         let conf = (a_val.confidence() * b_val.confidence()).clamp(0.0, 1.0);
         if conf < 1.0 {
-            self.data_stack.push(Value::Signal(
-                Box::new(Value::Bool(result)),
-                conf,
-            ));
+            self.data_stack
+                .push(Value::Signal(Box::new(Value::Bool(result)), conf));
         } else {
             self.data_stack.push(Value::Bool(result));
         }
@@ -876,8 +878,7 @@ fn whisper_to_json(v: &Value) -> Result<serde_json::Value, VmError> {
                 }
                 Ok(serde_json::Value::Object(map))
             } else {
-                let arr: Result<Vec<_>, _> =
-                    items.iter().map(whisper_to_json).collect();
+                let arr: Result<Vec<_>, _> = items.iter().map(whisper_to_json).collect();
                 Ok(serde_json::Value::Array(arr?))
             }
         }
@@ -905,11 +906,7 @@ mod tests {
     #[test]
     fn test_simple_arithmetic() {
         let mut vm = Vm::new();
-        let program = [
-            Opcode::PushI64(3),
-            Opcode::PushI64(4),
-            Opcode::Add,
-        ];
+        let program = [Opcode::PushI64(3), Opcode::PushI64(4), Opcode::Add];
         let result = vm.execute(&program).unwrap();
         assert_eq!(result, Some(Value::I64(7)));
     }
@@ -919,11 +916,7 @@ mod tests {
         let mut vm = Vm::new();
         // dup: 5 → 5 5
         // then add: 5 5 → 10
-        let program = [
-            Opcode::PushI64(5),
-            Opcode::Dup,
-            Opcode::Add,
-        ];
+        let program = [Opcode::PushI64(5), Opcode::Dup, Opcode::Add];
         let result = vm.execute(&program).unwrap();
         assert_eq!(result, Some(Value::I64(10)));
     }
@@ -960,9 +953,8 @@ mod tests {
     fn test_quotation_block() {
         let mut vm = Vm::new();
         // { 2 * } — a block that doubles the value on the stack
-        let block: Rc<[Opcode]> = Rc::from(
-            vec![Opcode::PushI64(2), Opcode::Mul, Opcode::Return].into_boxed_slice(),
-        );
+        let block: Rc<[Opcode]> =
+            Rc::from(vec![Opcode::PushI64(2), Opcode::Mul, Opcode::Return].into_boxed_slice());
         vm.data_stack.push(Value::I64(5));
         vm.execute_ref(&block).unwrap();
         let result = vm.data_stack.pop().unwrap();
@@ -974,12 +966,13 @@ mod tests {
         let mut vm = Vm::new();
         // [1, 2, 3] 0 { + } @fold
         vm.data_stack.push(Value::List(Rc::new(vec![
-            Value::I64(1), Value::I64(2), Value::I64(3),
+            Value::I64(1),
+            Value::I64(2),
+            Value::I64(3),
         ])));
         vm.data_stack.push(Value::I64(0));
-        vm.data_stack.push(Value::Ref(Rc::from(
-            vec![Opcode::Add].into_boxed_slice()
-        )));
+        vm.data_stack
+            .push(Value::Ref(Rc::from(vec![Opcode::Add].into_boxed_slice())));
         let result = vm.execute(&[Opcode::Fold]).unwrap();
         assert_eq!(result, Some(Value::I64(6)), "Fold sum [1,2,3] should be 6");
     }
@@ -996,11 +989,11 @@ mod tests {
         // [0, 1] start, then 10 times: swap over + swap
         let block: Rc<[Opcode]> = Rc::from(
             vec![
-                Opcode::Swap,   // a b → b a
-                Opcode::Dup,    // b a → b a a
-                Opcode::Rot,    // b a a → a a b
-                Opcode::Add,    // a a b → a (a+b)
-                Opcode::Swap,   // a (a+b) → (a+b) a
+                Opcode::Swap, // a b → b a
+                Opcode::Dup,  // b a → b a a
+                Opcode::Rot,  // b a a → a a b
+                Opcode::Add,  // a a b → a (a+b)
+                Opcode::Swap, // a (a+b) → (a+b) a
                 Opcode::Return,
             ]
             .into_boxed_slice(),
@@ -1019,11 +1012,7 @@ mod tests {
     #[test]
     fn test_division_by_zero() {
         let mut vm = Vm::new();
-        let program = [
-            Opcode::PushI64(10),
-            Opcode::PushI64(0),
-            Opcode::Div,
-        ];
+        let program = [Opcode::PushI64(10), Opcode::PushI64(0), Opcode::Div];
         let result = vm.execute(&program);
         assert!(result.is_err());
     }
@@ -1044,7 +1033,12 @@ mod tests {
         vm.data_stack.push(token);
         vm.data_stack.push(Value::I64(0));
         let r = vm.execute(&[Opcode::Nth]).unwrap();
-        assert_eq!(r, Some(Value::I64(0)), "Direct @nth should give 0, got {:?}", r);
+        assert_eq!(
+            r,
+            Some(Value::I64(0)),
+            "Direct @nth should give 0, got {:?}",
+            r
+        );
     }
 
     #[test]
@@ -1054,17 +1048,27 @@ mod tests {
         let token = Value::List(Rc::new(vec![Value::I64(0), Value::I64(42)]));
         vm.data_stack.push(token);
         let r = vm.execute(&[Opcode::Call("tt".to_string())]).unwrap();
-        assert_eq!(r, Some(Value::I64(0)), "Call tt should return 0, got {:?}", r);
+        assert_eq!(
+            r,
+            Some(Value::I64(0)),
+            "Call tt should return 0, got {:?}",
+            r
+        );
     }
 
     #[test]
     fn test_execute_ref_nested_call() {
         let mut vm = Vm::new();
         vm.define_word("tt".to_string(), vec![Opcode::PushI64(0), Opcode::Nth]);
-        vm.define_word("check".to_string(), vec![
-            Opcode::Dup, Opcode::Call("tt".to_string()),
-            Opcode::PushI64(0), Opcode::Eq,
-        ]);
+        vm.define_word(
+            "check".to_string(),
+            vec![
+                Opcode::Dup,
+                Opcode::Call("tt".to_string()),
+                Opcode::PushI64(0),
+                Opcode::Eq,
+            ],
+        );
         let token = Value::List(Rc::new(vec![Value::I64(0), Value::I64(42)]));
         vm.data_stack.push(token);
         let ref_code = Rc::from(vec![Opcode::Call("check".to_string())].into_boxed_slice());
@@ -1076,18 +1080,31 @@ mod tests {
     #[test]
     fn test_push_eq_in_word() {
         let mut vm = Vm::new();
-        vm.define_word("check".to_string(), vec![Opcode::PushI64(0), Opcode::PushI64(0), Opcode::Eq]);
+        vm.define_word(
+            "check".to_string(),
+            vec![Opcode::PushI64(0), Opcode::PushI64(0), Opcode::Eq],
+        );
         let r = vm.execute(&[Opcode::Call("check".to_string())]).unwrap();
-        assert_eq!(r, Some(Value::Bool(true)), "PushI64+PushI64+Eq in word: got {:?}", r);
+        assert_eq!(
+            r,
+            Some(Value::Bool(true)),
+            "PushI64+PushI64+Eq in word: got {:?}",
+            r
+        );
     }
 
     #[test]
     fn test_dup_call_push() {
         let mut vm = Vm::new();
         vm.define_word("tt".to_string(), vec![Opcode::PushI64(0), Opcode::Nth]);
-        vm.define_word("check".to_string(), vec![
-            Opcode::Dup, Opcode::Call("tt".to_string()), Opcode::PushI64(0),
-        ]);
+        vm.define_word(
+            "check".to_string(),
+            vec![
+                Opcode::Dup,
+                Opcode::Call("tt".to_string()),
+                Opcode::PushI64(0),
+            ],
+        );
         let token = Value::List(Rc::new(vec![Value::I64(0), Value::I64(42)]));
         vm.data_stack.push(token);
         // Stack should be [token, 0, 0] after check → execute pops 0
@@ -1099,7 +1116,10 @@ mod tests {
     fn test_dup_then_call() {
         let mut vm = Vm::new();
         vm.define_word("tt".to_string(), vec![Opcode::PushI64(0), Opcode::Nth]);
-        vm.define_word("check".to_string(), vec![Opcode::Dup, Opcode::Call("tt".to_string())]);
+        vm.define_word(
+            "check".to_string(),
+            vec![Opcode::Dup, Opcode::Call("tt".to_string())],
+        );
         let token = Value::List(Rc::new(vec![Value::I64(0), Value::I64(42)]));
         vm.data_stack.push(token);
         let r = vm.execute(&[Opcode::Call("check".to_string())]).unwrap();
@@ -1112,14 +1132,24 @@ mod tests {
         // Full check body with Eq: this now works correctly
         let mut vm = Vm::new();
         vm.define_word("tt".to_string(), vec![Opcode::PushI64(0), Opcode::Nth]);
-        vm.define_word("check".to_string(), vec![
-            Opcode::Dup, Opcode::Call("tt".to_string()),
-            Opcode::PushI64(0), Opcode::Eq,
-        ]);
+        vm.define_word(
+            "check".to_string(),
+            vec![
+                Opcode::Dup,
+                Opcode::Call("tt".to_string()),
+                Opcode::PushI64(0),
+                Opcode::Eq,
+            ],
+        );
         let token = Value::List(Rc::new(vec![Value::I64(0), Value::I64(42)]));
         vm.data_stack.push(token);
         let r = vm.execute(&[Opcode::Call("check".to_string())]).unwrap();
-        assert_eq!(r, Some(Value::Bool(true)), "check([0,42]) should be true, got {:?}", r);
+        assert_eq!(
+            r,
+            Some(Value::Bool(true)),
+            "check([0,42]) should be true, got {:?}",
+            r
+        );
     }
 
     // === ProbChoice tests ===
@@ -1136,9 +1166,9 @@ mod tests {
         // alt1 doubles the value, alt2 multiplies by 3
         let alt1 = make_ref(vec![Opcode::PushI64(2), Opcode::Mul, Opcode::Return]);
         let alt2 = make_ref(vec![Opcode::PushI64(3), Opcode::Mul, Opcode::Return]);
-        vm.data_stack.push(Value::I64(10));       // value with implicit conf 1.0
-        vm.data_stack.push(alt2);                   // alt2 deeper
-        vm.data_stack.push(alt1);                   // alt1 on top
+        vm.data_stack.push(Value::I64(10)); // value with implicit conf 1.0
+        vm.data_stack.push(alt2); // alt2 deeper
+        vm.data_stack.push(alt1); // alt1 on top
         let r = vm.execute(&[Opcode::ProbChoice]).unwrap();
         // 10 * 2 = 20 (always alt1 when confidence is 1.0)
         assert_eq!(r, Some(Value::I64(20)), "confidence 1.0 → always alt1");
@@ -1156,7 +1186,11 @@ mod tests {
         vm.data_stack.push(alt1);
         let val = vm.execute(&[Opcode::ProbChoice]).unwrap().unwrap();
         // 10 * 3 = 30, wrapped in Signal since confidence propagates
-        assert_eq!(val.unwrap_signal(), Value::I64(30), "confidence 0.0 → always alt2");
+        assert_eq!(
+            val.unwrap_signal(),
+            Value::I64(30),
+            "confidence 0.0 → always alt2"
+        );
     }
 
     /// Confidence 0.5 should exercise both branches over many trials.
@@ -1182,8 +1216,14 @@ mod tests {
                 break;
             }
         }
-        assert!(saw_alt1, "ProbChoice with c=0.5 should produce alt1 sometimes");
-        assert!(saw_alt2, "ProbChoice with c=0.5 should produce alt2 sometimes");
+        assert!(
+            saw_alt1,
+            "ProbChoice with c=0.5 should produce alt1 sometimes"
+        );
+        assert!(
+            saw_alt2,
+            "ProbChoice with c=0.5 should produce alt2 sometimes"
+        );
     }
 
     /// Non-Signal values have implicit confidence 1.0 → always alt1.
@@ -1196,7 +1236,11 @@ mod tests {
         vm.data_stack.push(alt2);
         vm.data_stack.push(alt1);
         let r = vm.execute(&[Opcode::ProbChoice]).unwrap();
-        assert_eq!(r, Some(Value::I64(14)), "implicit confidence 1.0 → alt1: 7*2=14");
+        assert_eq!(
+            r,
+            Some(Value::I64(14)),
+            "implicit confidence 1.0 → alt1: 7*2=14"
+        );
     }
 
     // === String operation tests ===
@@ -1238,7 +1282,8 @@ mod tests {
     #[test]
     fn test_strslice() {
         let mut vm = Vm::new();
-        vm.data_stack.push(Value::Str(Rc::new("Hello, World!".into())));
+        vm.data_stack
+            .push(Value::Str(Rc::new("Hello, World!".into())));
         vm.data_stack.push(Value::I64(0));
         vm.data_stack.push(Value::I64(5));
         let r = vm.execute(&[Opcode::StrSlice]).unwrap();
@@ -1262,7 +1307,11 @@ mod tests {
         vm.data_stack.push(Value::I64(0));
         vm.data_stack.push(Value::I64(100)); // len exceeds string
         let r = vm.execute(&[Opcode::StrSlice]).unwrap();
-        assert_eq!(r, Some(Value::Str(Rc::new("Hi".into()))), "should clamp to string length");
+        assert_eq!(
+            r,
+            Some(Value::Str(Rc::new("Hi".into()))),
+            "should clamp to string length"
+        );
     }
 
     // === Mod confidence propagation ===
@@ -1279,7 +1328,10 @@ mod tests {
         assert_eq!(r.unwrap_signal_ref(), &Value::I64(1));
         // Confidence should be 0.5 (0.5 from signal * 1.0 from literal)
         let conf = r.confidence();
-        assert!((conf - 0.5).abs() < 0.001, "expected confidence 0.5, got {conf}");
+        assert!(
+            (conf - 0.5).abs() < 0.001,
+            "expected confidence 0.5, got {conf}"
+        );
     }
 
     #[test]
@@ -1324,7 +1376,8 @@ mod tests {
     #[test]
     fn test_strfind_found() {
         let mut vm = Vm::new();
-        vm.data_stack.push(Value::Str(Rc::new("hello world".into())));
+        vm.data_stack
+            .push(Value::Str(Rc::new("hello world".into())));
         vm.data_stack.push(Value::Str(Rc::new("world".into())));
         let r = vm.execute(&[Opcode::StrFind]).unwrap();
         assert_eq!(r, Some(Value::I64(6)));

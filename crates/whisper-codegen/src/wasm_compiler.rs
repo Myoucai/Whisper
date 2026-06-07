@@ -17,7 +17,8 @@ const CODE: u8 = 10;
 const DATA: u8 = 11;
 
 /// WASM value types
-#[allow(dead_code)] const I32: u8 = 0x7F;
+#[allow(dead_code)]
+const I32: u8 = 0x7F;
 const I64: u8 = 0x7E;
 
 /// WASM opcodes
@@ -28,7 +29,8 @@ const I64_ADD: u8 = 0x7C;
 const I64_SUB: u8 = 0x7D;
 const I64_MUL: u8 = 0x7E;
 const I64_DIV_S: u8 = 0x7F;
-#[allow(dead_code)] const I32_STORE: u8 = 0x36;
+#[allow(dead_code)]
+const I32_STORE: u8 = 0x36;
 const I64_STORE: u8 = 0x37;
 
 /// Compile a linear Whisper program directly to WASM.
@@ -68,15 +70,16 @@ pub fn compile_direct(ops: &[Opcode]) -> Vec<u8> {
                 // Value stays on WASM stack as return value
                 // Also store to memory[0] for string/external access
                 body.push(0x21); // local.set 0 (save to local)
-                body.push(0);    // local 0
+                body.push(0); // local 0
                 body.push(I32_CONST);
                 leb128_s(&mut body, 0);
                 body.push(0x20); // local.get 0
-                body.push(0);    // local 0
+                body.push(0); // local 0
                 body.push(I64_STORE); // store to memory[0]
-                body.push(3); body.push(0);
+                body.push(3);
+                body.push(0);
                 body.push(0x20); // local.get 0 (restore for return)
-                body.push(0);    // local 0
+                body.push(0); // local 0
             }
             _ => {} // unsupported opcode, skip
         }
@@ -93,9 +96,9 @@ pub fn compile_direct(ops: &[Opcode]) -> Vec<u8> {
     // --- Build WASM sections ---
 
     // Type section: 2 types: ()->() and ()->i64
-    let types = vec![2u8,
-        0x60, 0, 0,          // type 0: () -> ()
-        0x60, 0, 1, I64,     // type 1: () -> i64
+    let types = vec![
+        2u8, 0x60, 0, 0, // type 0: () -> ()
+        0x60, 0, 1, I64, // type 1: () -> i64
     ];
     wasm.extend_from_slice(&section(TYPE, &types));
 
@@ -116,11 +119,11 @@ pub fn compile_direct(ops: &[Opcode]) -> Vec<u8> {
 
     // Code section: 1 function body
     let mut code = vec![1u8]; // 1 function
-    // Function body: 0 locals + instructions + end
+                              // Function body: 0 locals + instructions + end
     let mut func = Vec::new();
     leb128_u(&mut func, 1); // 1 local set
     leb128_u(&mut func, 1); // count=1
-    func.push(I64);          // type=i64
+    func.push(I64); // type=i64
     func.extend_from_slice(&body);
     code.extend_from_slice(&vec_u8(&func));
     wasm.extend_from_slice(&section(CODE, &code));
@@ -152,7 +155,7 @@ fn align_up(n: u32, align: u32) -> u32 {
 
 // === WASM encoding helpers (delegated to wasm_utils) ===
 
-use crate::wasm_utils::{section, vec_u8, leb128_u, leb128_s, export_entry};
+use crate::wasm_utils::{export_entry, leb128_s, leb128_u, section, vec_u8};
 
 #[cfg(test)]
 mod tests {
@@ -160,7 +163,12 @@ mod tests {
 
     #[test]
     fn test_compile_arithmetic() {
-        let ops = vec![Opcode::PushI64(42), Opcode::PushI64(13), Opcode::Add, Opcode::OutputTop];
+        let ops = vec![
+            Opcode::PushI64(42),
+            Opcode::PushI64(13),
+            Opcode::Add,
+            Opcode::OutputTop,
+        ];
         let wasm = compile_direct(&ops);
         assert_eq!(&wasm[0..4], b"\0asm");
         assert!(wasm.len() > 50);

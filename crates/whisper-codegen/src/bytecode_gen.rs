@@ -82,12 +82,13 @@ impl BytecodeGenerator {
                     // Compile to a temporary to extract literal values
                     values.push(ast_node_to_value(item, &self.word_dict));
                 }
-                let list_val = whisper_core::value::Value::List(
-                    std::rc::Rc::new(values),
-                );
+                let list_val = whisper_core::value::Value::List(std::rc::Rc::new(values));
                 self.compile_literal(&list_val);
             }
-            AstNode::Cond { then_branch, else_branch } => {
+            AstNode::Cond {
+                then_branch,
+                else_branch,
+            } => {
                 self.compile_cond(then_branch, else_branch.as_deref());
             }
             AstNode::Loop { body, condition } => {
@@ -106,7 +107,9 @@ impl BytecodeGenerator {
                 // Compile-time directives — no runtime effect
             }
             AstNode::ConfidenceLabel { body, confidence } => {
-                for n in body { self.compile_node(n); }
+                for n in body {
+                    self.compile_node(n);
+                }
                 self.emit(Opcode::ConfLabel(confidence.0));
             }
             AstNode::ProbChoice { alt1, alt2 } => {
@@ -116,10 +119,10 @@ impl BytecodeGenerator {
             }
             AstNode::CondArrow { then_branch } => {
                 // cond {then} ?-> : pop cond, if true execute then
-                self.emit(Opcode::Cond(
-                    then_branch.len() as i32 + 2
-                ));
-                for n in then_branch { self.compile_node(n); }
+                self.emit(Opcode::Cond(then_branch.len() as i32 + 2));
+                for n in then_branch {
+                    self.compile_node(n);
+                }
             }
         }
     }
@@ -278,11 +281,17 @@ impl BytecodeGenerator {
 }
 
 /// Extract a literal Value from an AST node (compile-time evaluation).
-fn ast_node_to_value(node: &AstNode, word_dict: &HashMap<String, Vec<Opcode>>) -> whisper_core::value::Value {
+fn ast_node_to_value(
+    node: &AstNode,
+    word_dict: &HashMap<String, Vec<Opcode>>,
+) -> whisper_core::value::Value {
     match node {
         AstNode::Literal(v) => v.clone(),
         AstNode::List(items) => {
-            let values: Vec<_> = items.iter().map(|n| ast_node_to_value(n, word_dict)).collect();
+            let values: Vec<_> = items
+                .iter()
+                .map(|n| ast_node_to_value(n, word_dict))
+                .collect();
             whisper_core::value::Value::List(std::rc::Rc::new(values))
         }
         AstNode::Quote(body) => {
@@ -291,9 +300,7 @@ fn ast_node_to_value(node: &AstNode, word_dict: &HashMap<String, Vec<Opcode>>) -
             let (code, _) = gen.compile(body);
             whisper_core::value::Value::Ref(std::rc::Rc::from(code.into_boxed_slice()))
         }
-        AstNode::Op(Operator::Sub) => {
-            whisper_core::value::Value::I64(0)
-        }
+        AstNode::Op(Operator::Sub) => whisper_core::value::Value::I64(0),
         _ => whisper_core::value::Value::I64(0),
     }
 }

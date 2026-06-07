@@ -1,6 +1,3 @@
-/// Capability-based security model.
-///
-use std::rc::Rc;
 /// Whisper programs have zero IO by default. All side effects require
 /// explicit capability tokens that are bound at load time by the host.
 ///
@@ -10,6 +7,9 @@ use std::rc::Rc;
 /// 3. Runtime: Capabilities run in restricted context (path/host whitelists)
 use crate::value::Value;
 use crate::VmError;
+/// Capability-based security model.
+///
+use std::rc::Rc;
 
 /// Trait for capabilities that can be called by Whisper programs.
 ///
@@ -27,11 +27,7 @@ pub trait Capability: Send + Sync {
 
     /// Execute the capability with the given arguments from the VM stack.
     /// The capability can push results back onto the VM's data stack.
-    fn call(
-        &self,
-        data_stack: &mut Vec<Value>,
-        args: &[Value],
-    ) -> Result<(), VmError>;
+    fn call(&self, data_stack: &mut Vec<Value>, args: &[Value]) -> Result<(), VmError>;
 }
 
 /// A table of capabilities indexed by their numeric ID.
@@ -107,11 +103,7 @@ impl Capability for FileReadCap {
     fn description(&self) -> &str {
         "Read files from allowed paths"
     }
-    fn call(
-        &self,
-        data_stack: &mut Vec<Value>,
-        args: &[Value],
-    ) -> Result<(), VmError> {
+    fn call(&self, data_stack: &mut Vec<Value>, args: &[Value]) -> Result<(), VmError> {
         if args.is_empty() {
             return Err(VmError::ProgramError(
                 "file_read: expected path argument".into(),
@@ -129,9 +121,10 @@ impl Capability for FileReadCap {
         let path = std::path::Path::new(&path_str);
 
         // Check path whitelist
-        let allowed = self.allowed_paths.iter().any(|allowed| {
-            path.starts_with(allowed)
-        });
+        let allowed = self
+            .allowed_paths
+            .iter()
+            .any(|allowed| path.starts_with(allowed));
         if !allowed {
             return Err(VmError::CapabilityDenied(format!(
                 "Path '{}' is not in allowed paths",
@@ -141,8 +134,7 @@ impl Capability for FileReadCap {
 
         match std::fs::read_to_string(path) {
             Ok(content) => {
-                data_stack
-                    .push(Value::Str(std::rc::Rc::new(content)));
+                data_stack.push(Value::Str(std::rc::Rc::new(content)));
                 Ok(())
             }
             Err(e) => Err(VmError::IoError(e.to_string())),
@@ -166,11 +158,7 @@ impl Capability for FileWriteCap {
     fn description(&self) -> &str {
         "Write files to allowed paths"
     }
-    fn call(
-        &self,
-        _data_stack: &mut Vec<Value>,
-        args: &[Value],
-    ) -> Result<(), VmError> {
+    fn call(&self, _data_stack: &mut Vec<Value>, args: &[Value]) -> Result<(), VmError> {
         if args.len() < 2 {
             return Err(VmError::ProgramError(
                 "file_write: expected path and content arguments".into(),
@@ -196,9 +184,10 @@ impl Capability for FileWriteCap {
         };
         let path = std::path::Path::new(&path_str);
 
-        let allowed = self.allowed_paths.iter().any(|allowed| {
-            path.starts_with(allowed)
-        });
+        let allowed = self
+            .allowed_paths
+            .iter()
+            .any(|allowed| path.starts_with(allowed));
         if !allowed {
             return Err(VmError::CapabilityDenied(format!(
                 "Path '{}' is not in allowed write paths",
@@ -206,8 +195,7 @@ impl Capability for FileWriteCap {
             )));
         }
 
-        std::fs::write(path, content)
-            .map_err(|e| VmError::IoError(e.to_string()))
+        std::fs::write(path, content).map_err(|e| VmError::IoError(e.to_string()))
     }
 }
 
@@ -218,26 +206,38 @@ pub struct HttpGetCap {
 }
 
 impl Capability for HttpGetCap {
-    fn id(&self) -> u16 { self.id }
-    fn name(&self) -> &str { "http_get" }
-    fn description(&self) -> &str { "HTTP GET requests to allowed hosts" }
+    fn id(&self) -> u16 {
+        self.id
+    }
+    fn name(&self) -> &str {
+        "http_get"
+    }
+    fn description(&self) -> &str {
+        "HTTP GET requests to allowed hosts"
+    }
 
     fn call(&self, data_stack: &mut Vec<Value>, args: &[Value]) -> Result<(), VmError> {
         if args.is_empty() {
-            return Err(VmError::ProgramError("http_get: expected URL argument".into()));
+            return Err(VmError::ProgramError(
+                "http_get: expected URL argument".into(),
+            ));
         }
         let url_str = match &args[0] {
             Value::Str(s) => s.as_ref().clone(),
-            other => return Err(VmError::TypeMismatch {
-                expected: "str".into(), actual: other.type_name().into(),
-            }),
+            other => {
+                return Err(VmError::TypeMismatch {
+                    expected: "str".into(),
+                    actual: other.type_name().into(),
+                })
+            }
         };
 
         let host = extract_host(&url_str).unwrap_or(&url_str);
         let allowed = self.allowed_hosts.iter().any(|h| host.contains(h.as_str()));
         if !allowed {
             return Err(VmError::CapabilityDenied(format!(
-                "Host '{}' not in allowed hosts: {:?}", host, self.allowed_hosts
+                "Host '{}' not in allowed hosts: {:?}",
+                host, self.allowed_hosts
             )));
         }
 
@@ -258,38 +258,73 @@ pub struct HttpPostCap {
 }
 
 impl Capability for HttpPostCap {
-    fn id(&self) -> u16 { self.id }
-    fn name(&self) -> &str { "http_post" }
-    fn description(&self) -> &str { "HTTP POST requests to allowed hosts" }
+    fn id(&self) -> u16 {
+        self.id
+    }
+    fn name(&self) -> &str {
+        "http_post"
+    }
+    fn description(&self) -> &str {
+        "HTTP POST requests to allowed hosts"
+    }
 
     fn call(&self, data_stack: &mut Vec<Value>, args: &[Value]) -> Result<(), VmError> {
         if args.len() < 2 {
-            return Err(VmError::ProgramError("http_post: expected URL and body".into()));
+            return Err(VmError::ProgramError(
+                "http_post: expected URL and body".into(),
+            ));
         }
-        let url_str = match &args[0] { Value::Str(s) => s.as_ref().clone(), other => return Err(VmError::TypeMismatch { expected: "str".into(), actual: other.type_name().into() }) };
-        let body_str = match &args[1] { Value::Str(s) => s.as_ref().clone(), other => return Err(VmError::TypeMismatch { expected: "str".into(), actual: other.type_name().into() }) };
+        let url_str = match &args[0] {
+            Value::Str(s) => s.as_ref().clone(),
+            other => {
+                return Err(VmError::TypeMismatch {
+                    expected: "str".into(),
+                    actual: other.type_name().into(),
+                })
+            }
+        };
+        let body_str = match &args[1] {
+            Value::Str(s) => s.as_ref().clone(),
+            other => {
+                return Err(VmError::TypeMismatch {
+                    expected: "str".into(),
+                    actual: other.type_name().into(),
+                })
+            }
+        };
 
         let host = extract_host(&url_str).unwrap_or(&url_str);
         let allowed = self.allowed_hosts.iter().any(|h| host.contains(h.as_str()));
         if !allowed {
-            return Err(VmError::CapabilityDenied(format!("Host '{}' not allowed", host)));
+            return Err(VmError::CapabilityDenied(format!(
+                "Host '{}' not allowed",
+                host
+            )));
         }
 
         match http_post(&url_str, &body_str) {
-            Ok(response) => { data_stack.push(Value::Str(Rc::new(response))); Ok(()) }
+            Ok(response) => {
+                data_stack.push(Value::Str(Rc::new(response)));
+                Ok(())
+            }
             Err(e) => Err(VmError::IoError(e)),
         }
     }
 }
 
 fn extract_host(url: &str) -> Option<&str> {
-    let s = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://"))?;
+    let s = url
+        .strip_prefix("https://")
+        .or_else(|| url.strip_prefix("http://"))?;
     s.split('/').next()
 }
 
 fn http_get(url: &str) -> Result<String, String> {
     let host = extract_host(url).ok_or_else(|| "Invalid URL".to_string())?;
-    let path = url.find(host).map(|i| &url[i + host.len()..]).unwrap_or("/");
+    let path = url
+        .find(host)
+        .map(|i| &url[i + host.len()..])
+        .unwrap_or("/");
 
     let mut stream = std::net::TcpStream::connect((host, 80))
         .or_else(|_| std::net::TcpStream::connect((host, 443)))
@@ -297,10 +332,14 @@ fn http_get(url: &str) -> Result<String, String> {
 
     use std::io::{Read, Write};
     let request = format!("GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n");
-    stream.write_all(request.as_bytes()).map_err(|e| e.to_string())?;
+    stream
+        .write_all(request.as_bytes())
+        .map_err(|e| e.to_string())?;
 
     let mut response = String::new();
-    stream.read_to_string(&mut response).map_err(|e| e.to_string())?;
+    stream
+        .read_to_string(&mut response)
+        .map_err(|e| e.to_string())?;
 
     let body = response.split("\r\n\r\n").nth(1).unwrap_or(&response);
     Ok(body.to_string())
@@ -308,20 +347,27 @@ fn http_get(url: &str) -> Result<String, String> {
 
 fn http_post(url: &str, body: &str) -> Result<String, String> {
     let host = extract_host(url).ok_or_else(|| "Invalid URL".to_string())?;
-    let path = url.find(host).map(|i| &url[i + host.len()..]).unwrap_or("/");
+    let path = url
+        .find(host)
+        .map(|i| &url[i + host.len()..])
+        .unwrap_or("/");
 
-    let mut stream = std::net::TcpStream::connect((host, 80))
-        .map_err(|e| format!("Connect failed: {e}"))?;
+    let mut stream =
+        std::net::TcpStream::connect((host, 80)).map_err(|e| format!("Connect failed: {e}"))?;
 
     use std::io::{Read, Write};
     let request = format!(
         "POST {path} HTTP/1.1\r\nHost: {host}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         body.len()
     );
-    stream.write_all(request.as_bytes()).map_err(|e| e.to_string())?;
+    stream
+        .write_all(request.as_bytes())
+        .map_err(|e| e.to_string())?;
 
     let mut response = String::new();
-    stream.read_to_string(&mut response).map_err(|e| e.to_string())?;
+    stream
+        .read_to_string(&mut response)
+        .map_err(|e| e.to_string())?;
 
     let body = response.split("\r\n\r\n").nth(1).unwrap_or(&response);
     Ok(body.to_string())
@@ -333,9 +379,15 @@ pub struct EnvCap {
 }
 
 impl Capability for EnvCap {
-    fn id(&self) -> u16 { self.id }
-    fn name(&self) -> &str { "env" }
-    fn description(&self) -> &str { "Read environment variables" }
+    fn id(&self) -> u16 {
+        self.id
+    }
+    fn name(&self) -> &str {
+        "env"
+    }
+    fn description(&self) -> &str {
+        "Read environment variables"
+    }
 
     fn call(&self, data_stack: &mut Vec<Value>, args: &[Value]) -> Result<(), VmError> {
         if args.is_empty() {
@@ -343,9 +395,12 @@ impl Capability for EnvCap {
         }
         let name = match &args[0] {
             Value::Str(s) => s.as_ref().clone(),
-            other => return Err(VmError::TypeMismatch {
-                expected: "str".into(), actual: other.type_name().into(),
-            }),
+            other => {
+                return Err(VmError::TypeMismatch {
+                    expected: "str".into(),
+                    actual: other.type_name().into(),
+                })
+            }
         };
         let value = std::env::var(&name).unwrap_or_default();
         data_stack.push(Value::Str(std::rc::Rc::new(value)));
@@ -359,19 +414,30 @@ pub struct ExecCap {
 }
 
 impl Capability for ExecCap {
-    fn id(&self) -> u16 { self.id }
-    fn name(&self) -> &str { "exec" }
-    fn description(&self) -> &str { "Execute shell commands" }
+    fn id(&self) -> u16 {
+        self.id
+    }
+    fn name(&self) -> &str {
+        "exec"
+    }
+    fn description(&self) -> &str {
+        "Execute shell commands"
+    }
 
     fn call(&self, data_stack: &mut Vec<Value>, args: &[Value]) -> Result<(), VmError> {
         if args.is_empty() {
-            return Err(VmError::ProgramError("exec: expected command string".into()));
+            return Err(VmError::ProgramError(
+                "exec: expected command string".into(),
+            ));
         }
         let cmd = match &args[0] {
             Value::Str(s) => s.as_ref().clone(),
-            other => return Err(VmError::TypeMismatch {
-                expected: "str".into(), actual: other.type_name().into(),
-            }),
+            other => {
+                return Err(VmError::TypeMismatch {
+                    expected: "str".into(),
+                    actual: other.type_name().into(),
+                })
+            }
         };
 
         #[cfg(windows)]
@@ -379,9 +445,7 @@ impl Capability for ExecCap {
             .args(["/C", &cmd])
             .output();
         #[cfg(not(windows))]
-        let output = std::process::Command::new("sh")
-            .args(["-c", &cmd])
-            .output();
+        let output = std::process::Command::new("sh").args(["-c", &cmd]).output();
 
         match output {
             Ok(out) => {
@@ -401,4 +465,3 @@ impl Capability for ExecCap {
         }
     }
 }
-

@@ -40,8 +40,14 @@ fn main() {
 
     let cmd = &args[1];
     let result = match cmd.as_str() {
-        "-h" | "--help" => { help(); Ok(()) }
-        "-V" | "--version" => { println!("whisper {VERSION}"); Ok(()) }
+        "-h" | "--help" => {
+            help();
+            Ok(())
+        }
+        "-V" | "--version" => {
+            println!("whisper {VERSION}");
+            Ok(())
+        }
         "run" => cmd_run(&args),
         "build" => cmd_build(&args),
         "check" => cmd_check(&args),
@@ -69,16 +75,21 @@ fn get_flag(args: &[String], flag: &str) -> bool {
 }
 
 fn get_opt(args: &[String], flag: &str) -> Option<String> {
-    args.iter().position(|a| a == flag)
+    args.iter()
+        .position(|a| a == flag)
         .and_then(|i| args.get(i + 1).cloned())
 }
 
 fn cmd_run(args: &[String]) -> Result<(), String> {
-    let file = args.iter().skip(2).find(|a| !a.starts_with('-'))
+    let file = args
+        .iter()
+        .skip(2)
+        .find(|a| !a.starts_with('-'))
         .ok_or("Expected: whisper run <file.ws>")?;
-    let source = std::fs::read_to_string(file)
-        .map_err(|e| format!("Cannot read '{file}': {e}"))?;
-    let source_dir = std::path::Path::new(file).parent().unwrap_or(std::path::Path::new("."));
+    let source = std::fs::read_to_string(file).map_err(|e| format!("Cannot read '{file}': {e}"))?;
+    let source_dir = std::path::Path::new(file)
+        .parent()
+        .unwrap_or(std::path::Path::new("."));
     let config = commands::run::RunConfig {
         allow_file_read: get_flag(args, "--allow-file-read"),
         allow_file_write: get_flag(args, "--allow-file-write"),
@@ -91,30 +102,32 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
 }
 
 fn cmd_build(args: &[String]) -> Result<(), String> {
-    let file = args.iter().skip(2).find(|a| !a.starts_with('-'))
+    let file = args
+        .iter()
+        .skip(2)
+        .find(|a| !a.starts_with('-'))
         .ok_or("Expected: whisper build <file.ws>")?;
     let target = get_opt(args, "--target").unwrap_or_else(|| "wbin".into());
     let output = get_opt(args, "-o").unwrap_or_else(|| {
         let ext = if target == "wasm" { "wasm" } else { "wbin" };
         file.replace(".ws", &format!(".{ext}"))
     });
-    let source = std::fs::read_to_string(file)
-        .map_err(|e| format!("Cannot read '{file}': {e}"))?;
-    let source_dir = std::path::Path::new(file).parent().unwrap_or(std::path::Path::new("."));
+    let source = std::fs::read_to_string(file).map_err(|e| format!("Cannot read '{file}': {e}"))?;
+    let source_dir = std::path::Path::new(file)
+        .parent()
+        .unwrap_or(std::path::Path::new("."));
     commands::build::build_file(&source, source_dir, &target, &output)
 }
 
 fn cmd_check(args: &[String]) -> Result<(), String> {
     let file = args.get(2).ok_or("Expected: whisper check <file.ws>")?;
-    let source = std::fs::read_to_string(file)
-        .map_err(|e| format!("Cannot read '{file}': {e}"))?;
+    let source = std::fs::read_to_string(file).map_err(|e| format!("Cannot read '{file}': {e}"))?;
     commands::check::check_file(&source)
 }
 
 fn cmd_fmt(args: &[String]) -> Result<(), String> {
     let file = args.get(2).ok_or("Expected: whisper fmt <file.ws>")?;
-    let source = std::fs::read_to_string(file)
-        .map_err(|e| format!("Cannot read '{file}': {e}"))?;
+    let source = std::fs::read_to_string(file).map_err(|e| format!("Cannot read '{file}': {e}"))?;
     match whisper_parser::Parser::parse_source(&source) {
         Ok(ast) => {
             println!("Formatted: {file} ({} nodes, no errors)", ast.len());
@@ -126,14 +139,15 @@ fn cmd_fmt(args: &[String]) -> Result<(), String> {
 
 fn cmd_bootstrap(args: &[String]) -> Result<(), String> {
     let file = args.get(2).ok_or("Expected: whisper bootstrap <file.ws>")?;
-    let source = std::fs::read_to_string(file)
-        .map_err(|e| format!("Cannot read '{file}': {e}"))?;
+    let source = std::fs::read_to_string(file).map_err(|e| format!("Cannot read '{file}': {e}"))?;
     commands::bootstrap::bootstrap_compile(&source)
 }
 
 fn cmd_serve(args: &[String]) -> Result<(), String> {
     let file = args.get(2).ok_or("Expected: whisper serve <handler.ws>")?;
-    let port: u16 = get_opt(args, "--port").and_then(|p| p.parse().ok()).unwrap_or(8080);
+    let port: u16 = get_opt(args, "--port")
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(8080);
     commands::serve::serve(file, port)
 }
 
@@ -156,11 +170,15 @@ fn cmd_install(args: &[String]) -> Result<(), String> {
     let mut installer = whisper_package::install::Installer::new();
 
     if get_flag(args, "--local") {
-        let path = args.get(3).ok_or("Expected: whisper install --local <path>")?;
+        let path = args
+            .get(3)
+            .ok_or("Expected: whisper install --local <path>")?;
         return installer.install_local(path, auto_yes);
     }
 
-    let pkg = args.get(2).ok_or("Expected: whisper install <github.com/user/repo>")?;
+    let pkg = args
+        .get(2)
+        .ok_or("Expected: whisper install <github.com/user/repo>")?;
     installer.install(pkg, auto_yes)
 }
 

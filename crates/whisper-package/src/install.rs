@@ -35,12 +35,7 @@ impl Installer {
         self.install_internal(spec, auto_yes, 0)
     }
 
-    fn install_internal(
-        &mut self,
-        spec: &str,
-        auto_yes: bool,
-        depth: usize,
-    ) -> Result<(), String> {
+    fn install_internal(&mut self, spec: &str, auto_yes: bool, depth: usize) -> Result<(), String> {
         if depth > 10 {
             return Err("Dependency depth exceeded (circular dependency?)".into());
         }
@@ -49,7 +44,11 @@ impl Installer {
         let info = crate::registry::resolve_package(spec)?;
 
         // Skip if already installed
-        let pkg_key = format!("{}@{}", info.package_name, info.version.as_deref().unwrap_or("latest"));
+        let pkg_key = format!(
+            "{}@{}",
+            info.package_name,
+            info.version.as_deref().unwrap_or("latest")
+        );
         if self.installed.contains(&pkg_key) {
             println!("  {} already installed, skipping", info.package_name);
             return Ok(());
@@ -62,7 +61,8 @@ impl Installer {
         let temp_dir = std::env::temp_dir().join(format!("whisper-pkg-{}", info.package_name));
         let _ = std::fs::remove_dir_all(&temp_dir);
 
-        let download_ok = self.try_git_clone(&info.git_url, &temp_dir)
+        let download_ok = self
+            .try_git_clone(&info.git_url, &temp_dir)
             .or_else(|_| self.try_curl_download(&info, &temp_dir))
             .or_else(|_| self.try_powershell_download(&info, &temp_dir));
 
@@ -106,9 +106,8 @@ impl Installer {
 
         // Save manifest
         let manifest_path = pkg_dir.join("package.ws");
-        let manifest_content = std::fs::read_to_string(
-            temp_dir.join("package.ws"),
-        ).map_err(|e| format!("Cannot read manifest: {e}"))?;
+        let manifest_content = std::fs::read_to_string(temp_dir.join("package.ws"))
+            .map_err(|e| format!("Cannot read manifest: {e}"))?;
         std::fs::write(&manifest_path, &manifest_content)
             .map_err(|e| format!("Failed to save manifest: {e}"))?;
 
@@ -159,7 +158,11 @@ impl Installer {
     }
 
     /// Try downloading via curl (HTTPS zip archive fallback).
-    fn try_curl_download(&self, info: &crate::registry::PackageInfo, dest: &Path) -> Result<(), String> {
+    fn try_curl_download(
+        &self,
+        info: &crate::registry::PackageInfo,
+        dest: &Path,
+    ) -> Result<(), String> {
         let curl_ok = Command::new("curl").arg("--version").output().is_ok();
         if !curl_ok {
             return Err("curl not available".into());
@@ -206,8 +209,16 @@ impl Installer {
     }
 
     /// Try PowerShell download on Windows.
-    fn try_powershell_download(&self, info: &crate::registry::PackageInfo, dest: &Path) -> Result<(), String> {
-        let ps_ok = Command::new("powershell").arg("-Command").arg("Write-Host test").output().is_ok();
+    fn try_powershell_download(
+        &self,
+        info: &crate::registry::PackageInfo,
+        dest: &Path,
+    ) -> Result<(), String> {
+        let ps_ok = Command::new("powershell")
+            .arg("-Command")
+            .arg("Write-Host test")
+            .output()
+            .is_ok();
         if !ps_ok {
             return Err("PowerShell not available".into());
         }
@@ -298,10 +309,14 @@ impl Installer {
                     continue;
                 }
                 let local_name_len = u16::from_le_bytes(
-                    data[local_offset + 26..local_offset + 28].try_into().unwrap(),
+                    data[local_offset + 26..local_offset + 28]
+                        .try_into()
+                        .unwrap(),
                 ) as usize;
                 let extra_len = u16::from_le_bytes(
-                    data[local_offset + 28..local_offset + 30].try_into().unwrap(),
+                    data[local_offset + 28..local_offset + 30]
+                        .try_into()
+                        .unwrap(),
                 ) as usize;
                 let file_data_start = local_offset + 30 + local_name_len + extra_len;
                 let file_data = &data[file_data_start..file_data_start + compressed_size];
@@ -311,8 +326,7 @@ impl Installer {
                 if let Some(parent) = target.parent() {
                     let _ = std::fs::create_dir_all(parent);
                 }
-                std::fs::write(&target, file_data)
-                    .map_err(|e| format!("Write {name}: {e}"))?;
+                std::fs::write(&target, file_data).map_err(|e| format!("Write {name}: {e}"))?;
                 extracted += 1;
             }
             pos += 46 + name_len;
@@ -361,8 +375,7 @@ impl Installer {
             if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
                 let manifest_path = entry.path().join("package.ws");
                 if manifest_path.exists() {
-                    let content =
-                        std::fs::read_to_string(&manifest_path).unwrap_or_default();
+                    let content = std::fs::read_to_string(&manifest_path).unwrap_or_default();
                     if let Ok(manifest) = PackageManifest::parse(&content) {
                         packages.push(InstalledPackage {
                             name: manifest.name.clone(),
@@ -381,12 +394,16 @@ impl Installer {
         if !pkg_file.exists() {
             return Err("package.ws not found".into());
         }
-        let content =
-            std::fs::read_to_string(&pkg_file).map_err(|e| format!("Cannot read package.ws: {e}"))?;
+        let content = std::fs::read_to_string(&pkg_file)
+            .map_err(|e| format!("Cannot read package.ws: {e}"))?;
         PackageManifest::parse(&content).map_err(|e| format!("Invalid package.ws: {e}"))
     }
 
-    fn review_capabilities(&self, manifest: &PackageManifest, auto_yes: bool) -> Result<(), String> {
+    fn review_capabilities(
+        &self,
+        manifest: &PackageManifest,
+        auto_yes: bool,
+    ) -> Result<(), String> {
         if manifest.capabilities.is_empty() {
             return Ok(());
         }
@@ -394,7 +411,10 @@ impl Installer {
             println!("Auto-authorizing capabilities: {:?}", manifest.capabilities);
             return Ok(());
         }
-        print!("Authorize capabilities ({:?})? [y/N]: ", manifest.capabilities);
+        print!(
+            "Authorize capabilities ({:?})? [y/N]: ",
+            manifest.capabilities
+        );
         let _ = std::io::stdout().flush();
         let mut input = String::new();
         std::io::stdin()
@@ -440,9 +460,7 @@ fn copy_ws_recursive(base: &Path, dst: &Path, current: &Path) -> Result<(), Stri
 /// Convert a Git URL to a GitHub archive download URL.
 fn git_to_archive_url(git_url: &str) -> String {
     // https://github.com/user/repo.git -> https://github.com/user/repo/archive/refs/heads/main.zip
-    let base = git_url
-        .strip_suffix(".git")
-        .unwrap_or(git_url);
+    let base = git_url.strip_suffix(".git").unwrap_or(git_url);
     format!("{base}/archive/refs/heads/main.zip")
 }
 

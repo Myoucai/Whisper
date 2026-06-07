@@ -1,11 +1,10 @@
 /// Integration tests for the full Whisper compilation pipeline:
 /// .ws → Parse → TypeCheck → Compile → VM Execute
-
 use std::rc::Rc;
+use whisper_codegen::bytecode_gen::BytecodeGenerator;
 use whisper_core::opcode::Opcode;
 use whisper_core::value::Value;
 use whisper_core::vm::Vm;
-use whisper_codegen::bytecode_gen::BytecodeGenerator;
 use whisper_parser::Parser;
 
 /// Helper: compile and execute a Whisper source string, return the result.
@@ -29,7 +28,10 @@ fn assert_eval(source: &str, expected: Value) {
 /// Helper: assert that parsing fails.
 fn assert_parse_error(source: &str) {
     let result = Parser::parse_source(source);
-    assert!(result.is_err(), "Expected parse error, got Ok for: {source}");
+    assert!(
+        result.is_err(),
+        "Expected parse error, got Ok for: {source}"
+    );
 }
 
 #[test]
@@ -109,9 +111,15 @@ fn test_fold_sum_via_pipeline() {
 #[test]
 fn test_map_via_pipeline() {
     let result = eval("[1 2 3] { _ * } @map").unwrap();
-    assert_eq!(result, Some(Value::List(Rc::new(vec![
-        Value::I64(1), Value::I64(4), Value::I64(9),
-    ]))), "Map square should be [1,4,9]");
+    assert_eq!(
+        result,
+        Some(Value::List(Rc::new(vec![
+            Value::I64(1),
+            Value::I64(4),
+            Value::I64(9),
+        ]))),
+        "Map square should be [1,4,9]"
+    );
 }
 
 #[test]
@@ -125,18 +133,33 @@ fn test_list_literal_order() {
 
     // Should emit: PushI64(1..5), PushI64(5), PushList
     // Elements first, then count on top (LIFO: count popped first)
-    assert_eq!(&bytecode[0..5], &[
-        Opcode::PushI64(1), Opcode::PushI64(2), Opcode::PushI64(3),
-        Opcode::PushI64(4), Opcode::PushI64(5),
-    ], "Elements should be 1,2,3,4,5");
+    assert_eq!(
+        &bytecode[0..5],
+        &[
+            Opcode::PushI64(1),
+            Opcode::PushI64(2),
+            Opcode::PushI64(3),
+            Opcode::PushI64(4),
+            Opcode::PushI64(5),
+        ],
+        "Elements should be 1,2,3,4,5"
+    );
     assert_eq!(bytecode[5], Opcode::PushI64(5), "Count=5 after elements");
     assert_eq!(bytecode[6], Opcode::PushList);
 
     // Execute and verify stack result
     let result = eval(source).unwrap();
-    assert_eq!(result, Some(Value::List(std::rc::Rc::new(vec![
-        Value::I64(1), Value::I64(2), Value::I64(3), Value::I64(4), Value::I64(5),
-    ]))), "List should be [1, 2, 3, 4, 5]");
+    assert_eq!(
+        result,
+        Some(Value::List(std::rc::Rc::new(vec![
+            Value::I64(1),
+            Value::I64(2),
+            Value::I64(3),
+            Value::I64(4),
+            Value::I64(5),
+        ]))),
+        "List should be [1, 2, 3, 4, 5]"
+    );
 }
 
 #[test]
@@ -170,7 +193,11 @@ fn test_wasm_generation() {
 
     // Valid WASM must start with magic
     assert_eq!(&wasm[0..4], b"\0asm");
-    assert!(wasm.len() > 50, "WASM module too small: {} bytes", wasm.len());
+    assert!(
+        wasm.len() > 50,
+        "WASM module too small: {} bytes",
+        wasm.len()
+    );
 }
 
 #[test]
@@ -187,9 +214,9 @@ fn test_nested_expressions() {
 
 #[test]
 fn test_parse_error_recovery() {
-    assert_parse_error("\"hello");    // unclosed string
-    // Note: [1 2 without closing ] is a valid token stream,
-    // the parser just stops at EOF. Error recovery is handled at a higher level.
+    assert_parse_error("\"hello"); // unclosed string
+                                   // Note: [1 2 without closing ] is a valid token stream,
+                                   // the parser just stops at EOF. Error recovery is handled at a higher level.
 }
 
 #[test]
@@ -295,7 +322,10 @@ fn test_wbin_with_definitions() {
 
 #[test]
 fn test_string_literal() {
-    assert_eval("\"hello\"", Value::Str(std::rc::Rc::new("hello".to_string())));
+    assert_eval(
+        "\"hello\"",
+        Value::Str(std::rc::Rc::new("hello".to_string())),
+    );
 }
 
 #[test]
@@ -306,7 +336,7 @@ fn test_deep_stack() {
         source.push_str(&format!("{i} "));
     }
     source.push_str("+ + + + + + + + +"); // 10 numbers, 9 adds
-    // Simpler: 1 2 3 4 5 + + + +
+                                          // Simpler: 1 2 3 4 5 + + + +
     assert_eval("1 2 3 4 5 + + + +", Value::I64(15));
 }
 
@@ -339,7 +369,9 @@ fn test_fib_recursive_working() {
     let mut gen = BytecodeGenerator::new();
     let (bytecode, defs) = gen.compile(&ast);
     let mut vm = Vm::new();
-    for (name, code) in defs { vm.define_word(name, code); }
+    for (name, code) in defs {
+        vm.define_word(name, code);
+    }
     let result = vm.execute(&bytecode).unwrap();
     assert_eq!(result, Some(Value::I64(8))); // fib(6) = 8
 }

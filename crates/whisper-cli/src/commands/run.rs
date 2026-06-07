@@ -1,9 +1,9 @@
 //! whisper run — Execute a Whisper source file
 
 use std::path::Path;
+use whisper_codegen::bytecode_gen::BytecodeGenerator;
 use whisper_core::capability::{CapabilityTable, FileReadCap, FileWriteCap};
 use whisper_core::vm::Vm;
-use whisper_codegen::bytecode_gen::BytecodeGenerator;
 use whisper_parser::Parser;
 
 /// Runtime configuration for source execution.
@@ -20,7 +20,10 @@ pub struct RunConfig {
 pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result<(), String> {
     // Phase 1: Parse source to AST
     let ast = Parser::parse_source(source).map_err(|e| {
-        format!("Parse error at {}:{}: {}", e.token.span.line, e.token.span.column, e.message)
+        format!(
+            "Parse error at {}:{}: {}",
+            e.token.span.line, e.token.span.column, e.message
+        )
     })?;
 
     // Phase 1a: Resolve imports
@@ -44,7 +47,10 @@ pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result
 
     // Phase 2b: Optimize bytecode
     let bytecode = whisper_codegen::optimize(&bytecode);
-    let defs: Vec<_> = defs.into_iter().map(|(k, v)| (k, whisper_codegen::optimize(&v))).collect();
+    let defs: Vec<_> = defs
+        .into_iter()
+        .map(|(k, v)| (k, whisper_codegen::optimize(&v)))
+        .collect();
 
     // Phase 4: Set up VM with requested capabilities
     let mut capability_table = CapabilityTable::new();
@@ -64,11 +70,17 @@ pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result
     if config.allow_http {
         capability_table.bind(Box::new(whisper_core::capability::HttpGetCap {
             id: 2,
-            allowed_hosts: vec!["api.github.com".into(), "jsonplaceholder.typicode.com".into()],
+            allowed_hosts: vec![
+                "api.github.com".into(),
+                "jsonplaceholder.typicode.com".into(),
+            ],
         }));
         capability_table.bind(Box::new(whisper_core::capability::HttpPostCap {
             id: 3,
-            allowed_hosts: vec!["api.github.com".into(), "jsonplaceholder.typicode.com".into()],
+            allowed_hosts: vec![
+                "api.github.com".into(),
+                "jsonplaceholder.typicode.com".into(),
+            ],
         }));
     }
     if config.allow_env {

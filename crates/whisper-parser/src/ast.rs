@@ -41,9 +41,7 @@ pub enum AstNode {
     },
 
     /// Single-branch conditional: cond {then} ?->
-    CondArrow {
-        then_branch: Vec<AstNode>,
-    },
+    CondArrow { then_branch: Vec<AstNode> },
 
     /// Loop: {body} {cond} #
     Loop {
@@ -52,15 +50,10 @@ pub enum AstNode {
     },
 
     /// Fixed-count loop: n {body} @times
-    Times {
-        body: Vec<AstNode>,
-    },
+    Times { body: Vec<AstNode> },
 
     /// Word definition: : name { body } ;
-    Def {
-        name: String,
-        body: Vec<AstNode>,
-    },
+    Def { name: String, body: Vec<AstNode> },
 
     /// Import module: import "path"
     Import(String),

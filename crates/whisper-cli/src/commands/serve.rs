@@ -13,22 +13,21 @@
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::rc::Rc;
+use whisper_codegen::bytecode_gen::BytecodeGenerator;
 use whisper_core::value::Value;
 use whisper_core::vm::Vm;
-use whisper_codegen::bytecode_gen::BytecodeGenerator;
 use whisper_parser::Parser;
 
 pub fn serve(handler_file: &str, port: u16) -> Result<(), String> {
     let handler_src = std::fs::read_to_string(handler_file)
         .map_err(|e| format!("Cannot read '{handler_file}': {e}"))?;
-    let ast = Parser::parse_source(&handler_src)
-        .map_err(|e| format!("Parse error: {}", e.message))?;
+    let ast =
+        Parser::parse_source(&handler_src).map_err(|e| format!("Parse error: {}", e.message))?;
     let mut gen = BytecodeGenerator::new();
     let (bytecode, defs) = gen.compile(&ast);
 
     let addr = format!("127.0.0.1:{port}");
-    let listener = TcpListener::bind(&addr)
-        .map_err(|e| format!("Cannot bind to {addr}: {e}"))?;
+    let listener = TcpListener::bind(&addr).map_err(|e| format!("Cannot bind to {addr}: {e}"))?;
     println!("Whisper server listening on http://{addr}");
     println!("Handler: {handler_file}");
 
@@ -50,12 +49,17 @@ fn handle_request(
     bytecode: &[whisper_core::opcode::Opcode],
     defs: &std::collections::HashMap<String, Vec<whisper_core::opcode::Opcode>>,
 ) -> Result<(), String> {
-    stream.set_read_timeout(Some(std::time::Duration::from_secs(5)))
+    stream
+        .set_read_timeout(Some(std::time::Duration::from_secs(5)))
         .map_err(|e| e.to_string())?;
 
     let mut buf = [0u8; 8192];
-    let n = stream.read(&mut buf).map_err(|e| format!("Read error: {e}"))?;
-    if n == 0 { return Ok(()); }
+    let n = stream
+        .read(&mut buf)
+        .map_err(|e| format!("Read error: {e}"))?;
+    if n == 0 {
+        return Ok(());
+    }
 
     let request = String::from_utf8_lossy(&buf[..n]);
     let (method, path, _body) = parse_http(&request);
@@ -74,7 +78,9 @@ fn handle_request(
     vm.execute(bytecode).map_err(|e| format!("Init: {e}"))?;
     vm.data_stack.push(req);
     let call_handler = [whisper_core::opcode::Opcode::Call("handler".to_string())];
-    let handler_result = vm.execute(&call_handler).map_err(|e| format!("Handler: {e}"))?;
+    let handler_result = vm
+        .execute(&call_handler)
+        .map_err(|e| format!("Handler: {e}"))?;
 
     let (status, ct, body) = match handler_result {
         Some(Value::List(items)) if items.len() >= 3 => (
@@ -90,9 +96,14 @@ fn handle_request(
 
     let response_text = format!(
         "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-        status, ct, body.len(), body
+        status,
+        ct,
+        body.len(),
+        body
     );
-    stream.write_all(response_text.as_bytes()).map_err(|e| e.to_string())?;
+    stream
+        .write_all(response_text.as_bytes())
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 

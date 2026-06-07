@@ -20,7 +20,10 @@ pub fn get_builtin_signature(name: &str) -> Option<(Vec<Type>, Vec<Type>)> {
         "dup" => Some((vec![tv()], vec![tv(), tv()])),
         "swap" => Some((vec![tv(), tv2()], vec![tv2(), tv()])),
         "drop" => Some((vec![tv()], vec![])),
-        "rot" => Some((vec![tv(), tv2(), Type::TypeVar(2)], vec![tv2(), Type::TypeVar(2), tv()])),
+        "rot" => Some((
+            vec![tv(), tv2(), Type::TypeVar(2)],
+            vec![tv2(), Type::TypeVar(2), tv()],
+        )),
 
         // Arithmetic — both i64 and f64 versions
         "+" => Some((vec![i64.clone(), i64.clone()], vec![i64.clone()])),
@@ -39,10 +42,7 @@ pub fn get_builtin_signature(name: &str) -> Option<(Vec<Type>, Vec<Type>)> {
         "!" => Some((vec![bool.clone()], vec![bool.clone()])),
 
         // List operations
-        "@nth" => Some((
-            vec![Type::List(Box::new(tv())), i64.clone()],
-            vec![tv()],
-        )),
+        "@nth" => Some((vec![Type::List(Box::new(tv())), i64.clone()], vec![tv()])),
         "append" => Some((
             vec![Type::List(Box::new(tv())), tv()],
             vec![Type::List(Box::new(tv()))],

@@ -1,14 +1,15 @@
 /// Fuzz testing for the Whisper VM.
 /// Generates random opcode sequences and verifies the VM handles them gracefully
 /// (no panics, only returns Err or Ok with reasonable stack state).
-
 use whisper_core::opcode::Opcode;
 use whisper_core::value::Value;
 use whisper_core::vm::Vm;
 
 /// Deterministic pseudo-random i64.
 fn rand_i64(seed: &mut u64) -> i64 {
-    *seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    *seed = seed
+        .wrapping_mul(6364136223846793005)
+        .wrapping_add(1442695040888963407);
     *seed as i64
 }
 
@@ -187,7 +188,8 @@ fn fuzz_control_flow() {
     // Random control flow should not panic
     for mut seed in 0..50 {
         let mut vm = Vm::new();
-        vm.data_stack.push(Value::Bool(rand_i64(&mut seed) % 2 == 0));
+        vm.data_stack
+            .push(Value::Bool(rand_i64(&mut seed) % 2 == 0));
         let mut s = seed + 5000;
         let prog: Vec<Opcode> = (0..10).map(|_| random_op_with_cf(&mut s)).collect();
         let _ = vm.execute(&prog);

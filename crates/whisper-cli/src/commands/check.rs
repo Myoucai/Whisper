@@ -7,7 +7,10 @@ use whisper_typecheck::TypeChecker;
 pub fn check_file(source: &str) -> Result<(), String> {
     // Phase 1: Parse
     let ast = Parser::parse_source(source).map_err(|e| {
-        format!("Parse error at {}:{}: {}", e.token.span.line, e.token.span.column, e.message)
+        format!(
+            "Parse error at {}:{}: {}",
+            e.token.span.line, e.token.span.column, e.message
+        )
     })?;
 
     println!("Parsed: {} nodes", ast.len());
@@ -23,7 +26,9 @@ pub fn check_file(source: &str) -> Result<(), String> {
         for node in &ast {
             match node {
                 whisper_parser::ast::AstNode::Literal(_) => stack.push("T"),
-                whisper_parser::ast::AstNode::Op(_) => { stack.pop(); }
+                whisper_parser::ast::AstNode::Op(_) => {
+                    stack.pop();
+                }
                 whisper_parser::ast::AstNode::Def { name, .. } => {
                     println!("  word '{}' defined", name);
                 }

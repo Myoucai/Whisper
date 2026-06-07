@@ -17,35 +17,64 @@
 //!   14 = ListCount     [14, count]
 //!   18 = Pre-compiled PushRef  [18, [inner_bytecodes...]]
 
+use std::rc::Rc;
+use whisper_codegen::bytecode_gen::BytecodeGenerator;
 use whisper_core::opcode::Opcode;
 use whisper_core::value::Value;
 use whisper_core::vm::Vm;
-use whisper_codegen::bytecode_gen::BytecodeGenerator;
-use whisper_parser::Parser;
 use whisper_parser::ast::{AstNode, Operator};
-use std::rc::Rc;
+use whisper_parser::Parser;
 
 fn op_to_byte(op: Operator) -> u8 {
     match op {
-        Operator::Dup => 0x00, Operator::Swap => 0x01, Operator::Drop => 0x02,
+        Operator::Dup => 0x00,
+        Operator::Swap => 0x01,
+        Operator::Drop => 0x02,
         Operator::Rot => 0x03,
-        Operator::Add => 0x10, Operator::Sub => 0x11, Operator::Mul => 0x12, Operator::Div => 0x13,
+        Operator::Add => 0x10,
+        Operator::Sub => 0x11,
+        Operator::Mul => 0x12,
+        Operator::Div => 0x13,
         Operator::Mod => 0x14,
-        Operator::Eq => 0x18, Operator::Lt => 0x19, Operator::Gt => 0x1A,
-        Operator::Neq => 0x1B, Operator::Le => 0x1C, Operator::Ge => 0x1D,
-        Operator::And => 0x20, Operator::Or => 0x21, Operator::Not => 0x22,
-        Operator::Nth => 0x40, Operator::Append => 0x41, Operator::Len => 0x42,
-        Operator::Map => 0x43, Operator::Each => 0x44, Operator::Fold => 0x45,
-        Operator::StrLen => 0x46, Operator::StrCat => 0x47, Operator::StrSlice => 0x48,
-        Operator::StrEq => 0x49, Operator::StrLt => 0x4A, Operator::StrFind => 0x4B,
-        Operator::StrReplace => 0x4C, Operator::StrToI64 => 0x4D, Operator::I64ToStr => 0x4E,
-        Operator::StrNth => 0x4F, Operator::StrChars => 0xB8, Operator::CharsStr => 0xB9,
-        Operator::I64ToF64 => 0xB0, Operator::F64ToI64 => 0xB1, Operator::FSqrt => 0xB2,
-        Operator::FSin => 0xB3, Operator::FCos => 0xB4, Operator::FTan => 0xB5,
-        Operator::JsonParse => 0xB6, Operator::JsonStringify => 0xB7,
+        Operator::Eq => 0x18,
+        Operator::Lt => 0x19,
+        Operator::Gt => 0x1A,
+        Operator::Neq => 0x1B,
+        Operator::Le => 0x1C,
+        Operator::Ge => 0x1D,
+        Operator::And => 0x20,
+        Operator::Or => 0x21,
+        Operator::Not => 0x22,
+        Operator::Nth => 0x40,
+        Operator::Append => 0x41,
+        Operator::Len => 0x42,
+        Operator::Map => 0x43,
+        Operator::Each => 0x44,
+        Operator::Fold => 0x45,
+        Operator::StrLen => 0x46,
+        Operator::StrCat => 0x47,
+        Operator::StrSlice => 0x48,
+        Operator::StrEq => 0x49,
+        Operator::StrLt => 0x4A,
+        Operator::StrFind => 0x4B,
+        Operator::StrReplace => 0x4C,
+        Operator::StrToI64 => 0x4D,
+        Operator::I64ToStr => 0x4E,
+        Operator::StrNth => 0x4F,
+        Operator::StrChars => 0xB8,
+        Operator::CharsStr => 0xB9,
+        Operator::I64ToF64 => 0xB0,
+        Operator::F64ToI64 => 0xB1,
+        Operator::FSqrt => 0xB2,
+        Operator::FSin => 0xB3,
+        Operator::FCos => 0xB4,
+        Operator::FTan => 0xB5,
+        Operator::JsonParse => 0xB6,
+        Operator::JsonStringify => 0xB7,
         Operator::AtTimes => 0x53,
         Operator::CapExec => 0x71,
-        Operator::OutputTop => 0x90, Operator::OutputAll => 0x91,
+        Operator::OutputTop => 0x90,
+        Operator::OutputAll => 0x91,
         Operator::ReadInput => 0x92,
         _ => 0x00,
     }
@@ -94,10 +123,8 @@ fn ast_to_whisper_tokens(nodes: &[AstNode]) -> Value {
                 let inner_tokens = ast_to_vec(body);
                 let mut inner_bytecodes = simple_compile(&inner_tokens);
                 inner_bytecodes.push(Value::I64(0x61)); // Return
-                let mut wrapped: Vec<Value> = vec![
-                    Value::I64(0x35),
-                    Value::I64(inner_bytecodes.len() as i64),
-                ];
+                let mut wrapped: Vec<Value> =
+                    vec![Value::I64(0x35), Value::I64(inner_bytecodes.len() as i64)];
                 wrapped.extend(inner_bytecodes);
                 tokens.push(Value::List(Rc::new(vec![
                     Value::I64(18),
@@ -134,10 +161,8 @@ fn simple_compile(tokens: &[Value]) -> Vec<Value> {
                 match ty {
                     0 => {
                         if let Value::I64(n) = &items[1] {
-                            result.push(Value::List(Rc::new(vec![
-                                Value::I64(0x30),
-                                Value::I64(*n),
-                            ])));
+                            result
+                                .push(Value::List(Rc::new(vec![Value::I64(0x30), Value::I64(*n)])));
                         }
                     }
                     1 => {
@@ -167,18 +192,14 @@ fn simple_compile(tokens: &[Value]) -> Vec<Value> {
                     }
                     13 => {
                         if let Value::I64(n) = &items[1] {
-                            result.push(Value::List(Rc::new(vec![
-                                Value::I64(0x33),
-                                Value::I64(*n),
-                            ])));
+                            result
+                                .push(Value::List(Rc::new(vec![Value::I64(0x33), Value::I64(*n)])));
                         }
                     }
                     14 => {
                         if let Value::I64(n) = &items[1] {
-                            result.push(Value::List(Rc::new(vec![
-                                Value::I64(0x34),
-                                Value::I64(*n),
-                            ])));
+                            result
+                                .push(Value::List(Rc::new(vec![Value::I64(0x34), Value::I64(*n)])));
                         }
                     }
                     18 => {
@@ -215,8 +236,8 @@ pub fn bootstrap_compile(source: &str) -> Result<(), String> {
 
     // Phase 3: Load whisperc compiler
     let compiler_src = include_str!("../../../../whisperc/main.ws");
-    let compiler_ast = Parser::parse_source(compiler_src)
-        .map_err(|e| format!("whisperc parse: {}", e.message))?;
+    let compiler_ast =
+        Parser::parse_source(compiler_src).map_err(|e| format!("whisperc parse: {}", e.message))?;
     let mut cgen = BytecodeGenerator::new();
     let (compiler_bc, compiler_defs) = cgen.compile(&compiler_ast);
 
@@ -254,8 +275,7 @@ pub fn bootstrap_compile(source: &str) -> Result<(), String> {
         vm2.define_word(name.clone(), code.clone());
     }
     print!("Rust VM output: ");
-    vm2.execute(&ref_bytecode)
-        .map_err(|e| format!("VM: {e}"))?;
+    vm2.execute(&ref_bytecode).map_err(|e| format!("VM: {e}"))?;
 
     // Phase 8: Execute whisperc-compiled bytecode
     println!("\nwhisperc bytecode: {} opcodes", whisperc_ops.len());

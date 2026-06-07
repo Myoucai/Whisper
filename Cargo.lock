@@ -203,6 +203,7 @@ version = "1.0.0"
 dependencies = [
  "whisper-codegen",
  "whisper-core",
+ "whisper-lsp",
  "whisper-package",
  "whisper-parser",
  "whisper-typecheck",
@@ -224,6 +225,7 @@ name = "whisper-core"
 version = "1.0.0"
 dependencies = [
  "serde",
+ "serde_json",
  "thiserror",
 ]
 

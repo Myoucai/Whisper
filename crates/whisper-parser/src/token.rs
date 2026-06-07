@@ -46,19 +46,19 @@ pub enum TokenKind {
     BoolFalse,
 
     // Stack operators
-    Dup,       // _
-    Swap,      // `
-    Drop,      // % (context: stack)
-    Rot,       // @
-    Pick(u8),  // $n
+    Dup,      // _
+    Swap,     // `
+    Drop,     // % (context: stack)
+    Rot,      // @
+    Pick(u8), // $n
 
     // Arithmetic
     Plus,
     Minus,
     Star,
     Slash,
-    Percent,   // % (modulo)
-    Mod,       // mod keyword (alias for %)
+    Percent, // % (modulo)
+    Mod,     // mod keyword (alias for %)
 
     // Comparison
     Eq,
@@ -69,44 +69,44 @@ pub enum TokenKind {
     Ge,
 
     // Logic
-    And,       // &
-    Or,        // |
-    Not,       // !
+    And, // &
+    Or,  // |
+    Not, // !
 
     // Delimiters
-    LBracket,  // [
-    RBracket,  // ]
-    LBrace,    // {
-    RBrace,    // }
+    LBracket, // [
+    RBracket, // ]
+    LBrace,   // {
+    RBrace,   // }
 
     // Control flow
-    CondQ,       // ??
-    CondArrow,   // ?->
-    Hash,        // #
-    AtTimes,     // @times
-    AtMap,       // @map
-    AtEach,      // @each
-    AtFold,      // @fold
-    AtNth,       // @nth
+    CondQ,     // ??
+    CondArrow, // ?->
+    Hash,      // #
+    AtTimes,   // @times
+    AtMap,     // @map
+    AtEach,    // @each
+    AtFold,    // @fold
+    AtNth,     // @nth
 
     // Definitions
-    Colon,       // :
-    Semicolon,   // ;
+    Colon,     // :
+    Semicolon, // ;
     Import,
     Export,
 
     // IO
-    Dot,         // .
-    Comma,       // ,
-    DotDot,      // ..
+    Dot,    // .
+    Comma,  // ,
+    DotDot, // ..
 
     // Capability
     CapCall(u16), // @n (n is a number)
     Bang,         // !
 
     // Confidence
-    ConfLabel(f64),  // :0.xx
-    ProbChoice,      // ?|
+    ConfLabel(f64), // :0.xx
+    ProbChoice,     // ?|
 
     // List operations
     Append,
