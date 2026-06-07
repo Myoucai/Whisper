@@ -12,25 +12,45 @@
 : is-blank { _ _ 32 = ` 9 = | ` 10 = | ` 13 = | } ;
 
 : skip-ws {
-    _ "" streq ??drop|]
-    _ 0 strnth is-blank ??_ 1 strslice skip-ws|]
+    _ "" streq ??|]
+    _ 0 strnth _ is-blank ??striter drop skip-ws|drop]
 } ;
 
 // Read until ws/delim; returns chunk and rest
+: next-chunk {
+    _ 0 strnth is-ws ??
+        striter                     // delim_char rest
+        ctos `                      // delim_str rest
+    |   "" ` next-chunk-acc         // regular: accumulate until ws/delim
+    ]
+} ;
+
 : next-chunk-acc {
-    _ "" streq ??drop ""|]
-    _ 0 strnth is-ws ??drop |]
-    _ 0 strnth ctos ` strcat _ 1 strslice next-chunk-acc
+    _ "" streq ??|]
+    _ 0 strnth is-ws ??|]
+    _ 0 strnth ctos               // acc src ch → acc src ch_str
+    $2 ` strcat                    // acc src ch_str acc → acc src acc ch_str → acc src new_acc
+    `                              // acc new_acc src
+    `                              // new_acc acc src  (swap: bring acc to top)
+    drop                           // new_acc src       (drop acc)
+    striter drop                   // new_acc src[1:]
+    next-chunk-acc
 } ;
 
-: next-chunk { "" ` next-chunk-acc } ;
-
-// String reader: src (after ") → [content, rest]
-: read-str {
-    _ "" streq ??drop "ERR:unterminated"|]
-    _ 0 strnth 34 = ??_ 1 strslice|]
-    _ 0 strnth ctos ` strcat _ 1 strslice read-str
+// String reader: acc src → content rest (stops at closing ")
+: read-str-acc {
+    _ "" streq ??"ERR" ""|]
+    _ 0 strnth 34 = ??striter drop|]
+    _ 0 strnth ctos               // acc src ch → acc src ch_str
+    $2 ` strcat                    // acc src new_acc
+    `                              // acc new_acc src
+    `                              // new_acc acc src
+    drop                           // new_acc src
+    striter drop                   // new_acc src[1:]
+    read-str-acc
 } ;
+
+: read-str { "" ` read-str-acc } ;
 
 // tokenize-loop: acc src → chunk_list
 // stack: [acc, src]
@@ -40,26 +60,14 @@
 
     // String: read until closing "
     _ 0 strnth 34 = ??
-        _ 1 strslice read-str           // acc src content rest_after
-        `                               // acc src rest_after content
-        $3                              // acc src rest_after content acc (copy acc)
-        `                               // acc src rest_after acc content
-        append                          // acc src rest_after [acc..., content]
-        `                               // acc src new_acc rest_after
-        `                               // acc new_acc src rest_after
-        drop                            // acc new_acc rest_after  (drop src)
-        `                               // acc rest_after new_acc
-        `                               // new_acc acc rest_after
-        drop                            // new_acc rest_after
-        tokenize-loop                   // recurse
-    |]
-
-    // Regular chunk
-    next-chunk                          // acc chunk rest
-    `                                   // acc rest chunk  (chunk on top)
-    $2                                  // acc rest chunk acc (copy acc)
-    `                                   // acc rest acc chunk
-    append                              // acc rest [acc..., chunk]
+        striter drop read-str          // acc content rest_after  (striter→first,rest; drop "; read)
+    |   next-chunk                     // acc chunk rest           (regular)
+    ]
+    // Common: acc elem rest → append elem to acc, recurse
+    `                                   // acc rest elem
+    $2                                  // acc rest elem acc (copy acc)
+    `                                   // acc rest acc elem
+    append                              // acc rest [acc..., elem]
     `                                   // acc new_acc rest
     `                                   // new_acc acc rest
     drop                                // new_acc rest
@@ -67,7 +75,7 @@
 } ;
 
 : tokenize {
-    [] swap tokenize-loop
+    [] ` tokenize-loop
 } ;
 
 export tokenize
