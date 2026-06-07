@@ -3,13 +3,13 @@
 
 : ctos { [] ` append charsstr } ;
 
-// Whitespace OR delimiter (splits chunks)
-: is-ws   { _ _ 32 = ` 9 = | ` 10 = | ` 13 = |
-            ` 123 = | ` 125 = | ` 91 = | ` 93 = |
-            ` 58 = | ` 59 = | } ;
+// Whitespace OR delimiter (splits chunks) — uses $1 not swap
+: is-ws   { 32 = $1 9 = | $1 10 = | $1 13 = |
+            $1 123 = | $1 125 = | $1 91 = | $1 93 = |
+            $1 58 = | $1 59 = | } ;
 
-// Skip blanks only
-: is-blank { _ _ 32 = ` 9 = | ` 10 = | ` 13 = | } ;
+// Skip blanks only (uses $1 not swap to avoid underflow)
+: is-blank { 32 = $1 9 = | $1 10 = | $1 13 = | } ;
 
 : skip-ws {
     _ "" streq ??|]
@@ -19,21 +19,20 @@
 // Read until ws/delim; returns chunk and rest
 : next-chunk {
     _ 0 strnth is-ws ??
-        striter                     // delim_char rest
-        ctos `                      // delim_str rest
-    |   "" ` next-chunk-acc         // regular: accumulate until ws/delim
+        striter ctos `              // delim_str rest
+    |   "" ` next-chunk-acc         // regular
     ]
 } ;
 
 : next-chunk-acc {
     _ "" streq ??|]
     _ 0 strnth is-ws ??|]
-    _ 0 strnth ctos               // acc src ch → acc src ch_str
-    $2 ` strcat                    // acc src ch_str acc → acc src acc ch_str → acc src new_acc
-    `                              // acc new_acc src
-    `                              // new_acc acc src  (swap: bring acc to top)
-    drop                           // new_acc src       (drop acc)
-    striter drop                   // new_acc src[1:]
+    _ 0 strnth ctos               // outer_acc acc src ch → outer_acc acc src ch_str
+    $3 ` strcat                    // outer_acc acc src ch_str acc → outer_acc acc src new_acc
+    `                              // outer_acc acc new_acc src
+    `                              // outer_acc new_acc acc src
+    drop                           // outer_acc new_acc src
+    striter drop                   // outer_acc new_acc src[1:]
     next-chunk-acc
 } ;
 
@@ -41,12 +40,12 @@
 : read-str-acc {
     _ "" streq ??"ERR" ""|]
     _ 0 strnth 34 = ??striter drop|]
-    _ 0 strnth ctos               // acc src ch → acc src ch_str
-    $2 ` strcat                    // acc src new_acc
-    `                              // acc new_acc src
-    `                              // new_acc acc src
-    drop                           // new_acc src
-    striter drop                   // new_acc src[1:]
+    _ 0 strnth ctos               // outer_acc acc src ch → outer_acc acc src ch_str
+    $3 ` strcat                    // outer_acc acc src new_acc
+    `                              // outer_acc acc new_acc src
+    `                              // outer_acc new_acc acc src
+    drop                           // outer_acc new_acc src
+    striter drop                   // outer_acc new_acc src[1:]
     read-str-acc
 } ;
 

@@ -651,4 +651,20 @@ mod tests {
         assert!(bootstrap_compile("[1 2 3 4 5] 0 { + } @fold").is_ok());
     }
 
+    #[test]
+    fn test_lexer_debug() {
+        let lexer_src = include_str!("../../../../whisperc/lexer.ws");
+        let ast = Parser::parse_source(lexer_src).unwrap();
+        let mut gen = BytecodeGenerator::new();
+        let (bc, defs) = gen.compile(&ast);
+        let mut vm = Vm::new();
+        for (name, code) in &defs {
+            vm.define_word(name.clone(), code.clone());
+        }
+        vm.execute(&bc).unwrap();
+        vm.data_stack.push(Value::Str(Rc::new("3".to_string())));
+        let call = [Opcode::Call("tokenize".to_string())];
+        let result = vm.execute(&call).unwrap();
+        println!("LEXER RESULT: {result:?}");
+    }
 }
