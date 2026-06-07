@@ -1,19 +1,19 @@
-/// Opcode definitions for the Whisper VM.
-/// Maps directly to the design document section 5.2 (binary format).
-///
-/// Binary encoding:
-///   0x00-0x0F: stack ops
-///   0x10-0x17: arithmetic
-///   0x18-0x1F: comparison
-///   0x20-0x23: logic
-///   0x30-0x3F: literals (prefix + LEB128 data)
-///   0x40-0x47: list operations
-///   0x50-0x57: control flow
-///   0x60-0x67: call/return
-///   0x70-0x73: capability
-///   0x80-0x83: confidence
-///   0x90-0x93: IO
-///   0xA0-0xA3: definitions
+//! Opcode definitions for the Whisper VM.
+//! Maps directly to the design document section 5.2 (binary format).
+//!
+//! Binary encoding:
+//!   0x00-0x0F: stack ops
+//!   0x10-0x17: arithmetic
+//!   0x18-0x1F: comparison
+//!   0x20-0x23: logic
+//!   0x30-0x3F: literals (prefix + LEB128 data)
+//!   0x40-0x47: list operations
+//!   0x50-0x57: control flow
+//!   0x60-0x67: call/return
+//!   0x70-0x73: capability
+//!   0x80-0x83: confidence
+//!   0x90-0x93: IO
+//!   0xA0-0xA3: definitions
 
 use std::rc::Rc;
 
