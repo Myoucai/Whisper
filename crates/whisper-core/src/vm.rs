@@ -410,6 +410,32 @@ impl Vm {
                 self.data_stack.push(Value::Str(Rc::new(n.to_string())));
             }
 
+            // === Float operations ===
+            Opcode::I64ToF64 => {
+                let n = self.pop_i64()?;
+                self.data_stack.push(Value::F64(n as f64));
+            }
+            Opcode::F64ToI64 => {
+                let f = self.pop_f64()?;
+                self.data_stack.push(Value::I64(f as i64));
+            }
+            Opcode::FSqrt => {
+                let f = self.pop_f64()?;
+                self.data_stack.push(Value::F64(f.sqrt()));
+            }
+            Opcode::FSin => {
+                let f = self.pop_f64()?;
+                self.data_stack.push(Value::F64(f.sin()));
+            }
+            Opcode::FCos => {
+                let f = self.pop_f64()?;
+                self.data_stack.push(Value::F64(f.cos()));
+            }
+            Opcode::FTan => {
+                let f = self.pop_f64()?;
+                self.data_stack.push(Value::F64(f.tan()));
+            }
+
             // === Control flow ===
             Opcode::Cond(offset) => {
                 let cond = self.pop_bool()?;
@@ -560,7 +586,6 @@ impl Vm {
         }
     }
 
-    #[allow(dead_code)]
     fn pop_f64(&mut self) -> Result<f64, VmError> {
         match self.pop()?.unwrap_signal() {
             Value::F64(n) => Ok(n),
@@ -1232,5 +1257,55 @@ mod tests {
         vm.data_stack.push(Value::I64(0));
         let r = vm.execute(&[Opcode::I64ToStr]).unwrap();
         assert_eq!(r, Some(Value::Str(Rc::new("0".into()))));
+    }
+
+    // === Float op tests ===
+
+    #[test]
+    fn test_i64tof64() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(42));
+        let r = vm.execute(&[Opcode::I64ToF64]).unwrap();
+        assert_eq!(r, Some(Value::F64(42.0)));
+    }
+
+    #[test]
+    fn test_f64toi64() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::F64(3.9));
+        let r = vm.execute(&[Opcode::F64ToI64]).unwrap();
+        assert_eq!(r, Some(Value::I64(3))); // truncate toward zero
+    }
+
+    #[test]
+    fn test_fsqrt() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::F64(16.0));
+        let r = vm.execute(&[Opcode::FSqrt]).unwrap();
+        assert_eq!(r, Some(Value::F64(4.0)));
+    }
+
+    #[test]
+    fn test_fsin() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::F64(0.0));
+        let r = vm.execute(&[Opcode::FSin]).unwrap();
+        assert_eq!(r, Some(Value::F64(0.0)));
+    }
+
+    #[test]
+    fn test_fcos() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::F64(0.0));
+        let r = vm.execute(&[Opcode::FCos]).unwrap();
+        assert_eq!(r, Some(Value::F64(1.0)));
+    }
+
+    #[test]
+    fn test_ftan() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::F64(0.0));
+        let r = vm.execute(&[Opcode::FTan]).unwrap();
+        assert_eq!(r, Some(Value::F64(0.0)));
     }
 }

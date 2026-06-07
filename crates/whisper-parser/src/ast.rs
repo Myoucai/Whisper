@@ -130,6 +130,14 @@ pub enum Operator {
     StrToI64,
     I64ToStr,
 
+    // Float
+    I64ToF64,
+    F64ToI64,
+    FSqrt,
+    FSin,
+    FCos,
+    FTan,
+
     // Control flow (runtime)
     CondQ,
     CondArrow,

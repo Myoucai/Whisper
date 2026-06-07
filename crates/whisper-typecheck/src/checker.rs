@@ -427,6 +427,20 @@ impl TypeChecker {
                 stack.push(Type::Str);
             }
 
+            // Float ops
+            Operator::I64ToF64 => {
+                self.expect(stack, &Type::I64, errors, ctx, "i64tof64");
+                stack.push(Type::F64);
+            }
+            Operator::F64ToI64 => {
+                self.expect(stack, &Type::F64, errors, ctx, "f64toi64");
+                stack.push(Type::I64);
+            }
+            Operator::FSqrt | Operator::FSin | Operator::FCos | Operator::FTan => {
+                self.expect(stack, &Type::F64, errors, ctx, "float math");
+                stack.push(Type::F64);
+            }
+
             Operator::Nth => {
                 let any_list = Type::List(Box::new(self.inferer.fresh_var()));
                 self.expect(stack, &Type::I64, errors, ctx, "@nth index");

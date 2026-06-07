@@ -123,6 +123,14 @@ pub enum TokenKind {
     StrToI64,
     I64ToStr,
 
+    // Float operations
+    I64ToF64,
+    F64ToI64,
+    FSqrt,
+    FSin,
+    FCos,
+    FTan,
+
     // Word reference (any identifier not matching keywords)
     Word(String),
 

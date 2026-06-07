@@ -60,6 +60,14 @@ pub fn get_builtin_signature(name: &str) -> Option<(Vec<Type>, Vec<Type>)> {
         "strtoi64" => Some((vec![Type::Str], vec![Type::I64])),
         "i64tostr" => Some((vec![Type::I64], vec![Type::Str])),
 
+        // Float operations
+        "i64tof64" => Some((vec![Type::I64], vec![Type::F64])),
+        "f64toi64" => Some((vec![Type::F64], vec![Type::I64])),
+        "fsqrt" => Some((vec![Type::F64], vec![Type::F64])),
+        "fsin" => Some((vec![Type::F64], vec![Type::F64])),
+        "fcos" => Some((vec![Type::F64], vec![Type::F64])),
+        "ftan" => Some((vec![Type::F64], vec![Type::F64])),
+
         _ => None,
     }
 }

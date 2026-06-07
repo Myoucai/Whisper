@@ -327,6 +327,12 @@ impl Server {
             ("strreplace", "Replace: str old new → str"),
             ("strtoi64", "Parse string to i64: str → i64"),
             ("i64tostr", "Format i64 to string: i64 → str"),
+            ("i64tof64", "Convert i64 to f64: i64 → f64"),
+            ("f64toi64", "Convert f64 to i64 (truncate)"),
+            ("fsqrt", "Square root: f64 → f64"),
+            ("fsin", "Sine (radians): f64 → f64"),
+            ("fcos", "Cosine (radians): f64 → f64"),
+            ("ftan", "Tangent (radians): f64 → f64"),
             (".", "Output top of stack"),
             ("..", "Output entire stack"),
             (",", "Read input"),
@@ -456,6 +462,14 @@ fn hover_info(word: &str) -> String {
         "strreplace" => "**strreplace** — replace all\n\nStack: `str old new → result`".into(),
         "strtoi64" => "**strtoi64** — parse string to integer\n\nStack: `str → i64`".into(),
         "i64tostr" => "**i64tostr** — format integer to string\n\nStack: `i64 → str`".into(),
+
+        // Float
+        "i64tof64" => "**i64tof64** — convert i64 to f64\n\nStack: `i64 → f64`".into(),
+        "f64toi64" => "**f64toi64** — truncate f64 to i64\n\nStack: `f64 → i64`".into(),
+        "fsqrt" => "**fsqrt** — square root\n\nStack: `f64 → f64`".into(),
+        "fsin" => "**fsin** — sine (radians)\n\nStack: `f64 → f64`".into(),
+        "fcos" => "**fcos** — cosine (radians)\n\nStack: `f64 → f64`".into(),
+        "ftan" => "**ftan** — tangent (radians)\n\nStack: `f64 → f64`".into(),
 
         // IO
         "." => "**Output** — print top of stack\n\nStack: `a →`".into(),

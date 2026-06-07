@@ -246,6 +246,12 @@ impl BytecodeGenerator {
             Operator::StrReplace => Opcode::StrReplace,
             Operator::StrToI64 => Opcode::StrToI64,
             Operator::I64ToStr => Opcode::I64ToStr,
+            Operator::I64ToF64 => Opcode::I64ToF64,
+            Operator::F64ToI64 => Opcode::F64ToI64,
+            Operator::FSqrt => Opcode::FSqrt,
+            Operator::FSin => Opcode::FSin,
+            Operator::FCos => Opcode::FCos,
+            Operator::FTan => Opcode::FTan,
             Operator::CondQ => Opcode::Cond(0), // placeholder
             Operator::CondArrow => Opcode::Cond(0),
             Operator::Hash => Opcode::Loop(0),

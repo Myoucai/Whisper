@@ -449,6 +449,32 @@ impl Parser {
                 Ok(Some(AstNode::Op(Operator::I64ToStr)))
             }
 
+            // Float operations
+            TokenKind::I64ToF64 => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::I64ToF64)))
+            }
+            TokenKind::F64ToI64 => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::F64ToI64)))
+            }
+            TokenKind::FSqrt => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::FSqrt)))
+            }
+            TokenKind::FSin => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::FSin)))
+            }
+            TokenKind::FCos => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::FCos)))
+            }
+            TokenKind::FTan => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::FTan)))
+            }
+
             // Capability
             TokenKind::CapCall(n) => {
                 let id = *n;
@@ -569,6 +595,12 @@ impl Parser {
             TokenKind::StrReplace => { self.advance(); Ok("strreplace".into()) }
             TokenKind::StrToI64 => { self.advance(); Ok("strtoi64".into()) }
             TokenKind::I64ToStr => { self.advance(); Ok("i64tostr".into()) }
+            TokenKind::I64ToF64 => { self.advance(); Ok("i64tof64".into()) }
+            TokenKind::F64ToI64 => { self.advance(); Ok("f64toi64".into()) }
+            TokenKind::FSqrt => { self.advance(); Ok("fsqrt".into()) }
+            TokenKind::FSin => { self.advance(); Ok("fsin".into()) }
+            TokenKind::FCos => { self.advance(); Ok("fcos".into()) }
+            TokenKind::FTan => { self.advance(); Ok("ftan".into()) }
             _ => Err(ParseError {
                 message: format!("Expected word, got {:?}", token.kind),
                 token,

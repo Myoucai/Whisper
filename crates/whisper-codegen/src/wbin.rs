@@ -231,6 +231,14 @@ impl WbinReader {
             0x4D => Ok(Opcode::StrToI64),
             0x4E => Ok(Opcode::I64ToStr),
 
+            // Float ops
+            0xB0 => Ok(Opcode::I64ToF64),
+            0xB1 => Ok(Opcode::F64ToI64),
+            0xB2 => Ok(Opcode::FSqrt),
+            0xB3 => Ok(Opcode::FSin),
+            0xB4 => Ok(Opcode::FCos),
+            0xB5 => Ok(Opcode::FTan),
+
             // Control flow
             0x50 => {
                 let offset = leb128::read::signed(cursor).map_err(|e| {

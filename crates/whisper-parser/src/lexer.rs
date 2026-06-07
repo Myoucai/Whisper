@@ -388,6 +388,12 @@ impl Lexer {
             "strreplace" => TokenKind::StrReplace,
             "strtoi64" => TokenKind::StrToI64,
             "i64tostr" => TokenKind::I64ToStr,
+            "i64tof64" => TokenKind::I64ToF64,
+            "f64toi64" => TokenKind::F64ToI64,
+            "fsqrt" => TokenKind::FSqrt,
+            "fsin" => TokenKind::FSin,
+            "fcos" => TokenKind::FCos,
+            "ftan" => TokenKind::FTan,
             _ => TokenKind::Word(name),
         }
     }

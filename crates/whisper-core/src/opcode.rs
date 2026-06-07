@@ -133,6 +133,20 @@ pub enum Opcode {
     /// Execute ref/capability on stack
     CapExec,
 
+    // === Float operations (0xB0-0xB5) ===
+    /// Convert i64 to f64: i64 → f64
+    I64ToF64,
+    /// Convert f64 to i64 (truncate): f64 → i64
+    F64ToI64,
+    /// Square root: f64 → f64
+    FSqrt,
+    /// Sine: f64 → f64
+    FSin,
+    /// Cosine: f64 → f64
+    FCos,
+    /// Tangent: f64 → f64
+    FTan,
+
     // === Confidence (0x80-0x83) ===
     /// Label following value with confidence
     ConfLabel(f64),
@@ -230,6 +244,14 @@ impl Opcode {
             Opcode::CapCall(_) => 0x70,
             Opcode::CapExec => 0x71,
 
+            // Float ops
+            Opcode::I64ToF64 => 0xB0,
+            Opcode::F64ToI64 => 0xB1,
+            Opcode::FSqrt => 0xB2,
+            Opcode::FSin => 0xB3,
+            Opcode::FCos => 0xB4,
+            Opcode::FTan => 0xB5,
+
             // Confidence
             Opcode::ConfLabel(_) => 0x80,
             Opcode::ProbChoice => 0x81,
@@ -298,6 +320,12 @@ impl Opcode {
             Opcode::Return => "return",
             Opcode::CapCall(_) => "cap_call",
             Opcode::CapExec => "cap_exec",
+            Opcode::I64ToF64 => "i64tof64",
+            Opcode::F64ToI64 => "f64toi64",
+            Opcode::FSqrt => "fsqrt",
+            Opcode::FSin => "fsin",
+            Opcode::FCos => "fcos",
+            Opcode::FTan => "ftan",
             Opcode::ConfLabel(_) => "conf_label",
             Opcode::ProbChoice => "prob_choice",
             Opcode::OutputTop => "output_top",
