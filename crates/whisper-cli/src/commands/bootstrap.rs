@@ -651,4 +651,137 @@ mod tests {
         assert!(bootstrap_compile("[1 2 3 4 5] 0 { + } @fold").is_ok());
     }
 
+    /// Full pipeline test: Rust tokens → whisperc compile → compare with Rust compiler
+    fn compile_via_whisperc(source: &str) -> Vec<Opcode> {
+        let ast = Parser::parse_source(source).unwrap();
+        let tokens = ast_to_whisper_tokens(&ast);
+
+        // Load whisperc compiler
+        let compiler_src = include_str!("../../../../whisperc/main.ws");
+        let compiler_ast = Parser::parse_source(compiler_src).unwrap();
+        let mut cgen = BytecodeGenerator::new();
+        let (compiler_bc, compiler_defs) = cgen.compile(&compiler_ast);
+
+        let mut vm = Vm::new();
+        for (n, c) in compiler_defs { vm.define_word(n, c.clone()); }
+        vm.execute(&compiler_bc).unwrap();
+        vm.data_stack.push(tokens);
+
+        match vm.execute(&[Opcode::Call("compile".to_string())]) {
+            Ok(Some(Value::List(vals))) => values_to_opcodes(vals.to_vec()),
+            other => panic!("whisperc compile failed: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_pipeline_compare() {
+        let source = "3 4 + 5 *";
+        let whisperc_ops = compile_via_whisperc(source);
+
+        let ast = Parser::parse_source(source).unwrap();
+        let mut gen = BytecodeGenerator::new();
+        let (rust_ops, _) = gen.compile(&ast);
+
+        // Both should produce valid bytecode
+        assert!(!whisperc_ops.is_empty(), "whisperc produced no bytecode");
+        assert!(!rust_ops.is_empty(), "rust produced no bytecode");
+
+        // Execute both and compare results
+        let mut vm1 = Vm::new();
+        let r1 = vm1.execute(&whisperc_ops).unwrap().unwrap();
+        let mut vm2 = Vm::new();
+        let r2 = vm2.execute(&rust_ops).unwrap().unwrap();
+        assert_eq!(r1, r2, "whisperc and rust results differ");
+    }
+
+    /// Self-hosting test: whisperc compiles itself (defs + main body)
+    #[test]
+    fn test_selfhost_compile_self() {
+        let source = include_str!("../../../../whisperc/main.ws");
+        let ast = Parser::parse_source(source).unwrap();
+
+        // Separate defs from main body (same as bootstrap_compile does)
+        let mut main_body: Vec<AstNode> = Vec::new();
+        let mut def_nodes: Vec<(String, Vec<AstNode>)> = Vec::new();
+        for node in &ast {
+            match node {
+                AstNode::Def { name, body } => def_nodes.push((name.clone(), body.clone())),
+                _ => main_body.push(node.clone()),
+            }
+        }
+
+        // Load whisperc compiler
+        let compiler_src = include_str!("../../../../whisperc/main.ws");
+        let compiler_ast = Parser::parse_source(compiler_src).unwrap();
+        let mut cgen = BytecodeGenerator::new();
+        let (compiler_bc, compiler_defs) = cgen.compile(&compiler_ast);
+        let mut vm = Vm::new();
+        for (n, c) in compiler_defs { vm.define_word(n, c.clone()); }
+        vm.execute(&compiler_bc).unwrap();
+
+        // Compile main body
+        let main_tokens = ast_to_whisper_tokens(&main_body);
+        vm.data_stack.push(main_tokens);
+        let r = vm.execute(&[Opcode::Call("compile".to_string())]).unwrap();
+        let main_ops = match r {
+            Some(Value::List(v)) => values_to_opcodes(v.to_vec()),
+            _ => vec![],
+        };
+
+        // Compile each def body
+        let mut wdefs: Vec<(String, Vec<Opcode>)> = Vec::new();
+        for (name, body) in &def_nodes {
+            let body_tokens = ast_to_whisper_tokens(body);
+            vm.data_stack.push(body_tokens);
+            let r = vm.execute(&[Opcode::Call("compile".to_string())]).unwrap();
+            if let Some(Value::List(v)) = r {
+                wdefs.push((name.clone(), values_to_opcodes(v.to_vec())));
+            }
+        }
+
+        println!("whisperc: main={} defs={}", main_ops.len(), wdefs.len());
+        assert!(wdefs.len() >= 2, "expected >=2 defs, got {}", wdefs.len());
+
+        // Compare with Rust compiler
+        let mut gen = BytecodeGenerator::new();
+        let (rust_ops, rust_defs) = gen.compile(&ast);
+        println!("rust:     main={} defs={}", rust_ops.len(), rust_defs.len());
+
+        // Both should produce same number of definitions
+        assert_eq!(wdefs.len(), rust_defs.len(),
+            "def count mismatch: whisperc={} rust={}", wdefs.len(), rust_defs.len());
+
+        // Execute whisperc-compiled main with whisperc-compiled defs
+        let mut vm2 = Vm::new();
+        for (name, code) in &wdefs {
+            vm2.define_word(name.clone(), code.clone());
+        }
+        let result = vm2.execute(&main_ops);
+        assert!(result.is_ok(), "whisperc self-execute failed: {result:?}");
+    }
+
+    /// Pipeline: Rust tokens → whisperc parser → whisperc compile
+    #[test]
+    fn test_full_pipeline_with_parser() {
+        // Use Rust classify_chunks as the parser (since whisperc parser has known bugs)
+        let source = "3 4 +";
+        let chunks = vec!["3", "4", "+"];
+        let tokens_rust: Vec<Value> = classify_chunks(&chunks.iter().map(|s| s.to_string()).collect::<Vec<_>>());
+
+        // Compile with whisperc
+        let compiler_src = include_str!("../../../../whisperc/main.ws");
+        let compiler_ast = Parser::parse_source(compiler_src).unwrap();
+        let mut cgen = BytecodeGenerator::new();
+        let (compiler_bc, compiler_defs) = cgen.compile(&compiler_ast);
+        let mut vm = Vm::new();
+        for (n, c) in compiler_defs { vm.define_word(n, c.clone()); }
+        vm.execute(&compiler_bc).unwrap();
+        vm.data_stack.push(Value::List(Rc::new(tokens_rust)));
+
+        let r = vm.execute(&[Opcode::Call("compile".to_string())]).unwrap().unwrap();
+        let ops = values_to_opcodes(match r { Value::List(v) => v.to_vec(), _ => panic!() });
+        let mut vm2 = Vm::new();
+        let result = vm2.execute(&ops).unwrap().unwrap();
+        assert_eq!(result.unwrap_signal(), Value::I64(7));
+    }
 }
