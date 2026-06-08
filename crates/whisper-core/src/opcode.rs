@@ -70,8 +70,8 @@ pub enum Opcode {
     PushI64(i64),
     /// Push f64 literal onto stack
     PushF64(f64),
-    /// Push string literal onto stack
-    PushStr(Rc<str>),
+    /// Push string literal onto stack (Rc<String> — allocated once at compile time)
+    PushStr(Rc<String>),
     /// Push bool literal onto stack
     PushBool(bool),
     /// Push list (followed by element count and elements)

@@ -176,7 +176,7 @@ mod tests {
 
     #[test]
     fn test_compile_hello() {
-        let ops = vec![Opcode::PushStr(std::rc::Rc::from("Hi")), Opcode::OutputTop];
+        let ops = vec![Opcode::PushStr(std::rc::Rc::new("Hi".to_string())), Opcode::OutputTop];
         let wasm = compile_direct(&ops);
         assert_eq!(&wasm[0..4], b"\0asm");
         // Should contain "Hi" in data section

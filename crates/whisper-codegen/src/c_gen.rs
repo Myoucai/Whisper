@@ -231,7 +231,7 @@ mod tests {
     #[test]
     fn test_c_compile_hello() {
         let ops = vec![
-            Opcode::PushStr(std::rc::Rc::from("Hello, World!")),
+            Opcode::PushStr(std::rc::Rc::new("Hello, World!".to_string())),
             Opcode::OutputTop,
         ];
         let c_code = compile_to_c(&ops);

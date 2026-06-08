@@ -50,6 +50,26 @@ fn constant_folding(ops: &[Opcode]) -> Vec<Opcode> {
                     continue;
                 }
             }
+            // f64 binary ops
+            if let (Opcode::PushF64(a), Opcode::PushF64(b), binop) =
+                (&ops[i], &ops[i + 1], &ops[i + 2])
+            {
+                let folded = fold_f64_binary(*a, *b, binop);
+                if let Some(op) = folded {
+                    result.push(op);
+                    i += 3;
+                    continue;
+                }
+            }
+            // String concatenation: PushStr(a) PushStr(b) StrCat → PushStr(a+b)
+            if let (Opcode::PushStr(a), Opcode::PushStr(b), Opcode::StrCat) =
+                (&ops[i], &ops[i + 1], &ops[i + 2])
+            {
+                let concat = format!("{a}{b}");
+                result.push(Opcode::PushStr(Rc::new(concat)));
+                i += 3;
+                continue;
+            }
         }
 
         // Single-arg folding: PushF64(x) FSqrt → PushF64(sqrt(x))
@@ -76,7 +96,7 @@ fn constant_folding(ops: &[Opcode]) -> Vec<Opcode> {
             }
             // PushI64(x) I64ToStr → PushStr(x.to_string())
             if let (Opcode::PushI64(x), Opcode::I64ToStr) = (&ops[i], &ops[i + 1]) {
-                result.push(Opcode::PushStr(Rc::from(x.to_string())));
+                result.push(Opcode::PushStr(Rc::new(x.to_string())));
                 i += 2;
                 continue;
             }
@@ -110,6 +130,22 @@ fn fold_i64_binary(a: i64, b: i64, binop: &Opcode) -> Option<Opcode> {
         Opcode::Mul => Some(Opcode::PushI64(a.wrapping_mul(b))),
         Opcode::Div if b != 0 => Some(Opcode::PushI64(a.wrapping_div(b))),
         Opcode::Mod if b != 0 => Some(Opcode::PushI64(a.wrapping_rem(b))),
+        Opcode::Eq => Some(Opcode::PushBool(a == b)),
+        Opcode::Lt => Some(Opcode::PushBool(a < b)),
+        Opcode::Gt => Some(Opcode::PushBool(a > b)),
+        Opcode::Neq => Some(Opcode::PushBool(a != b)),
+        Opcode::Le => Some(Opcode::PushBool(a <= b)),
+        Opcode::Ge => Some(Opcode::PushBool(a >= b)),
+        _ => None,
+    }
+}
+
+fn fold_f64_binary(a: f64, b: f64, binop: &Opcode) -> Option<Opcode> {
+    match binop {
+        Opcode::Add => Some(Opcode::PushF64(a + b)),
+        Opcode::Sub => Some(Opcode::PushF64(a - b)),
+        Opcode::Mul => Some(Opcode::PushF64(a * b)),
+        Opcode::Div if b != 0.0 => Some(Opcode::PushF64(a / b)),
         Opcode::Eq => Some(Opcode::PushBool(a == b)),
         Opcode::Lt => Some(Opcode::PushBool(a < b)),
         Opcode::Gt => Some(Opcode::PushBool(a > b)),
@@ -333,22 +369,76 @@ mod tests {
     }
 
     #[test]
+    fn test_constant_folding_f64_add() {
+        let ops = vec![Opcode::PushF64(3.0), Opcode::PushF64(4.0), Opcode::Add];
+        let opt = optimize(&ops);
+        assert_eq!(opt, vec![Opcode::PushF64(7.0)]);
+    }
+
+    #[test]
+    fn test_constant_folding_f64_mul() {
+        let ops = vec![Opcode::PushF64(2.5), Opcode::PushF64(4.0), Opcode::Mul];
+        let opt = optimize(&ops);
+        assert_eq!(opt, vec![Opcode::PushF64(10.0)]);
+    }
+
+    #[test]
+    fn test_constant_folding_f64_sub() {
+        let ops = vec![Opcode::PushF64(10.0), Opcode::PushF64(3.0), Opcode::Sub];
+        let opt = optimize(&ops);
+        assert_eq!(opt, vec![Opcode::PushF64(7.0)]);
+    }
+
+    #[test]
+    fn test_constant_folding_f64_div() {
+        let ops = vec![Opcode::PushF64(15.0), Opcode::PushF64(2.0), Opcode::Div];
+        let opt = optimize(&ops);
+        assert_eq!(opt, vec![Opcode::PushF64(7.5)]);
+    }
+
+    #[test]
+    fn test_constant_folding_f64_comparison() {
+        let ops = vec![Opcode::PushF64(3.0), Opcode::PushF64(5.0), Opcode::Lt];
+        let opt = optimize(&ops);
+        assert_eq!(opt, vec![Opcode::PushBool(true)]);
+    }
+
+    #[test]
+    fn test_no_fold_f64_div_by_zero() {
+        let ops = vec![Opcode::PushF64(5.0), Opcode::PushF64(0.0), Opcode::Div];
+        let opt = optimize(&ops);
+        // Should NOT fold division by zero — keep all three opcodes
+        assert_eq!(opt.len(), 3);
+    }
+
+    #[test]
     fn test_constant_folding_i64tostr() {
         let ops = vec![Opcode::PushI64(42), Opcode::I64ToStr];
         let opt = optimize(&ops);
-        assert_eq!(opt, vec![Opcode::PushStr(Rc::from("42"))]);
+        assert_eq!(opt, vec![Opcode::PushStr(Rc::new("42".to_string()))]);
     }
 
     #[test]
     fn test_constant_folding_strlen() {
-        let ops = vec![Opcode::PushStr(Rc::from("hello")), Opcode::StrLen];
+        let ops = vec![Opcode::PushStr(Rc::new("hello".to_string())), Opcode::StrLen];
         let opt = optimize(&ops);
         assert_eq!(opt, vec![Opcode::PushI64(5)]);
     }
 
     #[test]
+    fn test_constant_folding_strcat() {
+        let ops = vec![
+            Opcode::PushStr(Rc::new("Hello, ".to_string())),
+            Opcode::PushStr(Rc::new("World!".to_string())),
+            Opcode::StrCat,
+        ];
+        let opt = optimize(&ops);
+        assert_eq!(opt, vec![Opcode::PushStr(Rc::new("Hello, World!".to_string()))]);
+    }
+
+    #[test]
     fn test_constant_folding_strtoi64() {
-        let ops = vec![Opcode::PushStr(Rc::from("99")), Opcode::StrToI64];
+        let ops = vec![Opcode::PushStr(Rc::new("99".to_string())), Opcode::StrToI64];
         let opt = optimize(&ops);
         assert_eq!(opt, vec![Opcode::PushI64(99)]);
     }
@@ -442,7 +532,7 @@ mod tests {
     #[test]
     fn test_dead_store_push_str_drop() {
         let ops = vec![
-            Opcode::PushStr(Rc::from("unused")),
+            Opcode::PushStr(Rc::new("unused".to_string())),
             Opcode::Drop,
             Opcode::PushI64(0),
         ];

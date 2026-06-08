@@ -139,211 +139,6 @@ fn ast_to_whisper_tokens(nodes: &[AstNode]) -> Value {
     Value::List(Rc::new(tokens))
 }
 
-/// Classify a flat list of chunk strings (from whisperc lexer) into
-/// numeric token Values with nested grouping for { } blocks.
-fn classify_chunks(chunks: &[String]) -> Vec<Value> {
-    let mut tokens = Vec::new();
-    let mut i = 0;
-    while i < chunks.len() {
-        let chunk = &chunks[i];
-        match chunk.as_str() {
-            // Delimiters for grouping
-            "{" => {
-                // Collect inner chunks until matching }
-                let (inner, next) = collect_until(chunks, i + 1, "}");
-                tokens.push(Value::List(Rc::new(vec![
-                    Value::I64(5),
-                    Value::List(Rc::new(classify_chunks(&inner))),
-                ])));
-                i = next;
-            }
-            "}" => {
-                // Stray closing brace — emit as marker (shouldn't happen normally)
-                i += 1;
-            }
-            // Bool literals
-            "#t" => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(13), Value::I64(1)])));
-                i += 1;
-            }
-            "#f" => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(13), Value::I64(0)])));
-                i += 1;
-            }
-            // Operators
-            "+" => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x10)])));
-                i += 1;
-            }
-            "-" => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x11)])));
-                i += 1;
-            }
-            "*" => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x12)])));
-                i += 1;
-            }
-            "/" => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x13)])));
-                i += 1;
-            }
-            "=" => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x18)])));
-                i += 1;
-            }
-            "<" => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x19)])));
-                i += 1;
-            }
-            ">" => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1A)])));
-                i += 1;
-            }
-            "!=" => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1B)])));
-                i += 1;
-            }
-            "<=" => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1C)])));
-                i += 1;
-            }
-            ">=" => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1D)])));
-                i += 1;
-            }
-            "&" => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x20)])));
-                i += 1;
-            }
-            "|" => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x21)])));
-                i += 1;
-            }
-            "!" => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x22)])));
-                i += 1;
-            }
-            "_" => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x00)])));
-                i += 1;
-            }
-            "`" => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x01)])));
-                i += 1;
-            }
-            "@" => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x03)])));
-                i += 1;
-            }
-            "." => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x90)])));
-                i += 1;
-            }
-            "," => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x92)])));
-                i += 1;
-            }
-            ".." => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x91)])));
-                i += 1;
-            }
-            "%" => {
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x14)])));
-                i += 1;
-            }
-            ":" | ";" | "[" | "]" => {
-                // Structural markers — skip for now (handled by Rust AST)
-                i += 1;
-            }
-            // Known multi-char operators
-            "dup" | "drop" | "swap" | "rot" | "mod" | "len" | "append"
-            | "strlen" | "strcat" | "strslice" | "streq" | "strlt"
-            | "strfind" | "strreplace" | "strtoi64" | "i64tostr"
-            | "strnth" | "strchars" | "charsstr" | "striter"
-            | "listfind" | "strjoin" | "output" | "return" | "times" => {
-                let byte = word_to_op_byte(chunk);
-                tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(byte as i64)])));
-                i += 1;
-            }
-            // Numbers
-            _ if chunk.starts_with(|c: char| c.is_ascii_digit())
-                || (chunk.starts_with('-') && chunk.len() > 1 && chunk[1..].starts_with(|c: char| c.is_ascii_digit())) =>
-            {
-                if chunk.contains('.') {
-                    if let Ok(f) = chunk.parse::<f64>() {
-                        tokens.push(Value::List(Rc::new(vec![
-                            Value::I64(1),
-                            Value::I64(f.to_bits() as i64),
-                        ])));
-                    }
-                } else if let Ok(n) = chunk.parse::<i64>() {
-                    tokens.push(Value::List(Rc::new(vec![Value::I64(0), Value::I64(n)])));
-                }
-                i += 1;
-            }
-            // Default: word reference
-            _ => {
-                tokens.push(Value::List(Rc::new(vec![
-                    Value::I64(4),
-                    Value::Str(Rc::new(chunk.clone())),
-                ])));
-                i += 1;
-            }
-        }
-    }
-    tokens
-}
-
-/// Collect chunks until a matching end delimiter, handling nested blocks.
-fn collect_until(chunks: &[String], start: usize, end: &str) -> (Vec<String>, usize) {
-    let mut result = Vec::new();
-    let mut depth = 1;
-    let mut i = start;
-    while i < chunks.len() && depth > 0 {
-        match chunks[i].as_str() {
-            "{" => depth += 1,
-            "}" if end == "}" => depth -= 1,
-            _ => {}
-        }
-        if depth > 0 {
-            result.push(chunks[i].clone());
-        }
-        i += 1;
-    }
-    (result, i)
-}
-
-/// Map known operator words to their opcode bytes.
-fn word_to_op_byte(word: &str) -> u8 {
-    match word {
-        "dup" => 0x00,
-        "swap" => 0x01,
-        "drop" => 0x02,
-        "rot" => 0x03,
-        "mod" => 0x14,
-        "len" => 0x42,
-        "append" => 0x41,
-        "strlen" => 0x46,
-        "strcat" => 0x47,
-        "strslice" => 0x48,
-        "streq" => 0x49,
-        "strlt" => 0x4A,
-        "strfind" => 0x4B,
-        "strreplace" => 0x4C,
-        "strtoi64" => 0x4D,
-        "i64tostr" => 0x4E,
-        "strnth" => 0x4F,
-        "strchars" => 0xB8,
-        "charsstr" => 0xB9,
-        "striter" => 0xBA,
-        "listfind" => 0xBB,
-        "strjoin" => 0xBC,
-        "times" => 0x53,
-        "return" => 0x61,
-        _ => 0x00,
-    }
-}
-
 fn ast_to_vec(nodes: &[AstNode]) -> Vec<Value> {
     let tokens = ast_to_whisper_tokens(nodes);
     match tokens {
@@ -485,7 +280,7 @@ fn values_to_opcodes(vals: Vec<Value>) -> Vec<Opcode> {
                     0x32 => {
                         if items.len() >= 2 {
                             if let Value::Str(s) = &items[1] {
-                                ops.push(Opcode::PushStr(Rc::from(s.as_str())));
+                                ops.push(Opcode::PushStr(Rc::new(s.as_ref().clone())));
                             }
                         }
                     }
@@ -760,11 +555,128 @@ mod tests {
         assert!(result.is_ok(), "whisperc self-execute failed: {result:?}");
     }
 
+    // ── classify_chunks helper (used by test_full_pipeline_with_parser) ──
+
+    /// Classify a flat list of chunk strings into numeric token Values
+    /// with nested grouping for { } blocks.
+    fn classify_chunks(chunks: &[String]) -> Vec<Value> {
+        let mut tokens = Vec::new();
+        let mut i = 0;
+        while i < chunks.len() {
+            let chunk = &chunks[i];
+            match chunk.as_str() {
+                "{" => {
+                    let (inner, next) = collect_until(chunks, i + 1, "}");
+                    tokens.push(Value::List(Rc::new(vec![
+                        Value::I64(5),
+                        Value::List(Rc::new(classify_chunks(&inner))),
+                    ])));
+                    i = next;
+                }
+                "}" => {
+                    i += 1;
+                }
+                "#t" => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(13), Value::I64(1)])));
+                    i += 1;
+                }
+                "#f" => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(13), Value::I64(0)])));
+                    i += 1;
+                }
+                "+" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x10)]))); i += 1; }
+                "-" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x11)]))); i += 1; }
+                "*" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x12)]))); i += 1; }
+                "/" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x13)]))); i += 1; }
+                "=" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x18)]))); i += 1; }
+                "<" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x19)]))); i += 1; }
+                ">" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1A)]))); i += 1; }
+                "!=" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1B)]))); i += 1; }
+                "<=" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1C)]))); i += 1; }
+                ">=" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1D)]))); i += 1; }
+                "&" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x20)]))); i += 1; }
+                "|" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x21)]))); i += 1; }
+                "!" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x22)]))); i += 1; }
+                "_" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x00)]))); i += 1; }
+                "`" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x01)]))); i += 1; }
+                "@" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x03)]))); i += 1; }
+                "." => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x90)]))); i += 1; }
+                "," => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x92)]))); i += 1; }
+                ".." => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x91)]))); i += 1; }
+                "%" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x14)]))); i += 1; }
+                ":" | ";" | "[" | "]" => { i += 1; }
+                "dup" | "drop" | "swap" | "rot" | "mod" | "len" | "append"
+                | "strlen" | "strcat" | "strslice" | "streq" | "strlt"
+                | "strfind" | "strreplace" | "strtoi64" | "i64tostr"
+                | "strnth" | "strchars" | "charsstr" | "striter"
+                | "listfind" | "strjoin" | "output" | "return" | "times" => {
+                    let byte = word_to_op_byte(chunk);
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(byte as i64)])));
+                    i += 1;
+                }
+                _ if chunk.starts_with(|c: char| c.is_ascii_digit())
+                    || (chunk.starts_with('-') && chunk.len() > 1
+                        && chunk[1..].starts_with(|c: char| c.is_ascii_digit())) =>
+                {
+                    if chunk.contains('.') {
+                        if let Ok(f) = chunk.parse::<f64>() {
+                            tokens.push(Value::List(Rc::new(vec![
+                                Value::I64(1),
+                                Value::I64(f.to_bits() as i64),
+                            ])));
+                        }
+                    } else if let Ok(n) = chunk.parse::<i64>() {
+                        tokens.push(Value::List(Rc::new(vec![Value::I64(0), Value::I64(n)])));
+                    }
+                    i += 1;
+                }
+                _ => {
+                    tokens.push(Value::List(Rc::new(vec![
+                        Value::I64(4),
+                        Value::Str(Rc::new(chunk.clone())),
+                    ])));
+                    i += 1;
+                }
+            }
+        }
+        tokens
+    }
+
+    fn collect_until(chunks: &[String], start: usize, end: &str) -> (Vec<String>, usize) {
+        let mut result = Vec::new();
+        let mut depth = 1;
+        let mut i = start;
+        while i < chunks.len() && depth > 0 {
+            match chunks[i].as_str() {
+                "{" => depth += 1,
+                "}" if end == "}" => depth -= 1,
+                _ => {}
+            }
+            if depth > 0 {
+                result.push(chunks[i].clone());
+            }
+            i += 1;
+        }
+        (result, i)
+    }
+
+    fn word_to_op_byte(word: &str) -> u8 {
+        match word {
+            "dup" => 0x00, "swap" => 0x01, "drop" => 0x02, "rot" => 0x03,
+            "mod" => 0x14, "len" => 0x42, "append" => 0x41,
+            "strlen" => 0x46, "strcat" => 0x47, "strslice" => 0x48,
+            "streq" => 0x49, "strlt" => 0x4A, "strfind" => 0x4B,
+            "strreplace" => 0x4C, "strtoi64" => 0x4D, "i64tostr" => 0x4E,
+            "strnth" => 0x4F, "strchars" => 0xB8, "charsstr" => 0xB9,
+            "striter" => 0xBA, "listfind" => 0xBB, "strjoin" => 0xBC,
+            "times" => 0x53, "return" => 0x61,
+            _ => 0x00,
+        }
+    }
+
     /// Pipeline: Rust tokens → whisperc parser → whisperc compile
     #[test]
     fn test_full_pipeline_with_parser() {
-        // Use Rust classify_chunks as the parser (since whisperc parser has known bugs)
-        let source = "3 4 +";
         let chunks = vec!["3", "4", "+"];
         let tokens_rust: Vec<Value> = classify_chunks(&chunks.iter().map(|s| s.to_string()).collect::<Vec<_>>());
 

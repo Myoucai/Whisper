@@ -191,7 +191,7 @@ impl WbinReader {
                 cursor.read_exact(&mut buf)?;
                 let s = String::from_utf8(buf)
                     .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-                Ok(Opcode::PushStr(Rc::from(s)))
+                Ok(Opcode::PushStr(Rc::new(s)))
             }
             0x33 => {
                 let mut buf = [0u8; 1];
@@ -393,7 +393,7 @@ mod tests {
         let ops = vec![
             Opcode::PushI64(10),
             Opcode::Call("double".to_string()),
-            Opcode::PushStr(Rc::from("hello")),
+            Opcode::PushStr(Rc::new("hello".to_string())),
             Opcode::PushRef(vec![
                 Opcode::Dup,
                 Opcode::PushI64(1),

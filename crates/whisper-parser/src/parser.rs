@@ -127,7 +127,49 @@ impl Parser {
                 token: self.synthetic_eof(),
             });
         }
+        nodes = Self::fold_syntax_sugar(nodes);
         nodes
+    }
+
+    /// Post-processing pass: fold syntactic sugar patterns into proper AST nodes.
+    ///
+    /// Patterns:
+    ///   [..., Quote(body), Quote(condition), Op(Hash)]  →  [..., Loop { body, condition }]
+    ///   [..., Quote(then_body), Op(CondArrow)]          →  [..., CondArrow { then_branch }]
+    fn fold_syntax_sugar(nodes: Vec<AstNode>) -> Vec<AstNode> {
+        let mut result: Vec<AstNode> = Vec::with_capacity(nodes.len());
+        let len = nodes.len();
+        let mut i = 0;
+        while i < len {
+            // Pattern: Quote(body) + Quote(condition) + Op(Hash)  →  Loop
+            if i + 2 < len {
+                if let (AstNode::Quote(body), AstNode::Quote(condition), AstNode::Op(Operator::Hash)) =
+                    (&nodes[i], &nodes[i + 1], &nodes[i + 2])
+                {
+                    result.push(AstNode::Loop {
+                        body: body.clone(),
+                        condition: condition.clone(),
+                    });
+                    i += 3;
+                    continue;
+                }
+            }
+            // Pattern: Quote(then_body) + Op(CondArrow)  →  CondArrow { then_branch }
+            if i + 1 < len {
+                if let (AstNode::Quote(then_body), AstNode::Op(Operator::CondArrow)) =
+                    (&nodes[i], &nodes[i + 1])
+                {
+                    result.push(AstNode::CondArrow {
+                        then_branch: then_body.clone(),
+                    });
+                    i += 2;
+                    continue;
+                }
+            }
+            result.push(nodes[i].clone());
+            i += 1;
+        }
+        result
     }
 
     /// Skip tokens until a sync point is found.
@@ -281,12 +323,12 @@ impl Parser {
                 }))
             }
 
-            // Single-branch conditional: {then} ?->
+            // Single-branch conditional: cond {then} ?->
+            // Emit as Op(CondArrow) — fold_syntax_sugar captures the
+            // preceding Quote(then_body) and replaces both with CondArrow node.
             TokenKind::CondArrow => {
                 self.advance();
-                Ok(Some(AstNode::CondArrow {
-                    then_branch: Vec::new(),
-                }))
+                Ok(Some(AstNode::Op(Operator::CondArrow)))
             }
 
             // Loop: {body} {cond} #
@@ -752,7 +794,7 @@ impl Parser {
         while !self.is_at_end() {
             if std::mem::discriminant(&self.current().kind) == std::mem::discriminant(&end) {
                 self.advance(); // consume end delimiter
-                return nodes;
+                return Self::fold_syntax_sugar(nodes);
             }
             match self.parse_node() {
                 Ok(Some(node)) => nodes.push(node),
@@ -772,7 +814,7 @@ impl Parser {
                 token: self.synthetic_eof(),
             });
         }
-        nodes
+        Self::fold_syntax_sugar(nodes)
     }
 
     /// Parse nodes until any end token, with error recovery.
@@ -784,7 +826,7 @@ impl Parser {
                 .iter()
                 .any(|e| std::mem::discriminant(e) == current_disc)
             {
-                return nodes;
+                return Self::fold_syntax_sugar(nodes);
             }
             match self.parse_node() {
                 Ok(Some(node)) => nodes.push(node),
@@ -795,7 +837,7 @@ impl Parser {
                 }
             }
         }
-        nodes
+        Self::fold_syntax_sugar(nodes)
     }
 
     fn synthetic_eof(&self) -> Token {
@@ -884,5 +926,65 @@ mod tests {
         let (ast, errors) = Parser::parse_source_recovering("3 4 + 5 *");
         assert!(errors.is_empty(), "should have no errors");
         assert_eq!(ast.len(), 5); // 3, 4, +, 5, *
+    }
+
+    // ── Syntax sugar folding tests ──────────────────────────────────────
+
+    #[test]
+    fn test_fold_loop_syntax() {
+        // { 1 + } { _ 10 < } #  →  Loop { body: [1 +], condition: [_ 10 <] }
+        let (ast, errors) = Parser::parse_source_recovering("{ 1 + } { _ 10 < } #");
+        assert!(errors.is_empty(), "should have no errors, got {errors:?}");
+        assert_eq!(ast.len(), 1, "should fold to single Loop node, got {ast:?}");
+        match &ast[0] {
+            AstNode::Loop { body, condition } => {
+                assert_eq!(body.len(), 2); // 1, +
+                assert_eq!(condition.len(), 3); // _, 10, <
+            }
+            other => panic!("expected Loop node, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_fold_loop_mixed_with_other_nodes() {
+        // 5 { _ * } { _ 1 > } # .  →  5, Loop { body, condition }, .
+        let (ast, errors) =
+            Parser::parse_source_recovering("5 { _ * } { _ 1 > } # .");
+        assert!(errors.is_empty(), "should have no errors");
+        assert_eq!(ast.len(), 3, "5 + Loop + . = 3 nodes, got {ast:?}");
+        assert!(matches!(&ast[0], AstNode::Literal(_))); // 5
+        assert!(matches!(&ast[1], AstNode::Loop { .. })); // Loop
+        assert!(matches!(&ast[2], AstNode::Op(Operator::OutputTop))); // .
+    }
+
+    #[test]
+    fn test_fold_cond_arrow_syntax() {
+        // { 100 } ?->  →  CondArrow { then_branch: [100] }
+        let (ast, errors) = Parser::parse_source_recovering("{ 100 } ?->");
+        assert!(errors.is_empty(), "should have no errors, got {errors:?}");
+        assert_eq!(ast.len(), 1, "should fold to single CondArrow node");
+        match &ast[0] {
+            AstNode::CondArrow { then_branch } => {
+                assert_eq!(then_branch.len(), 1); // 100
+            }
+            other => panic!("expected CondArrow node, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_loop_folding_preserves_nested_quotes() {
+        // Nested: { { 1 } { 2 } # }  →  Quote(Loop)
+        // The outer {} should remain a Quote; the inner ones should fold to Loop
+        let (ast, errors) =
+            Parser::parse_source_recovering("{ { 1 } { 2 } # }");
+        assert!(errors.is_empty(), "should have no errors");
+        assert_eq!(ast.len(), 1, "should be single Quote node, got {ast:?}");
+        match &ast[0] {
+            AstNode::Quote(nodes) => {
+                assert_eq!(nodes.len(), 1, "inner should be 1 Loop node");
+                assert!(matches!(&nodes[0], AstNode::Loop { .. }));
+            }
+            other => panic!("expected Quote, got {other:?}"),
+        }
     }
 }

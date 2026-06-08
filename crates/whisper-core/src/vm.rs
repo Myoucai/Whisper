@@ -54,9 +54,10 @@ pub struct Vm {
     pub trace: bool,
     /// PRNG state for probabilistic choice (`?|`)
     rng_state: u64,
-    /// Single-entry word lookup cache: (last_name, last_code).
-    /// Avoids HashMap lookup on repeated calls to the same word.
-    word_cache: Option<(String, Vec<Opcode>)>,
+    /// 4-entry word lookup cache: fixed-size array with round-robin replacement.
+    /// Avoids HashMap lookup on repeated calls across a small working set.
+    word_cache: [Option<(String, Vec<Opcode>)>; 4],
+    word_cache_pos: usize,
     /// Byte buffers for binary output (BytesNew, BytesPush, etc.).
     byte_buffers: Vec<Vec<u8>>,
 }
@@ -78,7 +79,8 @@ impl Vm {
             memory: Vec::new(),
             trace: false,
             rng_state: seed,
-            word_cache: None,
+            word_cache: [const { None }, const { None }, const { None }, const { None }],
+            word_cache_pos: 0,
             byte_buffers: Vec::new(),
         }
     }
@@ -98,14 +100,16 @@ impl Vm {
             memory: Vec::new(),
             trace: false,
             rng_state: seed,
-            word_cache: None,
+            word_cache: [const { None }, const { None }, const { None }, const { None }],
+            word_cache_pos: 0,
             byte_buffers: Vec::new(),
         }
     }
 
-    /// Define a word in the dictionary. Invalidate cache.
+    /// Define a word in the dictionary. Invalidate all cache entries.
     pub fn define_word(&mut self, name: String, code: Vec<Opcode>) {
-        self.word_cache = None; // invalidate cache
+        self.word_cache = [const { None }, const { None }, const { None }, const { None }];
+        self.word_cache_pos = 0;
         self.word_dict.insert(name, code);
     }
 
@@ -271,9 +275,8 @@ impl Vm {
             Opcode::PushI64(n) => self.data_stack.push(Value::I64(*n)),
             Opcode::PushF64(n) => self.data_stack.push(Value::F64(*n)),
             Opcode::PushStr(s) => {
-                // Rc<str> → Rc<String> (one allocation at runtime;
-                // Opcode::clone is now cheaper since PushStr is Rc<str>)
-                self.data_stack.push(Value::Str(Rc::new(s.to_string())));
+                // Rc<String> allocated once at compile time — just bump refcount.
+                self.data_stack.push(Value::Str(Rc::clone(s)));
             }
             Opcode::PushBool(b) => self.data_stack.push(Value::Bool(*b)),
             Opcode::PushList => {
@@ -611,26 +614,16 @@ impl Vm {
 
             // === Call/Return ===
             Opcode::Call(name) => {
-                // Check cache first
-                let word_code = if let Some((cached_name, cached_code)) = &self.word_cache {
-                    if cached_name == name {
-                        cached_code.clone()
-                    } else {
-                        let code = self
-                            .word_dict
-                            .get(name)
-                            .cloned()
-                            .ok_or_else(|| VmError::UndefinedWord(name.clone()))?;
-                        self.word_cache = Some((name.clone(), code.clone()));
-                        code
-                    }
+                // Check 4-slot cache first
+                let word_code = if let Some(code) = self.word_cache_lookup(name) {
+                    code
                 } else {
                     let code = self
                         .word_dict
                         .get(name)
                         .cloned()
                         .ok_or_else(|| VmError::UndefinedWord(name.clone()))?;
-                    self.word_cache = Some((name.clone(), code.clone()));
+                    self.word_cache_insert(name.clone(), code.clone());
                     code
                 };
                 let frame = CallFrame {
@@ -727,6 +720,25 @@ impl Vm {
     }
 
     // === Helper methods ===
+
+    /// Look up a word in the 4-slot cache. Returns None on miss.
+    fn word_cache_lookup(&self, name: &str) -> Option<Vec<Opcode>> {
+        for slot in &self.word_cache {
+            if let Some((cached_name, cached_code)) = slot {
+                if cached_name == name {
+                    return Some(cached_code.clone());
+                }
+            }
+        }
+        None
+    }
+
+    /// Insert a word into the cache using round-robin replacement.
+    fn word_cache_insert(&mut self, name: String, code: Vec<Opcode>) {
+        let pos = self.word_cache_pos;
+        self.word_cache[pos] = Some((name, code));
+        self.word_cache_pos = (pos + 1) % 4;
+    }
 
     fn pop(&mut self) -> Result<Value, VmError> {
         self.data_stack.pop().ok_or(VmError::StackUnderflow {

@@ -119,8 +119,10 @@ impl BytecodeGenerator {
                 self.emit(Opcode::ProbChoice);
             }
             AstNode::CondArrow { then_branch } => {
-                // cond {then} ?-> : pop cond, if true execute then
-                self.emit(Opcode::Cond(then_branch.len() as i32 + 2));
+                // cond {then} ?-> : pop cond, if true execute then; else skip
+                // Cond(offset) skips over the then_branch when condition is false.
+                // Offset = then_len (no extra +2 — ip already advanced past Cond itself).
+                self.emit(Opcode::Cond(then_branch.len() as i32));
                 for n in then_branch {
                     self.compile_node(n);
                 }
@@ -133,7 +135,7 @@ impl BytecodeGenerator {
             whisper_core::value::Value::I64(n) => self.emit(Opcode::PushI64(*n)),
             whisper_core::value::Value::F64(n) => self.emit(Opcode::PushF64(*n)),
             whisper_core::value::Value::Bool(b) => self.emit(Opcode::PushBool(*b)),
-            whisper_core::value::Value::Str(s) => self.emit(Opcode::PushStr(Rc::from(s.as_str()))),
+            whisper_core::value::Value::Str(s) => self.emit(Opcode::PushStr(Rc::clone(s))),
             whisper_core::value::Value::List(items) => {
                 // Push elements first, then count, then PushList
                 // Count goes LAST so PushList pops it first (LIFO)
