@@ -780,6 +780,86 @@ mod tests {
         assert!(matches!(&result, Value::List(_)));
     }
 
+    // ── classify.ws tests ───────────────────────────────────────────────
+
+    fn call_whisperc_classify(chunks: &[&str]) -> Value {
+        let src = include_str!("../../../../whisperc/classify.ws");
+        let ast = Parser::parse_source(src).unwrap();
+        let mut gen = BytecodeGenerator::new();
+        let (bc, defs) = gen.compile(&ast);
+        let mut vm = Vm::new();
+        for (n, c) in defs { vm.define_word(n, c); }
+        vm.execute(&bc).unwrap();
+        // Build chunk list
+        let chunk_vals: Vec<Value> = chunks
+            .iter()
+            .map(|s| Value::Str(Rc::new(s.to_string())))
+            .collect();
+        vm.data_stack.push(Value::List(Rc::new(chunk_vals)));
+        vm.execute(&[Opcode::Call("classify".to_string())])
+            .unwrap()
+            .unwrap_or(Value::List(Rc::new(vec![])))
+    }
+
+    #[test]
+    fn test_classify_flat_single() {
+        let result = call_whisperc_classify(&["42"]);
+        eprintln!("classify(['42']) = {result:?}");
+        assert!(matches!(&result, Value::List(_)), "expected list");
+    }
+
+    #[test]
+    fn test_classify_flat_two() {
+        let result = call_whisperc_classify(&["3", "4"]);
+        eprintln!("classify(['3','4']) = {result:?}");
+        assert!(matches!(&result, Value::List(_)), "expected list");
+    }
+
+    #[test]
+    fn test_classify_arithmetic_flat() {
+        let result = call_whisperc_classify(&["3", "4", "+"]);
+        eprintln!("classified: {result:?}");
+        if let Value::List(items) = &result {
+            assert_eq!(items.len(), 3, "expected 3 tokens, got {items:?}");
+        } else {
+            panic!("expected list, got {result:?}");
+        }
+    }
+
+    #[test]
+    fn test_classify_one_number() {
+        let src = include_str!("../../../../whisperc/classify.ws");
+        let ast = Parser::parse_source(src).unwrap();
+        let mut gen = BytecodeGenerator::new();
+        let (bc, defs) = gen.compile(&ast);
+        eprintln!("defs keys: {:?}", defs.keys().collect::<Vec<_>>());
+        eprintln!("main bc len: {}", bc.len());
+        let mut vm = Vm::new();
+        for (n, c) in defs {
+            eprintln!("  define word: '{n}' ({} ops)", c.len());
+            vm.define_word(n, c);
+        }
+        vm.execute(&bc).unwrap();
+        eprintln!("after init: stack depth={}", vm.data_stack.len());
+        vm.data_stack.push(Value::Str(Rc::new("42".to_string())));
+        eprintln!("after push: stack depth={}", vm.data_stack.len());
+        let result = vm.execute(&[Opcode::Call("classify-one".to_string())])
+            .unwrap()
+            .unwrap_or(Value::List(Rc::new(vec![])));
+        eprintln!("classify_one('42') = {result:?}");
+    }
+
+    #[test]
+    fn test_classify_operators() {
+        let result = call_whisperc_classify(&["+", "_", ".", "dup", "strlen"]);
+        eprintln!("classify operators: {result:?}");
+        if let Value::List(items) = &result {
+            assert_eq!(items.len(), 5);
+        } else {
+            panic!("expected list");
+        }
+    }
+
     #[test]
     fn test_lexer_with_delimiters() {
         let result = call_whisperc_lexer(": sq { _ * } ;");
