@@ -784,4 +784,5 @@ mod tests {
         let result = vm2.execute(&ops).unwrap().unwrap();
         assert_eq!(result.unwrap_signal(), Value::I64(7));
     }
+
 }
