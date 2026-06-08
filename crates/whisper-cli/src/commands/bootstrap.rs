@@ -697,4 +697,102 @@ mod tests {
         assert_eq!(result.unwrap_signal(), Value::I64(7));
     }
 
+    // ── whisperc lexer probe tests ─────────────────────────────────────
+
+    /// Load whisperc lexer source, compile it, and call an exported word
+    /// with a string argument. Returns the value left on the VM stack.
+    fn call_whisperc_lexer(input: &str) -> Value {
+        let src = include_str!("../../../../whisperc/lexer.ws");
+        let ast = Parser::parse_source(src).unwrap();
+        let mut gen = BytecodeGenerator::new();
+        let (bc, defs) = gen.compile(&ast);
+        let mut vm = Vm::new();
+        // vm.trace = true;
+        for (n, c) in defs { vm.define_word(n, c); }
+        vm.execute(&bc).unwrap();
+        vm.data_stack.push(Value::Str(Rc::new(input.to_string())));
+        vm.execute(&[Opcode::Call("tokenize".to_string())])
+            .unwrap()
+            .unwrap_or(Value::List(Rc::new(vec![])))
+    }
+
+    #[test]
+    fn test_lexer_simple_number() {
+        let result = call_whisperc_lexer("42");
+        eprintln!("lexer('42') = {result:?}");
+        match &result {
+            Value::List(items) => {
+                assert!(!items.is_empty(), "should produce at least one token");
+            }
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_lexer_single() {
+        // Single number, no spaces
+        let result = call_whisperc_lexer("42");
+        eprintln!("lexer('42') = {result:?}");
+        assert!(matches!(&result, Value::List(_)), "expected list");
+    }
+
+    #[test]
+    fn test_lexer_two_numbers() {
+        // Two numbers separated by space
+        let result = call_whisperc_lexer("3 4");
+        eprintln!("lexer('3 4') = {result:?}");
+        if let Value::List(items) = &result {
+            eprintln!("  {} items:", items.len());
+            for (i, item) in items.iter().enumerate() {
+                eprintln!("  [{}] = {item:?}", i);
+            }
+        }
+        assert!(matches!(&result, Value::List(_)), "expected list");
+    }
+
+    #[test]
+    fn test_lexer_arithmetic() {
+        let result = call_whisperc_lexer("3 4 +");
+        eprintln!("lexer('3 4 +') = {result:?}");
+        // Expected chunks: ["3", "4", "+"]
+        if let Value::List(items) = &result {
+            assert_eq!(items.len(), 3, "expected 3 chunks, got {items:?}");
+            // Each chunk is a string
+            for item in items.iter() {
+                assert!(matches!(item, Value::Str(_)), "each chunk should be a string");
+            }
+        } else {
+            panic!("expected list, got {result:?}");
+        }
+    }
+
+    #[test]
+    fn test_lexer_string_literal() {
+        let result = call_whisperc_lexer("\"Hello\" .");
+        eprintln!("lexer('\"Hello\" .') = {result:?}");
+        if let Value::List(items) = &result {
+            eprintln!("  {} items:", items.len());
+            for (i, item) in items.iter().enumerate() {
+                eprintln!("  [{}] = {item:?}", i);
+            }
+            assert!(items.len() >= 2, "should have string and operator");
+        }
+        assert!(matches!(&result, Value::List(_)));
+    }
+
+    #[test]
+    fn test_lexer_with_delimiters() {
+        let result = call_whisperc_lexer(": sq { _ * } ;");
+        eprintln!("lexer(': sq {{ _ * }} ;') = {result:?}");
+        match &result {
+            Value::List(items) => {
+                eprintln!("  {} items:", items.len());
+                for (i, item) in items.iter().enumerate() {
+                    eprintln!("  [{}] = {item:?}", i);
+                }
+            }
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
+
 }

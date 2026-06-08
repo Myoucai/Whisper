@@ -31,13 +31,13 @@
 : tokenize-loop {
     _ "" streq ??drop
     |   _ 0 strnth _ is-blank ??
-            ` striter ` drop ` drop tokenize-loop
+            ` striter ` drop ` drop
         |drop]
 
         _ "" streq ??drop
         |   _ 0 strnth 34 = ??
-                $1 1 9999 strslice "" ` read-str-acc
-                @ drop @ @ append ` tokenize-loop
+                1 9999 strslice "" ` read-str-acc
+                @ @ append ` tokenize-loop
             |   _ 0 strnth is-ws ??
                     striter ` ctos
                     @ ` append ` tokenize-loop
