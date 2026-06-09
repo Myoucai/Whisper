@@ -1779,12 +1779,62 @@ fn impl_misc_ops(x: &mut X) {
     // For now, just no-op (native mode has full privileges)
     x.back();
 
-    // Confidence ops (0x80, 0x81) — no-ops
+    // ConfLabel (0x80) — value → signal(value, confidence)
+    // Reads 8-byte f64 confidence operand. In native mode, just pass through value.
     x.patch_handler(0x80);
-    // ConfLabel reads 8-byte f64 operand
-    x.add_ri(13, 8);
+    x.add_ri(13, 8); // skip confidence operand
+    x.back(); // value stays on stack (no Signal wrapping in native)
+
+    // ProbChoice (0x81) — value {alt2} {alt1} → result
+    // Bytecode: [ref2_len:4B][ref2_data...][ref1_len:4B][ref1_data...]
+    // In native mode, always execute alt1 (confidence = 1.0)
+    x.patch_handler(0x81);
+    // Read and skip ref2
+    x.i(&[0x47, 0x8B, 0x04, 0x2E]); // mov eax, [r14+r13] (ref2_len)
+    x.add_ri(13, 4);
+    x.i(&[0x49, 0x01, 0xC5]); // skip ref2 data
+    // Read ref1
+    x.i(&[0x47, 0x8B, 0x04, 0x2E]); // mov eax, [r14+r13] (ref1_len)
+    x.mov_rr(8, 0); // r8 = ref1_len
+    x.add_ri(13, 4);
+    // r13 now points to ref1 data
+    x.mov_rr(9, 13); // r9 = ref1 data address (relative to r14)
+    x.i(&[0x4D, 0x01, 0xC5]); // add r13, r8 (skip ref1 data)
+    // Call run_ref with ref1
+    x.mov_rr(7, 14); // rdi = bytecode base
+    x.i(&[0x4C, 0x01, 0xCF]); // add rdi, r9? No — need absolute address
+    // Actually: ref1 data is at r14 + (r13 - ref1_len - 4)
+    // We saved r9 = r13 before skipping. So ref1_addr = r14 + r9.
+    // But r9 was set to r13 (the ip), not the offset.
+    // Let me recalculate: after reading ref1_len and advancing ip by 4,
+    // r13 points to the start of ref1 data. We saved r13 to r9.
+    // So ref1_addr = r14 + r9. But r14 is the bytecode base.
+    // Actually, the bytecode is at CODE_VADDR + 0x1000, and r14 = CODE_VADDR + 0x1000.
+    // The ref1 data is at [r14 + old_r13]. But old_r13 was the ip before reading ref1.
+    // After: ip += 4 (read len), then ip += ref1_len (skip data).
+    // We saved ip at the point after reading len (before skipping data) to r9.
+    // So ref1_data_addr = r14 + r9. Wait, r13 is an offset from r14.
+    // Let me use: rdi = r14 + saved_offset.
+    // r9 = r13 at the point after reading len. So ref1_data = r14 + r9.
+    // But we already advanced r13 past ref1. We need the address before advancing.
+    // Let me restructure: save the offset before advancing.
+    // Actually, I already did: x.mov_rr(9, 13) before x.add_ri(13, ...).
+    // So r9 = offset of ref1 data within bytecode.
+    // ref1 absolute address = r14 + r9.
+    // But wait — r14 = CODE_VADDR + 0x1000. The bytecode starts at r14.
+    // So ref1_addr = r14 + r9.
+    // However, run_ref expects rdi = absolute address of ref bytecode.
+    // So: rdi = r14 + r9. But we need to compute this.
+    // x.mov_rr(7, 14); then x.i(add rdi, r9) — but r9 is not a register we can add.
+    // Actually, r9 IS a register. add rdi, r9 = add r7, r9.
+    x.mov_rr(7, 14); // rdi = r14 (bytecode base)
+    x.i(&[0x4C, 0x01, 0xCF]); // add rdi, r9
+    // rdi now = absolute address of ref1 data
+    x.mov_rr(6, 8); // rsi = ref1_len
+    x.push_r(8); x.push_r(9);
+    x.b(0xE8); x.i32(2); // call run_ref
+    x.pop_r(9); x.pop_r(8);
     x.back();
-    x.patch_handler(0x81); x.back();
 
     // Definition ops (0xA0-0xA3) — no-ops at runtime
     for op in [0xA0, 0xA1, 0xA2, 0xA3] {
