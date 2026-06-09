@@ -1764,9 +1764,20 @@ fn impl_float_ops(x: &mut X) {
 // ── Miscellaneous operations ────────────────────────────────────────
 
 fn impl_misc_ops(x: &mut X) {
-    // Capability ops (0x70, 0x71) — no-ops
-    x.patch_handler(0x70); x.back();
-    x.patch_handler(0x71); x.back();
+    // CapCall (0x70) — no-op in native mode (capabilities not enforced)
+    x.patch_handler(0x70);
+    // Read capability ID (2 bytes) and skip
+    x.add_ri(13, 2);
+    // Pop argument
+    x.add_ri(15, 8);
+    x.back();
+
+    // CapExec (0x71) — execute ref or cap
+    x.patch_handler(0x71);
+    x.mov_rm(0, 15, 0); // rax = value (cap or ref)
+    x.add_ri(15, 8); // pop
+    // For now, just no-op (native mode has full privileges)
+    x.back();
 
     // Confidence ops (0x80, 0x81) — no-ops
     x.patch_handler(0x80);
