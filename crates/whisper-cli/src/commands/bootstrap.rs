@@ -832,17 +832,10 @@ mod tests {
         let ast = Parser::parse_source(src).unwrap();
         let mut gen = BytecodeGenerator::new();
         let (bc, defs) = gen.compile(&ast);
-        eprintln!("defs keys: {:?}", defs.keys().collect::<Vec<_>>());
-        eprintln!("main bc len: {}", bc.len());
         let mut vm = Vm::new();
-        for (n, c) in defs {
-            eprintln!("  define word: '{n}' ({} ops)", c.len());
-            vm.define_word(n, c);
-        }
+        for (n, c) in defs { vm.define_word(n, c); }
         vm.execute(&bc).unwrap();
-        eprintln!("after init: stack depth={}", vm.data_stack.len());
         vm.data_stack.push(Value::Str(Rc::new("42".to_string())));
-        eprintln!("after push: stack depth={}", vm.data_stack.len());
         let result = vm.execute(&[Opcode::Call("classify-one".to_string())])
             .unwrap()
             .unwrap_or(Value::List(Rc::new(vec![])));
@@ -873,6 +866,80 @@ mod tests {
             }
             other => panic!("expected list, got {other:?}"),
         }
+    }
+
+    // ── Phase 3: Full pipeline (lex → classify → compile → execute) ──
+
+    /// Load all whisperc components (lexer + classify + compiler) into one VM.
+    fn load_whisperc_pipeline(vm: &mut Vm) {
+        let files = [
+            include_str!("../../../../whisperc/lexer.ws"),
+            include_str!("../../../../whisperc/classify.ws"),
+            include_str!("../../../../whisperc/main.ws"),
+        ];
+        for src in files {
+            let ast = Parser::parse_source(src).unwrap();
+            let mut gen = BytecodeGenerator::new();
+            let (bc, defs) = gen.compile(&ast);
+            for (n, c) in defs {
+                vm.define_word(n, c);
+            }
+            vm.execute(&bc).unwrap();
+        }
+    }
+
+    /// Run the full whisperc pipeline on source code, returning VM bytecode Opcodes.
+    fn whisperc_compile(source: &str) -> Vec<Opcode> {
+        let mut vm = Vm::new();
+        load_whisperc_pipeline(&mut vm);
+
+        // Step 1: tokenize — returns chunk list
+        vm.data_stack.push(Value::Str(Rc::new(source.to_string())));
+        let chunks = vm.execute(&[Opcode::Call("tokenize".to_string())])
+            .unwrap().unwrap();
+
+        // Step 2: classify — returns token list
+        vm.data_stack.push(chunks);
+        let tokens = vm.execute(&[Opcode::Call("classify".to_string())])
+            .unwrap().unwrap();
+
+        // Step 3: compile — returns bytecode values list
+        vm.data_stack.push(tokens);
+        let bytecode_vals = vm.execute(&[Opcode::Call("compile".to_string())])
+            .unwrap();
+
+        // Step 4: convert to Opcodes
+        match bytecode_vals {
+            Some(Value::List(vals)) => values_to_opcodes(vals.to_vec()),
+            other => panic!("expected list of bytecode, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_pipeline_simple_arithmetic() {
+        let ops = whisperc_compile("3 4 +");
+        eprintln!("whisperc compiled: {ops:?}");
+
+        let mut vm = Vm::new();
+        let result = vm.execute(&ops).unwrap().unwrap();
+        assert_eq!(result.unwrap_signal(), Value::I64(7),
+            "3 4 + should equal 7");
+    }
+
+    #[test]
+    fn test_pipeline_number() {
+        let ops = whisperc_compile("42");
+        let mut vm = Vm::new();
+        let result = vm.execute(&ops).unwrap().unwrap();
+        assert_eq!(result.unwrap_signal(), Value::I64(42));
+    }
+
+    #[test]
+    fn test_pipeline_dot_output() {
+        // "Hello" .  — should push string then output (output goes to stdout)
+        // We just check compilation succeeds and produces bytecode
+        let ops = whisperc_compile("\"Hello\" .");
+        assert!(!ops.is_empty(), "should produce bytecode");
     }
 
 }
