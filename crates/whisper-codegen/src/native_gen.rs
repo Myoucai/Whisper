@@ -1125,8 +1125,108 @@ fn impl_string_ops(x: &mut X) {
 
     // STRREPLACE (0x4C) — src old new → result
     x.patch_handler(0x4C);
-    // Pop new, old, src. For now, simplified: just return src.
-    x.add_ri(15, 16); // pop old and new
+    x.mov_rm(6, 15, 0); // r6 = new
+    x.mov_rm(7, 15, 8); // r7 = old
+    x.mov_rm(8, 15, 16); // r8 = src
+    x.add_ri(15, 16); // pop old and new, reuse slot for result
+    // Use OUT_BUF as temp buffer, then allocate result in heap
+    x.mov_r64i(9, OUT_BUF_ADDR); // r9 = dest pointer
+    x.mov_rr(10, 8); // r10 = src scan pointer
+    x.mov_rm(11, 7, -4); // r11 = old_len
+    // Main loop: scan src for old
+    let sr_outer = x.m();
+    // Check if *src == 0 (end of string)
+    x.i(&[0x41, 0x0F, 0xB6, 0x02]); // movzx eax, byte [r10]
+    x.i(&[0x48, 0x85, 0xC0]); // test rax, rax
+    let sr_done = x.je8();
+    // Try to match 'old' at current position
+    x.xor_rr(12, 12); // r12 = match index
+    let sr_match = x.m();
+    x.i(&[0x4D, 0x39, 0xDC]); // cmp r12, r11 (old_len)
+    let sr_matched = x.jge8(); // all bytes matched
+    // Compare src[pos+idx] with old[idx]
+    x.mov_rr(0, 10); // rax = src pos
+    x.i(&[0x4C, 0x01, 0xE0]); // add rax, r12
+    x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
+    x.mov_rr(1, 7); // rcx = old
+    x.i(&[0x4C, 0x01, 0xE1]); // add rcx, r12
+    x.i(&[0x0F, 0xB6, 0x09]); // movzx ecx, byte [rcx]
+    x.i(&[0x48, 0x39, 0xC8]); // cmp rax, rcx
+    let sr_no_match = x.jne8();
+    x.add_ri(12, 1);
+    let sr_match_back = x.jmp();
+    x.p_i32(sr_match_back, sr_match as i32 - (sr_match_back + 4) as i32);
+    // Matched! Copy 'new' to dest
+    x.patch_jmp_rel8(sr_matched);
+    x.xor_rr(12, 12); // idx = 0
+    let sr_cpy_new = x.m();
+    x.mov_rm(0, 6, -4); // rax = new_len
+    x.i(&[0x4C, 0x39, 0xE0]); // cmp rax, r12
+    let sr_cpy_new_done = x.jge8();
+    x.mov_rr(0, 6);
+    x.i(&[0x4C, 0x01, 0xE0]); // add rax, r12
+    x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
+    x.i(&[0x41, 0x88, 0x01]); // mov [r9], al
+    x.add_ri(9, 1);
+    x.add_ri(12, 1);
+    let sr_cpy_new_back = x.jmp();
+    x.p_i32(sr_cpy_new_back, sr_cpy_new as i32 - (sr_cpy_new_back + 4) as i32);
+    x.patch_jmp_rel8(sr_cpy_new_done);
+    // Advance src past the matched 'old'
+    x.mov_rm(0, 7, -4); // rax = old_len
+    x.i(&[0x4C, 0x01, 0xC2]); // add r10, rax
+    let sr_continue = x.jmp();
+    // No match: copy current byte and advance
+    x.patch_jmp_rel8(sr_no_match);
+    x.i(&[0x41, 0x0F, 0xB6, 0x02]); // movzx eax, byte [r10]
+    x.i(&[0x41, 0x88, 0x01]); // mov [r9], al
+    x.add_ri(9, 1);
+    x.add_ri(10, 1);
+    x.p_i32(sr_continue, sr_outer as i32 - (sr_continue + 4) as i32);
+    // Done: write null terminator
+    x.patch_jmp_rel8(sr_done);
+    x.i(&[0x41, 0xC6, 0x01, 0x00]); // mov byte [r9], 0
+    // Calculate result length
+    x.mov_r64i(0, OUT_BUF_ADDR);
+    x.i(&[0x4C, 0x29, 0xC8]); // sub rax, r9? No — r9 is dest, rax is start
+    // Actually: result_len = r9 - OUT_BUF_ADDR
+    x.mov_rr(0, 9);
+    x.mov_r64i(1, OUT_BUF_ADDR);
+    x.i(&[0x48, 0x29, 0xC8]); // sub rax, rcx (result_len = dest - start)
+    // Allocate string in heap: result_len + 5
+    x.mov_rr(12, 0); // r12 = result_len
+    x.add_ri(0, 5);
+    x.mov_rr(7, 0);
+    x.push_r(6); x.push_r(8); x.push_r(9); x.push_r(10); x.push_r(11); x.push_r(12);
+    x.b(0xE8); x.i32(1); // call alloc
+    x.pop_r(12); x.pop_r(11); x.pop_r(10); x.pop_r(9); x.pop_r(8); x.pop_r(6);
+    // rax = alloc ptr
+    x.mov_rr(8, 0); // r8 = alloc ptr
+    // Write length
+    x.i(&[0x45, 0x89, 0x20]); // mov [r8], r12d
+    x.add_ri(8, 4); // r8 = data area
+    // Copy from OUT_BUF to heap
+    x.mov_r64i(6, OUT_BUF_ADDR);
+    x.xor_rr(10, 10);
+    let sr_copy = x.m();
+    x.i(&[0x4D, 0x39, 0xD4]); // cmp r12, r10
+    let sr_copy_done = x.jge8();
+    x.mov_rr(0, 6);
+    x.i(&[0x4C, 0x01, 0xD0]); // add rax, r10
+    x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
+    x.mov_rr(1, 8);
+    x.i(&[0x4C, 0x01, 0xD1]); // add rcx, r10
+    x.i(&[0x88, 0x01]); // mov [rcx], al
+    x.add_ri(10, 1);
+    let sr_copy_back = x.jmp();
+    x.p_i32(sr_copy_back, sr_copy as i32 - (sr_copy_back + 4) as i32);
+    x.patch_jmp_rel8(sr_copy_done);
+    // Null terminate
+    x.mov_rr(0, 8);
+    x.i(&[0x4C, 0x01, 0xE0]); // add rax, r12
+    x.i(&[0xC6, 0x00, 0x00]);
+    // Push result (r8 = data area)
+    x.mov_mr(15, 0, 8);
     x.back();
 
     // STRTOI64 (0x4D) — str → i64
@@ -1652,88 +1752,132 @@ fn impl_misc_ops(x: &mut X) {
     x.patch_jmp_rel8(si_end);
     x.back();
 
-    // LISTFIND (0xBB) — list key → found value
+    // LISTFIND (0xBB) — list key → found_bool value
+    // Searches association list for matching key. Pushes two values.
+    // Uses r8-r12 for temporaries (avoid r6/r7 which map to r14/r15 with REX).
     x.patch_handler(0xBB);
-    // Simplified: pop key and list, push false and 0
-    x.mov_rm(0, 15, 0); // rax = key
-    x.add_ri(15, 8); // pop key
-    x.add_ri(15, 8); // pop list
+    x.mov_rm(8, 15, 0); // r8 = key (using r8 instead of r6)
+    x.mov_rm(9, 15, 8); // r9 = list_ptr (using r9 instead of r7)
+    x.add_ri(15, 16); // pop both
+    x.mov_rm(10, 9, 0); // r10 = count
+    x.xor_rr(11, 11); // r11 = index
+    let lf_loop = x.m();
+    x.i(&[0x4D, 0x39, 0xDA]); // cmp r10, r11
+    let lf_notfound = x.jge8();
+    // Read element: [list + 8 + idx*8]
+    x.mov_rr(0, 11); // rax = idx
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3
+    x.i(&[0x4C, 0x01, 0xC8]); // add rax, r9 (list_ptr)
+    x.add_ri(0, 8); // skip count
+    x.mov_rm(0, 0, 0); // rax = element (list ptr)
+    // Check if element is a list (ptr > HEAP_VADDR)
+    x.i(&[0x48, 0x3D, 0x00, 0x00, 0x10, 0x00]); // cmp rax, 0x100000
+    let lf_skip = x.jb8();
+    // It's a list ptr — read count
+    x.mov_rm(1, 0, 0); // rcx = count
+    x.i(&[0x48, 0x83, 0xF9, 0x02]); // cmp rcx, 2
+    let lf_skip2 = x.jne8();
+    // Read first element (key of association pair)
+    x.mov_rm(1, 0, 8); // rcx = first element (assoc key)
+    // Compare with search key (r8)
+    x.i(&[0x49, 0x39, 0xC8]); // cmp r8, rcx
+    let lf_found = x.je8();
+    // Not a match — continue
+    x.patch_jmp_rel8(lf_skip);
+    x.patch_jmp_rel8(lf_skip2);
+    x.add_ri(11, 1);
+    let lf_back = x.jmp();
+    x.p_i32(lf_back, lf_loop as i32 - (lf_back + 4) as i32);
+    // Found! Push true and the value (second element)
+    x.patch_jmp_rel8(lf_found);
+    x.mov_rm(0, 0, 16); // rax = second element (value)
+    x.sub_ri(15, 8);
+    x.i(&[0x49, 0xC7, 0x07, 0x01, 0x00, 0x00, 0x00]); // push 1 (found)
+    x.sub_ri(15, 8);
+    x.mov_mr(15, 0, 0); // push value
+    let lf_end = x.jmp();
+    // Not found
+    x.patch_jmp_rel8(lf_notfound);
     x.sub_ri(15, 8);
     x.i(&[0x49, 0xC7, 0x07, 0x00, 0x00, 0x00, 0x00]); // push 0 (not found)
     x.sub_ri(15, 8);
-    x.i(&[0x49, 0xC7, 0x07, 0x00, 0x00, 0x00, 0x00]); // push 0 (default value)
+    x.i(&[0x49, 0xC7, 0x07, 0x00, 0x00, 0x00, 0x00]); // push 0 (default)
+    x.patch_jmp_rel8(lf_end);
     x.back();
 
     // STRJOIN (0xBC) — list of strings → str
     x.patch_handler(0xBC);
-    x.mov_rm(7, 15, 0); // r7 = list ptr
-    x.mov_rm(8, 7, 0); // r8 = count
-    // For now, simplified: allocate a buffer and concatenate
+    x.mov_rm(0, 15, 0); // rax = list ptr (use rax, safe register)
+    x.mov_rr(8, 0); // r8 = list ptr (save in r8)
+    x.mov_rm(9, 8, 0); // r9 = count
+    x.add_ri(15, 8); // pop list
     // Use OUT_BUF as temp buffer
-    x.mov_r64i(6, OUT_BUF_ADDR); // dest
-    x.xor_rr(9, 9); // r9 = total length
-    x.xor_rr(10, 10); // r10 = index
+    x.mov_r64i(10, OUT_BUF_ADDR); // r10 = dest pointer
+    x.xor_rr(11, 11); // r11 = total length
+    x.xor_rr(12, 12); // r12 = index
     let sj_loop = x.m();
-    x.i(&[0x4D, 0x39, 0xC2]); // cmp r10, r8
+    x.i(&[0x4D, 0x39, 0xE1]); // cmp r9, r12
     let sj_done = x.jge8();
-    // Read list element [list + 8 + r10*8]
-    x.mov_rr(0, 10);
-    x.i(&[0x48, 0xC1, 0xE0, 0x03]);
-    x.i(&[0x48, 0x01, 0xF8]); // add rax, r7
-    x.add_ri(0, 8);
+    // Read list element [list + 8 + idx*8]
+    x.mov_rr(0, 12); // rax = idx
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3
+    x.i(&[0x4C, 0x01, 0xC0]); // add rax, r8 (list ptr)
+    x.add_ri(0, 8); // skip count
     x.mov_rm(0, 0, 0); // rax = element (string addr)
     // Copy string to dest
     let sj_cpy = x.m();
     x.i(&[0x0F, 0xB6, 0x08]); // movzx ecx, byte [rax]
     x.i(&[0x48, 0x85, 0xC9]); // test rcx, rcx
     let sj_cpy_done = x.je8();
-    x.i(&[0x41, 0x88, 0x0E]); // mov [r14]? No — dest is r6
-    // Actually: mov [rsi], cl where rsi = r6
-    x.i(&[0x40, 0x88, 0x0E]); // mov [rsi], cl (rsi is r6)
-    x.add_ri(6, 1);
-    x.add_ri(9, 1); // total_len++
-    x.add_ri(0, 1);
+    // Write byte to [r10]
+    x.i(&[0x41, 0x88, 0x0A]); // mov [r10], cl
+    x.add_ri(10, 1); // dest++
+    x.add_ri(11, 1); // total_len++
+    x.add_ri(0, 1); // src++
     let sj_cpy_back = x.jmp();
     x.p_i32(sj_cpy_back, sj_cpy as i32 - (sj_cpy_back + 4) as i32);
     x.patch_jmp_rel8(sj_cpy_done);
-    x.add_ri(10, 1);
+    x.add_ri(12, 1); // idx++
     let sj_back = x.jmp();
     x.p_i32(sj_back, sj_loop as i32 - (sj_back + 4) as i32);
     x.patch_jmp_rel8(sj_done);
-    // Write null
-    x.i(&[0xC6, 0x06, 0x00]); // mov byte [rsi], 0
-    // Allocate string in heap
-    x.mov_rr(0, 9);
+    // Write null terminator at [r10]
+    x.i(&[0x41, 0xC6, 0x02, 0x00]); // mov byte [r10], 0
+    // Allocate string in heap: total_len + 5
+    x.mov_rr(0, 11); // rax = total_len
     x.add_ri(0, 5);
-    x.mov_rr(7, 0);
-    x.push_r(14); x.push_r(13); x.push_r(9); x.push_r(6);
+    x.mov_rr(7, 0); // rdi = alloc size
+    x.push_r(8); x.push_r(9); x.push_r(10); x.push_r(11); x.push_r(12);
     x.b(0xE8); x.i32(1); // call alloc
-    x.pop_r(6); x.pop_r(9); x.pop_r(13); x.pop_r(14);
+    x.pop_r(12); x.pop_r(11); x.pop_r(10); x.pop_r(9); x.pop_r(8);
+    // rax = alloc ptr, r11 = total_len
     x.mov_rr(8, 0); // r8 = alloc ptr
     // Write length
-    x.i(&[0x45, 0x89, 0x08]); // mov [r8], r9d
-    x.add_ri(8, 4);
+    x.i(&[0x44, 0x89, 0x18]); // mov [rax], r11d
+    x.add_ri(8, 4); // r8 = data area
     // Copy from OUT_BUF to heap
-    x.mov_r64i(6, OUT_BUF_ADDR);
-    x.xor_rr(10, 10);
+    x.mov_r64i(10, OUT_BUF_ADDR); // r10 = source
+    x.xor_rr(12, 12); // r12 = index
     let sj_copy = x.m();
-    x.i(&[0x4D, 0x39, 0xCA]); // cmp r10, r9
+    x.i(&[0x4D, 0x39, 0xDC]); // cmp r12, r11 (index vs total_len)
     let sj_copy_done = x.jge8();
-    x.mov_rr(0, 6);
-    x.i(&[0x4C, 0x01, 0xD0]); // add rax, r10
+    // Read byte: [OUT_BUF + idx]
+    x.mov_rr(0, 10); // rax = OUT_BUF_ADDR
+    x.i(&[0x4C, 0x01, 0xE0]); // add rax, r12 (idx)
     x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
-    x.mov_rr(1, 8);
-    x.i(&[0x4C, 0x01, 0xD1]); // add rcx, r10
+    // Write byte: [r8 + idx]
+    x.mov_rr(1, 8); // rcx = heap dest
+    x.i(&[0x4C, 0x01, 0xE1]); // add rcx, r12 (idx)
     x.i(&[0x88, 0x01]); // mov [rcx], al
-    x.add_ri(10, 1);
+    x.add_ri(12, 1); // idx++
     let sj_copy_back = x.jmp();
     x.p_i32(sj_copy_back, sj_copy as i32 - (sj_copy_back + 4) as i32);
     x.patch_jmp_rel8(sj_copy_done);
-    // Null terminate
-    x.mov_rr(0, 8);
-    x.i(&[0x4C, 0x01, 0xC8]); // add rax, r9
-    x.i(&[0xC6, 0x00, 0x00]);
-    // Push result (r8 = data area)
+    // Null terminate at [r8 + total_len]
+    x.mov_rr(0, 8); // rax = data area
+    x.i(&[0x4C, 0x01, 0xD8]); // add rax, r11 (total_len)
+    x.i(&[0xC6, 0x00, 0x00]); // mov byte [rax], 0
+    // Push result (r8 = data area = string address)
     x.mov_mr(15, 0, 8);
     x.back();
 
