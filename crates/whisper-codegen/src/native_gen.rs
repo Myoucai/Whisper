@@ -1599,12 +1599,165 @@ fn impl_float_ops(x: &mut X) {
     x.mov_mr(15, 0, 0);
     x.back();
 
-    // JsonParse (0xB6) — placeholder
+    // JsonParse (0xB6) — str → value
+    // Simplified: parse JSON number or string literal
     x.patch_handler(0xB6);
+    x.mov_rm(0, 15, 0); // rax = json string addr
+    x.add_ri(15, 8); // pop string
+    // Check first char
+    x.i(&[0x0F, 0xB6, 0x08]); // movzx ecx, byte [rax]
+    // Check for '"'
+    x.i(&[0x48, 0x83, 0xF9, 0x22]); // cmp rcx, '"'
+    let jp_not_str = x.jne8();
+    // String: skip opening '"', read until closing '"'
+    x.add_ri(0, 1); // skip '"'
+    // Find closing '"' and copy to OUT_BUF
+    x.mov_r64i(6, OUT_BUF_ADDR); // dest
+    let jp_str_loop = x.m();
+    x.i(&[0x0F, 0xB6, 0x08]); // movzx ecx, byte [rax]
+    x.i(&[0x48, 0x83, 0xF9, 0x22]); // cmp rcx, '"'
+    let jp_str_end = x.je8();
+    x.i(&[0x88, 0x0E]); // mov [rsi], cl
+    x.add_ri(6, 1);
+    x.add_ri(0, 1);
+    let jp_str_back = x.jmp();
+    x.p_i32(jp_str_back, jp_str_loop as i32 - (jp_str_back + 4) as i32);
+    x.patch_jmp_rel8(jp_str_end);
+    // Write null
+    x.i(&[0xC6, 0x06, 0x00]); // mov byte [rsi], 0
+    // Allocate string in heap
+    x.mov_rr(7, 6); // rdi = dest (length = dest - OUT_BUF)
+    x.mov_r64i(0, OUT_BUF_ADDR);
+    x.i(&[0x48, 0x29, 0xC7]); // sub rdi, rax (length)
+    x.mov_rr(12, 7); // r12 = length
+    x.add_ri(7, 5); // +5 for prefix+null
+    x.push_r(12);
+    x.b(0xE8); x.i32(1); // call alloc
+    x.pop_r(12);
+    x.mov_rr(8, 0); // r8 = alloc ptr
+    x.i(&[0x44, 0x89, 0x20]); // mov [rax], r12d (write length)
+    x.add_ri(8, 4);
+    // Copy from OUT_BUF
+    x.mov_r64i(6, OUT_BUF_ADDR);
+    x.xor_rr(9, 9);
+    let jp_cpy = x.m();
+    x.i(&[0x4D, 0x39, 0xCC]); // cmp r12, r9
+    let jp_cpy_done = x.jge8();
+    x.mov_rr(0, 6);
+    x.i(&[0x4C, 0x01, 0xC8]); // add rax, r9
+    x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
+    x.mov_rr(1, 8);
+    x.i(&[0x4C, 0x01, 0xC9]); // add rcx, r9
+    x.i(&[0x88, 0x01]); // mov [rcx], al
+    x.add_ri(9, 1);
+    let jp_cpy_back = x.jmp();
+    x.p_i32(jp_cpy_back, jp_cpy as i32 - (jp_cpy_back + 4) as i32);
+    x.patch_jmp_rel8(jp_cpy_done);
+    // Null terminate
+    x.mov_rr(0, 8);
+    x.i(&[0x4C, 0x01, 0xE0]); // add rax, r12
+    x.i(&[0xC6, 0x00, 0x00]);
+    // Push string address
+    x.sub_ri(15, 8);
+    x.mov_mr(15, 0, 8);
+    let jp_end = x.jmp();
+    // Not a string — parse as number
+    x.patch_jmp_rel8(jp_not_str);
+    // Check for 't' (true) or 'f' (false)
+    x.i(&[0x48, 0x83, 0xF9, 0x74]); // cmp rcx, 't'
+    let jp_not_true = x.jne8();
+    // true → push 1
+    x.sub_ri(15, 8);
+    x.i(&[0x49, 0xC7, 0x07, 0x01, 0x00, 0x00, 0x00]); // push 1
+    let jp_end2 = x.jmp();
+    x.patch_jmp_rel8(jp_not_true);
+    x.i(&[0x48, 0x83, 0xF9, 0x66]); // cmp rcx, 'f'
+    let jp_not_false = x.jne8();
+    // false → push 0
+    x.sub_ri(15, 8);
+    x.i(&[0x49, 0xC7, 0x07, 0x00, 0x00, 0x00, 0x00]);
+    let jp_end3 = x.jmp();
+    x.patch_jmp_rel8(jp_not_false);
+    // Parse as number (integer)
+    x.xor_rr(8, 8); // r8 = result
+    x.xor_rr(9, 9); // r9 = negative flag
+    // Check for '-'
+    x.i(&[0x48, 0x83, 0xF9, 0x2D]); // cmp rcx, '-'
+    let jp_not_neg = x.jne8();
+    x.mov_r64i(9, 1);
+    x.add_ri(0, 1);
+    x.i(&[0x0F, 0xB6, 0x08]); // read next char
+    x.patch_jmp_rel8(jp_not_neg);
+    // Parse digits
+    let jp_num_loop = x.m();
+    x.i(&[0x48, 0x83, 0xF9, 0x30]); // cmp rcx, '0'
+    let jp_num_done = x.jb8();
+    x.i(&[0x48, 0x83, 0xF9, 0x39]); // cmp rcx, '9'
+    let jp_num_done2 = x.jg8();
+    // result = result * 10 + (digit - '0')
+    x.i(&[0x49, 0x6B, 0xC0, 0x0A]); // imul r8, r8, 10
+    x.i(&[0x48, 0x83, 0xE9, 0x30]); // sub rcx, '0'
+    x.i(&[0x49, 0x01, 0xC8]); // add r8, rcx
+    x.add_ri(0, 1);
+    x.i(&[0x0F, 0xB6, 0x08]); // movzx ecx, byte [rax]
+    let jp_num_back = x.jmp();
+    x.p_i32(jp_num_back, jp_num_loop as i32 - (jp_num_back + 4) as i32);
+    x.patch_jmp_rel8(jp_num_done);
+    x.patch_jmp_rel8(jp_num_done2);
+    // Apply negation
+    x.i(&[0x4D, 0x85, 0xC9]); // test r9, r9
+    let jp_num_pos = x.je8();
+    x.i(&[0x49, 0xF7, 0xD8]); // neg r8
+    x.patch_jmp_rel8(jp_num_pos);
+    // Push number
+    x.sub_ri(15, 8);
+    x.mov_mr(15, 0, 8);
+    x.patch_jmp_rel8(jp_end);
+    x.patch_jmp_rel8(jp_end2);
+    x.patch_jmp_rel8(jp_end3);
     x.back();
 
-    // JsonStringify (0xB7) — placeholder
+    // JsonStringify (0xB7) — value → str
+    // Simplified: convert i64 to string, or pass through strings
     x.patch_handler(0xB7);
+    x.mov_rm(0, 15, 0); // rax = value
+    // For now, just call I64TOSTR logic (convert number to string)
+    x.mov_rr(7, 0); // rdi = value
+    x.mov_r64i(6, OUT_BUF_ADDR);
+    x.push_r(0); x.push_r(1); x.push_r(2);
+    x.b(0xE8); x.i32(0); // call itoa
+    x.pop_r(2); x.pop_r(1); x.pop_r(0);
+    // rax = length, rsi = buffer
+    x.mov_rr(12, 0); // r12 = length
+    // Allocate string
+    x.add_ri(0, 5);
+    x.mov_rr(7, 0);
+    x.push_r(12);
+    x.b(0xE8); x.i32(1); // call alloc
+    x.pop_r(12);
+    x.mov_rr(8, 0);
+    x.i(&[0x44, 0x89, 0x20]); // write length
+    x.add_ri(8, 4);
+    // Copy
+    x.mov_r64i(6, OUT_BUF_ADDR);
+    x.xor_rr(9, 9);
+    let js_cpy = x.m();
+    x.i(&[0x4D, 0x39, 0xCC]);
+    let js_done = x.jge8();
+    x.mov_rr(0, 6);
+    x.i(&[0x4C, 0x01, 0xC8]);
+    x.i(&[0x0F, 0xB6, 0x00]);
+    x.mov_rr(1, 8);
+    x.i(&[0x4C, 0x01, 0xC9]);
+    x.i(&[0x88, 0x01]);
+    x.add_ri(9, 1);
+    let js_back = x.jmp();
+    x.p_i32(js_back, js_cpy as i32 - (js_back + 4) as i32);
+    x.patch_jmp_rel8(js_done);
+    x.mov_rr(0, 8);
+    x.i(&[0x4C, 0x01, 0xE0]);
+    x.i(&[0xC6, 0x00, 0x00]);
+    x.mov_mr(15, 0, 8);
     x.back();
 }
 
