@@ -60,41 +60,81 @@ impl X {
     fn mark_next(&mut self) {
         self.next_pos = self.v.len();
     }
+    // REX prefix helpers: W=1 always (64-bit), R extends reg, B extends r/m
+    fn rex_w(&self) -> u8 { 0x48 } // REX.W only
+    fn rex_wr(&self, reg: u8) -> u8 { 0x48 | ((reg >> 3) & 1) << 2 } // REX.W + R (extends reg field)
+    fn rex_wb(&self, rm: u8) -> u8 { 0x48 | ((rm >> 3) & 1) } // REX.W + B (extends r/m field)
+    fn rex_wrb(&self, reg: u8, rm: u8) -> u8 { 0x48 | ((reg >> 3) & 1) << 2 | ((rm >> 3) & 1) } // REX.W + R + B
+
     fn mov_r64i(&mut self, r: u8, v: u64) {
-        self.b(0x49);
-        self.b(0xBF | (r & 7));
+        // mov r64, imm64: REX.W[B] + B8+rd
+        if r >= 8 { self.b(0x49); } else { self.b(0x48); }
+        self.b(0xB8 | (r & 7));
         self.u64(v);
     }
     fn mov_rr(&mut self, d: u8, s: u8) {
-        self.i(&[0x49, 0x89, 0xC0 | (s << 3) | d]);
+        // mov r64, r64: REX.WRB + 89 /r (mod=11, reg=s, r/m=d)
+        self.b(self.rex_wrb(s, d));
+        self.b(0x89);
+        self.b(0xC0 | ((s & 7) << 3) | (d & 7));
     }
     fn mov_rm(&mut self, d: u8, b: u8, o: i32) {
-        self.i(&[0x49, 0x8B, 0x80 | (d << 3) | (b & 7)]);
+        // mov r64, [r64+disp32]: REX.WRB + 8B /r (mod=10, reg=d, r/m=b)
+        self.b(self.rex_wrb(d, b));
+        self.b(0x8B);
+        self.b(0x80 | ((d & 7) << 3) | (b & 7));
         self.i32(o);
     }
     fn mov_mr(&mut self, b: u8, o: i32, s: u8) {
-        self.i(&[0x49, 0x89, 0x80 | (s << 3) | (b & 7)]);
+        // mov [r64+disp32], r64: REX.WRB + 89 /r (mod=10, reg=s, r/m=b)
+        self.b(self.rex_wrb(s, b));
+        self.b(0x89);
+        self.b(0x80 | ((s & 7) << 3) | (b & 7));
         self.i32(o);
     }
     fn add_ri(&mut self, r: u8, n: i32) {
         if n == 1 {
-            self.i(&[0x49, 0xFF, 0xC0 | r]);
+            // inc r64: REX.WB + FF /0 (mod=11, reg=0, r/m=r)
+            self.b(self.rex_wb(r));
+            self.b(0xFF);
+            self.b(0xC0 | (r & 7));
         } else {
-            self.i(&[0x49, 0x81, 0xC0 | r]);
+            // add r64, imm32: REX.WB + 81 /0 (mod=11, reg=0, r/m=r)
+            self.b(self.rex_wb(r));
+            self.b(0x81);
+            self.b(0xC0 | (r & 7));
             self.i32(n);
         }
     }
     fn sub_ri(&mut self, r: u8, n: i32) {
-        self.add_ri(r, -n);
+        if n == 1 {
+            // dec r64: REX.WB + FF /1 (mod=11, reg=1, r/m=r)
+            self.b(self.rex_wb(r));
+            self.b(0xFF);
+            self.b(0xC8 | (r & 7));
+        } else {
+            // sub r64, imm32: REX.WB + 81 /5 (mod=11, reg=5, r/m=r)
+            self.b(self.rex_wb(r));
+            self.b(0x81);
+            self.b(0xE8 | (r & 7));
+            self.i32(n);
+        }
     }
     fn push_r(&mut self, r: u8) {
+        // push r64: REX.B + 50+rd (only needs REX if r8-r15)
+        if r >= 8 { self.b(0x41); }
         self.b(0x50 | (r & 7));
     }
     fn pop_r(&mut self, r: u8) {
+        // pop r64: REX.B + 58+rd
+        if r >= 8 { self.b(0x41); }
         self.b(0x58 | (r & 7));
     }
     fn xor_rr(&mut self, a: u8, b: u8) {
-        self.i(&[0x4D, 0x31, 0xC0 | (b << 3) | a]);
+        // xor r64, r64: REX.WRB + 31 /r (mod=11, reg=b, r/m=a)
+        self.b(self.rex_wrb(b, a));
+        self.b(0x31);
+        self.b(0xC0 | ((b & 7) << 3) | (a & 7));
     }
     fn je(&mut self) -> usize {
         self.b(0x0F);
