@@ -4,16 +4,17 @@
 //! from the top of the stack and produces M values. The type checker
 //! verifies that stack effects are consistent throughout the program.
 
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use crate::types::Type;
 
-/// Counter for generating unique type variables in stack effects.
-static mut STACK_EFFECT_VAR_COUNTER: u64 = 1000;
+/// Atomic counter for generating unique type variables in stack effects.
+/// Starts at 1000 to avoid collision with TypeInferer::next_var (starts at 0).
+static STACK_EFFECT_VAR_COUNTER: AtomicU64 = AtomicU64::new(1000);
 
 fn fresh_stack_var() -> Type {
-    unsafe {
-        STACK_EFFECT_VAR_COUNTER += 1;
-        Type::TypeVar(STACK_EFFECT_VAR_COUNTER)
-    }
+    let id = STACK_EFFECT_VAR_COUNTER.fetch_add(1, Ordering::Relaxed);
+    Type::TypeVar(id)
 }
 
 /// Represents a stack effect: inputs (consumed) and outputs (produced).
@@ -38,7 +39,7 @@ impl StackEffect {
     }
 
     /// Combine two stack effects sequentially (composition).
-    /// Effect of A then B: check B's inputs match A's outputs.
+    /// Effect of A then B: A's outputs become B's inputs.
     pub fn compose(&self, other: &StackEffect) -> Option<StackEffect> {
         Some(StackEffect {
             inputs: self.inputs.clone(),

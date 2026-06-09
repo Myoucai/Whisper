@@ -107,11 +107,12 @@ impl TypeChecker {
                 && !e.message.contains("underflow")
         });
 
+        // Resolve type variables using the temp inferer before swapping back
+        let inputs: Vec<Type> = input_types.iter().map(|t| self.inferer.resolve(t)).collect();
+        let outputs: Vec<Type> = stack.iter().map(|t| self.inferer.resolve(t)).collect();
+
         // Restore the main inferer (discard inference temporaries)
         std::mem::swap(&mut self.inferer, &mut temp_inferer);
-
-        let inputs = input_types;
-        let outputs = stack;
 
         WordSig { inputs, outputs }
     }
@@ -300,8 +301,18 @@ impl TypeChecker {
                 self.expect_ref(stack, errors, ctx, "@times quot");
             }
 
-            AstNode::CondArrow { .. } => {
+            AstNode::CondArrow { then_branch } => {
                 self.expect(stack, &Type::Bool, errors, ctx, "?-> condition");
+                let depth = stack.len();
+                let mut then_stack = stack.clone();
+                for n in then_branch {
+                    self.check_node(n, &mut then_stack, errors, &format!("{ctx}/cond-arrow"));
+                }
+                // Take the suffix above original depth
+                stack.truncate(depth);
+                for t in then_stack.into_iter().skip(depth) {
+                    stack.push(t);
+                }
             }
 
             AstNode::ConfidenceLabel {
@@ -396,6 +407,10 @@ impl TypeChecker {
                         message: "Rot: need 3 values".into(),
                         context: ctx.into(),
                     });
+                } else {
+                    let len = stack.len();
+                    let c = stack.remove(len - 3);
+                    stack.push(c);
                 }
             }
 

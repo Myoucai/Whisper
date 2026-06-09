@@ -76,8 +76,8 @@ impl Parser {
 
     /// Strict parse — returns first error (backward-compatible signature).
     pub fn parse_source(source: &str) -> Result<Vec<AstNode>, ParseError> {
-        let (ast, mut errors) = Self::parse_source_recovering(source);
-        if let Some(err) = errors.pop() {
+        let (ast, errors) = Self::parse_source_recovering(source);
+        if let Some(err) = errors.into_iter().next() {
             // Return the first error; for multiple errors use parse_source_recovering
             Err(err)
         } else {
