@@ -149,59 +149,92 @@ fn ast_to_vec(nodes: &[AstNode]) -> Vec<Value> {
 
 /// Hard bootstrap: use whisperc pipeline (lexer + classify + compile) for the
 /// token→bytecode step, with Rust handling structural nodes (Def, Cond, Loop).
+/// Separate type-9 (word def) tokens from main tokens.
+fn split_defs(tokens: &Value) -> (Vec<Value>, Vec<(String, Vec<Value>)>) {
+    let mut main = Vec::new();
+    let mut defs = Vec::new();
+    if let Value::List(items) = tokens {
+        for item in items.iter() {
+            if let Value::List(inner) = item {
+                if inner.len() == 3 {
+                    if let Value::I64(9) = &inner[0] {
+                        if let (Value::Str(name), body) = (&inner[1], &inner[2]) {
+                            if let Value::List(body_tokens) = body {
+                                defs.push((name.as_ref().clone(), body_tokens.to_vec()));
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+            main.push(item.clone());
+        }
+    }
+    (main, defs)
+}
+
+/// Compile a list of classified tokens into Opcodes via whisperc compile.
+fn compile_tokens(vm: &mut Vm, tokens: &[Value]) -> Result<Vec<Opcode>, String> {
+    vm.data_stack.push(Value::List(Rc::new(tokens.to_vec())));
+    let bc = vm.execute(&[Opcode::Call("compile".to_string())])
+        .map_err(|e| format!("compile: {e}"))?
+        .ok_or("compile: no output")?;
+    match bc {
+        Value::List(vals) => Ok(values_to_opcodes(vals.to_vec())),
+        other => Err(format!("expected list, got {other:?}")),
+    }
+}
+
+/// Full whisperc pipeline: lex → structify → classify → split defs → compile
+fn compile_via_whisperc_full(vm: &mut Vm, source: &str) -> Result<(Vec<Opcode>, Vec<(String, Vec<Opcode>)>), String> {
+    vm.data_stack.push(Value::Str(Rc::new(source.to_string())));
+    let chunks = vm.execute(&[Opcode::Call("tokenize".to_string())])
+        .map_err(|e| format!("lex: {e}"))?
+        .ok_or("lex: no output")?;
+    let nested = if let Value::List(ref items) = chunks {
+        structify_chunks(items)
+    } else { chunks };
+    let tokens = classify_nested(vm, &nested);
+    let (main_tokens, def_tokens) = split_defs(&tokens);
+    let main_ops = compile_tokens(vm, &main_tokens)?;
+    let mut def_ops = Vec::new();
+    for (name, body) in &def_tokens {
+        def_ops.push((name.clone(), compile_tokens(vm, body)?));
+    }
+    Ok((main_ops, def_ops))
+}
+
 pub fn hard_bootstrap_compile(source: &str) -> Result<(), String> {
-    // Phase 1: Parse with Rust compiler to extract structural nodes
+    // Phase 1: Rust reference (for comparison)
     let ast = Parser::parse_source(source).map_err(|e| format!("Parse: {}", e.message))?;
     let mut gen = BytecodeGenerator::new();
     let (ref_bytecode, ref_defs) = gen.compile(&ast);
 
-    // Phase 2: Separate defs from main body
-    let mut main_body: Vec<AstNode> = Vec::new();
-    let mut def_nodes: Vec<(String, Vec<AstNode>)> = Vec::new();
-    for node in &ast {
-        match node {
-            AstNode::Def { name, body } => {
-                def_nodes.push((name.clone(), body.clone()));
-            }
-            _ => main_body.push(node.clone()),
-        }
-    }
-
-    // Phase 3: Load whisperc pipeline (lexer + classify + compiler)
+    // Phase 2: Load whisperc pipeline
     let mut vm = Vm::new();
     load_whisperc_pipeline(&mut vm);
-    // Phase 4: Compile main body through whisperc pipeline
-    let main_source = nodes_to_source_string(&main_body);
-    let whisperc_ops = compile_via_whisperc_pipeline(&mut vm, &main_source)?;
 
-    // Phase 5: Compile each def body through whisperc pipeline
-    let mut whisperc_defs: Vec<(String, Vec<Opcode>)> = Vec::new();
-    for (def_name, def_body) in &def_nodes {
-        let body_source = nodes_to_source_string(def_body);
-        let body_ops = compile_via_whisperc_pipeline(&mut vm, &body_source)?;
-        println!("  def '{}': {} opcodes (whisperc)", def_name, body_ops.len());
-        whisperc_defs.push((def_name.clone(), body_ops));
-    }
+    // Phase 3: Full whisperc compilation (lex → structify → classify → split → compile)
+    let (whisperc_ops, whisperc_defs) = compile_via_whisperc_full(&mut vm, source)?;
+    println!("whisperc: {} main ops, {} defs", whisperc_ops.len(), whisperc_defs.len());
+    println!("rust:     {} main ops, {} defs", ref_bytecode.len(), ref_defs.len());
 
-    // Phase 6: Execute Rust-compiled reference
-    println!("whisperc output: {} ops (main), {} defs", whisperc_ops.len(), whisperc_defs.len());
+    // Phase 4: Execute Rust reference
     let mut vm_ref = Vm::new();
-    for (name, code) in &ref_defs {
-        vm_ref.define_word(name.clone(), code.clone());
-    }
+    for (name, code) in &ref_defs { vm_ref.define_word(name.clone(), code.clone()); }
     print!("Rust VM output: ");
-    vm_ref.execute(&ref_bytecode).map_err(|e| format!("VM: {e}"))?;
+    vm_ref.execute(&ref_bytecode).map_err(|e| format!("Rust VM: {e}"))?;
 
-    // Phase 7: Execute whisperc-compiled bytecode
+    // Phase 5: Execute whisperc-compiled bytecode
     let mut vm_wc = Vm::new();
-    for (name, code) in &whisperc_defs {
-        vm_wc.define_word(name.clone(), code.clone());
-    }
+    for (name, code) in &whisperc_defs { vm_wc.define_word(name.clone(), code.clone()); }
     print!("whisperc VM output: ");
     vm_wc.execute(&whisperc_ops).map_err(|e| format!("whisperc VM: {e}"))?;
     println!();
-    println!("Hard self-hosting pipeline complete.");
 
+    assert_eq!(whisperc_defs.len(), ref_defs.len(),
+        "def count: whisperc={} vs rust={}", whisperc_defs.len(), ref_defs.len());
+    println!("Hard self-hosting pipeline complete.");
     Ok(())
 }
 
@@ -292,7 +325,7 @@ fn compile_via_whisperc_pipeline(vm: &mut Vm, source: &str) -> Result<Vec<Opcode
         .ok_or("lex: no output")?;
 
     let nested = if let Value::List(ref items) = chunks {
-        nest_chunks(items)
+        structify_chunks(items)
     } else {
         chunks
     };
@@ -596,39 +629,35 @@ fn load_whisperc_pipeline(vm: &mut Vm) {
     }
 }
 
-/// Group `{...}` blocks into nested lists for recursive classification.
-fn nest_chunks(chunks: &[Value]) -> Value {
+/// Structural chunk grouper — handles { }, [ ], ??...|...], {}{}#, :...;
+/// Produces typed markers: 5=Quote, 6=List, 7=Cond, 8=Loop, 9=Def
+fn structify_chunks(chunks: &[Value]) -> Value {
+    let grouped = group_paired_delimiters(chunks);
+    let patterned = recognize_patterns(&grouped);
+    Value::List(Rc::new(patterned))
+}
+
+/// Pass 1: Group { } and [ ] paired delimiters into typed markers.
+fn group_paired_delimiters(chunks: &[Value]) -> Vec<Value> {
     let mut result = Vec::new();
     let mut i = 0;
     while i < chunks.len() {
         match &chunks[i] {
             Value::Str(s) if s.as_ref() == "{" => {
-                i += 1;
-                let mut depth = 1;
-                let mut inner = Vec::new();
-                while i < chunks.len() && depth > 0 {
-                    match &chunks[i] {
-                        Value::Str(s) if s.as_ref() == "{" => {
-                            depth += 1;
-                            inner.push(chunks[i].clone());
-                        }
-                        Value::Str(s) if s.as_ref() == "}" => {
-                            depth -= 1;
-                            if depth > 0 {
-                                inner.push(chunks[i].clone());
-                            }
-                        }
-                        _ => inner.push(chunks[i].clone()),
-                    }
-                    i += 1;
-                }
+                let (inner, next) = collect_balanced(chunks, i + 1, "{", "}");
                 result.push(Value::List(Rc::new(vec![
                     Value::I64(5),
-                    nest_chunks(&inner),
+                    Value::List(Rc::new(group_paired_delimiters(&inner))),
                 ])));
+                i = next;
             }
-            Value::Str(s) if s.as_ref() == "}" => {
-                i += 1;
+            Value::Str(s) if s.as_ref() == "[" => {
+                let (inner, next) = collect_balanced(chunks, i + 1, "[", "]");
+                result.push(Value::List(Rc::new(vec![
+                    Value::I64(6),
+                    Value::List(Rc::new(group_paired_delimiters(&inner))),
+                ])));
+                i = next;
             }
             _ => {
                 result.push(chunks[i].clone());
@@ -636,32 +665,203 @@ fn nest_chunks(chunks: &[Value]) -> Value {
             }
         }
     }
-    Value::List(Rc::new(result))
+    result
 }
 
-/// Recursively classify nested chunks using the Whisper classify-one word.
+/// Collect balanced delimiters, returning (inner_chunks, next_index).
+fn collect_balanced(chunks: &[Value], start: usize, open: &str, close: &str) -> (Vec<Value>, usize) {
+    let mut inner = Vec::new();
+    let mut depth = 1;
+    let mut i = start;
+    while i < chunks.len() && depth > 0 {
+        match &chunks[i] {
+            Value::Str(s) if s.as_ref() == open => {
+                depth += 1;
+                if depth > 1 { inner.push(chunks[i].clone()); }
+            }
+            Value::Str(s) if s.as_ref() == close => {
+                depth -= 1;
+                if depth > 0 { inner.push(chunks[i].clone()); }
+            }
+            _ => inner.push(chunks[i].clone()),
+        }
+        i += 1;
+    }
+    (inner, i)
+}
+
+/// Pass 2: Recognize multi-token structural patterns.
+fn recognize_patterns(chunks: &[Value]) -> Vec<Value> {
+    let mut result = Vec::new();
+    let mut i = 0;
+    while i < chunks.len() {
+        // Pattern: : name {body} ;  →  [9, name, body]
+        if i + 3 < chunks.len()
+            && is_str_eq(&chunks[i], ":")
+            && is_str(&chunks[i + 1])
+            && is_typed_list(&chunks[i + 2], 5)
+            && is_str_eq(&chunks[i + 3], ";")
+        {
+            let name = chunks[i + 1].clone();
+            let body = get_inner(&chunks[i + 2]);
+            result.push(Value::List(Rc::new(vec![
+                Value::I64(9),
+                name,
+                Value::List(Rc::new(recognize_patterns(&body))),
+            ])));
+            i += 4;
+            continue;
+        }
+        // Pattern: [5, body]  [5, cond]  #  →  [8, body, cond]
+        if i + 2 < chunks.len()
+            && is_typed_list(&chunks[i], 5)
+            && is_typed_list(&chunks[i + 1], 5)
+            && is_str_eq(&chunks[i + 2], "#")
+        {
+            let body = get_inner(&chunks[i]);
+            let cond = get_inner(&chunks[i + 1]);
+            result.push(Value::List(Rc::new(vec![
+                Value::I64(8),
+                Value::List(Rc::new(recognize_patterns(&body))),
+                Value::List(Rc::new(recognize_patterns(&cond))),
+            ])));
+            i += 3;
+            continue;
+        }
+        // Pattern: ?? ... | ... ]  →  [7, then, else]
+        if is_str_eq(&chunks[i], "??") {
+            // Find | separator and closing ]
+            let (then_tokens, else_tokens, next) = split_cond(&chunks, i + 1);
+            result.push(Value::List(Rc::new(vec![
+                Value::I64(7),
+                Value::List(Rc::new(recognize_patterns(&then_tokens))),
+                Value::List(Rc::new(recognize_patterns(&else_tokens))),
+            ])));
+            i = next;
+            continue;
+        }
+        // Recurse into nested groups
+        match &chunks[i] {
+            Value::List(items) if items.len() == 2 && matches!(&items[0], Value::I64(5 | 6)) => {
+                let tag = items[0].clone();
+                let inner = get_inner(&chunks[i]);
+                result.push(Value::List(Rc::new(vec![
+                    tag,
+                    Value::List(Rc::new(recognize_patterns(&inner))),
+                ])));
+            }
+            _ => {
+                result.push(chunks[i].clone());
+            }
+        }
+        i += 1;
+    }
+    result
+}
+
+/// Split ?? then | else ] into (then, else, next_index).
+fn split_cond(chunks: &[Value], start: usize) -> (Vec<Value>, Vec<Value>, usize) {
+    let mut then_tokens = Vec::new();
+    let mut else_tokens = Vec::new();
+    let mut depth = 1; // for the ?? opener
+    let mut i = start;
+    let mut in_else = false;
+    while i < chunks.len() && depth > 0 {
+        match &chunks[i] {
+            Value::Str(s) if s.as_ref() == "??" => { depth += 1; if !in_else { then_tokens.push(chunks[i].clone()); } else { else_tokens.push(chunks[i].clone()); } }
+            Value::Str(s) if s.as_ref() == "]" => { depth -= 1; if depth == 0 { break; } if !in_else { then_tokens.push(chunks[i].clone()); } else { else_tokens.push(chunks[i].clone()); } }
+            Value::Str(s) if s.as_ref() == "|" && depth == 1 => { in_else = true; }
+            _ => {
+                if !in_else { then_tokens.push(chunks[i].clone()); }
+                else { else_tokens.push(chunks[i].clone()); }
+            }
+        }
+        i += 1;
+    }
+    (then_tokens, else_tokens, i + 1)
+}
+
+fn is_str_eq(v: &Value, s: &str) -> bool {
+    matches!(v, Value::Str(x) if x.as_ref() == s)
+}
+
+fn is_str(v: &Value) -> bool {
+    matches!(v, Value::Str(_))
+}
+
+fn is_typed_list(v: &Value, tag: i64) -> bool {
+    matches!(v, Value::List(items) if items.len() == 2 && matches!(&items[0], Value::I64(t) if *t == tag))
+}
+
+fn get_inner(v: &Value) -> Vec<Value> {
+    match v {
+        Value::List(items) if items.len() == 2 => match &items[1] {
+            Value::List(inner) => inner.to_vec(),
+            _ => vec![],
+        },
+        _ => vec![],
+    }
+}
+
+/// Recursively classify structified chunks using the Whisper classify-one word.
 fn classify_nested(vm: &mut Vm, nested: &Value) -> Value {
     match nested {
         Value::List(items) => {
-            if items.len() == 2 {
-                if let Value::I64(5) = &items[0] {
-                    let inner = classify_nested(vm, &items[1]);
-                    return Value::List(Rc::new(vec![Value::I64(5), inner]));
+            if items.len() >= 2 {
+                if let Value::I64(tag) = &items[0] {
+                    match *tag {
+                        // Quote block: [5, inner] → [5, classified_inner]
+                        5 => {
+                            let inner = classify_nested(vm, &items[1]);
+                            return Value::List(Rc::new(vec![Value::I64(5), inner]));
+                        }
+                        // List: [6, elements] → [6, classified_elements]
+                        6 => {
+                            if let Value::List(elems) = &items[1] {
+                                let classified: Vec<Value> = elems.iter()
+                                    .map(|e| classify_nested(vm, e))
+                                    .collect();
+                                return Value::List(Rc::new(vec![
+                                    Value::I64(6),
+                                    Value::List(Rc::new(classified)),
+                                ]));
+                            }
+                        }
+                        // Conditional: [7, then, else] → [7, classified_then, classified_else]
+                        7 if items.len() == 3 => {
+                            let then_c = classify_nested(vm, &items[1]);
+                            let else_c = classify_nested(vm, &items[2]);
+                            return Value::List(Rc::new(vec![Value::I64(7), then_c, else_c]));
+                        }
+                        // Loop: [8, body, cond] → [8, classified_body, classified_cond]
+                        8 if items.len() == 3 => {
+                            let body_c = classify_nested(vm, &items[1]);
+                            let cond_c = classify_nested(vm, &items[2]);
+                            return Value::List(Rc::new(vec![Value::I64(8), body_c, cond_c]));
+                        }
+                        // WordDef: [9, name, body] → pass through (body classified)
+                        9 if items.len() == 3 => {
+                            let body_c = classify_nested(vm, &items[2]);
+                            return Value::List(Rc::new(vec![
+                                Value::I64(9),
+                                items[1].clone(),
+                                body_c,
+                            ]));
+                        }
+                        _ => {}
+                    }
                 }
             }
-            let classified: Vec<Value> = items
-                .iter()
+            let classified: Vec<Value> = items.iter()
                 .map(|item| classify_nested(vm, item))
                 .collect();
             Value::List(Rc::new(classified))
         }
         Value::Str(s) => {
-            // Strings starting with " are string literals
             if s.starts_with('"') {
-                let content = &s[1..]; // strip the opening "
                 Value::List(Rc::new(vec![
-                    Value::I64(2), // type = Str
-                    Value::Str(Rc::new(content.to_string())),
+                    Value::I64(2),
+                    Value::Str(Rc::new(s[1..].to_string())),
                 ]))
             } else {
                 vm.data_stack.push(nested.clone());
@@ -1047,7 +1247,7 @@ mod tests {
         let chunks = vm.execute(&[Opcode::Call("tokenize".to_string())])
             .unwrap().unwrap();
         let nested = if let Value::List(ref items) = chunks {
-            nest_chunks(items)
+            structify_chunks(items)
         } else {
             chunks
         };

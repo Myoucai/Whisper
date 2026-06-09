@@ -1,15 +1,16 @@
-// Whisper Compiler v3.0 — nested quote compilation
-//
+// Whisper Compiler v4.0 — full structural compilation
 // Token types:
 //   0  = I64 literal   [0, value]
 //   1  = F64 literal   [1, bits_as_i64]
 //   2  = Str literal   [2, string]
 //   3  = Operator      [3, opcode_byte]
 //   4  = WordRef       [4, name_string]
-//   5  = Quote block   [5, [...inner_tokens...]]  ← NEW: recursive compile
+//   5  = Quote block   [5, [...inner_tokens...]]
+//   6  = List          [6, [...element_tokens...]]
+//   7  = Conditional   [7, [then_tokens], [else_tokens]]
+//   8  = Loop          [8, [body_tokens], [cond_tokens]]
 //   13 = Bool literal  [13, 0/1]
-//   14 = ListCount     [14, count]
-//   18 = Pre-compiled PushRef (legacy, passed through)
+//   18 = Pre-compiled PushRef (legacy)
 
 : tk-type { 0 @nth } ;
 : tk-val  { 1 @nth } ;
@@ -18,15 +19,58 @@
 : op-f64   { tk-val [49] ` append } ;
 : op-str   { tk-val [50] ` append } ;
 : op-bool  { tk-val [51] ` append } ;
-: op-list  { tk-val [52] ` append } ;
 : op-op    { tk-val } ;
 : op-call  { tk-val [96] ` append } ;
+: op-list  { tk-val [52] ` append } ;
 : op-ref   { tk-val } ;
 
 // Quote block: recursively compile inner tokens, wrap in PushRef
 : op-quote {
-    tk-val compile                    // compile inner tokens → bytecode list
-    [53] ` append                     // [0x35, [compiled_inner]]
+    tk-val compile
+    [53] ` append
+} ;
+
+// List: compile each element, append [PushLen, PushList]
+: op-list6 {
+    [] tk-val
+    { compile-one ` swap { ` swap ` append } @each } @each
+    tk-val len [48] ` append swap append
+    52 swap append
+} ;
+
+// Conditional: compile then, compile else, measure, emit Cond+Jump
+: op-cond {
+    tk-val                                     // [then_tokens[], else_tokens[]]
+    0 @nth compile                             // then_bc
+    swap 1 @nth compile                        // else_bc
+    // Stack: [then_bc_list, else_bc_list]
+    _ len _ len                                // [then_bc, else_bc, then_len, else_len]
+    // Emit: Cond(then_len+1) + then_bc + Jump(else_len) + else_bc
+    // Cond = [80, offset], Jump = [81, offset]
+    [80] swap 1 + append                       // [80, then_len+1] — Cond opcode
+    swap                                        // [else_bc, Cond_token, then_bc]
+    `                                           // [else_bc, then_bc, Cond_token]
+    swap append                                 // [else_bc, then_bc_with_Cond]
+    [81] ` 4 pick append                        // [81, else_len] — Jump opcode
+    swap append                                 // [..., Jump_token, else_bc]
+    append                                      // [then_bc+Cond, Jump+else_bc]
+} ;
+
+// Loop: compile body, compile cond, measure, emit Loop(offset)
+: op-loop {
+    tk-val                                     // [body_tokens[], cond_tokens[]]
+    0 @nth compile                             // body_bc
+    swap 1 @nth compile                        // cond_bc
+    // Stack: [body_bc, cond_bc]
+    _ len _ len                                // [body_bc, cond_bc, body_len, cond_len]
+    // Loop offset = -(body_len + cond_len + 1)  (jump back past body+cond+Loop)
+    + 1 +                                      // total = body_len + cond_len + 1
+    -1 *                                       // negate for backward jump
+    // Emit: body_bc + cond_bc + Loop(offset)
+    // Loop = [82, offset]
+    [82] swap append                           // [82, -offset] — Loop opcode
+    swap append                                // [body, cond+Loop]
+    swap append                                // [body+cond+Loop]
 } ;
 
 : compile-one {
@@ -37,10 +81,13 @@
     |_ tk-type 3  = ??op-op
     |_ tk-type 4  = ??op-call
     |_ tk-type 5  = ??op-quote
+    |_ tk-type 6  = ??op-list6
+    |_ tk-type 7  = ??op-cond
+    |_ tk-type 8  = ??op-loop
     |_ tk-type 13 = ??op-bool
     |_ tk-type 14 = ??op-list
     |_ tk-type 18 = ??op-ref
-    |drop drop ] ] ] ] ] ] ] ] ]
+    |drop drop ] ] ] ] ] ] ] ] ] ] ] ]
 } ;
 
 : compile {
