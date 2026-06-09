@@ -534,51 +534,40 @@ fn impl_push_ops(x: &mut X, _raw_bc: &[u8]) {
 
     // PUSH_LIST (0x34) — pop count, allocate list in heap, copy elements
     // Heap layout: [count:8B] [elem0:8B] [elem1:8B] ...
+    // Stack grows down: [r15]=last_pushed, [r15+8]=second_last, ...
+    // List order: elem0=first_pushed (deepest), elemN=last_pushed (top)
+    // So heap[i] = stack[count-1-i] = [r15 + (count-1-i)*8]
     x.patch_handler(0x34);
     x.mov_rm(0, 15, 0); // rax = count
     x.add_ri(15, 8); // pop count
-    // Save count to r9
     x.mov_rr(9, 0); // r9 = count
     // Allocate (count+1)*8 bytes
-    x.add_ri(0, 1); // rax = count+1
+    x.add_ri(0, 1);
     x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3
-    x.mov_rr(7, 0); // rdi = size
-    // Call alloc (will be patched)
-    x.push_r(14); x.push_r(13);
+    x.mov_rr(7, 0);
+    x.push_r(9); x.push_r(14); x.push_r(13);
     x.b(0xE8); x.i32(1); // call alloc
-    x.pop_r(13); x.pop_r(14);
-    // rax = list_ptr
+    x.pop_r(13); x.pop_r(14); x.pop_r(9);
     x.mov_rr(8, 0); // r8 = list_ptr
-    // Write count
     x.mov_mr(8, 0, 9); // [r8] = count
-    // Copy elements from stack to heap
-    // Elements are at [r15], [r15+8], ... (count elements)
-    // Heap is at [r8+8], [r8+16], ...
-    x.xor_rr(10, 10); // r10 = 0 (index)
-    // Loop: if r10 >= r9, done
+    // Copy elements in correct order: heap[i] = [r15 + (count-1-i)*8]
+    x.xor_rr(10, 10); // r10 = i (heap index)
     let pl_loop = x.m();
     x.i(&[0x4D, 0x39, 0xCA]); // cmp r10, r9
     let pl_done = x.jge8();
-    // Read element from stack: rax = [r15 + r10*8]
-    x.mov_rr(0, 10);
+    // stack_idx = count - 1 - i
+    x.mov_rr(0, 9); // rax = count
+    x.sub_ri(0, 1); // rax = count - 1
+    x.i(&[0x4C, 0x29, 0xD0]); // sub rax, r10 (rax = count-1-i)
     x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3
     x.i(&[0x49, 0x01, 0xF8]); // add rax, r15
-    x.mov_rm(0, 0, 0); // rax = [rax]
-    // Write to heap: [r8 + 8 + r10*8] = rax
-    x.mov_rr(1, 10);
-    x.i(&[0x48, 0xC1, 0xE1, 0x03]); // shl rcx, 3
-    x.i(&[0x49, 0x01, 0xC8]); // add r8_temp, rcx — wrong, need separate reg
-    // Use r11 as temp: r11 = r8 + 8 + r10*8
-    x.mov_rr(11, 8);
-    x.add_ri(11, 8);
-    x.i(&[0x4D, 0x01, 0xD3]); // add r11, r10 (wrong — need shl first)
-    // Simpler: use indexed store
+    x.mov_rm(0, 0, 0); // rax = [r15 + (count-1-i)*8]
+    // Write to heap: [r8 + 8 + i*8]
     x.mov_rr(11, 10);
     x.i(&[0x49, 0xC1, 0xE3, 0x03]); // shl r11, 3
     x.i(&[0x4D, 0x01, 0xC3]); // add r11, r8
     x.add_ri(11, 8);
-    x.mov_mr(11, 0, 0); // [r11] = rax
-    // Increment index
+    x.mov_mr(11, 0, 0);
     x.add_ri(10, 1);
     let pl_back = x.jmp();
     x.p_i32(pl_back, pl_loop as i32 - (pl_back + 4) as i32);
@@ -2024,8 +2013,8 @@ fn impl_misc_ops(x: &mut X) {
     x.i(&[0x4C, 0x01, 0xC8]); // add rax, r9 (list_ptr)
     x.add_ri(0, 8); // skip count
     x.mov_rm(0, 0, 0); // rax = element (list ptr)
-    // Check if element is a list (ptr > HEAP_VADDR)
-    x.i(&[0x48, 0x3D, 0x00, 0x00, 0x10, 0x00]); // cmp rax, 0x100000
+    // Check if element is a list (ptr >= HEAP_VADDR = 0x500000)
+    x.i(&[0x48, 0x3D, 0x00, 0x00, 0x50, 0x00]); // cmp rax, 0x500000
     let lf_skip = x.jb8();
     // It's a list ptr — read count
     x.mov_rm(1, 0, 0); // rcx = count
@@ -2154,17 +2143,27 @@ fn impl_misc_ops(x: &mut X) {
     x.mov_rm(0, 15, 0); // rax = byte value
     x.add_ri(15, 8); // pop byte
     x.mov_rm(1, 15, 0); // rcx = buffer ptr
-    // Read current length
     x.mov_rm(2, 1, 0); // rdx = length
     // Write byte at [buf + 8 + length]
+    // Use r8 = buf + 8, then add length
     x.mov_rr(8, 1); // r8 = buf
-    x.add_ri(8, 8); // skip length field
-    x.i(&[0x4C, 0x01, 0xD1]); // add rcx, r10? No — add rcx, rdx
-    x.i(&[0x48, 0x01, 0xD1]); // add rcx, rdx
-    x.i(&[0x88, 0x01]); // mov [rcx], al (write byte)
+    x.add_ri(8, 8); // r8 = buf + 8 (data area)
+    x.i(&[0x4C, 0x01, 0xD0]); // add rax? No — we need r8+rdx
+    // Actually: write to [r8 + rdx]
+    x.mov_rr(11, 8); // r11 = buf + 8
+    x.i(&[0x4C, 0x01, 0xD3]); // add r11, r10? No — add r11, rdx
+    // Use: r11 = r8 + rdx
+    x.i(&[0x49, 0x01, 0xD3]); // add r11, rdx
+    // Wait, rdx is register 2, not r10. The add encoding: add r11, rdx
+    // REX.WRB + 01 + ModR/M (mod=11, reg=rdx, r/m=r11)
+    // r11 = 11, rdx = 2. REX = 0x48 | (2>>3)<<2 | (11>>3) = 0x48 | 0 | 1 = 0x49
+    // ModR/M = 0xC0 | (2<<3) | (11&7) = 0xC0 | 0x10 | 3 = 0xD3
+    // So: 0x49, 0x01, 0xD3 — correct!
+    // Store byte: mov [r11], al
+    x.i(&[0x41, 0x88, 0x03]); // mov [r11], al
     // Increment length
     x.add_ri(2, 1);
-    x.mov_mr(1, 0, 2); // [buf] = new length
+    x.mov_mr(1, 0, 2); // [buf] = new length (rcx = buf)
     x.back();
 
     // BytesLen (0xBF) — buf → length
