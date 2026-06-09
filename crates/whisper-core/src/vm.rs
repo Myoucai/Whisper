@@ -723,11 +723,9 @@ impl Vm {
 
     /// Look up a word in the 4-slot cache. Returns None on miss.
     fn word_cache_lookup(&self, name: &str) -> Option<Vec<Opcode>> {
-        for slot in &self.word_cache {
-            if let Some((cached_name, cached_code)) = slot {
-                if cached_name == name {
-                    return Some(cached_code.clone());
-                }
+        for (cached_name, cached_code) in self.word_cache.iter().flatten() {
+            if cached_name == name {
+                return Some(cached_code.clone());
             }
         }
         None
