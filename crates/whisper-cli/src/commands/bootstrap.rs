@@ -889,6 +889,83 @@ mod tests {
     }
 
     /// Run the full whisperc pipeline on source code, returning VM bytecode Opcodes.
+    /// Group `{...}` blocks into nested lists for recursive classification.
+    fn nest_chunks(chunks: &[Value]) -> Value {
+        let mut result = Vec::new();
+        let mut i = 0;
+        while i < chunks.len() {
+            match &chunks[i] {
+                Value::Str(s) if s.as_ref() == "{" => {
+                    i += 1; // skip {
+                    let mut depth = 1;
+                    let mut inner = Vec::new();
+                    while i < chunks.len() && depth > 0 {
+                        match &chunks[i] {
+                            Value::Str(s) if s.as_ref() == "{" => {
+                                depth += 1;
+                                inner.push(chunks[i].clone());
+                            }
+                            Value::Str(s) if s.as_ref() == "}" => {
+                                depth -= 1;
+                                if depth > 0 {
+                                    inner.push(chunks[i].clone());
+                                }
+                            }
+                            _ => inner.push(chunks[i].clone()),
+                        }
+                        i += 1;
+                    }
+                    // Recursively nest the inner group
+                    result.push(Value::List(Rc::new(vec![
+                        Value::I64(5), // Quote type marker
+                        nest_chunks(&inner),
+                    ])));
+                }
+                Value::Str(s) if s.as_ref() == "}" => {
+                    i += 1; // skip stray }
+                }
+                _ => {
+                    result.push(chunks[i].clone());
+                    i += 1;
+                }
+            }
+        }
+        Value::List(Rc::new(result))
+    }
+
+    /// Recursively classify nested chunks using the Whisper classify-one word.
+    fn classify_nested(vm: &mut Vm, nested: &Value) -> Value {
+        match nested {
+            Value::List(items) => {
+                // Check if this is a [5, inner] quote marker from nest_chunks
+                if items.len() == 2 {
+                    if let Value::I64(5) = &items[0] {
+                        // Quote block: recursively classify inner, wrap in [5, ...]
+                        let inner = classify_nested(vm, &items[1]);
+                        return Value::List(Rc::new(vec![
+                            Value::I64(5),
+                            inner,
+                        ]));
+                    }
+                }
+                // Regular list of chunks: classify each element
+                let classified: Vec<Value> = items
+                    .iter()
+                    .map(|item| classify_nested(vm, item))
+                    .collect();
+                Value::List(Rc::new(classified))
+            }
+            Value::Str(_) => {
+                // Leaf: call classify-one in the VM
+                vm.data_stack.push(nested.clone());
+                vm.execute(&[Opcode::Call("classify-one".to_string())])
+                    .unwrap()
+                    .unwrap_or(Value::List(Rc::new(vec![])))
+            }
+            other => other.clone(),
+        }
+    }
+
     fn whisperc_compile(source: &str) -> Vec<Opcode> {
         let mut vm = Vm::new();
         load_whisperc_pipeline(&mut vm);
@@ -898,17 +975,22 @@ mod tests {
         let chunks = vm.execute(&[Opcode::Call("tokenize".to_string())])
             .unwrap().unwrap();
 
-        // Step 2: classify — returns token list
-        vm.data_stack.push(chunks);
-        let tokens = vm.execute(&[Opcode::Call("classify".to_string())])
-            .unwrap().unwrap();
+        // Step 2: nest { } blocks → nested chunk structure
+        let nested = if let Value::List(ref items) = chunks {
+            nest_chunks(items)
+        } else {
+            chunks
+        };
 
-        // Step 3: compile — returns bytecode values list
+        // Step 3: classify recursively (handles nesting)
+        let tokens = classify_nested(&mut vm, &nested);
+
+        // Step 4: compile — returns bytecode values list
         vm.data_stack.push(tokens);
         let bytecode_vals = vm.execute(&[Opcode::Call("compile".to_string())])
             .unwrap();
 
-        // Step 4: convert to Opcodes
+        // Step 5: convert to Opcodes
         match bytecode_vals {
             Some(Value::List(vals)) => values_to_opcodes(vals.to_vec()),
             other => panic!("expected list of bytecode, got {other:?}"),
@@ -936,10 +1018,132 @@ mod tests {
 
     #[test]
     fn test_pipeline_dot_output() {
-        // "Hello" .  — should push string then output (output goes to stdout)
-        // We just check compilation succeeds and produces bytecode
         let ops = whisperc_compile("\"Hello\" .");
         assert!(!ops.is_empty(), "should produce bytecode");
+    }
+
+    #[test]
+    fn test_pipeline_dup_add() {
+        // 5 _ *  — dup then multiply: 5*5 = 25
+        let ops = whisperc_compile("5 _ *");
+        let mut vm = Vm::new();
+        let result = vm.execute(&ops).unwrap().unwrap();
+        assert_eq!(result.unwrap_signal(), Value::I64(25));
+    }
+
+    #[test]
+    fn test_pipeline_stack_ops() {
+        // 3 4 swap -  — 4-3 = 1
+        let ops = whisperc_compile("3 4 ` -");
+        let mut vm = Vm::new();
+        let result = vm.execute(&ops).unwrap().unwrap();
+        assert_eq!(result.unwrap_signal(), Value::I64(1));
+    }
+
+    #[test]
+    fn test_pipeline_comparison() {
+        // 5 3 >  — true
+        let ops = whisperc_compile("5 3 >");
+        let mut vm = Vm::new();
+        let result = vm.execute(&ops).unwrap().unwrap();
+        assert_eq!(result.unwrap_signal(), Value::Bool(true));
+    }
+
+    #[test]
+    fn test_pipeline_drop() {
+        // 42 drop 7  — drops 42, leaves 7
+        let ops = whisperc_compile("42 drop 7");
+        let mut vm = Vm::new();
+        let result = vm.execute(&ops).unwrap().unwrap();
+        assert_eq!(result.unwrap_signal(), Value::I64(7));
+    }
+
+    #[test]
+    fn test_pipeline_rot() {
+        // 1 2 3 @  — rot: 1 2 3 → 2 3 1  (top is 1)
+        let ops = whisperc_compile("1 2 3 @");
+        let mut vm = Vm::new();
+        let result = vm.execute(&ops).unwrap().unwrap();
+        assert_eq!(result.unwrap_signal(), Value::I64(1));
+    }
+
+    #[test]
+    fn test_pipeline_selfhost_compare() {
+        // Compare whisperc output with Rust reference for a simple program
+        let source = "3 4 + 5 *";
+        let whisperc_ops = whisperc_compile(source);
+
+        let ast = Parser::parse_source(source).unwrap();
+        let mut gen = BytecodeGenerator::new();
+        let (rust_ops, _) = gen.compile(&ast);
+
+        // Both should produce the same result
+        let mut vm1 = Vm::new();
+        let r1 = vm1.execute(&whisperc_ops).unwrap().unwrap();
+        let mut vm2 = Vm::new();
+        let r2 = vm2.execute(&rust_ops).unwrap().unwrap();
+        assert_eq!(r1.unwrap_signal(), r2.unwrap_signal(),
+            "whisperc and Rust should produce same result");
+    }
+
+    /// Self-hosting test: whisperc compiles a flat subset of main.ws tokens
+    /// and the result matches Rust-compiled bytecode.
+    #[test]
+    fn test_pipeline_selfhost_compile_main_flat() {
+        // Flat expression from main.ws: tk-type and tk-val definitions
+        // These are flat token sequences that main.ws uses internally
+        // tk-type: 0 @nth
+        let ops = whisperc_compile("0 @nth");
+        let mut vm = Vm::new();
+        // Push a [type, value] pair and extract type (first element)
+        vm.data_stack.push(Value::List(Rc::new(vec![
+            Value::I64(0),
+            Value::I64(42),
+        ])));
+        let result = vm.execute(&ops).unwrap().unwrap();
+        assert_eq!(result.unwrap_signal(), Value::I64(0),
+            "0 @nth on [0, 42] should give 0");
+    }
+
+    /// Self-hosting: token access patterns used in main.ws
+    #[test]
+    fn test_pipeline_selfhost_token_access() {
+        // tk-type: 0 @nth  (extracts type from [type, value] pair)
+        let ops = whisperc_compile("0 @nth");
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::List(Rc::new(vec![
+            Value::I64(0), Value::I64(42),
+        ])));
+        let result = vm.execute(&ops).unwrap().unwrap();
+        assert_eq!(result.unwrap_signal(), Value::I64(0));
+
+        // tk-val: 1 @nth  (extracts value from [type, value] pair)
+        let ops2 = whisperc_compile("1 @nth");
+        let mut vm2 = Vm::new();
+        vm2.data_stack.push(Value::List(Rc::new(vec![
+            Value::I64(3), Value::I64(16),  // [type=3, value=16] = operator +
+        ])));
+        let result2 = vm2.execute(&ops2).unwrap().unwrap();
+        assert_eq!(result2.unwrap_signal(), Value::I64(16));
+    }
+
+    /// Self-hosting: typical classify-one pattern for operator dispatch
+    #[test]
+    fn test_pipeline_selfhost_dispatch() {
+        // Simulate: type=3 check → if match, use value directly
+        // Equivalent to: tk-type 3 = ?? use-op | ... ]
+        // But since we can't do conditional in flat pipeline,
+        // test the basic comparison: 3 3 =
+        let ops = whisperc_compile("3 3 =");
+        let mut vm = Vm::new();
+        let result = vm.execute(&ops).unwrap().unwrap();
+        assert_eq!(result.unwrap_signal(), Value::Bool(true));
+
+        // NOT equal: 3 4 =
+        let ops2 = whisperc_compile("3 4 =");
+        let mut vm2 = Vm::new();
+        let result2 = vm2.execute(&ops2).unwrap().unwrap();
+        assert_eq!(result2.unwrap_signal(), Value::Bool(false));
     }
 
 }

@@ -27,13 +27,25 @@
     | _ "|"   streq ?? drop [3] 33 append
     | _ "!"   streq ?? drop [3] 34 append
     | _ "_"   streq ?? drop [3] 0 append
-    | _ "@"   streq ?? drop [3] 3 append
+    | _ "@"    streq ?? drop [3] 3 append
+    | _ "@nth" streq ?? drop [3] 64 append
+    | _ "@map" streq ?? drop [3] 67 append
+    | _ "@each" streq ?? drop [3] 68 append
+    | _ "@fold" streq ?? drop [3] 69 append
+    | _ "@times" streq ?? drop [3] 83 append
     | _ "."   streq ?? drop [3] 144 append
     | _ ".."  streq ?? drop [3] 145 append
     | _ ","   streq ?? drop [3] 146 append
     | _ ":"   streq ?? drop [3] 160 append
     | _ ";"   streq ?? drop [3] 161 append
     | _ "`"   streq ?? drop [3] 1 append
+    | _ "??"  streq ?? drop [3] 80 append
+    | _ "?|"  streq ?? drop [3] 129 append
+    | _ "?->" streq ?? drop [3] 80 append
+    | _ "#"   streq ?? drop [3] 83 append
+    | _ "["   streq ?? drop [3] 0 append
+    | _ "]"   streq ?? drop [3] 0 append
+    | _ "$"   streq ?? drop [3] 4 append
     | _ "dup"   streq ?? drop [3] 0 append
     | _ "drop"  streq ?? drop [3] 2 append
     | _ "mod"   streq ?? drop [3] 20 append
@@ -68,7 +80,7 @@
     | _ "json-stringify" streq ?? drop [3] 183 append
     | _ is-num-str ?? [0] ` strtoi64 append
     | [4] ` append
-    ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
+    ]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]
 } ;
 
 : classify { { classify-one } @map } ;
