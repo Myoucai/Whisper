@@ -181,26 +181,6 @@ fn test_wbin_roundtrip_full() {
 }
 
 #[test]
-fn test_wasm_generation() {
-    use whisper_codegen::wasm_gen::WasmGenerator;
-    let source = "3 4 +";
-    let ast = Parser::parse_source(source).unwrap();
-    let mut gen = BytecodeGenerator::new();
-    let (bytecode, _defs) = gen.compile(&ast);
-
-    let wasm_gen = WasmGenerator::new(bytecode);
-    let wasm = wasm_gen.compile();
-
-    // Valid WASM must start with magic
-    assert_eq!(&wasm[0..4], b"\0asm");
-    assert!(
-        wasm.len() > 50,
-        "WASM module too small: {} bytes",
-        wasm.len()
-    );
-}
-
-#[test]
 fn test_negative_numbers() {
     assert_eval("0 5 -", Value::I64(-5));
     assert_eval("0 10 - 0 3 - +", Value::I64(-13));

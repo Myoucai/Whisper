@@ -1,20 +1,13 @@
-// Whisper Codegen - Code generation from AST to bytecode and WASM
+// Whisper Codegen - Code generation from AST to bytecode and native ELF
 
 pub mod bytecode_gen;
-pub mod c_gen;
 pub mod formatter;
 pub mod native_gen;
 pub mod optimizer;
-pub mod wasm_compiler;
-pub mod wasm_gen;
-mod wasm_utils;
 pub mod wbin;
 
 pub use bytecode_gen::BytecodeGenerator;
-pub use c_gen::compile_to_c;
 pub use formatter::format_ast;
 pub use native_gen::compile_to_native;
 pub use optimizer::optimize;
-pub use wasm_compiler::compile_direct;
-pub use wasm_gen::WasmGenerator;
 pub use wbin::WbinWriter;

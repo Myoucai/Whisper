@@ -485,16 +485,6 @@ fn capability_bound_executes() {
 // ── WASM compilation ──────────────────────────────────────────────────
 
 #[test]
-fn wasm_compiles_hello() {
-    let source = "\"Hi\" .";
-    let ast = Parser::parse_source(source).unwrap();
-    let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
-    let wasm = whisper_codegen::compile_direct(&bc);
-    assert_eq!(&wasm[0..4], b"\0asm");
-    assert!(wasm.len() > 50, "WASM too small");
-}
-
 // ── .wbin roundtrip ──────────────────────────────────────────────────
 
 #[test]

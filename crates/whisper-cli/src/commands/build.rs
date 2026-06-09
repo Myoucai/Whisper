@@ -1,4 +1,4 @@
-//! whisper build — Compile .ws to .wbin or .wasm
+//! whisper build — Compile .ws to .wbin or native ELF
 
 use std::path::Path;
 use whisper_codegen::bytecode_gen::BytecodeGenerator;
@@ -45,19 +45,6 @@ pub fn build_file(
             let size = std::fs::metadata(output_path).map(|m| m.len()).unwrap_or(0);
             println!("Compiled {} bytes → {}", size, output);
         }
-        "wasm" => {
-            let wasm = whisper_codegen::compile_direct(&bytecode);
-            std::fs::write(output, wasm).map_err(|e| format!("Failed to write WASM: {e}"))?;
-            let size = std::fs::metadata(output).map(|m| m.len()).unwrap_or(0);
-            println!("Compiled {} bytes → {}", size, output);
-        }
-        "c" => {
-            let c_code = whisper_codegen::compile_to_c(&bytecode, &defs);
-            std::fs::write(output, &c_code).map_err(|e| format!("Failed to write C: {e}"))?;
-            let size = std::fs::metadata(output).map(|m| m.len()).unwrap_or(0);
-            println!("Compiled {} bytes → {}", size, output);
-            println!("Build with: gcc -O2 {output} -o program -lm && ./program");
-        }
         "native" | "elf" => {
             let elf = whisper_codegen::compile_to_native(&bytecode, &defs);
             std::fs::write(output, &elf).map_err(|e| format!("Failed to write ELF: {e}"))?;
@@ -73,7 +60,7 @@ pub fn build_file(
             println!("Run: ./{output}");
         }
         other => {
-            return Err(format!("Unknown target: {other}. Supported: wbin, wasm, c, native"));
+            return Err(format!("Unknown target: {other}. Supported: wbin, native"));
         }
     }
 

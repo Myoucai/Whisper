@@ -9,7 +9,7 @@ fn help() {
     println!();
     println!("USAGE:");
     println!("  whisper run    <file.ws>    Execute a Whisper source file");
-    println!("  whisper build  <file.ws>    Compile to .wbin or .wasm");
+    println!("  whisper build  <file.ws>    Compile to .wbin or native ELF");
     println!("  whisper check  <file.ws>    Type-check without executing");
     println!("  whisper repl               Start interactive REPL");
     println!("  whisper fmt    <file.ws>    Format a source file");
@@ -21,7 +21,7 @@ fn help() {
     println!("  whisper lsp                 Start LSP language server");
     println!();
     println!("OPTIONS:");
-    println!("  --target wbin|wasm|c         Build target (default: wbin)");
+    println!("  --target wbin|native         Build target (default: wbin)");
     println!("  -o <file>                   Output file path");
     println!("  --allow-http                Enable HTTP capabilities");
     println!("  --allow-file-read           Enable file read capability");
@@ -113,7 +113,7 @@ fn cmd_build(args: &[String]) -> Result<(), String> {
         .ok_or("Expected: whisper build <file.ws>")?;
     let target = get_opt(args, "--target").unwrap_or_else(|| "wbin".into());
     let output = get_opt(args, "-o").unwrap_or_else(|| {
-        let ext = if target == "wasm" { "wasm" } else { "wbin" };
+        let ext = if target == "native" || target == "elf" { "elf" } else { "wbin" };
         file.replace(".ws", &format!(".{ext}"))
     });
     let source = std::fs::read_to_string(file).map_err(|e| format!("Cannot read '{file}': {e}"))?;
