@@ -55,22 +55,24 @@ pub struct Vm {
     /// PRNG state for probabilistic choice (`?|`)
     rng_state: u64,
     /// 4-entry word lookup cache: fixed-size array with round-robin replacement.
-    /// Avoids HashMap lookup on repeated calls across a small working set.
-    word_cache: [Option<(String, Vec<Opcode>)>; 4],
+    /// Stores Rc<[Opcode]> to avoid clone+allocation on cache hits.
+    word_cache: [Option<(String, Rc<[Opcode]>)>; 4],
     word_cache_pos: usize,
     /// Byte buffers for binary output (BytesNew, BytesPush, etc.).
     byte_buffers: Vec<Vec<u8>>,
 }
 
+fn generate_rng_seed() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos() as u64)
+        .unwrap_or(0xDEAD_BEEF)
+        .wrapping_mul(0x2545F4914F6CDD1D)
+}
+
 impl Vm {
     /// Create a new VM with empty stacks and default settings.
     pub fn new() -> Self {
-        // Seed PRNG with system time for probabilistic choice
-        let seed = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos() as u64)
-            .unwrap_or(0xDEAD_BEEF)
-            .wrapping_mul(0x2545F4914F6CDD1D);
         Vm {
             data_stack: Vec::new(),
             call_stack: Vec::new(),
@@ -78,7 +80,7 @@ impl Vm {
             capability_table: CapabilityTable::new(),
             memory: Vec::new(),
             trace: false,
-            rng_state: seed,
+            rng_state: generate_rng_seed(),
             word_cache: [const { None }, const { None }, const { None }, const { None }],
             word_cache_pos: 0,
             byte_buffers: Vec::new(),
@@ -87,11 +89,6 @@ impl Vm {
 
     /// Create a VM with a pre-bound capability table.
     pub fn with_capabilities(capability_table: CapabilityTable) -> Self {
-        let seed = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos() as u64)
-            .unwrap_or(0xDEAD_BEEF)
-            .wrapping_mul(0x2545F4914F6CDD1D);
         Vm {
             data_stack: Vec::new(),
             call_stack: Vec::new(),
@@ -99,7 +96,7 @@ impl Vm {
             capability_table,
             memory: Vec::new(),
             trace: false,
-            rng_state: seed,
+            rng_state: generate_rng_seed(),
             word_cache: [const { None }, const { None }, const { None }, const { None }],
             word_cache_pos: 0,
             byte_buffers: Vec::new(),
@@ -241,7 +238,7 @@ impl Vm {
             Opcode::Eq => {
                 let a = self.pop()?;
                 let b = self.pop()?;
-                let result = a.clone().unwrap_signal().equals(&b.clone().unwrap_signal());
+                let result = a.equals(&b);
                 self.data_stack.push(Value::Bool(result));
             }
             Opcode::Lt => self.compare_op(|a, b| a < b)?,
@@ -249,8 +246,7 @@ impl Vm {
             Opcode::Neq => {
                 let a = self.pop()?;
                 let b = self.pop()?;
-                self.data_stack
-                    .push(Value::Bool(!a.unwrap_signal().equals(&b.unwrap_signal())));
+                self.data_stack.push(Value::Bool(!a.equals(&b)));
             }
             Opcode::Le => self.compare_op(|a, b| a <= b)?,
             Opcode::Ge => self.compare_op(|a, b| a >= b)?,
@@ -360,7 +356,7 @@ impl Vm {
                     self.data_stack.push(acc.clone());
                     self.data_stack.push(item.clone());
                     self.execute_ref(&quot)?;
-                    acc = self.pop().unwrap_or(acc);
+                    acc = self.pop()?;
                 }
                 self.data_stack.push(acc);
             }
@@ -588,19 +584,19 @@ impl Vm {
                 if !cond {
                     // Jump forward by offset (skip then-branch)
                     let frame = self.call_stack.last_mut().unwrap();
-                    frame.ip = (frame.ip as i32 + offset) as usize;
+                    frame.ip = (frame.ip as i64 + *offset as i64) as usize;
                 }
             }
             Opcode::Jump(offset) => {
                 let frame = self.call_stack.last_mut().unwrap();
-                frame.ip = (frame.ip as i32 + offset) as usize;
+                frame.ip = (frame.ip as i64 + *offset as i64) as usize;
             }
             Opcode::Loop(offset) => {
                 // Check condition at top of stack; if true, jump back
                 let cond = self.pop_bool()?;
                 if cond {
                     let frame = self.call_stack.last_mut().unwrap();
-                    frame.ip = (frame.ip as i32 + offset) as usize;
+                    frame.ip = (frame.ip as i64 + *offset as i64) as usize;
                 }
                 // If false, fall through (exit loop)
             }
@@ -614,21 +610,23 @@ impl Vm {
 
             // === Call/Return ===
             Opcode::Call(name) => {
-                // Check 4-slot cache first
+                // Check 4-slot cache first (Rc::clone is just a refcount bump)
                 let word_code = if let Some(code) = self.word_cache_lookup(name) {
                     code
                 } else {
-                    let code = self
-                        .word_dict
-                        .get(name)
-                        .cloned()
-                        .ok_or_else(|| VmError::UndefinedWord(name.clone()))?;
+                    let code: Rc<[Opcode]> = Rc::from(
+                        self.word_dict
+                            .get(name)
+                            .cloned()
+                            .ok_or_else(|| VmError::UndefinedWord(name.clone()))?
+                            .into_boxed_slice(),
+                    );
                     self.word_cache_insert(name.clone(), code.clone());
                     code
                 };
                 let frame = CallFrame {
                     word_name: Some(name.clone()),
-                    code: Rc::from(word_code.into_boxed_slice()),
+                    code: word_code,
                     ip: 0,
                     base: self.data_stack.len(),
                 };
@@ -722,17 +720,17 @@ impl Vm {
     // === Helper methods ===
 
     /// Look up a word in the 4-slot cache. Returns None on miss.
-    fn word_cache_lookup(&self, name: &str) -> Option<Vec<Opcode>> {
+    fn word_cache_lookup(&self, name: &str) -> Option<Rc<[Opcode]>> {
         for (cached_name, cached_code) in self.word_cache.iter().flatten() {
             if cached_name == name {
-                return Some(cached_code.clone());
+                return Some(cached_code.clone()); // Rc::clone is just a refcount bump
             }
         }
         None
     }
 
     /// Insert a word into the cache using round-robin replacement.
-    fn word_cache_insert(&mut self, name: String, code: Vec<Opcode>) {
+    fn word_cache_insert(&mut self, name: String, code: Rc<[Opcode]>) {
         let pos = self.word_cache_pos;
         self.word_cache[pos] = Some((name, code));
         self.word_cache_pos = (pos + 1) % 4;
