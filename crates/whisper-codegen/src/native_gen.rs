@@ -2034,11 +2034,76 @@ fn impl_misc_ops(x: &mut X) {
     x.mov_mr(15, 0, 8);
     x.back();
 
-    // Bytes ops (0xBD-0xC0) — placeholders
-    for op in 0xBD..=0xC0 {
-        x.patch_handler(op);
-        x.back();
-    }
+    // BytesNew (0xBD) — push new empty byte buffer
+    // Buffer layout in heap: [length:8B] [data:...]
+    x.patch_handler(0xBD);
+    // Allocate 4096 bytes for buffer
+    x.mov_r64i(7, 4096);
+    x.push_r(14); x.push_r(13);
+    x.b(0xE8); x.i32(1); // call alloc
+    x.pop_r(13); x.pop_r(14);
+    // rax = buffer ptr, write length = 0
+    x.i(&[0x48, 0xC7, 0x00, 0x00, 0x00, 0x00, 0x00]); // mov qword [rax], 0
+    x.sub_ri(15, 8);
+    x.mov_mr(15, 0, 0);
+    x.back();
+
+    // BytesPush (0xBE) — buf byte → buf
+    x.patch_handler(0xBE);
+    x.mov_rm(0, 15, 0); // rax = byte value
+    x.add_ri(15, 8); // pop byte
+    x.mov_rm(1, 15, 0); // rcx = buffer ptr
+    // Read current length
+    x.mov_rm(2, 1, 0); // rdx = length
+    // Write byte at [buf + 8 + length]
+    x.mov_rr(8, 1); // r8 = buf
+    x.add_ri(8, 8); // skip length field
+    x.i(&[0x4C, 0x01, 0xD1]); // add rcx, r10? No — add rcx, rdx
+    x.i(&[0x48, 0x01, 0xD1]); // add rcx, rdx
+    x.i(&[0x88, 0x01]); // mov [rcx], al (write byte)
+    // Increment length
+    x.add_ri(2, 1);
+    x.mov_mr(1, 0, 2); // [buf] = new length
+    x.back();
+
+    // BytesLen (0xBF) — buf → length
+    x.patch_handler(0xBF);
+    x.mov_rm(0, 15, 0); // rax = buffer ptr
+    x.mov_rm(0, 0, 0); // rax = [rax] = length
+    x.mov_mr(15, 0, 0);
+    x.back();
+
+    // BytesWriteFile (0xC0) — buf path → (nothing)
+    x.patch_handler(0xC0);
+    x.mov_rm(8, 15, 0); // r8 = path string addr
+    x.mov_rm(9, 15, 8); // r9 = buffer ptr
+    x.add_ri(15, 16); // pop both
+    // open(path, O_WRONLY|O_CREAT|O_TRUNC, 0644)
+    // syscall 2 on x86-64 Linux
+    x.mov_r64i(0, 2); // rax = 2 (open)
+    x.mov_rr(7, 8); // rdi = path (r8→rdi)
+    x.mov_r64i(6, 0x241); // rsi = flags (O_WRONLY|O_CREAT|O_TRUNC = 0x241)
+    x.mov_r64i(2, 0x1A4); // rdx = mode 0644
+    x.syscall();
+    // rax = fd (or error)
+    x.i(&[0x48, 0x85, 0xC0]); // test rax, rax
+    let bw_ok = x.jg8();
+    x.back(); // error: skip write
+    x.patch_jmp_rel8(bw_ok);
+    // Save fd
+    x.mov_rr(10, 0); // r10 = fd
+    // write(fd, buf+8, length)
+    x.mov_r64i(0, 1); // rax = 1 (write)
+    x.mov_rr(7, 10); // rdi = fd
+    x.mov_rr(6, 9); // rsi = buf+8 (data area)
+    x.add_ri(6, 8);
+    x.mov_rm(2, 9, 0); // rdx = length
+    x.syscall();
+    // close(fd)
+    x.mov_r64i(0, 3); // rax = 3 (close)
+    x.mov_rr(7, 10); // rdi = fd
+    x.syscall();
+    x.back();
 
     // Try (0xC1) — placeholder: just execute the ref
     x.patch_handler(0xC1);
