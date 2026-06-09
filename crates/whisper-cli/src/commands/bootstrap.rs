@@ -239,6 +239,7 @@ pub fn hard_bootstrap_compile(source: &str) -> Result<(), String> {
 }
 
 /// Convert AST nodes back to a source string for re-lexing by whisperc.
+#[allow(dead_code)]
 fn nodes_to_source_string(nodes: &[AstNode]) -> String {
     use std::fmt::Write;
     let mut s = String::new();
@@ -280,6 +281,7 @@ fn nodes_to_source_string(nodes: &[AstNode]) -> String {
     s
 }
 
+#[allow(dead_code)]
 fn operator_to_str(op: Operator) -> &'static str {
     match op {
         Operator::Dup => "_",
@@ -318,6 +320,7 @@ fn operator_to_str(op: Operator) -> &'static str {
 }
 
 /// Compile source string through the full whisperc pipeline.
+#[allow(dead_code)]
 fn compile_via_whisperc_pipeline(vm: &mut Vm, source: &str) -> Result<Vec<Opcode>, String> {
     vm.data_stack.push(Value::Str(Rc::new(source.to_string())));
     let chunks = vm.execute(&[Opcode::Call("tokenize".to_string())])

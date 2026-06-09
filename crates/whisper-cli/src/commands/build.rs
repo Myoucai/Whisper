@@ -31,7 +31,7 @@ pub fn build_file(
 
     // Phase 2b: Optimize bytecode
     let bytecode = whisper_codegen::optimize(&bytecode);
-    let _defs: Vec<_> = defs
+    let defs: Vec<_> = defs
         .into_iter()
         .map(|(k, v)| (k, whisper_codegen::optimize(&v)))
         .collect();
@@ -52,11 +52,11 @@ pub fn build_file(
             println!("Compiled {} bytes → {}", size, output);
         }
         "c" => {
-            let c_code = whisper_codegen::compile_to_c(&bytecode);
+            let c_code = whisper_codegen::compile_to_c(&bytecode, &defs);
             std::fs::write(output, &c_code).map_err(|e| format!("Failed to write C: {e}"))?;
             let size = std::fs::metadata(output).map(|m| m.len()).unwrap_or(0);
             println!("Compiled {} bytes → {}", size, output);
-            println!("Build with: gcc {output} -o program && ./program");
+            println!("Build with: gcc -O2 {output} -o program -lm && ./program");
         }
         other => {
             return Err(format!("Unknown target: {other}. Supported: wbin, wasm, c"));
