@@ -85,5 +85,88 @@
 
 : classify { { classify-one } @map } ;
 
+// ── Recursive classification for structured token trees ─────────────
+// Each handler takes [list] on the stack and returns [classified_list].
+// "over" is used to access the original list without consuming it.
+
+: cl-quote {
+    over 1 @nth classify-nested   // [list, inner_c]
+    [5] swap append               // [list, [5, inner_c]]
+    swap drop
+} ;
+: cl-list {
+    over 1 @nth { classify-nested } @map
+    [6] swap append
+    swap drop
+} ;
+: cl-cond {
+    over 1 @nth classify-nested   // [list, then_c]
+    over 2 @nth classify-nested   // [list, then_c, else_c]
+    [7] swap append append        // [7, then_c, else_c]
+    swap drop
+} ;
+: cl-loop {
+    over 1 @nth classify-nested
+    over 2 @nth classify-nested
+    [8] swap append append
+    swap drop
+} ;
+
+: classify-nested {
+    _ list? ??
+        _ len 0 = ?? ]
+        dup 0 @nth _ i64? ??
+            // Tagged list — dispatch on tag
+            over 0 @nth _ 5 = ??
+                drop cl-quote
+            | over 0 @nth _ 6 = ??
+                drop cl-list
+            | over 0 @nth _ 7 = ??
+                drop cl-cond
+            | over 0 @nth _ 8 = ??
+                drop cl-loop
+            | over 0 @nth _ 9 = ??
+                drop
+                // Special handling for Def: don't classify the name
+                // [9, name, body] → [9, name, body_classified]
+                dup 2 @nth classify-nested   // classify body
+                // Stack: [list, body_c]
+                // Need to rebuild: [9, original_name, body_c]
+                // original_name = list[1]
+                over 1 @nth                  // [list, body_c, name]
+                rot                          // [body_c, name, list]
+                drop                         // [body_c, name]
+                [9] swap append              // [[9, name], body_c]
+                // Hmm, [9] + name = [9, name], then append body_c = [9, name, body_c]
+                // But append is: list elem → new_list
+                // So [9] name append → [9, name]. Good.
+                // Then [9, name] body_c append → [9, name, body_c]. Good!
+                append                       // [9, name, body_c]
+            | drop                           // unknown tag
+            ]]]]]
+        |
+            // Untagged list — classify each element
+            drop
+            { classify-nested } @map
+        ]
+    |
+        // Not a list
+        _ str? ??
+            _ 0 strnth 34 = ??
+                // String literal (starts with ") — wrap as [2, content]
+                drop
+                1 9999 strslice
+                [2] swap append
+            |
+                // Regular string token — classify via classify-one
+                classify-one
+            ]
+        |
+            // Non-string, non-list — pass through
+        ]
+    ]
+} ;
+
 export classify
 export classify-one
+export classify-nested

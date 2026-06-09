@@ -26,6 +26,10 @@ pub struct Parser {
     /// Brace nesting depth tracker.  Used to auto-close at EOF.
     brace_depth: usize,
     bracket_depth: usize,
+    /// Conditional nesting depth (??...|...] blocks).
+    cond_depth: usize,
+    /// Stack of bracket_depth values saved when entering each ?? block.
+    cond_bracket_stack: Vec<usize>,
     /// Whether we're in recovering mode (collect errors, don't abort).
     recovering: bool,
 }
@@ -53,6 +57,8 @@ impl Parser {
             errors: Vec::new(),
             brace_depth: 0,
             bracket_depth: 0,
+            cond_depth: 0,
+            cond_bracket_stack: Vec::new(),
             recovering: false,
         }
     }
@@ -228,7 +234,7 @@ impl Parser {
             TokenKind::LBracket => {
                 self.advance();
                 self.bracket_depth += 1;
-                let items = self.parse_until_recovering(TokenKind::RBracket);
+                let items = self.parse_until_recovering_inner(TokenKind::RBracket, true);
                 if self.bracket_depth > 0 {
                     self.bracket_depth -= 1;
                 }
@@ -289,7 +295,9 @@ impl Parser {
             // Conditional: ??true-expr|false-expr]
             TokenKind::CondQ => {
                 self.advance();
-                self.bracket_depth += 1;
+                self.cond_depth += 1;
+                self.cond_bracket_stack.push(self.bracket_depth);
+                self.bracket_depth = 0; // reset for inside ??
                 let then_branch =
                     self.parse_until_any_recovering(&[TokenKind::Or, TokenKind::RBracket]);
                 let else_branch = if matches!(self.current().kind, TokenKind::Or) {
@@ -309,13 +317,13 @@ impl Parser {
                             token: self.current().clone(),
                         });
                     }
-                    if self.bracket_depth > 0 {
-                        self.bracket_depth -= 1;
-                    }
                     None
                 };
-                if self.bracket_depth > 0 {
-                    self.bracket_depth -= 1;
+                if self.cond_depth > 0 {
+                    self.cond_depth -= 1;
+                }
+                if let Some(saved) = self.cond_bracket_stack.pop() {
+                    self.bracket_depth = saved;
                 }
                 Ok(Some(AstNode::Cond {
                     then_branch,
@@ -784,7 +792,29 @@ impl Parser {
     /// Parse nodes until a matching end delimiter, with error recovery.
     /// On missing closer: auto-recover at EOF or sync point.
     fn parse_until_recovering(&mut self, end: TokenKind) -> Vec<AstNode> {
-        if std::mem::discriminant(&self.current().kind) == std::mem::discriminant(&end) {
+        self.parse_until_recovering_inner(end, false)
+    }
+
+    /// Parse nodes until end delimiter. `inside_list` = true means we're inside
+    /// a `[...]` list and `]` should always close it.
+    fn parse_until_recovering_inner(
+        &mut self,
+        end: TokenKind,
+        inside_list: bool,
+    ) -> Vec<AstNode> {
+        let is_rbracket = std::mem::discriminant(&end)
+            == std::mem::discriminant(&TokenKind::RBracket);
+        // For RBracket: stop only when not inside a [..] list (bracket_depth == 0).
+        // When bracket_depth > 0, ] belongs to the list, not to us.
+        // Exception: if inside_list is true, always stop (we're the list parser).
+        let can_stop = if is_rbracket && !inside_list {
+            self.bracket_depth == 0
+        } else {
+            true
+        };
+        if can_stop
+            && std::mem::discriminant(&self.current().kind) == std::mem::discriminant(&end)
+        {
             self.advance();
             return Vec::new();
         }
@@ -792,7 +822,14 @@ impl Parser {
         let start_pos = self.pos;
         let mut nodes = Vec::new();
         while !self.is_at_end() {
-            if std::mem::discriminant(&self.current().kind) == std::mem::discriminant(&end) {
+            let should_stop = if is_rbracket && !inside_list {
+                self.bracket_depth == 0
+                    && std::mem::discriminant(&self.current().kind)
+                        == std::mem::discriminant(&end)
+            } else {
+                std::mem::discriminant(&self.current().kind) == std::mem::discriminant(&end)
+            };
+            if should_stop {
                 self.advance(); // consume end delimiter
                 return Self::fold_syntax_sugar(nodes);
             }
@@ -822,10 +859,19 @@ impl Parser {
         let mut nodes = Vec::new();
         while !self.is_at_end() {
             let current_disc = std::mem::discriminant(&self.current().kind);
-            if ends
-                .iter()
-                .any(|e| std::mem::discriminant(e) == current_disc)
-            {
+            let should_stop = ends.iter().any(|e| {
+                let e_disc = std::mem::discriminant(e);
+                // Don't stop at RBracket if we're inside a [..] list (bracket_depth > 0).
+                // The ] belongs to the list, not to the ?? block.
+                if e_disc == std::mem::discriminant(&TokenKind::RBracket)
+                    && self.bracket_depth > 0
+                {
+                    false
+                } else {
+                    e_disc == current_disc
+                }
+            });
+            if should_stop {
                 return Self::fold_syntax_sugar(nodes);
             }
             match self.parse_node() {

@@ -74,6 +74,7 @@ static unsigned char embedded_bc[]={{
 }};
 static int embedded_bc_len = {bc_len};
 static unsigned char bc[MAX_BC]; static int bc_len=0;
+static unsigned char bc_stack[16][MAX_BC]; static int bc_len_stack[16]; static int bc_sp=0;
 static int call_stack[MAX_FRAMES]; static int call_sp=0;
 static int ip=0;
 static uint64_t rng_state=123456789;
@@ -88,6 +89,7 @@ static inline void push_b(int v)   {{ Value x; x.tag=TAG_BOOL; x.b=v; stack[sp++
 static inline void push_s(int v)   {{ Value x; x.tag=TAG_STR; x.s=v; stack[sp++]=x; }}
 static inline void push_l(int v)   {{ Value x; x.tag=TAG_LIST; x.s=v; stack[sp++]=x; }}
 
+static inline Value    pop(void)  {{ return stack[--sp]; }}
 static inline int64_t  pop_i(void){{ return stack[--sp].i; }}
 static inline double   pop_f(void){{ return stack[--sp].f; }}
 static inline int      pop_b(void){{ return stack[--sp].b; }}
@@ -136,7 +138,9 @@ static double xorshift64(void){{
 // ── Execution ────────────────────────────────────────────────────────
 static int run_ref(const unsigned char *ref_bc, int ref_len, int base_sp){{
     call_stack[call_sp++]=ip; call_stack[call_sp++]=base_sp;
-    int saved_ip=ip, saved_len=bc_len;
+    // Save current bc buffer
+    if(bc_sp<16){{ memcpy(bc_stack[bc_sp],bc,bc_len); bc_len_stack[bc_sp]=bc_len; bc_sp++; }}
+    int saved_ip=ip;
     memcpy(bc,ref_bc,ref_len); bc_len=ref_len; ip=0;
     // Execute until frame returns
     int ret=1, depth=call_sp;
@@ -159,7 +163,7 @@ static int run_ref(const unsigned char *ref_bc, int ref_len, int base_sp){{
         case ADD: {{ if(peek_tag()==TAG_F64||stack[sp-2].tag==TAG_F64){{ double b=pop_f(),a=pop_f(); push_f(a+b); }} else {{ int64_t b=pop_i(),a=pop_i(); push_i(a+b); }} }} break;
         case SUB: {{ if(peek_tag()==TAG_F64||stack[sp-2].tag==TAG_F64){{ double b=pop_f(),a=pop_f(); push_f(a-b); }} else {{ int64_t b=pop_i(),a=pop_i(); push_i(a-b); }} }} break;
         case MUL: {{ if(peek_tag()==TAG_F64||stack[sp-2].tag==TAG_F64){{ double b=pop_f(),a=pop_f(); push_f(a*b); }} else {{ int64_t b=pop_i(),a=pop_i(); push_i(a*b); }} }} break;
-        case DIV: {{ if(peek_tag()==TAG_F64||stack[sp-2].tag==TAG_F64){{ double b=pop_f(),a=pop_f(); push_f(b!=0?a/b:0); }} else {{ int64_t b=pop_i(),a=pop_i(); push_i(b?a/b:0); }} }} break;
+        case DIV: {{ if(peek_tag()==TAG_F64||stack[sp-2].tag==TAG_F64){{ double b=pop_f(),a=pop_f(); push_f(a/b); }} else {{ int64_t b=pop_i(),a=pop_i(); if(!b){{ fprintf(stderr,"division by zero\\n"); exit(1); }} push_i(a/b); }} }} break;
         case MOD: {{ int64_t b=pop_i(),a=pop_i(); push_i(b?a%b:0); }} break;
 
         case EQ: {{ if(stack[sp-1].tag==TAG_STR){{ int b=pop_s(),a=pop_s(); push_b(strcmp(strs[a],strs[b])==0); }} else if(stack[sp-1].tag==TAG_F64||stack[sp-2].tag==TAG_F64){{ double b=pop_f(),a=pop_f(); push_b(a==b); }} else {{ int64_t b=pop_i(),a=pop_i(); push_b(a==b); }} }} break;
@@ -202,8 +206,8 @@ static int run_ref(const unsigned char *ref_bc, int ref_len, int base_sp){{
         case LOOP: {{ int off=read_i32(&bc[ip]); ip+=4; if(pop_b()) ip+=off; }} break;
         case TIMES: {{ int ref_len=read_i32(&bc[ip]); ip+=4; const unsigned char *rb=&bc[ip]; ip+=ref_len; int64_t n=pop_i(); for(int64_t i=0;i<n;i++)run_ref(rb,ref_len,sp); }} break;
 
-        case CALL: {{ int name_len=bc[ip++]; char name[64]={{0}}; memcpy(name,&bc[ip],name_len); ip+=name_len; {wd} }} break;
-        case RETURN: {{ call_sp-=2; if(call_sp>=0){{ sp=call_stack[call_sp]; ip=call_stack[call_sp-2]; memcpy(bc,bc_saved,sizeof(bc)); bc_len=bc_saved_len; }} else {{ ip=bc_len; }} }} break;
+        case CALL: {{ int name_len=bc[ip++]; if(name_len>63)name_len=63; char name[64]={{0}}; memcpy(name,&bc[ip],name_len); ip+=name_len; {wd} }} break;
+        case RETURN: {{ call_sp-=2; if(call_sp>=0){{ sp=call_stack[call_sp]; ip=call_stack[call_sp-2]; if(bc_sp>0){{ bc_sp--; memcpy(bc,bc_stack[bc_sp],bc_len_stack[bc_sp]); bc_len=bc_len_stack[bc_sp]; }} }} else {{ ip=bc_len; }} }} break;
 
         case OUTPUT_TOP: {{ Value v=pop(); if(v.tag==TAG_STR)printf("%%s\n",strs[v.s]); else if(v.tag==TAG_F64)printf("%%.6f\n",v.f); else if(v.tag==TAG_BOOL){{ if(v.b)printf("#t\n"); else printf("#f\n"); }} else printf("%%lld\n",(long long)v.i); fflush(stdout); }} break;
         case OUTPUT_ALL: {{ printf("["); for(int i=0;i<sp;i++)printf("%lld ",(long long)stack[i].i); printf("]\n"); }} break;
@@ -224,7 +228,8 @@ static int run_ref(const unsigned char *ref_bc, int ref_len, int base_sp){{
         if(call_sp<depth){{ ret=0; break; }}
     }}
     call_sp-=2; sp=call_stack[call_sp+1]; ip=call_stack[call_sp];
-    memcpy(bc,bc_saved,bc_saved_len); bc_len=bc_saved_len;
+    // Restore bc buffer from stack
+    if(bc_sp>0){{ bc_sp--; memcpy(bc,bc_stack[bc_sp],bc_len_stack[bc_sp]); bc_len=bc_len_stack[bc_sp]; }}
     return ret;
 }}
 
@@ -249,7 +254,6 @@ int main(int argc, char **argv){{
 /// Generate word dispatch table in C.
 fn gen_word_table(defs: &[(String, Vec<Opcode>)]) -> (String, String) {
     let mut out = String::new();
-    out.push_str("static unsigned char bc_saved[MAX_BC]; static int bc_saved_len=0;\n");
     out.push_str("static int word_bc_len[256]; static unsigned char word_bc[256][8192];\n");
     out.push_str("static const char *word_names[]={");
     for (i, (name, _)) in defs.iter().enumerate() {
@@ -269,7 +273,7 @@ fn gen_word_table(defs: &[(String, Vec<Opcode>)]) -> (String, String) {
     }
     out.push_str("}\n");
 
-    let dispatch = "int w=-1; for(int i=0;word_names[i];i++){if(strncmp(name,word_names[i],name_len)==0&&(int)strlen(word_names[i])==name_len){w=i;break;}} if(w>=0){memcpy(bc_saved,bc,bc_len);bc_saved_len=bc_len;memcpy(bc,word_bc[w],word_bc_len[w]);bc_len=word_bc_len[w];call_stack[call_sp+1]=sp;call_stack[call_sp]=ip-1-name_len-1;call_sp+=2;ip=0;}".to_string();
+    let dispatch = "int w=-1; for(int i=0;word_names[i];i++){if(strncmp(name,word_names[i],name_len)==0&&(int)strlen(word_names[i])==name_len){w=i;break;}} if(w>=0){if(bc_sp<16){memcpy(bc_stack[bc_sp],bc,bc_len);bc_len_stack[bc_sp]=bc_len;bc_sp++;}memcpy(bc,word_bc[w],word_bc_len[w]);bc_len=word_bc_len[w];call_stack[call_sp+1]=sp;call_stack[call_sp]=ip-1-name_len-1;call_sp+=2;ip=0;}".to_string();
     (out, dispatch)
 }
 

@@ -167,10 +167,23 @@ pub fn compile_to_native(bytecode: &[Opcode], _defs: &[(String, Vec<Opcode>)]) -
     // PUSH_BOOL
     x.patch_handler(0x33);
     x.i(&[0x43,0x0F,0xB6,0x04,0x2E]); x.add_ri(13, 1); x.sub_ri(15, 8); x.mov_mr(15, 0, 0); x.back();
-    // PUSH_STR: skip len+data bytes, push 0
+    // PUSH_STR: push address of string data in bytecode, skip len+data
     x.patch_handler(0x32);
-    x.i(&[0x47,0x8B,0x04,0x2E]); x.add_ri(13, 4); x.i(&[0x49,0x01,0xC5]); x.sub_ri(15, 8);
-    x.i(&[0x49,0xC7,0x07,0x00,0x00,0x00,0x00]); x.back();
+    // Read length from bytecode first: eax = [r14+r13]
+    x.i(&[0x47,0x8B,0x04,0x2E]);    // mov eax, [r14+r13]
+    // Save length to r8: r8 = rax
+    x.mov_rr(8, 0);                 // r8 = length
+    // Compute string data address: rax = r14 + r13 + 4
+    x.mov_rr(0, 13);                // rax = ip
+    x.i(&[0x4C,0x01,0xF0]);         // rax += r14 (bytecode base)
+    x.add_ri(0, 4);                 // rax += 4 (past length field)
+    // Push address onto stack
+    x.sub_ri(15, 8);                // allocate stack slot
+    x.mov_mr(15, 0, 0);             // [r15] = address
+    // Advance ip past string: ip += 4 + length
+    x.add_ri(13, 4);                // ip += 4 (length field)
+    x.i(&[0x4D,0x01,0xC5]);         // r13 += r8 (skip string data)
+    x.back();
 
     // COND
     x.patch_handler(0x50);

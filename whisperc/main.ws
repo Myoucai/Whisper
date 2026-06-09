@@ -94,4 +94,16 @@
     { compile-one } @map
 } ;
 
+// ── Full classification pipeline ────────────────────────────────────
+// source_string → classified_tokens (ready for compile)
+// Runs: tokenize → structify → classify-nested
+// The Rust bridge then splits defs and calls compile on each part.
+
+: classify-full {
+    tokenize
+    structify
+    { classify-nested } @map
+} ;
+
 export compile
+export classify-full

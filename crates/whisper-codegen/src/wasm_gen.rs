@@ -42,8 +42,10 @@ mod w {
     pub const I64_LT_S: u8 = 0x53;
     pub const I64_GT_S: u8 = 0x55;
     pub const I32_EQ: u8 = 0x46;
-    pub const I32_GE_U: u8 = 0x4F;
+    pub const I32_NE: u8 = 0x47;
     pub const I32_LT_U: u8 = 0x49;
+    pub const I32_GE_U: u8 = 0x4F;
+    pub const I32_GT_U: u8 = 0x4B;
     pub const I64_EXTEND_I32_S: u8 = 0xAC;
     pub const I64_REM_S: u8 = 0x6F;
     pub const I64_EQZ: u8 = 0x50;
@@ -998,19 +1000,19 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     b.push(w::END);
 
     // 0x49 StrEq — str1_ptr str2_ptr → bool
-    // Compare two strings by reading lengths and data from bytecode
+    // Byte-by-byte comparison with length check
     if_op(&mut b, 0x49);
     pop(&mut b); // ptr2
     ci32(&mut b, 0x1040);
     b.push(w::I64_STORE);
     b.push(3);
-    b.push(0); // scratch[0x1040] = ptr2
+    b.push(0);
     pop(&mut b); // ptr1
     ci32(&mut b, 0x1030);
     b.push(w::I64_STORE);
     b.push(3);
-    b.push(0); // scratch[0x1030] = ptr1
-               // Read len1 from (ptr1 - 4)
+    b.push(0);
+    // Read len1 from (ptr1 - 4)
     ci32(&mut b, 0x1030);
     b.push(w::I32_LOAD);
     b.push(2);
@@ -1023,8 +1025,8 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     ci32(&mut b, 0x1038);
     b.push(w::I32_STORE);
     b.push(2);
-    b.push(0); // scratch[0x1038] = len1
-               // Read len2 from (ptr2 - 4)
+    b.push(0);
+    // Read len2 from (ptr2 - 4)
     ci32(&mut b, 0x1040);
     b.push(w::I32_LOAD);
     b.push(2);
@@ -1037,8 +1039,8 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     ci32(&mut b, 0x1048);
     b.push(w::I32_STORE);
     b.push(2);
-    b.push(0); // scratch[0x1048] = len2
-               // Compare: len1 == len2  → i64
+    b.push(0);
+    // Quick check: len1 != len2 → false
     ci32(&mut b, 0x1038);
     b.push(w::I32_LOAD);
     b.push(2);
@@ -1047,39 +1049,277 @@ fn build_interpreter(i64_result: bool) -> Vec<u8> {
     b.push(w::I32_LOAD);
     b.push(2);
     b.push(0);
-    b.push(w::I32_EQ); // len1 == len2
-    b.push(w::I64_EXTEND_I32_S);
+    b.push(w::I32_NE);
+    // If lengths differ, push false and end
+    let str_eq_len_diff = b.len();
+    b.push(w::IF); // void block
+    b.push(0x40); // void
+    ci64(&mut b, 0);
+    push(&mut b); // push false (0)
+    b.push(w::ELSE);
+    // Lengths equal — byte-by-byte loop
+    // i = 0 at scratch[0x1050]
+    ci32(&mut b, 0);
+    ci32(&mut b, 0x1050);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    // Loop block
+    b.push(w::BLOCK);
+    b.push(0x40); // void
+    b.push(w::LOOP);
+    b.push(0x40); // void
+    // Check: i >= len1 → done (equal)
+    ci32(&mut b, 0x1050);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x1038);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I32_GE_U);
+    b.push(w::BR_IF);
+    b.push(1); // break to outer block
+    // Load byte1 = memory[ptr1 + i]
+    ci32(&mut b, 0x1030);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x1050);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I32_ADD);
+    b.push(w::I32_LOAD8_U);
+    b.push(0);
+    b.push(0);
+    // Load byte2 = memory[ptr2 + i]
+    ci32(&mut b, 0x1040);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x1050);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I32_ADD);
+    b.push(w::I32_LOAD8_U);
+    b.push(0);
+    b.push(0);
+    // Compare bytes
+    b.push(w::I32_NE);
+    b.push(w::IF);
+    b.push(0x40);
+    ci64(&mut b, 0);
+    push(&mut b); // push false
+    b.push(w::BR);
+    b.push(2); // break to outer block + end
+    b.push(w::END);
+    // i++
+    ci32(&mut b, 0x1050);
+    ci32(&mut b, 0x1050);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 1);
+    b.push(w::I32_ADD);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    b.push(w::BR);
+    b.push(0); // continue loop
+    b.push(w::END); // end loop
+    b.push(w::END); // end block
+    // All bytes matched — push true
+    ci64(&mut b, 1);
     push(&mut b);
+    b.push(w::END); // end if (len diff check)
     b.push(w::END);
 
     // 0x4A StrLt — str1_ptr str2_ptr → bool (lexicographic compare)
     if_op(&mut b, 0x4A);
-    pop(&mut b); // ptr2 → scratch
+    pop(&mut b); // ptr2
     ci32(&mut b, 0x1040);
     b.push(w::I64_STORE);
     b.push(3);
     b.push(0);
-    pop(&mut b); // ptr1 → scratch
+    pop(&mut b); // ptr1
     ci32(&mut b, 0x1030);
     b.push(w::I64_STORE);
     b.push(3);
     b.push(0);
-    // Simple: compare first 4 bytes of each string
+    // Read len1
     ci32(&mut b, 0x1030);
     b.push(w::I32_LOAD);
     b.push(2);
     b.push(0);
+    ci32(&mut b, 0xFFFFFFFCu32 as i32);
+    b.push(w::I32_ADD);
     b.push(w::I32_LOAD);
     b.push(2);
-    b.push(0); // first 4 bytes of str1
+    b.push(0);
+    ci32(&mut b, 0x1038);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    // Read len2
     ci32(&mut b, 0x1040);
     b.push(w::I32_LOAD);
     b.push(2);
     b.push(0);
+    ci32(&mut b, 0xFFFFFFFCu32 as i32);
+    b.push(w::I32_ADD);
     b.push(w::I32_LOAD);
     b.push(2);
-    b.push(0); // first 4 bytes of str2
-    b.push(w::I32_LT_U); // unsigned less-than
+    b.push(0);
+    ci32(&mut b, 0x1048);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    // Compute min_len = min(len1, len2)
+    ci32(&mut b, 0x1038);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x1048);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I32_LT_U);
+    b.push(w::IF);
+    b.push(0x7B); // i32 result
+    ci32(&mut b, 0x1038);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::ELSE);
+    ci32(&mut b, 0x1048);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::END);
+    ci32(&mut b, 0x1054); // scratch[0x1054] = min_len
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    // i = 0 at scratch[0x1050]
+    ci32(&mut b, 0);
+    ci32(&mut b, 0x1050);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    // Loop block
+    b.push(w::BLOCK);
+    b.push(0x40);
+    b.push(w::LOOP);
+    b.push(0x40);
+    // Check: i >= min_len → break (all common bytes equal)
+    ci32(&mut b, 0x1050);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x1054);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I32_GE_U);
+    b.push(w::BR_IF);
+    b.push(1);
+    // Load byte1
+    ci32(&mut b, 0x1030);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x1050);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I32_ADD);
+    b.push(w::I32_LOAD8_U);
+    b.push(0);
+    b.push(0);
+    // Load byte2
+    ci32(&mut b, 0x1040);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x1050);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I32_ADD);
+    b.push(w::I32_LOAD8_U);
+    b.push(0);
+    b.push(0);
+    // byte1 < byte2 → true
+    b.push(w::I32_LT_U);
+    b.push(w::IF);
+    b.push(0x40);
+    ci64(&mut b, 1);
+    push(&mut b);
+    b.push(w::BR);
+    b.push(2);
+    b.push(w::END);
+    // byte1 > byte2 → false
+    // Reload byte1 and byte2 for second comparison
+    ci32(&mut b, 0x1030);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x1050);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I32_ADD);
+    b.push(w::I32_LOAD8_U);
+    b.push(0);
+    b.push(0);
+    ci32(&mut b, 0x1040);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x1050);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I32_ADD);
+    b.push(w::I32_LOAD8_U);
+    b.push(0);
+    b.push(0);
+    b.push(w::I32_GT_U);
+    b.push(w::IF);
+    b.push(0x40);
+    ci64(&mut b, 0);
+    push(&mut b);
+    b.push(w::BR);
+    b.push(2);
+    b.push(w::END);
+    // i++
+    ci32(&mut b, 0x1050);
+    ci32(&mut b, 0x1050);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 1);
+    b.push(w::I32_ADD);
+    b.push(w::I32_STORE);
+    b.push(2);
+    b.push(0);
+    b.push(w::BR);
+    b.push(0);
+    b.push(w::END); // end loop
+    b.push(w::END); // end block
+    // All common bytes equal — shorter string is "less than"
+    ci32(&mut b, 0x1038);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    ci32(&mut b, 0x1048);
+    b.push(w::I32_LOAD);
+    b.push(2);
+    b.push(0);
+    b.push(w::I32_LT_U);
     b.push(w::I64_EXTEND_I32_S);
     push(&mut b);
     b.push(w::END);
@@ -1122,6 +1362,11 @@ fn build_get_sp() -> Vec<u8> {
 fn ci32(b: &mut Vec<u8>, n: i32) {
     b.push(w::I32_CONST);
     leb128_s(b, n as i64);
+}
+
+fn ci64(b: &mut Vec<u8>, n: i64) {
+    b.push(w::I64_CONST);
+    leb128_s(b, n);
 }
 
 fn ld_i32(b: &mut Vec<u8>, addr: u32) {

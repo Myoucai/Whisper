@@ -185,17 +185,18 @@ fn compile_tokens(vm: &mut Vm, tokens: &[Value]) -> Result<Vec<Opcode>, String> 
     }
 }
 
-/// Full whisperc pipeline: lex → structify → classify → split defs → compile
+/// Full whisperc pipeline: classify-full (Whisper: lex→structify→classify) → split defs → compile
 fn compile_via_whisperc_full(vm: &mut Vm, source: &str) -> Result<(Vec<Opcode>, Vec<(String, Vec<Opcode>)>), String> {
+    // Phase 1: Whisper handles tokenize → structify → classify-nested
     vm.data_stack.push(Value::Str(Rc::new(source.to_string())));
-    let chunks = vm.execute(&[Opcode::Call("tokenize".to_string())])
-        .map_err(|e| format!("lex: {e}"))?
-        .ok_or("lex: no output")?;
-    let nested = if let Value::List(ref items) = chunks {
-        structify_chunks(items)
-    } else { chunks };
-    let tokens = classify_nested(vm, &nested);
+    let tokens = vm.execute(&[Opcode::Call("classify-full".to_string())])
+        .map_err(|e| format!("classify-full: {e}"))?
+        .ok_or("classify-full: no output")?;
+
+    // Phase 2: Rust splits definitions from main tokens
     let (main_tokens, def_tokens) = split_defs(&tokens);
+
+    // Phase 3: Whisper compiles main tokens and each def body
     let main_ops = compile_tokens(vm, &main_tokens)?;
     let mut def_ops = Vec::new();
     for (name, body) in &def_tokens {
@@ -614,11 +615,12 @@ fn byte_to_opcode(byte: u8) -> Opcode {
     }
 }
 
-/// Load all whisperc components (lexer + classify + compiler) into one VM.
+/// Load all whisperc components (lexer + classify + parser + compiler) into one VM.
 fn load_whisperc_pipeline(vm: &mut Vm) {
     let files = [
         include_str!("../../../../whisperc/lexer.ws"),
         include_str!("../../../../whisperc/classify.ws"),
+        include_str!("../../../../whisperc/parser.ws"),
         include_str!("../../../../whisperc/main.ws"),
     ];
     for src in files {
