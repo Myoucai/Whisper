@@ -314,6 +314,25 @@ impl Opcode {
         }
     }
 
+    /// Return the total byte size of this opcode including its operand.
+    pub fn byte_size(&self) -> usize {
+        match self {
+            Opcode::Pick(_) => 2,
+            Opcode::PushI64(_) => 9,
+            Opcode::PushF64(_) => 9,
+            Opcode::PushStr(s) => 5 + s.len(),
+            Opcode::PushBool(_) => 2,
+            Opcode::PushList => 1,
+            Opcode::PushRef(inner) => 5 + inner.iter().map(|op| op.byte_size()).sum::<usize>(),
+            Opcode::Cond(_) | Opcode::Jump(_) | Opcode::Loop(_) => 5,
+            Opcode::Call(name) => 2 + name.len(),
+            Opcode::CapCall(_) => 3,
+            Opcode::ConfLabel(_) => 9,
+            Opcode::DefWord(name) => 2 + name.len(),
+            _ => 1,
+        }
+    }
+
     /// Human-readable name for debugging/tracing.
     pub fn name(&self) -> &'static str {
         match self {
