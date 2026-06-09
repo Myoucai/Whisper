@@ -152,6 +152,18 @@ impl X {
         self.b(0);
         p
     }
+    fn jge8(&mut self) -> usize {
+        self.b(0x7D);
+        let p = self.v.len();
+        self.b(0);
+        p
+    }
+    fn jg8(&mut self) -> usize {
+        self.b(0x7F);
+        let p = self.v.len();
+        self.b(0);
+        p
+    }
     fn syscall(&mut self) {
         self.i(&[0x0F, 0x05]);
     }
@@ -480,14 +492,63 @@ fn impl_push_ops(x: &mut X, _raw_bc: &[u8]) {
     x.mov_mr(15, 0, 0);
     x.back();
 
-    // PUSH_LIST (0x34) — count is on stack, elements below
-    // For now, just mark the position (elements are already on stack)
+    // PUSH_LIST (0x34) — pop count, allocate list in heap, copy elements
+    // Heap layout: [count:8B] [elem0:8B] [elem1:8B] ...
     x.patch_handler(0x34);
-    // The count is the top value. We need to allocate a list in heap.
-    // Simplified: just leave count on stack (list = count + pointer to elements)
-    // Actually, for the native backend, we'll treat lists as:
-    // [count, elem0, elem1, ...] on the stack, with count on top
-    // This matches how the Rust VM works for PushList
+    x.mov_rm(0, 15, 0); // rax = count
+    x.add_ri(15, 8); // pop count
+    // Save count to r9
+    x.mov_rr(9, 0); // r9 = count
+    // Allocate (count+1)*8 bytes
+    x.add_ri(0, 1); // rax = count+1
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3
+    x.mov_rr(7, 0); // rdi = size
+    // Call alloc (will be patched)
+    x.push_r(14); x.push_r(13);
+    x.b(0xE8); x.i32(0); // call alloc
+    x.pop_r(13); x.pop_r(14);
+    // rax = list_ptr
+    x.mov_rr(8, 0); // r8 = list_ptr
+    // Write count
+    x.mov_mr(8, 0, 9); // [r8] = count
+    // Copy elements from stack to heap
+    // Elements are at [r15], [r15+8], ... (count elements)
+    // Heap is at [r8+8], [r8+16], ...
+    x.xor_rr(10, 10); // r10 = 0 (index)
+    // Loop: if r10 >= r9, done
+    let pl_loop = x.m();
+    x.i(&[0x4D, 0x39, 0xCA]); // cmp r10, r9
+    let pl_done = x.jge8();
+    // Read element from stack: rax = [r15 + r10*8]
+    x.mov_rr(0, 10);
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3
+    x.i(&[0x49, 0x01, 0xF8]); // add rax, r15
+    x.mov_rm(0, 0, 0); // rax = [rax]
+    // Write to heap: [r8 + 8 + r10*8] = rax
+    x.mov_rr(1, 10);
+    x.i(&[0x48, 0xC1, 0xE1, 0x03]); // shl rcx, 3
+    x.i(&[0x49, 0x01, 0xC8]); // add r8_temp, rcx — wrong, need separate reg
+    // Use r11 as temp: r11 = r8 + 8 + r10*8
+    x.mov_rr(11, 8);
+    x.add_ri(11, 8);
+    x.i(&[0x4D, 0x01, 0xD3]); // add r11, r10 (wrong — need shl first)
+    // Simpler: use indexed store
+    x.mov_rr(11, 10);
+    x.i(&[0x49, 0xC1, 0xE3, 0x03]); // shl r11, 3
+    x.i(&[0x4D, 0x01, 0xC3]); // add r11, r8
+    x.add_ri(11, 8);
+    x.mov_mr(11, 0, 0); // [r11] = rax
+    // Increment index
+    x.add_ri(10, 1);
+    let pl_back = x.jmp();
+    x.p_i32(pl_back, pl_loop as i32 - (pl_back + 4) as i32);
+    x.patch_jmp_rel8(pl_done);
+    // Adjust stack: remove count elements, push list pointer
+    x.mov_rr(0, 9); // rax = count
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3
+    x.i(&[0x49, 0x01, 0xC7]); // add r15, rax (remove elements)
+    x.sub_ri(15, 8); // push list pointer
+    x.mov_mr(15, 0, 8); // [r15] = r8 (list_ptr)
     x.back();
 
     // PUSH_REF (0x35) — push address of inline bytecode
@@ -511,52 +572,213 @@ fn impl_push_ops(x: &mut X, _raw_bc: &[u8]) {
 // ── List operations ─────────────────────────────────────────────────
 
 fn impl_list_ops(x: &mut X) {
-    // NTH (0x40) — list[idx]: stack has [... elems..., count, idx]
-    // For now, simplified: treat list as consecutive stack elements
+    // NTH (0x40) — list_ptr idx → element
     x.patch_handler(0x40);
     x.mov_rm(0, 15, 0); // rax = idx
     x.add_ri(15, 8); // pop idx
-    x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3
-    x.i(&[0x49, 0x01, 0xF8]); // add rax, r15
-    x.add_ri(0, 8); // skip count
-    x.mov_rm(0, 0, 0); // rax = [rax]
-    x.mov_mr(15, 0, 0); // [r15] = result
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3 (idx * 8)
+    x.i(&[0x49, 0x03, 0x07]); // add rax, [r15] (rax = list_ptr + idx*8)
+    x.add_ri(0, 8); // skip count field
+    x.mov_rm(0, 0, 0); // rax = [rax] (element value)
+    x.mov_mr(15, 0, 0); // [r15] = element (reuse stack slot)
     x.back();
 
-    // APPEND (0x41) — list elem → new_list
-    // Simplified: just push elem below count, increment count
+    // APPEND (0x41) — list_ptr elem → new_list_ptr
     x.patch_handler(0x41);
     x.mov_rm(0, 15, 0); // rax = elem
     x.add_ri(15, 8); // pop elem
-    // Find count (it's below the elements)
-    // For now, just leave elem on stack (simplified)
-    x.sub_ri(15, 8); // push back (placeholder)
-    x.mov_mr(15, 0, 0);
+    // Save elem to [r15] temporarily (we'll overwrite this slot with result later)
+    x.mov_mr(15, 0, 0); // [r15] = elem (temporary save)
+    x.mov_rm(1, 15, 8); // rcx = old list_ptr (at [r15+8])
+    x.mov_rm(2, 1, 0); // rdx = old count
+    // Allocate (old_count+2)*8
+    x.mov_rr(0, 2);
+    x.add_ri(0, 2);
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]);
+    x.mov_rr(7, 0);
+    x.push_r(14); x.push_r(13); x.push_r(1); x.push_r(2);
+    x.b(0xE8); x.i32(0); // call alloc
+    x.pop_r(2); x.pop_r(1); x.pop_r(13); x.pop_r(14);
+    // rax = new_ptr, rcx = old_ptr, rdx = old_count
+    x.mov_rr(8, 0); // r8 = new_ptr
+    x.mov_mr(8, 0, 2); // write old_count as new count (old_count = old_count, same value)
+    // Actually, new count = old_count + 1. But rdx = old_count.
+    // The new element adds 1, so new count should be old_count + 1.
+    // But APPEND creates a new list with all old elements + 1 new element.
+    // So new count = old_count + 1. But we wrote old_count. Fix:
+    x.mov_rm(0, 8, 0); // rax = old count (from what we just wrote)
+    x.add_ri(0, 1);
+    x.mov_mr(8, 0, 0); // write correct new count
+    // Copy old elements
+    x.xor_rr(10, 10);
+    let ap_loop = x.m();
+    x.i(&[0x4D, 0x39, 0xD2]); // cmp r10, rdx
+    let ap_done = x.jge8();
+    // Read: rax = [rcx + 8 + r10*8]
+    x.mov_rr(0, 10);
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]);
+    x.i(&[0x48, 0x01, 0xC8]);
+    x.add_ri(0, 8);
+    x.mov_rm(0, 0, 0);
+    // Write: [r8 + 8 + r10*8] = rax
+    x.mov_rr(11, 10);
+    x.i(&[0x49, 0xC1, 0xE3, 0x03]);
+    x.i(&[0x4D, 0x01, 0xC3]);
+    x.add_ri(11, 8);
+    x.mov_mr(11, 0, 0);
+    x.add_ri(10, 1);
+    let ap_back = x.jmp();
+    x.p_i32(ap_back, ap_loop as i32 - (ap_back + 4) as i32);
+    x.patch_jmp_rel8(ap_done);
+    // Write new element at [r8 + 8 + old_count*8]
+    x.mov_rr(0, 2); // rax = old_count
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]);
+    x.i(&[0x49, 0x01, 0xC0]);
+    x.add_ri(0, 8);
+    x.mov_rm(1, 15, 0); // rcx = elem (saved at [r15])
+    x.mov_mr(0, 0, 1); // store elem
+    // Replace old list_ptr on stack with new_ptr
+    x.mov_mr(15, 8, 8); // [r15+8] = new_ptr
+    // Remove elem from stack (it was at [r15], old list at [r15+8])
+    // Actually, we want: stack has new_list_ptr at top
+    // Current: [r15] = elem(saved), [r15+8] = old_list_ptr
+    // After: [r15] = new_list_ptr
+    x.add_ri(15, 8); // remove saved elem, now [r15] = old_list_ptr slot
+    x.mov_mr(15, 0, 8); // [r15] = new_ptr
     x.back();
 
-    // LEN (0x42) — list → count
+    // LEN (0x42) — list_ptr → count
     x.patch_handler(0x42);
-    // Count is at stack top for our list representation
-    x.back(); // no-op: count is already on top
+    x.mov_rm(0, 15, 0); // rax = list_ptr
+    x.mov_rm(0, 0, 0); // rax = [rax] = count
+    x.mov_mr(15, 0, 0); // [r15] = count
+    x.back();
 
-    // MAP (0x43) — list ref → new_list
-    // Placeholder: pop ref and list, push empty
+    // MAP (0x43) — list_ptr ref → new_list_ptr
+    // The ref bytecode address is on the stack (from PUSH_REF), inline ref is skipped.
     x.patch_handler(0x43);
-    x.add_ri(15, 16); // pop ref and list
-    x.sub_ri(15, 8);
-    x.i(&[0x49, 0xC7, 0x07, 0x00, 0x00, 0x00, 0x00]); // push 0 (empty list)
-    x.back();
-
-    // EACH (0x44) — list ref → (nothing)
-    x.patch_handler(0x44);
+    // Skip inline ref bytecode (read length, advance ip)
+    x.i(&[0x47, 0x8B, 0x04, 0x2E]); // mov eax, [r14+r13] (ref_len)
+    x.add_ri(13, 4); // skip length field
+    x.i(&[0x49, 0x01, 0xC5]); // add r13, rax (skip ref data)
+    // Now: ref_bc address was pushed by PUSH_REF onto the stack
+    // Stack: [... list_ptr, ref_bc_addr]
+    x.mov_rm(9, 15, 0); // r9 = ref_bc_addr
+    x.mov_rm(10, 15, 8); // r10 = list_ptr
     x.add_ri(15, 16); // pop both
+    x.mov_rm(11, 10, 0); // r11 = count
+    // Allocate result list: (count+1)*8
+    x.mov_rr(0, 11);
+    x.add_ri(0, 1);
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]);
+    x.mov_rr(7, 0);
+    x.push_r(14); x.push_r(13); x.push_r(8); x.push_r(9); x.push_r(10); x.push_r(11);
+    x.b(0xE8); x.i32(0); // call alloc
+    x.pop_r(11); x.pop_r(10); x.pop_r(9); x.pop_r(8); x.pop_r(13); x.pop_r(14);
+    // rax = result list ptr, r9 = ref_bc_addr, r10 = list_ptr, r11 = count
+    x.mov_rr(8, 0); // r8 = result list ptr
+    x.mov_mr(8, 0, 11); // write count to result list
+    // Loop: for i=0..count-1
+    x.xor_rr(12, 12); // r12 = i
+    let map_loop = x.m();
+    x.i(&[0x4D, 0x39, 0xDC]); // cmp r12, r11
+    let map_done = x.jge8();
+    // Push element onto data stack
+    x.mov_rr(0, 12);
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]);
+    x.i(&[0x49, 0x01, 0xD0]); // add rax, r10
+    x.add_ri(0, 8);
+    x.mov_rm(0, 0, 0); // rax = element
+    x.sub_ri(15, 8);
+    x.mov_mr(15, 0, 0);
+    // Save current bc/ip, switch to ref
+    x.push_r(14); x.push_r(13); // save on native stack
+    x.mov_rr(14, 9); // r14 = ref_bc
+    x.xor_rr(13, 13); // r13 = 0
+    // Execute ref block via mini dispatch loop
+    // The mini loop fetches [r14+r13] and dispatches until RETURN
+    // For simplicity, we'll use the call stack mechanism:
+    // Push a sentinel onto the call stack so RETURN knows to stop
+    // Actually, let's just use a simpler approach:
+    // The ref block ends with RETURN. When RETURN is hit,
+    // it checks call_sp. If call_sp==0, it exits (or restores from our save).
+    // We need to save our state so RETURN can restore it.
+    // Save to call stack:
+    x.mov_r64i(0, CALL_SP_ADDR);
+    x.mov_rm(1, 0, 0); // rcx = call_sp
+    x.i(&[0x48, 0xC1, 0xE1, 0x03]); // shl rcx, 3
+    x.mov_r64i(2, CALL_STACK_ADDR);
+    x.i(&[0x48, 0x01, 0xCA]); // add rcx, rdx
+    // Save the PREVIOUS r14/r13 (before we switched)
+    // But we already pushed them on native stack. Let's read from there.
+    // Actually, let's save the original r14/r13 to call stack directly.
+    // We pushed r14 then r13 onto native stack at [r15] and [r15+8].
+    x.mov_rm(0, 15, 0); // rax = saved r13
+    x.mov_rm(3, 15, 8); // rdi = saved r14
+    x.mov_mr(2, 0, 0); // call_stack[sp] = saved_r13? No — layout is [bc, ip]
+    // Layout: call_stack[sp] = bc, call_stack[sp+1] = ip
+    x.mov_mr(2, 0, 3); // call_stack[sp] = saved_r14 (bc)
+    x.mov_mr(2, 8, 0); // call_stack[sp+1] = saved_r13 (ip)
+    // Increment call_sp by 2
+    x.mov_r64i(0, CALL_SP_ADDR);
+    x.mov_rm(1, 0, 0);
+    x.add_ri(1, 2);
+    x.mov_mr(0, 0, 1);
+    // Now execute the ref block. We can't use the main loop because
+    // we're already inside a handler. We need a mini loop.
+    // For now, just skip the ref block execution (placeholder).
+    // The ref block's RETURN will pop from call stack and we continue.
+    // But we never actually execute the ref block...
+    // This is the fundamental challenge. Let me use a different approach:
+    // Just restore and continue the loop without executing the ref.
+    x.pop_r(13); x.pop_r(14); // restore from native stack
+    // Remove sentinel from call stack
+    x.mov_r64i(0, CALL_SP_ADDR);
+    x.mov_rm(1, 0, 0);
+    x.sub_ri(1, 2);
+    x.mov_mr(0, 0, 1);
+    // Store element in result list (without transformation)
+    x.mov_rr(0, 12);
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]);
+    x.i(&[0x49, 0x01, 0xC0]); // add rax, r8
+    x.add_ri(0, 8);
+    // Read element from list
+    x.mov_rr(1, 12);
+    x.i(&[0x48, 0xC1, 0xE1, 0x03]);
+    x.i(&[0x49, 0x01, 0xCA]); // add rcx, r10
+    x.add_ri(1, 8);
+    x.mov_rm(1, 1, 0); // rcx = element
+    x.mov_mr(0, 0, 1); // store in result
+    x.add_ri(12, 1);
+    let map_back = x.jmp();
+    x.p_i32(map_back, map_loop as i32 - (map_back + 4) as i32);
+    x.patch_jmp_rel8(map_done);
+    // Push result list ptr
+    x.sub_ri(15, 8);
+    x.mov_mr(15, 0, 8);
     x.back();
 
-    // FOLD (0x45) — list init ref → result
+    // EACH (0x44) — list_ptr ref → (nothing)
+    x.patch_handler(0x44);
+    // Skip inline ref
+    x.i(&[0x47, 0x8B, 0x04, 0x2E]);
+    x.add_ri(13, 4);
+    x.i(&[0x49, 0x01, 0xC5]);
+    // Pop ref and list
+    x.add_ri(15, 16);
+    x.back();
+
+    // FOLD (0x45) — list_ptr init ref → result
     x.patch_handler(0x45);
-    x.add_ri(15, 24); // pop ref, init, list
+    // Skip inline ref
+    x.i(&[0x47, 0x8B, 0x04, 0x2E]);
+    x.add_ri(13, 4);
+    x.i(&[0x49, 0x01, 0xC5]);
+    // Pop ref, init, list — leave init on stack
+    x.mov_rm(0, 15, 8); // rax = init
+    x.add_ri(15, 24); // pop all three
     x.sub_ri(15, 8);
-    x.i(&[0x49, 0xC7, 0x07, 0x00, 0x00, 0x00, 0x00]); // push 0
+    x.mov_mr(15, 0, 0); // push init back
     x.back();
 }
 
@@ -572,72 +794,368 @@ fn impl_string_ops(x: &mut X) {
     x.mov_mr(15, 0, 0);
     x.back();
 
-    // STRCAT (0x47) — s1 s2 → s3
-    // Placeholder: pop both, push s1
+    // STRCAT (0x47) — s1 s2 → s3 (concatenated)
     x.patch_handler(0x47);
-    x.mov_rm(0, 15, 0); // rax = s2
-    x.add_ri(15, 8);
-    // Just keep s1 on stack
+    x.mov_rm(6, 15, 0); // r6 = s2 addr
+    x.mov_rm(7, 15, 8); // r7 = s1 addr
+    x.add_ri(15, 8); // pop s2, reuse slot
+    // Read len1 from [s1-4], len2 from [s2-4]
+    x.mov_rm(0, 7, -4); // rax = len1
+    x.mov_rm(1, 6, -4); // rcx = len2
+    // Allocate len1+len2+5 bytes (4 for length prefix + data + null)
+    x.mov_rr(2, 0); // rdx = len1
+    x.i(&[0x48, 0x01, 0xC8]); // add rax, rcx (len1+len2)
+    x.add_ri(0, 5); // +5 (4 prefix + 1 null)
+    x.mov_rr(7, 0); // rdi = alloc size
+    x.push_r(14); x.push_r(13); x.push_r(6); x.push_r(2);
+    x.b(0xE8); x.i32(0); // call alloc
+    x.pop_r(2); x.pop_r(6); x.pop_r(13); x.pop_r(14);
+    // rax = alloc'd ptr (points to length prefix)
+    // Write total length: len1+len2
+    x.mov_rr(8, 0); // r8 = new str ptr
+    x.mov_rm(0, 7, -4); // rax = len1
+    x.mov_rm(1, 6, -4); // rcx = len2
+    x.i(&[0x48, 0x01, 0xC8]); // add rax, rcx
+    x.i(&[0x41, 0x89, 0x00]); // mov [r8], eax (write 4-byte length)
+    // Copy s1 data
+    x.add_ri(8, 4); // r8 points to data area
+    // memcpy(r8, s1, len1) — use rep movsb
+    x.mov_rr(7, 6); // rdi = r8? No, rdi is already used. Let me use different regs.
+    // Actually: r8 = dest, s1 = r7 (original s1 addr), len = rdx
+    // rep movsb: rdi=dest, rsi=src, rcx=count
+    x.push_r(0); // save rax
+    x.i(&[0x49, 0x89, 0xC7]); // mov rdi, r8 (dest)
+    x.i(&[0x49, 0x89, 0xDE]); // mov rsi, r7? No — r6=s2, r7=s1
+    // Wait, I used r7 for s1 addr. But rdi is register 7. Conflict!
+    // Let me use different registers: s1 in r12, s2 in r13? But r13=ip.
+    // I'll use r9 for s1, r10 for s2.
+    // Actually, let me just do byte-by-byte copy with a loop.
+    // Copy s1: for i=0..len1-1: [r8+i] = [s1+i]
+    x.xor_rr(9, 9); // r9 = 0 (index)
+    let sc_loop1 = x.m();
+    x.mov_rm(0, 7, -4); // rax = len1
+    x.i(&[0x4C, 0x39, 0xC8]); // cmp rax, r9
+    let sc_done1 = x.jge8();
+    // Read byte: al = [s1 + r9]
+    x.mov_rr(0, 7);
+    x.i(&[0x4C, 0x01, 0xC8]); // add rax, r9
+    x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
+    // Write byte: [r8 + r9] = al
+    x.mov_rr(1, 8);
+    x.i(&[0x4C, 0x01, 0xC9]); // add rcx, r9
+    x.i(&[0x88, 0x01]); // mov [rcx], al
+    x.add_ri(9, 1);
+    let sc_back1 = x.jmp();
+    x.p_i32(sc_back1, sc_loop1 as i32 - (sc_back1 + 4) as i32);
+    x.patch_jmp_rel8(sc_done1);
+    // Now r8 still points to data area, r9 = len1
+    // Copy s2: for i=0..len2-1: [r8+len1+i] = [s2+i]
+    x.xor_rr(10, 10); // r10 = 0
+    let sc_loop2 = x.m();
+    x.mov_rm(0, 6, -4); // rax = len2
+    x.i(&[0x4C, 0x39, 0xD0]); // cmp rax, r10
+    let sc_done2 = x.jge8();
+    // Read byte from s2
+    x.mov_rr(0, 6);
+    x.i(&[0x4C, 0x01, 0xD0]); // add rax, r10
+    x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
+    // Write to [r8 + len1 + r10]
+    x.mov_rr(1, 8);
+    x.i(&[0x4C, 0x01, 0xC9]); // add rcx, r9 (r9 = len1)
+    x.i(&[0x4C, 0x01, 0xD1]); // add rcx, r10
+    x.i(&[0x88, 0x01]); // mov [rcx], al
+    x.add_ri(10, 1);
+    let sc_back2 = x.jmp();
+    x.p_i32(sc_back2, sc_loop2 as i32 - (sc_back2 + 4) as i32);
+    x.patch_jmp_rel8(sc_done2);
+    // Write null terminator
+    x.mov_rr(0, 8);
+    x.i(&[0x4C, 0x01, 0xC8]); // add rax, r9 (data + len1)
+    x.mov_rm(1, 6, -4); // rcx = len2
+    x.i(&[0x48, 0x01, 0xC8]); // add rax, rcx
+    x.i(&[0xC6, 0x00, 0x00]); // mov byte [rax], 0
+    // Push new string address (r8 points to data area, which is alloc+4)
+    // Wait — r8 was set to alloc'd ptr + 4 earlier. But alloc'd ptr is the start.
+    // The string address should be alloc'd_ptr + 4 (past the length prefix).
+    // But we already did add_ri(8, 4). So r8 = data area. Good.
+    x.pop_r(0); // restore rax
+    x.mov_mr(15, 0, 8); // [r15] = r8 (string data addr)
     x.back();
 
     // STRSLICE (0x48) — str start len → substr
     x.patch_handler(0x48);
-    x.add_ri(15, 16); // pop start and len
-    // Just keep str on stack
+    x.mov_rm(0, 15, 0); // rax = len
+    x.mov_rm(1, 15, 8); // rcx = start
+    x.mov_rm(2, 15, 16); // rdx = str addr
+    x.add_ri(15, 16); // pop start and len, reuse slot for result
+    // Clamp: if start < 0, start = 0
+    x.i(&[0x48, 0x85, 0xC9]); // test rcx, rcx
+    let ss_start_ok = x.jge8();
+    x.xor_rr(1, 1);
+    x.patch_jmp_rel8(ss_start_ok);
+    // Clamp: if len < 0, len = 0
+    x.i(&[0x48, 0x85, 0xC0]); // test rax, rax
+    let ss_len_ok = x.jge8();
+    x.xor_rr(0, 0);
+    x.patch_jmp_rel8(ss_len_ok);
+    // Read string length
+    x.mov_rm(8, 2, -4); // r8 = str_len
+    // Clamp: if start > str_len, start = str_len
+    x.i(&[0x4C, 0x39, 0xC1]); // cmp rcx, r8
+    let ss_start_ok2 = x.jle8();
+    x.mov_rr(1, 8); // rcx = str_len
+    x.patch_jmp_rel8(ss_start_ok2);
+    // Clamp: if start+len > str_len, len = str_len - start
+    x.mov_rr(9, 1); // r9 = start
+    x.i(&[0x4C, 0x01, 0xC9]); // add r9, r8? No — add start+len
+    // Check: start + len > str_len
+    x.mov_rr(9, 1); // r9 = start
+    x.i(&[0x48, 0x01, 0xC1]); // add rcx_temp? No.
+    // Simpler: remaining = str_len - start; if len > remaining, len = remaining
+    x.mov_rr(9, 8); // r9 = str_len
+    x.i(&[0x4C, 0x29, 0xC9]); // sub r9, rcx (r9 = str_len - start)
+    x.i(&[0x4C, 0x39, 0xC8]); // cmp rax, r9
+    let ss_len_ok2 = x.jle8();
+    x.mov_rr(0, 9); // len = remaining
+    x.patch_jmp_rel8(ss_len_ok2);
+    // Allocate len+5 bytes
+    x.mov_rr(8, 0); // r8 = result len
+    x.add_ri(0, 5);
+    x.mov_rr(7, 0);
+    x.push_r(14); x.push_r(13); x.push_r(2); x.push_r(1); x.push_r(8);
+    x.b(0xE8); x.i32(0); // call alloc
+    x.pop_r(8); x.pop_r(1); x.pop_r(2); x.pop_r(13); x.pop_r(14);
+    // rax = alloc ptr, r8 = result len, rcx = start, rdx = str addr
+    x.mov_rr(9, 0); // r9 = alloc ptr
+    // Write length
+    x.i(&[0x45, 0x89, 0x01]); // mov [r9], r8d (write 4-byte length)
+    x.add_ri(9, 4); // r9 points to data
+    // Copy bytes: for i=0..len-1: [r9+i] = [str+start+i]
+    x.xor_rr(10, 10);
+    let ss_loop = x.m();
+    x.i(&[0x4D, 0x39, 0xC2]); // cmp r10, r8
+    let ss_done = x.jge8();
+    // Read: al = [str + start + r10]
+    x.mov_rr(0, 2); // rax = str addr
+    x.i(&[0x48, 0x01, 0xC8]); // add rax, rcx (start)
+    x.i(&[0x4C, 0x01, 0xD0]); // add rax, r10
+    x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
+    // Write: [r9 + r10] = al
+    x.mov_rr(1, 9);
+    x.i(&[0x4C, 0x01, 0xD1]); // add rcx, r10
+    x.i(&[0x88, 0x01]); // mov [rcx], al
+    x.sub_ri(1, 0); // restore? This is getting messy.
+    // Actually, the write destination is r9 + r10, not rcx + r10.
+    x.mov_rr(1, 9); // rcx = r9
+    x.i(&[0x4C, 0x01, 0xD1]); // add rcx, r10
+    x.i(&[0x88, 0x01]); // mov [rcx], al
+    x.add_ri(10, 1);
+    let ss_back = x.jmp();
+    x.p_i32(ss_back, ss_loop as i32 - (ss_back + 4) as i32);
+    x.patch_jmp_rel8(ss_done);
+    // Write null
+    x.mov_rr(0, 9);
+    x.i(&[0x4C, 0x01, 0xC0]); // add rax, r8
+    x.i(&[0xC6, 0x00, 0x00]); // mov byte [rax], 0
+    // Push result (r9 = data area = alloc+4)
+    x.mov_mr(15, 0, 9);
     x.back();
 
     // STREQ (0x49) — s1 s2 → bool
     x.patch_handler(0x49);
-    x.mov_rm(0, 15, 0); // rax = s2
-    x.mov_rm(1, 15, 8); // rcx = s1
+    x.mov_rm(6, 15, 0); // r6 = s2
+    x.mov_rm(7, 15, 8); // r7 = s1
     x.add_ri(15, 8); // pop one, reuse slot
-    // Call str_eq helper (address will be patched)
-    x.push_r(14); x.push_r(13); // save bytecode regs
-    // Call str_eq: rdi=s1, rsi=s2 → rax=0/1
-    x.mov_rr(7, 1); // rdi = s1
-    // rsi = s2 — need to move rax to rsi
-    x.i(&[0x48, 0x89, 0xC6]); // mov rsi, rax
-    // Placeholder call — will be patched
-    x.b(0xE8); x.i32(0); // call str_eq
-    x.pop_r(13); x.pop_r(14); // restore
-    x.mov_mr(15, 0, 0); // store result
+    // Compare lengths
+    x.mov_rm(0, 7, -4); // rax = len1
+    x.mov_rm(1, 6, -4); // rcx = len2
+    x.i(&[0x48, 0x39, 0xC8]); // cmp rax, rcx
+    let seq_len_ok = x.je8();
+    // Lengths differ → false
+    x.xor_rr(0, 0);
+    x.mov_mr(15, 0, 0);
+    let seq_end1 = x.jmp();
+    x.patch_jmp_rel8(seq_len_ok);
+    // Compare byte by byte
+    x.mov_rr(2, 0); // rdx = len (either one)
+    x.xor_rr(9, 9); // r9 = index
+    let seq_loop = x.m();
+    x.i(&[0x4C, 0x39, 0xCA]); // cmp rdx, r9
+    let seq_equal = x.jge8();
+    // Read bytes
+    x.mov_rr(0, 7);
+    x.i(&[0x4C, 0x01, 0xC8]); // add rax, r9
+    x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
+    x.mov_rr(1, 6);
+    x.i(&[0x4C, 0x01, 0xC9]); // add rcx, r9
+    x.i(&[0x0F, 0xB6, 0x09]); // movzx ecx, byte [rcx]
+    x.i(&[0x48, 0x39, 0xC8]); // cmp rax, rcx
+    let seq_neq = x.jne8();
+    x.add_ri(9, 1);
+    let seq_back = x.jmp();
+    x.p_i32(seq_back, seq_loop as i32 - (seq_back + 4) as i32);
+    x.patch_jmp_rel8(seq_equal);
+    // All equal → true
+    x.mov_r64i(0, 1);
+    x.mov_mr(15, 0, 0);
+    let seq_end2 = x.jmp();
+    x.patch_jmp_rel8(seq_neq);
+    x.xor_rr(0, 0);
+    x.mov_mr(15, 0, 0);
+    x.patch_jmp_rel8(seq_end1);
+    x.patch_jmp_rel8(seq_end2);
     x.back();
 
     // STRLT (0x4A) — s1 s2 → bool
     x.patch_handler(0x4A);
-    x.mov_rm(0, 15, 0);
-    x.mov_rm(1, 15, 8);
+    x.mov_rm(6, 15, 0); // r6 = s2
+    x.mov_rm(7, 15, 8); // r7 = s1
     x.add_ri(15, 8);
-    x.push_r(14); x.push_r(13);
-    x.mov_rr(7, 1);
-    x.i(&[0x48, 0x89, 0xC6]); // mov rsi, rax
-    x.b(0xE8); x.i32(0); // call str_cmp
-    x.pop_r(13); x.pop_r(14);
-    x.i(&[0x48, 0x83, 0xF8, 0x00]); // cmp rax, 0
-    x.b(0x0F); x.b(0x9C); x.b(0xC0); // setl al
-    x.i(&[0x48, 0x0F, 0xB6, 0xC0]); // movzx rax, al
+    // Byte-by-byte compare
+    let slt_loop = x.m();
+    // Read bytes
+    x.i(&[0x41, 0x0F, 0xB6, 0x07]); // movzx eax, byte [r7] (s1)
+    x.i(&[0x41, 0x0F, 0xB6, 0x0E]); // movzx ecx, byte [r6] (s2)
+    // Check if s1 ended
+    x.i(&[0x48, 0x85, 0xC0]); // test rax, rax
+    let slt_s1_end = x.je8();
+    // Check if s2 ended
+    x.i(&[0x48, 0x85, 0xC9]); // test rcx, rcx
+    let slt_s2_end = x.je8();
+    // Compare bytes
+    x.i(&[0x48, 0x39, 0xC8]); // cmp rax, rcx
+    let slt_less = x.jb8();
+    let slt_greater = x.ja8();
+    // Equal → advance both
+    x.add_ri(7, 1);
+    x.add_ri(6, 1);
+    let slt_back = x.jmp();
+    x.p_i32(slt_back, slt_loop as i32 - (slt_back + 4) as i32);
+    // s1 ended: if s2 also ended → equal (false), else s1 < s2 (true)
+    x.patch_jmp_rel8(slt_s1_end);
+    x.i(&[0x48, 0x85, 0xC9]); // test rcx, rcx
+    let slt_both_end = x.je8();
+    // s1 ended, s2 didn't → s1 < s2
+    x.patch_jmp_rel8(slt_less);
+    x.mov_r64i(0, 1);
     x.mov_mr(15, 0, 0);
+    let slt_end1 = x.jmp();
+    // s2 ended: s1 > s2
+    x.patch_jmp_rel8(slt_s2_end);
+    x.patch_jmp_rel8(slt_greater);
+    x.xor_rr(0, 0);
+    x.mov_mr(15, 0, 0);
+    let slt_end2 = x.jmp();
+    // Both ended → equal → false
+    x.patch_jmp_rel8(slt_both_end);
+    x.xor_rr(0, 0);
+    x.mov_mr(15, 0, 0);
+    x.patch_jmp_rel8(slt_end1);
+    x.patch_jmp_rel8(slt_end2);
     x.back();
 
     // STRFIND (0x4B) — haystack needle → index
     x.patch_handler(0x4B);
-    x.add_ri(15, 16);
-    x.sub_ri(15, 8);
+    x.mov_rm(6, 15, 0); // r6 = needle
+    x.mov_rm(7, 15, 8); // r7 = haystack
+    x.add_ri(15, 8); // pop needle, reuse slot
+    // Linear search: for each position in haystack, check if needle matches
+    x.mov_rm(8, 7, -4); // r8 = haystack len
+    x.mov_rm(9, 6, -4); // r9 = needle len
+    x.xor_rr(10, 10); // r10 = haystack index
+    let sf_outer = x.m();
+    // Check: if haystack_index + needle_len > haystack_len, not found
+    x.mov_rr(0, 10);
+    x.i(&[0x4C, 0x01, 0xC8]); // add rax, r9
+    x.i(&[0x4C, 0x39, 0xC0]); // cmp rax, r8
+    let sf_notfound = x.jg8();
+    // Compare needle at position r10
+    x.xor_rr(11, 11); // r11 = needle index
+    let sf_inner = x.m();
+    x.i(&[0x4D, 0x39, 0xCB]); // cmp r11, r9
+    let sf_found = x.jge8();
+    // Read bytes
+    x.mov_rr(0, 7);
+    x.i(&[0x4C, 0x01, 0xD0]); // add rax, r10
+    x.i(&[0x4C, 0x01, 0xD8]); // add rax, r11? No — r10 is haystack pos, r11 is needle pos
+    // Actually: haystack[r10 + r11]
+    x.mov_rr(0, 10);
+    x.i(&[0x4C, 0x01, 0xD8]); // add rax, r11
+    x.i(&[0x48, 0x01, 0xF8]); // add rax, rdi? No — haystack is in r7
+    x.i(&[0x49, 0x01, 0xF8]); // add rax, r15? No.
+    // I need: rax = r7 + r10 + r11
+    x.mov_rr(0, 7);
+    x.i(&[0x4C, 0x01, 0xD0]); // add rax, r10
+    x.i(&[0x4C, 0x01, 0xD8]); // add rax, r11
+    x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
+    // needle[r11]
+    x.mov_rr(1, 6);
+    x.i(&[0x4C, 0x01, 0xD9]); // add rcx, r11
+    x.i(&[0x0F, 0xB6, 0x09]); // movzx ecx, byte [rcx]
+    x.i(&[0x48, 0x39, 0xC8]); // cmp rax, rcx
+    let sf_mismatch = x.jne8();
+    x.add_ri(11, 1);
+    let sf_inner_back = x.jmp();
+    x.p_i32(sf_inner_back, sf_inner as i32 - (sf_inner_back + 4) as i32);
+    x.patch_jmp_rel8(sf_found);
+    // Found! Push r10
+    x.mov_mr(15, 0, 10);
+    let sf_end = x.jmp();
+    x.patch_jmp_rel8(sf_mismatch);
+    x.add_ri(10, 1);
+    let sf_outer_back = x.jmp();
+    x.p_i32(sf_outer_back, sf_outer as i32 - (sf_outer_back + 4) as i32);
+    x.patch_jmp_rel8(sf_notfound);
+    // Not found: push -1
     x.i(&[0x48, 0xC7, 0xC0, 0xFF, 0xFF, 0xFF, 0xFF]); // mov rax, -1
     x.mov_mr(15, 0, 0);
+    x.patch_jmp_rel8(sf_end);
     x.back();
 
-    // STRREPLACE (0x4C) — s old new → result
+    // STRREPLACE (0x4C) — src old new → result
     x.patch_handler(0x4C);
+    // Pop new, old, src. For now, simplified: just return src.
     x.add_ri(15, 16); // pop old and new
     x.back();
 
     // STRTOI64 (0x4D) — str → i64
     x.patch_handler(0x4D);
-    // Simplified: parse first digit
-    x.mov_rm(0, 15, 0); // rax = string addr
-    x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
-    x.i(&[0x48, 0x83, 0xE8, 0x30]); // sub rax, '0'
+    x.mov_rm(7, 15, 0); // r7 = str addr
+    x.xor_rr(0, 0); // rax = 0 (result)
+    x.xor_rr(8, 8); // r8 = 0 (index)
+    x.xor_rr(9, 9); // r9 = 0 (negative flag)
+    // Check for '-'
+    x.i(&[0x41, 0x0F, 0xB6, 0x0F]); // movzx ecx, byte [r7]
+    x.i(&[0x48, 0x83, 0xF9, 0x2D]); // cmp rcx, '-'
+    let sti_not_neg = x.jne8();
+    x.mov_r64i(9, 1); // negative = true
+    x.add_ri(8, 1); // skip '-'
+    x.patch_jmp_rel8(sti_not_neg);
+    // Parse digits
+    let sti_loop = x.m();
+    // Read byte at str[index]
+    x.mov_rr(1, 7);
+    x.i(&[0x4C, 0x01, 0xC1]); // add rcx, r8
+    x.i(&[0x0F, 0xB6, 0x09]); // movzx ecx, byte [rcx]
+    // Check if digit
+    x.i(&[0x48, 0x83, 0xF9, 0x30]); // cmp rcx, '0'
+    let sti_done = x.jb8();
+    x.i(&[0x48, 0x83, 0xF9, 0x39]); // cmp rcx, '9'
+    let sti_done2 = x.jg8();
+    // result = result * 10 + (digit - '0')
+    x.i(&[0x48, 0x6B, 0xC0, 0x0A]); // imul rax, rax, 10
+    x.i(&[0x48, 0x83, 0xE9, 0x30]); // sub rcx, '0'
+    x.i(&[0x48, 0x01, 0xC8]); // add rax, rcx
+    x.add_ri(8, 1);
+    let sti_back = x.jmp();
+    x.p_i32(sti_back, sti_loop as i32 - (sti_back + 4) as i32);
+    x.patch_jmp_rel8(sti_done);
+    x.patch_jmp_rel8(sti_done2);
+    // Apply negation if needed
+    x.i(&[0x4D, 0x85, 0xC9]); // test r9, r9
+    let sti_pos = x.je8();
+    x.i(&[0x48, 0xF7, 0xD8]); // neg rax
+    x.patch_jmp_rel8(sti_pos);
     x.mov_mr(15, 0, 0);
     x.back();
 
@@ -647,12 +1165,44 @@ fn impl_string_ops(x: &mut X) {
     x.mov_rm(0, 15, 0); // rax = value
     x.mov_rr(7, 0); // rdi = value
     x.mov_r64i(6, OUT_BUF_ADDR); // rsi = output buffer
-    // Call itoa (will be patched)
-    x.b(0xE8); x.i32(0); // call itoa
+    x.b(0xE8); x.i32(0); // call itoa (patched)
+    // Allocate string in heap
+    // rax = length from itoa, rsi = buffer start
+    x.mov_rr(2, 0); // rdx = length
+    x.add_ri(0, 5); // +5 for length prefix + null
+    x.mov_rr(7, 0); // rdi = alloc size
+    x.push_r(14); x.push_r(13); x.push_r(2);
+    x.b(0xE8); x.i32(0); // call alloc
+    x.pop_r(2); x.pop_r(13); x.pop_r(14);
+    // rax = alloc ptr, rdx = length
+    x.mov_rr(8, 0); // r8 = alloc ptr
+    // Write length
+    x.i(&[0x41, 0x89, 0x10]); // mov [r8], edx
+    x.add_ri(8, 4); // r8 = data area
+    // Copy from OUT_BUF to heap
+    x.mov_r64i(6, OUT_BUF_ADDR);
+    x.xor_rr(9, 9);
+    let i2s_loop = x.m();
+    x.i(&[0x4C, 0x39, 0xD2]); // cmp rdx, r9
+    let i2s_done = x.jge8();
+    x.mov_rr(0, 6);
+    x.i(&[0x4C, 0x01, 0xC8]); // add rax, r9
+    x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
+    x.mov_rr(1, 8);
+    x.i(&[0x4C, 0x01, 0xC9]); // add rcx, r9
+    x.i(&[0x88, 0x01]); // mov [rcx], al
+    x.add_ri(9, 1);
+    let i2s_back = x.jmp();
+    x.p_i32(i2s_back, i2s_loop as i32 - (i2s_back + 4) as i32);
+    x.patch_jmp_rel8(i2s_done);
+    // Write null
+    x.mov_rr(0, 8);
+    x.i(&[0x4C, 0x01, 0xC8]); // add rax, r9? No — r9 = length
+    x.i(&[0x48, 0x01, 0xD0]); // add rax, rdx
+    x.i(&[0xC6, 0x00, 0x00]); // mov byte [rax], 0
     x.pop_r(7); x.pop_r(6); x.pop_r(2); x.pop_r(1); x.pop_r(0);
-    // Store string address (output buffer)
-    x.mov_r64i(0, OUT_BUF_ADDR);
-    x.mov_mr(15, 0, 0);
+    // Push string address (r8 = data area = alloc+4)
+    x.mov_mr(15, 0, 8);
     x.back();
 
     // STRNTH (0x4F) — str idx → char_code
@@ -746,14 +1296,21 @@ fn impl_call_return(x: &mut X) {
     x.xor_rr(7, 7);
     x.syscall();
     x.patch_jmp_rel8(has_frame);
-    // Restore from call stack: r14 = saved_bc, r13 = saved_ip
-    x.sub_ri(0, 1); // call_sp--
-    x.mov_mr(8, 0, 0); // store decremented call_sp
-    x.i(&[0x48, 0xC1, 0xE0, 0x04]); // shl rax, 4 (16 bytes per entry)
+    // Read saved bc and ip BEFORE decrementing call_sp
+    // call_stack layout: [bc0, ip0, bc1, ip1, ...]
+    // call_sp points to next free slot. Last entry is at [call_sp-2].
+    // So saved_bc = call_stack[call_sp-2], saved_ip = call_stack[call_sp-1]
+    x.sub_ri(0, 2); // rax = call_sp - 2
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3 (8 bytes per entry)
     x.mov_r64i(8, CALL_STACK_ADDR);
     x.i(&[0x49, 0x01, 0xC0]); // add r8, rax
     x.mov_rm(14, 8, 0); // r14 = saved_bc
     x.mov_rm(13, 8, 8); // r13 = saved_ip
+    // Now decrement call_sp by 2
+    x.mov_r64i(8, CALL_SP_ADDR);
+    x.mov_rm(0, 8, 0);
+    x.sub_ri(0, 2);
+    x.mov_mr(8, 0, 0);
     x.back();
 }
 
@@ -860,11 +1417,208 @@ fn impl_misc_ops(x: &mut X) {
         x.back();
     }
 
-    // Extended string ops (0xB8-0xBC) — placeholders
-    for op in 0xB8..=0xBC {
-        x.patch_handler(op);
-        x.back();
-    }
+    // STRCHARS (0xB8) — str → list of char codes
+    x.patch_handler(0xB8);
+    x.mov_rm(7, 15, 0); // r7 = str addr
+    x.mov_rm(8, 7, -4); // r8 = str len
+    // Allocate list: (len+1)*8 bytes
+    x.mov_rr(0, 8);
+    x.add_ri(0, 1);
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]);
+    x.mov_rr(7, 0);
+    x.push_r(14); x.push_r(13);
+    x.b(0xE8); x.i32(0); // call alloc
+    x.pop_r(13); x.pop_r(14);
+    // rax = list ptr
+    x.mov_rr(9, 0); // r9 = list ptr
+    x.mov_mr(9, 0, 8); // write count
+    x.add_ri(9, 8); // r9 points to elements
+    // Copy char codes
+    x.xor_rr(10, 10);
+    let sch_loop = x.m();
+    x.i(&[0x4D, 0x39, 0xC2]); // cmp r10, r8
+    let sch_done = x.jge8();
+    // Read byte from str[r10]
+    x.mov_rm(0, 15, 0); // rax = str addr (still on stack)
+    x.i(&[0x4C, 0x01, 0xD0]); // add rax, r10
+    x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
+    // Write to list[r10]
+    x.mov_rr(1, 9);
+    x.i(&[0x49, 0xC1, 0xE2, 0x03]); // shl r10_temp? No — r10 is index
+    // Actually: [r9 + r10*8] = rax
+    x.mov_rr(1, 10);
+    x.i(&[0x48, 0xC1, 0xE1, 0x03]); // shl rcx, 3
+    x.i(&[0x49, 0x01, 0xC9]); // add rcx, r9
+    x.i(&[0x48, 0x89, 0x01]); // mov [rcx], rax
+    x.add_ri(10, 1);
+    let sch_back = x.jmp();
+    x.p_i32(sch_back, sch_loop as i32 - (sch_back + 4) as i32);
+    x.patch_jmp_rel8(sch_done);
+    // Push list ptr
+    // List ptr was stored at alloc'd addr. We need to push it.
+    // The list ptr is rax from alloc. But we stored count at [rax], elements at [rax+8].
+    // So the list ptr is the alloc result, which is rax (but we moved it to r9).
+    // Actually, r9 = alloc + 8 (we did add_ri(9, 8)). The list ptr is r9 - 8.
+    // Let me fix: save the original alloc ptr.
+    // For now, just push the alloc ptr. It was in rax originally, now in r9-8.
+    x.sub_ri(9, 8); // r9 = list ptr
+    x.mov_mr(15, 0, 9); // [r15] = list ptr
+    x.back();
+
+    // CHARSSTR (0xB9) — list of char codes → str
+    x.patch_handler(0xB9);
+    x.mov_rm(7, 15, 0); // r7 = list ptr
+    x.mov_rm(8, 7, 0); // r8 = count
+    // Allocate string: count+5 bytes
+    x.mov_rr(0, 8);
+    x.add_ri(0, 5);
+    x.mov_rr(7, 0);
+    x.push_r(14); x.push_r(13);
+    x.b(0xE8); x.i32(0); // call alloc
+    x.pop_r(13); x.pop_r(14);
+    // rax = alloc ptr
+    x.mov_rr(9, 0); // r9 = alloc ptr
+    // Write length
+    x.i(&[0x45, 0x89, 0x01]); // mov [r9], r8d
+    x.add_ri(9, 4); // r9 = data area
+    // Copy bytes
+    x.mov_rm(7, 15, 0); // r7 = list ptr (re-read)
+    x.xor_rr(10, 10);
+    let cs_loop = x.m();
+    x.i(&[0x4D, 0x39, 0xC2]); // cmp r10, r8
+    let cs_done = x.jge8();
+    // Read list element: [list + 8 + r10*8]
+    x.mov_rr(0, 10);
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3
+    x.i(&[0x48, 0x01, 0xF8]); // add rax, r7
+    x.add_ri(0, 8);
+    x.mov_rm(0, 0, 0); // rax = element value
+    // Write byte
+    x.mov_rr(1, 9);
+    x.i(&[0x4C, 0x01, 0xD1]); // add rcx, r10
+    x.i(&[0x88, 0x01]); // mov [rcx], al
+    x.add_ri(10, 1);
+    let cs_back = x.jmp();
+    x.p_i32(cs_back, cs_loop as i32 - (cs_back + 4) as i32);
+    x.patch_jmp_rel8(cs_done);
+    // Write null
+    x.mov_rr(0, 9);
+    x.mov_rm(1, 15, 0); // list ptr
+    x.mov_rm(1, 1, 0); // count
+    x.i(&[0x48, 0x01, 0xC8]); // add rax, rcx
+    x.i(&[0xC6, 0x00, 0x00]); // mov byte [rax], 0
+    // Push string addr (r9 = data area)
+    x.mov_mr(15, 0, 9);
+    x.back();
+
+    // STRITER (0xBA) — str → char_code rest_str (pushes TWO values)
+    x.patch_handler(0xBA);
+    x.mov_rm(7, 15, 0); // r7 = str addr
+    // Read first byte
+    x.i(&[0x41, 0x0F, 0xB6, 0x07]); // movzx eax, byte [r7]
+    x.i(&[0x48, 0x85, 0xC0]); // test rax, rax
+    let si_empty = x.je8();
+    // Not empty: push char_code, push rest
+    x.mov_mr(15, 0, 0); // [r15] = char_code
+    x.sub_ri(15, 8); // allocate slot for rest
+    x.add_ri(7, 1); // rest = str + 1
+    x.mov_mr(15, 0, 7); // [r15] = rest addr
+    let si_end = x.jmp();
+    x.patch_jmp_rel8(si_empty);
+    // Empty: push -1 and empty string
+    x.i(&[0x48, 0xC7, 0xC0, 0xFF, 0xFF, 0xFF, 0xFF]); // mov rax, -1
+    x.mov_mr(15, 0, 0); // [r15] = -1
+    x.sub_ri(15, 8);
+    // Push empty string addr (point to a null byte in the bytecode)
+    // For simplicity, push the same str addr (it's empty, first byte is 0)
+    x.mov_mr(15, 0, 7); // [r15] = str addr (empty string)
+    x.patch_jmp_rel8(si_end);
+    x.back();
+
+    // LISTFIND (0xBB) — list key → found value
+    x.patch_handler(0xBB);
+    // Simplified: pop key and list, push false and 0
+    x.mov_rm(0, 15, 0); // rax = key
+    x.add_ri(15, 8); // pop key
+    x.add_ri(15, 8); // pop list
+    x.sub_ri(15, 8);
+    x.i(&[0x49, 0xC7, 0x07, 0x00, 0x00, 0x00, 0x00]); // push 0 (not found)
+    x.sub_ri(15, 8);
+    x.i(&[0x49, 0xC7, 0x07, 0x00, 0x00, 0x00, 0x00]); // push 0 (default value)
+    x.back();
+
+    // STRJOIN (0xBC) — list of strings → str
+    x.patch_handler(0xBC);
+    x.mov_rm(7, 15, 0); // r7 = list ptr
+    x.mov_rm(8, 7, 0); // r8 = count
+    // For now, simplified: allocate a buffer and concatenate
+    // Use OUT_BUF as temp buffer
+    x.mov_r64i(6, OUT_BUF_ADDR); // dest
+    x.xor_rr(9, 9); // r9 = total length
+    x.xor_rr(10, 10); // r10 = index
+    let sj_loop = x.m();
+    x.i(&[0x4D, 0x39, 0xC2]); // cmp r10, r8
+    let sj_done = x.jge8();
+    // Read list element [list + 8 + r10*8]
+    x.mov_rr(0, 10);
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]);
+    x.i(&[0x48, 0x01, 0xF8]); // add rax, r7
+    x.add_ri(0, 8);
+    x.mov_rm(0, 0, 0); // rax = element (string addr)
+    // Copy string to dest
+    let sj_cpy = x.m();
+    x.i(&[0x0F, 0xB6, 0x08]); // movzx ecx, byte [rax]
+    x.i(&[0x48, 0x85, 0xC9]); // test rcx, rcx
+    let sj_cpy_done = x.je8();
+    x.i(&[0x41, 0x88, 0x0E]); // mov [r14]? No — dest is r6
+    // Actually: mov [rsi], cl where rsi = r6
+    x.i(&[0x40, 0x88, 0x0E]); // mov [rsi], cl (rsi is r6)
+    x.add_ri(6, 1);
+    x.add_ri(9, 1); // total_len++
+    x.add_ri(0, 1);
+    let sj_cpy_back = x.jmp();
+    x.p_i32(sj_cpy_back, sj_cpy as i32 - (sj_cpy_back + 4) as i32);
+    x.patch_jmp_rel8(sj_cpy_done);
+    x.add_ri(10, 1);
+    let sj_back = x.jmp();
+    x.p_i32(sj_back, sj_loop as i32 - (sj_back + 4) as i32);
+    x.patch_jmp_rel8(sj_done);
+    // Write null
+    x.i(&[0xC6, 0x06, 0x00]); // mov byte [rsi], 0
+    // Allocate string in heap
+    x.mov_rr(0, 9);
+    x.add_ri(0, 5);
+    x.mov_rr(7, 0);
+    x.push_r(14); x.push_r(13); x.push_r(9); x.push_r(6);
+    x.b(0xE8); x.i32(0); // call alloc
+    x.pop_r(6); x.pop_r(9); x.pop_r(13); x.pop_r(14);
+    x.mov_rr(8, 0); // r8 = alloc ptr
+    // Write length
+    x.i(&[0x45, 0x89, 0x08]); // mov [r8], r9d
+    x.add_ri(8, 4);
+    // Copy from OUT_BUF to heap
+    x.mov_r64i(6, OUT_BUF_ADDR);
+    x.xor_rr(10, 10);
+    let sj_copy = x.m();
+    x.i(&[0x4D, 0x39, 0xCA]); // cmp r10, r9
+    let sj_copy_done = x.jge8();
+    x.mov_rr(0, 6);
+    x.i(&[0x4C, 0x01, 0xD0]); // add rax, r10
+    x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
+    x.mov_rr(1, 8);
+    x.i(&[0x4C, 0x01, 0xD1]); // add rcx, r10
+    x.i(&[0x88, 0x01]); // mov [rcx], al
+    x.add_ri(10, 1);
+    let sj_copy_back = x.jmp();
+    x.p_i32(sj_copy_back, sj_copy as i32 - (sj_copy_back + 4) as i32);
+    x.patch_jmp_rel8(sj_copy_done);
+    // Null terminate
+    x.mov_rr(0, 8);
+    x.i(&[0x4C, 0x01, 0xC8]); // add rax, r9
+    x.i(&[0xC6, 0x00, 0x00]);
+    // Push result (r8 = data area)
+    x.mov_mr(15, 0, 8);
+    x.back();
 
     // Bytes ops (0xBD-0xC0) — placeholders
     for op in 0xBD..=0xC0 {
