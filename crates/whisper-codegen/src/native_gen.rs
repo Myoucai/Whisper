@@ -1434,30 +1434,69 @@ fn impl_io_ops(x: &mut X) {
 // ── Float operations ────────────────────────────────────────────────
 
 fn impl_float_ops(x: &mut X) {
-    // I64ToF64 (0xB0)
+    // I64ToF64 (0xB0) — convert i64 to f64
     x.patch_handler(0xB0);
-    // Convert integer on stack to float (no-op for now — same bit pattern)
+    x.mov_rm(0, 15, 0); // rax = i64 value
+    x.i(&[0x48, 0x89, 0x45, 0x00]); // mov [rbp], rax (scratch)
+    x.i(&[0xDB, 0x45, 0x00]); // fild dword [rbp] (load integer)
+    x.i(&[0xDD, 0x5D, 0x00]); // fstp qword [rbp] (store as f64)
+    x.i(&[0x48, 0x8B, 0x45, 0x00]); // mov rax, [rbp]
+    x.mov_mr(15, 0, 0); // store back
     x.back();
 
-    // F64ToI64 (0xB1)
+    // F64ToI64 (0xB1) — truncate f64 to i64
     x.patch_handler(0xB1);
-    // Truncate float to integer (no-op for now)
+    x.mov_rm(0, 15, 0); // rax = f64 bits
+    x.i(&[0x48, 0x89, 0x45, 0x00]); // mov [rbp], rax
+    x.i(&[0xDD, 0x45, 0x00]); // fld qword [rbp]
+    x.i(&[0xDB, 0x5D, 0x00]); // fistp dword [rbp] (truncate to i32)
+    x.i(&[0x48, 0x63, 0x45, 0x00]); // movsxd rax, dword [rbp]
+    x.mov_mr(15, 0, 0);
     x.back();
 
-    // FSqrt (0xB2) — placeholder
+    // FSqrt (0xB2)
     x.patch_handler(0xB2);
+    x.mov_rm(0, 15, 0);
+    x.i(&[0x48, 0x89, 0x45, 0x00]);
+    x.i(&[0xDD, 0x45, 0x00]); // fld
+    x.i(&[0xD9, 0xFA]); // fsqrt
+    x.i(&[0xDD, 0x5D, 0x00]); // fstp
+    x.i(&[0x48, 0x8B, 0x45, 0x00]);
+    x.mov_mr(15, 0, 0);
     x.back();
 
-    // FSin (0xB3) — placeholder
+    // FSin (0xB3)
     x.patch_handler(0xB3);
+    x.mov_rm(0, 15, 0);
+    x.i(&[0x48, 0x89, 0x45, 0x00]);
+    x.i(&[0xDD, 0x45, 0x00]);
+    x.i(&[0xD9, 0xFE]); // fsin
+    x.i(&[0xDD, 0x5D, 0x00]);
+    x.i(&[0x48, 0x8B, 0x45, 0x00]);
+    x.mov_mr(15, 0, 0);
     x.back();
 
-    // FCos (0xB4) — placeholder
+    // FCos (0xB4)
     x.patch_handler(0xB4);
+    x.mov_rm(0, 15, 0);
+    x.i(&[0x48, 0x89, 0x45, 0x00]);
+    x.i(&[0xDD, 0x45, 0x00]);
+    x.i(&[0xD9, 0xFF]); // fcos
+    x.i(&[0xDD, 0x5D, 0x00]);
+    x.i(&[0x48, 0x8B, 0x45, 0x00]);
+    x.mov_mr(15, 0, 0);
     x.back();
 
-    // FTan (0xB5) — placeholder
+    // FTan (0xB5)
     x.patch_handler(0xB5);
+    x.mov_rm(0, 15, 0);
+    x.i(&[0x48, 0x89, 0x45, 0x00]);
+    x.i(&[0xDD, 0x45, 0x00]);
+    x.i(&[0xD9, 0xF2]); // fptan
+    x.i(&[0xDD, 0xD8]); // fstp st(0) (discard 1.0 from fptan)
+    x.i(&[0xDD, 0x5D, 0x00]);
+    x.i(&[0x48, 0x8B, 0x45, 0x00]);
+    x.mov_mr(15, 0, 0);
     x.back();
 
     // JsonParse (0xB6) — placeholder
