@@ -58,8 +58,22 @@ pub fn build_file(
             println!("Compiled {} bytes → {}", size, output);
             println!("Build with: gcc -O2 {output} -o program -lm && ./program");
         }
+        "native" | "elf" => {
+            let elf = whisper_codegen::compile_to_native(&bytecode, &defs);
+            std::fs::write(output, &elf).map_err(|e| format!("Failed to write ELF: {e}"))?;
+            let size = std::fs::metadata(output).map(|m| m.len()).unwrap_or(0);
+            println!("Compiled {} bytes → {}", size, output);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(output,
+                    std::fs::Permissions::from_mode(0o755))
+                    .map_err(|e| format!("chmod: {e}"))?;
+            }
+            println!("Run: ./{output}");
+        }
         other => {
-            return Err(format!("Unknown target: {other}. Supported: wbin, wasm, c"));
+            return Err(format!("Unknown target: {other}. Supported: wbin, wasm, c, native"));
         }
     }
 
