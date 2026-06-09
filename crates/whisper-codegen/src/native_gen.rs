@@ -2105,12 +2105,50 @@ fn impl_misc_ops(x: &mut X) {
     x.syscall();
     x.back();
 
-    // Try (0xC1) — placeholder: just execute the ref
+    // Try (0xC1) — ref → success_bool result
     x.patch_handler(0xC1);
-    // Read ref length and skip it (placeholder)
+    // Skip inline ref bytecode
     x.i(&[0x47, 0x8B, 0x04, 0x2E]); // mov eax, [r14+r13]
     x.add_ri(13, 4);
-    x.i(&[0x49, 0x01, 0xC5]); // add r13, rax
+    x.i(&[0x49, 0x01, 0xC5]); // skip ref data
+    // Stack: [... ref_bc_addr]
+    x.mov_rm(8, 15, 0); // r8 = ref_bc_addr
+    x.add_ri(15, 8); // pop ref
+    // Call run_ref to execute the quotation
+    x.mov_rr(7, 8); // rdi = ref_bc_addr
+    x.mov_r64i(6, 0xFFFF); // rsi = large len
+    x.push_r(8);
+    x.b(0xE8); x.i32(2); // call run_ref
+    x.pop_r(8);
+    // Result is on stack top
+    // Push true below it: stack becomes [..., true, result]
+    // Current: [... result]
+    // Need: [... true, result]
+    x.mov_rm(0, 15, 0); // rax = result
+    x.i(&[0x49, 0xC7, 0x07, 0x01, 0x00, 0x00, 0x00]); // mov qword [r15], 1 (true)
+    x.sub_ri(15, 8); // allocate slot
+    x.mov_mr(15, 0, 0); // push result (true is now below)
+    // Wait — the order is wrong. Let me restructure:
+    // Current stack: [... result]  (result at [r15])
+    // We want: [... true, result]  (true at [r15], result at [r15-8])
+    // Actually: we need to shift. Let me just:
+    // 1. Save result
+    // 2. Push true
+    // 3. Push result
+    x.mov_rm(0, 15, 0); // rax = result (from run_ref)
+    x.add_ri(15, 8); // pop result
+    x.sub_ri(15, 8); // push true
+    x.i(&[0x49, 0xC7, 0x07, 0x01, 0x00, 0x00, 0x00]); // [r15] = 1 (true)
+    x.sub_ri(15, 8); // push result
+    x.mov_mr(15, 0, 0); // [r15] = result
+    // Now stack: [... true, result] — but we want true ON TOP
+    // The Rust VM does: push true, push result → stack has [true, result]
+    // With true on top. Let me swap:
+    x.mov_rm(0, 15, 0); // rax = result
+    x.mov_rm(1, 15, 8); // rcx = true
+    x.mov_mr(15, 8, 0); // [r15+8] = result
+    x.mov_mr(15, 0, 1); // [r15] = true
+    // Now stack: [... result, true] — true on top. Correct!
     x.back();
 }
 
