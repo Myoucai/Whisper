@@ -2464,12 +2464,22 @@ fn impl_run_ref(x: &mut X, _raw_bc: &[u8]) -> usize {
     for op in 0x18..=0x1D { x.op(op); }
     // AND, OR, NOT (0x20-0x22)
     for op in 0x20..=0x22 { x.op(op); }
+    // PICK (0x04)
+    x.op(0x04);
     // PUSH_I64 (0x30)
     x.op(0x30);
+    // PUSH_F64 (0x31)
+    x.op(0x31);
     // PUSH_STR (0x32)
     x.op(0x32);
     // PUSH_BOOL (0x33)
     x.op(0x33);
+    // PUSH_LIST (0x34)
+    x.op(0x34);
+    // NTH (0x40), APPEND (0x41), LEN (0x42)
+    for op in 0x40..=0x42 { x.op(op); }
+    // STRLEN (0x46)
+    x.op(0x46);
     // COND (0x50)
     x.op(0x50);
     // JUMP (0x51)
@@ -2574,8 +2584,24 @@ fn impl_run_ref(x: &mut X, _raw_bc: &[u8]) -> usize {
     x.patch_handler(0x22);
     x.i(&[0x49, 0x83, 0x37, 0x01]); x.back();
 
+    // PICK
+    x.patch_handler(0x04);
+    x.i(&[0x43, 0x0F, 0xB6, 0x04, 0x2E]); // movzx eax, [r14+r13]
+    x.add_ri(13, 1);
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3
+    x.i(&[0x49, 0x01, 0xF8]); // add rax, r15
+    x.mov_rm(0, 0, 0);
+    x.sub_ri(15, 8);
+    x.mov_mr(15, 0, 0);
+    x.back();
+
     // PUSH_I64
     x.patch_handler(0x30);
+    x.i(&[0x4B, 0x8B, 0x04, 0x2E]); x.add_ri(13, 8);
+    x.sub_ri(15, 8); x.mov_mr(15, 0, 0); x.back();
+
+    // PUSH_F64
+    x.patch_handler(0x31);
     x.i(&[0x4B, 0x8B, 0x04, 0x2E]); x.add_ri(13, 8);
     x.sub_ri(15, 8); x.mov_mr(15, 0, 0); x.back();
 
@@ -2597,6 +2623,43 @@ fn impl_run_ref(x: &mut X, _raw_bc: &[u8]) -> usize {
     x.i(&[0x43, 0x0F, 0xB6, 0x04, 0x2E]);
     x.add_ri(13, 1);
     x.sub_ri(15, 8);
+    x.mov_mr(15, 0, 0);
+    x.back();
+
+    // PUSH_LIST — simplified: just pop count, leave elements on stack
+    x.patch_handler(0x34);
+    x.add_ri(15, 8); // pop count (elements already on stack)
+    x.back();
+
+    // NTH
+    x.patch_handler(0x40);
+    x.mov_rm(0, 15, 0); // rax = idx
+    x.add_ri(15, 8);
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3
+    x.i(&[0x49, 0x03, 0x07]); // add rax, [r15]
+    x.add_ri(0, 8);
+    x.mov_rm(0, 0, 0);
+    x.mov_mr(15, 0, 0);
+    x.back();
+
+    // APPEND — simplified: pop elem and list, push list back
+    x.patch_handler(0x41);
+    x.add_ri(15, 8); // pop elem
+    x.back(); // list stays on stack
+
+    // LEN
+    x.patch_handler(0x42);
+    x.mov_rm(0, 15, 0); // rax = list_ptr
+    x.mov_rm(0, 0, 0); // rax = count
+    x.mov_mr(15, 0, 0);
+    x.back();
+
+    // STRLEN
+    x.patch_handler(0x46);
+    x.mov_rm(0, 15, 0); // rax = str addr
+    x.i(&[0x48, 0x83, 0xE8, 0x04]); // sub rax, 4
+    x.i(&[0x8B, 0x00]); // mov eax, [rax]
+    x.i(&[0x48, 0x98]); // cdqe
     x.mov_mr(15, 0, 0);
     x.back();
 
