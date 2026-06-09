@@ -37,6 +37,8 @@
         _ "" streq ??drop
         |   _ 0 strnth 34 = ??
                 1 9999 strslice "" ` read-str-acc
+                // Prepend " marker for classify
+                ` "\"" ` strcat `
                 @ @ append ` tokenize-loop
             |   _ 0 strnth is-ws ??
                     striter ` ctos

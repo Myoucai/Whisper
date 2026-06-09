@@ -141,9 +141,16 @@ fn cmd_fmt(args: &[String]) -> Result<(), String> {
 }
 
 fn cmd_bootstrap(args: &[String]) -> Result<(), String> {
-    let file = args.get(2).ok_or("Expected: whisper bootstrap <file.ws>")?;
+    let file = args.iter()
+        .skip(2)
+        .find(|a| !a.starts_with('-'))
+        .ok_or("Expected: whisper bootstrap <file.ws>")?;
     let source = std::fs::read_to_string(file).map_err(|e| format!("Cannot read '{file}': {e}"))?;
-    commands::bootstrap::bootstrap_compile(&source)
+    if get_flag(args, "--hard") {
+        commands::bootstrap::hard_bootstrap_compile(&source)
+    } else {
+        commands::bootstrap::bootstrap_compile(&source)
+    }
 }
 
 fn cmd_serve(args: &[String]) -> Result<(), String> {

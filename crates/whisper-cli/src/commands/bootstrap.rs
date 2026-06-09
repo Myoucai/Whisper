@@ -147,6 +147,168 @@ fn ast_to_vec(nodes: &[AstNode]) -> Vec<Value> {
     }
 }
 
+/// Hard bootstrap: use whisperc pipeline (lexer + classify + compile) for the
+/// token→bytecode step, with Rust handling structural nodes (Def, Cond, Loop).
+pub fn hard_bootstrap_compile(source: &str) -> Result<(), String> {
+    // Phase 1: Parse with Rust compiler to extract structural nodes
+    let ast = Parser::parse_source(source).map_err(|e| format!("Parse: {}", e.message))?;
+    let mut gen = BytecodeGenerator::new();
+    let (ref_bytecode, ref_defs) = gen.compile(&ast);
+
+    // Phase 2: Separate defs from main body
+    let mut main_body: Vec<AstNode> = Vec::new();
+    let mut def_nodes: Vec<(String, Vec<AstNode>)> = Vec::new();
+    for node in &ast {
+        match node {
+            AstNode::Def { name, body } => {
+                def_nodes.push((name.clone(), body.clone()));
+            }
+            _ => main_body.push(node.clone()),
+        }
+    }
+
+    // Phase 3: Load whisperc pipeline (lexer + classify + compiler)
+    let mut vm = Vm::new();
+    load_whisperc_pipeline(&mut vm);
+    // Phase 4: Compile main body through whisperc pipeline
+    let main_source = nodes_to_source_string(&main_body);
+    let whisperc_ops = compile_via_whisperc_pipeline(&mut vm, &main_source)?;
+
+    // Phase 5: Compile each def body through whisperc pipeline
+    let mut whisperc_defs: Vec<(String, Vec<Opcode>)> = Vec::new();
+    for (def_name, def_body) in &def_nodes {
+        let body_source = nodes_to_source_string(def_body);
+        let body_ops = compile_via_whisperc_pipeline(&mut vm, &body_source)?;
+        println!("  def '{}': {} opcodes (whisperc)", def_name, body_ops.len());
+        whisperc_defs.push((def_name.clone(), body_ops));
+    }
+
+    // Phase 6: Execute Rust-compiled reference
+    println!("whisperc output: {} ops (main), {} defs", whisperc_ops.len(), whisperc_defs.len());
+    let mut vm_ref = Vm::new();
+    for (name, code) in &ref_defs {
+        vm_ref.define_word(name.clone(), code.clone());
+    }
+    print!("Rust VM output: ");
+    vm_ref.execute(&ref_bytecode).map_err(|e| format!("VM: {e}"))?;
+
+    // Phase 7: Execute whisperc-compiled bytecode
+    let mut vm_wc = Vm::new();
+    for (name, code) in &whisperc_defs {
+        vm_wc.define_word(name.clone(), code.clone());
+    }
+    print!("whisperc VM output: ");
+    vm_wc.execute(&whisperc_ops).map_err(|e| format!("whisperc VM: {e}"))?;
+    println!();
+    println!("Hard self-hosting pipeline complete.");
+
+    Ok(())
+}
+
+/// Convert AST nodes back to a source string for re-lexing by whisperc.
+fn nodes_to_source_string(nodes: &[AstNode]) -> String {
+    use std::fmt::Write;
+    let mut s = String::new();
+    for node in nodes {
+        match node {
+            AstNode::Literal(val) => {
+                write!(s, "{val} ").unwrap();
+            }
+            AstNode::WordRef(name) => {
+                write!(s, "{name} ").unwrap();
+            }
+            AstNode::Op(op) => {
+                write!(s, "{} ", operator_to_str(*op)).unwrap();
+            }
+            AstNode::Quote(body) => {
+                s.push_str("{ ");
+                s.push_str(&nodes_to_source_string(body));
+                s.push_str("} ");
+            }
+            AstNode::List(items) => {
+                s.push_str("[ ");
+                for item in items {
+                    s.push_str(&nodes_to_source_string(std::slice::from_ref(item)));
+                }
+                s.push_str("] ");
+            }
+            AstNode::Cond { then_branch, else_branch } => {
+                s.push_str("?? ");
+                s.push_str(&nodes_to_source_string(then_branch));
+                if let Some(ref eb) = else_branch {
+                    s.push_str("| ");
+                    s.push_str(&nodes_to_source_string(eb));
+                }
+                s.push_str("] ");
+            }
+            _ => {}
+        }
+    }
+    s
+}
+
+fn operator_to_str(op: Operator) -> &'static str {
+    match op {
+        Operator::Dup => "_",
+        Operator::Swap => "`",
+        Operator::Drop => "drop",
+        Operator::Rot => "@",
+        Operator::Add => "+",
+        Operator::Sub => "-",
+        Operator::Mul => "*",
+        Operator::Div => "/",
+        Operator::Mod => "%",
+        Operator::Eq => "=",
+        Operator::Lt => "<",
+        Operator::Gt => ">",
+        Operator::Neq => "!=",
+        Operator::Le => "<=",
+        Operator::Ge => ">=",
+        Operator::And => "&",
+        Operator::Or => "|",
+        Operator::Not => "!",
+        Operator::Nth => "@nth",
+        Operator::Append => "append",
+        Operator::Len => "len",
+        Operator::Map => "@map",
+        Operator::Each => "@each",
+        Operator::Fold => "@fold",
+        Operator::AtTimes => "@times",
+        Operator::OutputTop => ".",
+        Operator::OutputAll => "..",
+        Operator::ReadInput => ",",
+        Operator::StrLen => "strlen",
+        Operator::StrCat => "strcat",
+        Operator::StrSlice => "strslice",
+        _ => "drop", // fallback
+    }
+}
+
+/// Compile source string through the full whisperc pipeline.
+fn compile_via_whisperc_pipeline(vm: &mut Vm, source: &str) -> Result<Vec<Opcode>, String> {
+    vm.data_stack.push(Value::Str(Rc::new(source.to_string())));
+    let chunks = vm.execute(&[Opcode::Call("tokenize".to_string())])
+        .map_err(|e| format!("lex: {e}"))?
+        .ok_or("lex: no output")?;
+
+    let nested = if let Value::List(ref items) = chunks {
+        nest_chunks(items)
+    } else {
+        chunks
+    };
+    let tokens = classify_nested(vm, &nested);
+
+    vm.data_stack.push(tokens);
+    let bytecode_vals = vm.execute(&[Opcode::Call("compile".to_string())])
+        .map_err(|e| format!("compile: {e}"))?
+        .ok_or("compile: no output")?;
+
+    match bytecode_vals {
+        Value::List(vals) => Ok(values_to_opcodes(vals.to_vec())),
+        other => Err(format!("expected list of bytecode, got {other:?}")),
+    }
+}
+
 pub fn bootstrap_compile(source: &str) -> Result<(), String> {
     // Phase 1: Parse with Rust compiler (reference)
     let ast = Parser::parse_source(source).map_err(|e| format!("Parse: {}", e.message))?;
@@ -413,6 +575,102 @@ fn byte_to_opcode(byte: u8) -> Opcode {
         0x91 => Opcode::OutputAll,
         0x92 => Opcode::ReadInput,
         _ => Opcode::PushI64(byte as i64),
+    }
+}
+
+/// Load all whisperc components (lexer + classify + compiler) into one VM.
+fn load_whisperc_pipeline(vm: &mut Vm) {
+    let files = [
+        include_str!("../../../../whisperc/lexer.ws"),
+        include_str!("../../../../whisperc/classify.ws"),
+        include_str!("../../../../whisperc/main.ws"),
+    ];
+    for src in files {
+        let ast = Parser::parse_source(src).unwrap();
+        let mut gen = BytecodeGenerator::new();
+        let (bc, defs) = gen.compile(&ast);
+        for (n, c) in defs {
+            vm.define_word(n, c);
+        }
+        vm.execute(&bc).unwrap();
+    }
+}
+
+/// Group `{...}` blocks into nested lists for recursive classification.
+fn nest_chunks(chunks: &[Value]) -> Value {
+    let mut result = Vec::new();
+    let mut i = 0;
+    while i < chunks.len() {
+        match &chunks[i] {
+            Value::Str(s) if s.as_ref() == "{" => {
+                i += 1;
+                let mut depth = 1;
+                let mut inner = Vec::new();
+                while i < chunks.len() && depth > 0 {
+                    match &chunks[i] {
+                        Value::Str(s) if s.as_ref() == "{" => {
+                            depth += 1;
+                            inner.push(chunks[i].clone());
+                        }
+                        Value::Str(s) if s.as_ref() == "}" => {
+                            depth -= 1;
+                            if depth > 0 {
+                                inner.push(chunks[i].clone());
+                            }
+                        }
+                        _ => inner.push(chunks[i].clone()),
+                    }
+                    i += 1;
+                }
+                result.push(Value::List(Rc::new(vec![
+                    Value::I64(5),
+                    nest_chunks(&inner),
+                ])));
+            }
+            Value::Str(s) if s.as_ref() == "}" => {
+                i += 1;
+            }
+            _ => {
+                result.push(chunks[i].clone());
+                i += 1;
+            }
+        }
+    }
+    Value::List(Rc::new(result))
+}
+
+/// Recursively classify nested chunks using the Whisper classify-one word.
+fn classify_nested(vm: &mut Vm, nested: &Value) -> Value {
+    match nested {
+        Value::List(items) => {
+            if items.len() == 2 {
+                if let Value::I64(5) = &items[0] {
+                    let inner = classify_nested(vm, &items[1]);
+                    return Value::List(Rc::new(vec![Value::I64(5), inner]));
+                }
+            }
+            let classified: Vec<Value> = items
+                .iter()
+                .map(|item| classify_nested(vm, item))
+                .collect();
+            Value::List(Rc::new(classified))
+        }
+        Value::Str(s) => {
+            // Strings starting with " are string literals
+            if s.starts_with('"') {
+                let content = &s[1..]; // strip the opening "
+                Value::List(Rc::new(vec![
+                    Value::I64(2), // type = Str
+                    Value::Str(Rc::new(content.to_string())),
+                ]))
+            } else {
+                vm.data_stack.push(nested.clone());
+                vm.execute(&[Opcode::Call("classify-one".to_string())])
+                    .unwrap()
+                    .unwrap_or(Value::List(Rc::new(vec![])))
+            }
+        }
+        other => other.clone(),
     }
 }
 
@@ -780,6 +1038,29 @@ mod tests {
         assert!(matches!(&result, Value::List(_)));
     }
 
+    // ── Pipeline test helper ────────────────────────────────────────────
+
+    fn whisperc_compile(source: &str) -> Vec<Opcode> {
+        let mut vm = Vm::new();
+        load_whisperc_pipeline(&mut vm);
+        vm.data_stack.push(Value::Str(Rc::new(source.to_string())));
+        let chunks = vm.execute(&[Opcode::Call("tokenize".to_string())])
+            .unwrap().unwrap();
+        let nested = if let Value::List(ref items) = chunks {
+            nest_chunks(items)
+        } else {
+            chunks
+        };
+        let tokens = classify_nested(&mut vm, &nested);
+        vm.data_stack.push(tokens);
+        let bytecode_vals = vm.execute(&[Opcode::Call("compile".to_string())])
+            .unwrap();
+        match bytecode_vals {
+            Some(Value::List(vals)) => values_to_opcodes(vals.to_vec()),
+            other => panic!("expected list, got {other:?}"),
+        }
+    }
+
     // ── classify.ws tests ───────────────────────────────────────────────
 
     fn call_whisperc_classify(chunks: &[&str]) -> Value {
@@ -865,135 +1146,6 @@ mod tests {
                 }
             }
             other => panic!("expected list, got {other:?}"),
-        }
-    }
-
-    // ── Phase 3: Full pipeline (lex → classify → compile → execute) ──
-
-    /// Load all whisperc components (lexer + classify + compiler) into one VM.
-    fn load_whisperc_pipeline(vm: &mut Vm) {
-        let files = [
-            include_str!("../../../../whisperc/lexer.ws"),
-            include_str!("../../../../whisperc/classify.ws"),
-            include_str!("../../../../whisperc/main.ws"),
-        ];
-        for src in files {
-            let ast = Parser::parse_source(src).unwrap();
-            let mut gen = BytecodeGenerator::new();
-            let (bc, defs) = gen.compile(&ast);
-            for (n, c) in defs {
-                vm.define_word(n, c);
-            }
-            vm.execute(&bc).unwrap();
-        }
-    }
-
-    /// Run the full whisperc pipeline on source code, returning VM bytecode Opcodes.
-    /// Group `{...}` blocks into nested lists for recursive classification.
-    fn nest_chunks(chunks: &[Value]) -> Value {
-        let mut result = Vec::new();
-        let mut i = 0;
-        while i < chunks.len() {
-            match &chunks[i] {
-                Value::Str(s) if s.as_ref() == "{" => {
-                    i += 1; // skip {
-                    let mut depth = 1;
-                    let mut inner = Vec::new();
-                    while i < chunks.len() && depth > 0 {
-                        match &chunks[i] {
-                            Value::Str(s) if s.as_ref() == "{" => {
-                                depth += 1;
-                                inner.push(chunks[i].clone());
-                            }
-                            Value::Str(s) if s.as_ref() == "}" => {
-                                depth -= 1;
-                                if depth > 0 {
-                                    inner.push(chunks[i].clone());
-                                }
-                            }
-                            _ => inner.push(chunks[i].clone()),
-                        }
-                        i += 1;
-                    }
-                    // Recursively nest the inner group
-                    result.push(Value::List(Rc::new(vec![
-                        Value::I64(5), // Quote type marker
-                        nest_chunks(&inner),
-                    ])));
-                }
-                Value::Str(s) if s.as_ref() == "}" => {
-                    i += 1; // skip stray }
-                }
-                _ => {
-                    result.push(chunks[i].clone());
-                    i += 1;
-                }
-            }
-        }
-        Value::List(Rc::new(result))
-    }
-
-    /// Recursively classify nested chunks using the Whisper classify-one word.
-    fn classify_nested(vm: &mut Vm, nested: &Value) -> Value {
-        match nested {
-            Value::List(items) => {
-                // Check if this is a [5, inner] quote marker from nest_chunks
-                if items.len() == 2 {
-                    if let Value::I64(5) = &items[0] {
-                        // Quote block: recursively classify inner, wrap in [5, ...]
-                        let inner = classify_nested(vm, &items[1]);
-                        return Value::List(Rc::new(vec![
-                            Value::I64(5),
-                            inner,
-                        ]));
-                    }
-                }
-                // Regular list of chunks: classify each element
-                let classified: Vec<Value> = items
-                    .iter()
-                    .map(|item| classify_nested(vm, item))
-                    .collect();
-                Value::List(Rc::new(classified))
-            }
-            Value::Str(_) => {
-                // Leaf: call classify-one in the VM
-                vm.data_stack.push(nested.clone());
-                vm.execute(&[Opcode::Call("classify-one".to_string())])
-                    .unwrap()
-                    .unwrap_or(Value::List(Rc::new(vec![])))
-            }
-            other => other.clone(),
-        }
-    }
-
-    fn whisperc_compile(source: &str) -> Vec<Opcode> {
-        let mut vm = Vm::new();
-        load_whisperc_pipeline(&mut vm);
-
-        // Step 1: tokenize — returns chunk list
-        vm.data_stack.push(Value::Str(Rc::new(source.to_string())));
-        let chunks = vm.execute(&[Opcode::Call("tokenize".to_string())])
-            .unwrap().unwrap();
-
-        // Step 2: nest { } blocks → nested chunk structure
-        let nested = if let Value::List(ref items) = chunks {
-            nest_chunks(items)
-        } else {
-            chunks
-        };
-
-        // Step 3: classify recursively (handles nesting)
-        let tokens = classify_nested(&mut vm, &nested);
-
-        // Step 4: compile — returns bytecode values list
-        vm.data_stack.push(tokens);
-        let bytecode_vals = vm.execute(&[Opcode::Call("compile".to_string())])
-            .unwrap();
-
-        // Step 5: convert to Opcodes
-        match bytecode_vals {
-            Some(Value::List(vals)) => values_to_opcodes(vals.to_vec()),
-            other => panic!("expected list of bytecode, got {other:?}"),
         }
     }
 
