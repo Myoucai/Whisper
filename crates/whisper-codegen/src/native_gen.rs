@@ -264,7 +264,7 @@ pub fn compile_to_native(bytecode: &[Opcode], defs: &[(String, Vec<Opcode>)]) ->
     let alloc_addr = impl_alloc(&mut x);
     let run_ref_addr = impl_run_ref(&mut x, &raw_bc);
 
-    // Patch helper call sites
+    // Patch helper call sites (marker 0=itoa, 1=alloc, 2=run_ref)
     patch_helper_calls(&mut x, itoa_addr, str_eq_addr, str_cmp_addr, alloc_addr, run_ref_addr);
 
     // ── Build ELF ────────────────────────────────────────────────
@@ -505,7 +505,7 @@ fn impl_push_ops(x: &mut X, _raw_bc: &[u8]) {
     x.mov_rr(7, 0); // rdi = size
     // Call alloc (will be patched)
     x.push_r(14); x.push_r(13);
-    x.b(0xE8); x.i32(0); // call alloc
+    x.b(0xE8); x.i32(1); // call alloc
     x.pop_r(13); x.pop_r(14);
     // rax = list_ptr
     x.mov_rr(8, 0); // r8 = list_ptr
@@ -597,7 +597,7 @@ fn impl_list_ops(x: &mut X) {
     x.i(&[0x48, 0xC1, 0xE0, 0x03]);
     x.mov_rr(7, 0);
     x.push_r(14); x.push_r(13); x.push_r(1); x.push_r(2);
-    x.b(0xE8); x.i32(0); // call alloc
+    x.b(0xE8); x.i32(1); // call alloc
     x.pop_r(2); x.pop_r(1); x.pop_r(13); x.pop_r(14);
     // rax = new_ptr, rcx = old_ptr, rdx = old_count
     x.mov_rr(8, 0); // r8 = new_ptr
@@ -654,14 +654,12 @@ fn impl_list_ops(x: &mut X) {
     x.mov_mr(15, 0, 0); // [r15] = count
     x.back();
 
-    // MAP (0x43) — list_ptr ref → new_list_ptr
-    // The ref bytecode address is on the stack (from PUSH_REF), inline ref is skipped.
+    // MAP (0x43) — list_ptr ref_bc_ptr → new_list_ptr
     x.patch_handler(0x43);
-    // Skip inline ref bytecode (read length, advance ip)
-    x.i(&[0x47, 0x8B, 0x04, 0x2E]); // mov eax, [r14+r13] (ref_len)
-    x.add_ri(13, 4); // skip length field
-    x.i(&[0x49, 0x01, 0xC5]); // add r13, rax (skip ref data)
-    // Now: ref_bc address was pushed by PUSH_REF onto the stack
+    // Skip inline ref bytecode
+    x.i(&[0x47, 0x8B, 0x04, 0x2E]); // mov eax, [r14+r13]
+    x.add_ri(13, 4);
+    x.i(&[0x49, 0x01, 0xC5]); // add r13, rax
     // Stack: [... list_ptr, ref_bc_addr]
     x.mov_rm(9, 15, 0); // r9 = ref_bc_addr
     x.mov_rm(10, 15, 8); // r10 = list_ptr
@@ -672,12 +670,12 @@ fn impl_list_ops(x: &mut X) {
     x.add_ri(0, 1);
     x.i(&[0x48, 0xC1, 0xE0, 0x03]);
     x.mov_rr(7, 0);
-    x.push_r(14); x.push_r(13); x.push_r(8); x.push_r(9); x.push_r(10); x.push_r(11);
-    x.b(0xE8); x.i32(0); // call alloc
-    x.pop_r(11); x.pop_r(10); x.pop_r(9); x.pop_r(8); x.pop_r(13); x.pop_r(14);
-    // rax = result list ptr, r9 = ref_bc_addr, r10 = list_ptr, r11 = count
+    x.push_r(9); x.push_r(10); x.push_r(11);
+    x.b(0xE8); x.i32(1); // call alloc (marker 1)
+    x.pop_r(11); x.pop_r(10); x.pop_r(9);
+    // rax = result list ptr
     x.mov_rr(8, 0); // r8 = result list ptr
-    x.mov_mr(8, 0, 11); // write count to result list
+    x.mov_mr(8, 0, 11); // write count
     // Loop: for i=0..count-1
     x.xor_rr(12, 12); // r12 = i
     let map_loop = x.m();
@@ -691,64 +689,21 @@ fn impl_list_ops(x: &mut X) {
     x.mov_rm(0, 0, 0); // rax = element
     x.sub_ri(15, 8);
     x.mov_mr(15, 0, 0);
-    // Save current bc/ip, switch to ref
-    x.push_r(14); x.push_r(13); // save on native stack
-    x.mov_rr(14, 9); // r14 = ref_bc
-    x.xor_rr(13, 13); // r13 = 0
-    // Execute ref block via mini dispatch loop
-    // The mini loop fetches [r14+r13] and dispatches until RETURN
-    // For simplicity, we'll use the call stack mechanism:
-    // Push a sentinel onto the call stack so RETURN knows to stop
-    // Actually, let's just use a simpler approach:
-    // The ref block ends with RETURN. When RETURN is hit,
-    // it checks call_sp. If call_sp==0, it exits (or restores from our save).
-    // We need to save our state so RETURN can restore it.
-    // Save to call stack:
-    x.mov_r64i(0, CALL_SP_ADDR);
-    x.mov_rm(1, 0, 0); // rcx = call_sp
-    x.i(&[0x48, 0xC1, 0xE1, 0x03]); // shl rcx, 3
-    x.mov_r64i(2, CALL_STACK_ADDR);
-    x.i(&[0x48, 0x01, 0xCA]); // add rcx, rdx
-    // Save the PREVIOUS r14/r13 (before we switched)
-    // But we already pushed them on native stack. Let's read from there.
-    // Actually, let's save the original r14/r13 to call stack directly.
-    // We pushed r14 then r13 onto native stack at [r15] and [r15+8].
-    x.mov_rm(0, 15, 0); // rax = saved r13
-    x.mov_rm(3, 15, 8); // rdi = saved r14
-    x.mov_mr(2, 0, 0); // call_stack[sp] = saved_r13? No — layout is [bc, ip]
-    // Layout: call_stack[sp] = bc, call_stack[sp+1] = ip
-    x.mov_mr(2, 0, 3); // call_stack[sp] = saved_r14 (bc)
-    x.mov_mr(2, 8, 0); // call_stack[sp+1] = saved_r13 (ip)
-    // Increment call_sp by 2
-    x.mov_r64i(0, CALL_SP_ADDR);
-    x.mov_rm(1, 0, 0);
-    x.add_ri(1, 2);
-    x.mov_mr(0, 0, 1);
-    // Now execute the ref block. We can't use the main loop because
-    // we're already inside a handler. We need a mini loop.
-    // For now, just skip the ref block execution (placeholder).
-    // The ref block's RETURN will pop from call stack and we continue.
-    // But we never actually execute the ref block...
-    // This is the fundamental challenge. Let me use a different approach:
-    // Just restore and continue the loop without executing the ref.
-    x.pop_r(13); x.pop_r(14); // restore from native stack
-    // Remove sentinel from call stack
-    x.mov_r64i(0, CALL_SP_ADDR);
-    x.mov_rm(1, 0, 0);
-    x.sub_ri(1, 2);
-    x.mov_mr(0, 0, 1);
-    // Store element in result list (without transformation)
-    x.mov_rr(0, 12);
-    x.i(&[0x48, 0xC1, 0xE0, 0x03]);
-    x.i(&[0x49, 0x01, 0xC0]); // add rax, r8
-    x.add_ri(0, 8);
-    // Read element from list
+    // Call run_ref: rdi = ref_bc_addr, rsi = ref_len
+    x.mov_rr(7, 9); // rdi = ref_bc_addr
+    x.mov_r64i(6, 0xFFFF); // rsi = large (RETURN breaks out)
+    x.push_r(8); x.push_r(9); x.push_r(10); x.push_r(11); x.push_r(12);
+    x.b(0xE8); x.i32(2); // call run_ref (marker 2)
+    x.pop_r(12); x.pop_r(11); x.pop_r(10); x.pop_r(9); x.pop_r(8);
+    // Result is on data stack top
+    x.mov_rm(0, 15, 0); // rax = result
+    x.add_ri(15, 8); // pop result
+    // Store in result list at [r8 + 8 + i*8]
     x.mov_rr(1, 12);
     x.i(&[0x48, 0xC1, 0xE1, 0x03]);
-    x.i(&[0x49, 0x01, 0xCA]); // add rcx, r10
+    x.i(&[0x49, 0x01, 0xC1]); // add rcx, r8
     x.add_ri(1, 8);
-    x.mov_rm(1, 1, 0); // rcx = element
-    x.mov_mr(0, 0, 1); // store in result
+    x.mov_mr(1, 0, 0); // store
     x.add_ri(12, 1);
     let map_back = x.jmp();
     x.p_i32(map_back, map_loop as i32 - (map_back + 4) as i32);
@@ -808,7 +763,7 @@ fn impl_string_ops(x: &mut X) {
     x.add_ri(0, 5); // +5 (4 prefix + 1 null)
     x.mov_rr(7, 0); // rdi = alloc size
     x.push_r(14); x.push_r(13); x.push_r(6); x.push_r(2);
-    x.b(0xE8); x.i32(0); // call alloc
+    x.b(0xE8); x.i32(1); // call alloc
     x.pop_r(2); x.pop_r(6); x.pop_r(13); x.pop_r(14);
     // rax = alloc'd ptr (points to length prefix)
     // Write total length: len1+len2
@@ -923,7 +878,7 @@ fn impl_string_ops(x: &mut X) {
     x.add_ri(0, 5);
     x.mov_rr(7, 0);
     x.push_r(14); x.push_r(13); x.push_r(2); x.push_r(1); x.push_r(8);
-    x.b(0xE8); x.i32(0); // call alloc
+    x.b(0xE8); x.i32(1); // call alloc
     x.pop_r(8); x.pop_r(1); x.pop_r(2); x.pop_r(13); x.pop_r(14);
     // rax = alloc ptr, r8 = result len, rcx = start, rdx = str addr
     x.mov_rr(9, 0); // r9 = alloc ptr
@@ -1172,7 +1127,7 @@ fn impl_string_ops(x: &mut X) {
     x.add_ri(0, 5); // +5 for length prefix + null
     x.mov_rr(7, 0); // rdi = alloc size
     x.push_r(14); x.push_r(13); x.push_r(2);
-    x.b(0xE8); x.i32(0); // call alloc
+    x.b(0xE8); x.i32(1); // call alloc
     x.pop_r(2); x.pop_r(13); x.pop_r(14);
     // rax = alloc ptr, rdx = length
     x.mov_rr(8, 0); // r8 = alloc ptr
@@ -1288,25 +1243,36 @@ fn impl_call_return(x: &mut X) {
     x.patch_handler(0x61);
     // Check call_sp: if > 0, restore saved state; else exit
     x.mov_r64i(8, CALL_SP_ADDR);
-    x.mov_rm(0, 8, 0); // rax = call_sp
-    x.i(&[0x48, 0x85, 0xC0]); // test rax, rax
+    x.mov_rm(0, 8, 0);
+    x.i(&[0x48, 0x85, 0xC0]);
     let has_frame = x.jne8();
-    // No frames: exit(0)
-    x.mov_r64i(0, 60);
-    x.xor_rr(7, 7);
-    x.syscall();
+    x.mov_r64i(0, 60); x.xor_rr(7, 7); x.syscall();
     x.patch_jmp_rel8(has_frame);
-    // Read saved bc and ip BEFORE decrementing call_sp
-    // call_stack layout: [bc0, ip0, bc1, ip1, ...]
-    // call_sp points to next free slot. Last entry is at [call_sp-2].
-    // So saved_bc = call_stack[call_sp-2], saved_ip = call_stack[call_sp-1]
-    x.sub_ri(0, 2); // rax = call_sp - 2
-    x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3 (8 bytes per entry)
+    // Restore from call stack
+    x.sub_ri(0, 2);
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]);
     x.mov_r64i(8, CALL_STACK_ADDR);
-    x.i(&[0x49, 0x01, 0xC0]); // add r8, rax
-    x.mov_rm(14, 8, 0); // r14 = saved_bc
-    x.mov_rm(13, 8, 8); // r13 = saved_ip
-    // Now decrement call_sp by 2
+    x.i(&[0x49, 0x01, 0xC0]);
+    x.mov_rm(14, 8, 0);
+    x.mov_rm(13, 8, 8);
+    x.mov_r64i(8, CALL_SP_ADDR);
+    x.mov_rm(0, 8, 0);
+    x.sub_ri(0, 2);
+    x.mov_mr(8, 0, 0);
+    x.back();
+    x.mov_r64i(8, CALL_SP_ADDR);
+    x.mov_rm(0, 8, 0);
+    x.i(&[0x48, 0x85, 0xC0]);
+    let has_frame = x.jne8();
+    x.mov_r64i(0, 60); x.xor_rr(7, 7); x.syscall();
+    x.patch_jmp_rel8(has_frame);
+    // Restore from call stack
+    x.sub_ri(0, 2);
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]);
+    x.mov_r64i(8, CALL_STACK_ADDR);
+    x.i(&[0x49, 0x01, 0xC0]);
+    x.mov_rm(14, 8, 0);
+    x.mov_rm(13, 8, 8);
     x.mov_r64i(8, CALL_SP_ADDR);
     x.mov_rm(0, 8, 0);
     x.sub_ri(0, 2);
@@ -1427,7 +1393,7 @@ fn impl_misc_ops(x: &mut X) {
     x.i(&[0x48, 0xC1, 0xE0, 0x03]);
     x.mov_rr(7, 0);
     x.push_r(14); x.push_r(13);
-    x.b(0xE8); x.i32(0); // call alloc
+    x.b(0xE8); x.i32(1); // call alloc
     x.pop_r(13); x.pop_r(14);
     // rax = list ptr
     x.mov_rr(9, 0); // r9 = list ptr
@@ -1474,7 +1440,7 @@ fn impl_misc_ops(x: &mut X) {
     x.add_ri(0, 5);
     x.mov_rr(7, 0);
     x.push_r(14); x.push_r(13);
-    x.b(0xE8); x.i32(0); // call alloc
+    x.b(0xE8); x.i32(1); // call alloc
     x.pop_r(13); x.pop_r(14);
     // rax = alloc ptr
     x.mov_rr(9, 0); // r9 = alloc ptr
@@ -1590,7 +1556,7 @@ fn impl_misc_ops(x: &mut X) {
     x.add_ri(0, 5);
     x.mov_rr(7, 0);
     x.push_r(14); x.push_r(13); x.push_r(9); x.push_r(6);
-    x.b(0xE8); x.i32(0); // call alloc
+    x.b(0xE8); x.i32(1); // call alloc
     x.pop_r(6); x.pop_r(9); x.pop_r(13); x.pop_r(14);
     x.mov_rr(8, 0); // r8 = alloc ptr
     // Write length
@@ -1804,27 +1770,221 @@ fn impl_alloc(x: &mut X) -> usize {
 
 fn impl_run_ref(x: &mut X, _raw_bc: &[u8]) -> usize {
     let start = x.m();
-    // Save current state to call stack
-    x.mov_r64i(8, CALL_SP_ADDR);
-    x.mov_rm(0, 8, 0); // rax = call_sp
-    // Save r14 (bc) and r13 (ip) to call_stack[call_sp]
-    x.i(&[0x48, 0xC1, 0xE0, 0x04]); // shl rax, 4 (16 bytes per entry)
-    x.mov_r64i(9, CALL_STACK_ADDR);
-    x.i(&[0x4D, 0x01, 0xC1]); // add r9, rax
-    x.mov_mr(9, 0, 14); // call_stack[sp].bc = r14
-    x.mov_mr(9, 8, 13); // call_stack[sp].ip = r13
-    // Increment call_sp
-    x.mov_r64i(8, CALL_SP_ADDR);
-    x.mov_rm(0, 8, 0);
-    x.add_ri(0, 1);
-    x.mov_mr(8, 0, 0);
-    // rdi = ref_bc address, rsi = ref_len
+    // Entry: rdi = ref_bc address, rsi = ref_len
+    // Self-contained mini dispatch loop for executing reference bytecode.
+    // Supports all essential opcodes. RETURN breaks out and returns here.
+
+    // Save r14/r13 on native stack
+    x.push_r(14);
+    x.push_r(13);
+
     // Set r14 = ref_bc, r13 = 0
-    x.mov_rr(14, 7); // r14 = rdi = ref_bc
-    x.xor_rr(13, 13); // r13 = 0
-    // Return — the main dispatch loop will now execute the ref bytecode
-    // When RETURN is hit, it will restore from the call stack
+    x.mov_rr(14, 7);
+    x.xor_rr(13, 13);
+
+    // Set next_pos for this mini loop's back() jumps
+    x.mark_next();
+
+    // Mini fetch: al = [r14+r13]; ip++
+    x.i(&[0x43, 0x0F, 0xB6, 0x04, 0x2E]);
+    x.add_ri(13, 1);
+
+    // RETURN (0x61) → break out
+    x.op(0x61);
+    // DUP (0x00)
+    x.op(0x00);
+    // SWAP (0x01)
+    x.op(0x01);
+    // DROP (0x02)
+    x.op(0x02);
+    // ROT (0x03)
+    x.op(0x03);
+    // ADD (0x10)
+    x.op(0x10);
+    // SUB (0x11)
+    x.op(0x11);
+    // MUL (0x12)
+    x.op(0x12);
+    // DIV (0x13)
+    x.op(0x13);
+    // MOD (0x14)
+    x.op(0x14);
+    // EQ..GE (0x18-0x1D)
+    for op in 0x18..=0x1D { x.op(op); }
+    // AND, OR, NOT (0x20-0x22)
+    for op in 0x20..=0x22 { x.op(op); }
+    // PUSH_I64 (0x30)
+    x.op(0x30);
+    // PUSH_STR (0x32)
+    x.op(0x32);
+    // PUSH_BOOL (0x33)
+    x.op(0x33);
+    // COND (0x50)
+    x.op(0x50);
+    // JUMP (0x51)
+    x.op(0x51);
+    // LOOP (0x52)
+    x.op(0x52);
+    // CALL (0x60)
+    x.op(0x60);
+
+    x.done(); // back to mini fetch
+
+    // ── Mini handlers ─────────────────────────────────────────────
+
+    // RETURN → break out
+    x.patch_handler(0x61);
+    // Restore r14/r13 and return
+    x.pop_r(13);
+    x.pop_r(14);
     x.ret();
+
+    // DUP
+    x.patch_handler(0x00);
+    x.mov_rm(0, 15, 0); x.sub_ri(15, 8); x.mov_mr(15, 0, 0);
+    x.back();
+
+    // SWAP
+    x.patch_handler(0x01);
+    x.mov_rm(0, 15, 0); x.mov_rm(1, 15, 8);
+    x.mov_mr(15, 8, 0); x.mov_mr(15, 0, 1);
+    x.back();
+
+    // DROP
+    x.patch_handler(0x02);
+    x.add_ri(15, 8); x.back();
+
+    // ROT
+    x.patch_handler(0x03);
+    x.mov_rm(0, 15, 0); x.mov_rm(1, 15, 8); x.mov_rm(2, 15, 16);
+    x.mov_mr(15, 0, 1); x.mov_mr(15, 8, 0); x.mov_mr(15, 16, 2);
+    x.back();
+
+    // ADD
+    x.patch_handler(0x10);
+    x.mov_rm(0, 15, 0); x.add_ri(15, 8);
+    x.i(&[0x49, 0x01, 0x07]); x.back();
+
+    // SUB
+    x.patch_handler(0x11);
+    x.mov_rm(0, 15, 0); x.add_ri(15, 8);
+    x.i(&[0x49, 0x29, 0x07]); x.back();
+
+    // MUL
+    x.patch_handler(0x12);
+    x.mov_rm(0, 15, 0); x.add_ri(15, 8);
+    x.i(&[0x49, 0x0F, 0xAF, 0x07]);
+    x.mov_mr(15, 0, 0); x.back();
+
+    // DIV
+    x.patch_handler(0x13);
+    x.mov_rm(0, 15, 0); x.add_ri(15, 8);
+    x.mov_rm(1, 15, 0);
+    x.i(&[0x48, 0x85, 0xC0]); let m_ok = x.jne8();
+    x.mov_r64i(0, 60); x.xor_rr(7, 7); x.syscall();
+    x.patch_jmp_rel8(m_ok);
+    x.mov_rr(7, 0); x.mov_rr(0, 1);
+    x.i(&[0x48, 0x99]); x.i(&[0x48, 0xF7, 0xFF]);
+    x.mov_mr(15, 0, 0); x.back();
+
+    // MOD
+    x.patch_handler(0x14);
+    x.mov_rm(0, 15, 0); x.add_ri(15, 8);
+    x.mov_rm(1, 15, 0);
+    x.mov_rr(7, 0); x.mov_rr(0, 1);
+    x.i(&[0x48, 0x99]); x.i(&[0x48, 0xF7, 0xFF]);
+    x.mov_mr(15, 0, 2); x.back();
+
+    // CMP ops
+    let cmps: [(u8, u8); 6] = [
+        (0x18, 0x94), (0x19, 0x9C), (0x1A, 0x9F),
+        (0x1B, 0x95), (0x1C, 0x9E), (0x1D, 0x9D),
+    ];
+    for (opc, cc) in &cmps {
+        x.patch_handler(*opc);
+        x.mov_rm(0, 15, 0); x.add_ri(15, 8);
+        x.i(&[0x49, 0x39, 0x07]);
+        x.b(0x0F); x.b(*cc); x.b(0xC0);
+        x.i(&[0x48, 0x0F, 0xB6, 0xC0]);
+        x.mov_mr(15, 0, 0); x.back();
+    }
+
+    // AND
+    x.patch_handler(0x20);
+    x.mov_rm(0, 15, 0); x.add_ri(15, 8);
+    x.i(&[0x49, 0x21, 0x07]); x.back();
+
+    // OR
+    x.patch_handler(0x21);
+    x.mov_rm(0, 15, 0); x.add_ri(15, 8);
+    x.i(&[0x49, 0x09, 0x07]); x.back();
+
+    // NOT
+    x.patch_handler(0x22);
+    x.i(&[0x49, 0x83, 0x37, 0x01]); x.back();
+
+    // PUSH_I64
+    x.patch_handler(0x30);
+    x.i(&[0x4B, 0x8B, 0x04, 0x2E]); x.add_ri(13, 8);
+    x.sub_ri(15, 8); x.mov_mr(15, 0, 0); x.back();
+
+    // PUSH_STR
+    x.patch_handler(0x32);
+    x.i(&[0x47, 0x8B, 0x04, 0x2E]);
+    x.mov_rr(8, 0);
+    x.mov_rr(0, 13);
+    x.i(&[0x4C, 0x01, 0xF0]);
+    x.add_ri(0, 4);
+    x.sub_ri(15, 8);
+    x.mov_mr(15, 0, 0);
+    x.add_ri(13, 4);
+    x.i(&[0x4D, 0x01, 0xC5]);
+    x.back();
+
+    // PUSH_BOOL
+    x.patch_handler(0x33);
+    x.i(&[0x43, 0x0F, 0xB6, 0x04, 0x2E]);
+    x.add_ri(13, 1);
+    x.sub_ri(15, 8);
+    x.mov_mr(15, 0, 0);
+    x.back();
+
+    // COND
+    x.patch_handler(0x50);
+    x.mov_rm(0, 15, 0); x.add_ri(15, 8);
+    x.i(&[0x47, 0x8B, 0x0C, 0x2E]);
+    x.add_ri(13, 4);
+    x.i(&[0x48, 0x85, 0xC0]);
+    let m_taken = x.jne8();
+    x.i(&[0x49, 0x01, 0xCD]);
+    x.patch_jmp_rel8(m_taken);
+    x.back();
+
+    // JUMP
+    x.patch_handler(0x51);
+    x.i(&[0x47, 0x8B, 0x04, 0x2E]);
+    x.add_ri(13, 4);
+    x.i(&[0x49, 0x01, 0xC5]);
+    x.back();
+
+    // LOOP
+    x.patch_handler(0x52);
+    x.mov_rm(0, 15, 0); x.add_ri(15, 8);
+    x.i(&[0x47, 0x8B, 0x0C, 0x2E]);
+    x.add_ri(13, 4);
+    x.i(&[0x48, 0x85, 0xC0]);
+    let m_nojmp = x.je8();
+    x.i(&[0x49, 0x01, 0xCD]);
+    x.patch_jmp_rel8(m_nojmp);
+    x.back();
+
+    // CALL — skip name (placeholder)
+    x.patch_handler(0x60);
+    x.i(&[0x43, 0x0F, 0xB6, 0x04, 0x2E]);
+    x.add_ri(13, 1);
+    x.i(&[0x49, 0x01, 0xC5]);
+    x.back();
+
     start
 }
 
@@ -1835,20 +1995,28 @@ fn patch_helper_calls(
     itoa_addr: usize,
     _str_eq_addr: usize,
     _str_cmp_addr: usize,
-    _alloc_addr: usize,
-    _run_ref_addr: usize,
+    alloc_addr: usize,
+    run_ref_addr: usize,
 ) {
-    // Patch all `call itoa` sites (E8 00 00 00 00 → E8 rel32)
-    // We need to find all 0xE8 bytes followed by 0x00 0x00 0x00 0x00
-    // and patch the relative offset to itoa_addr
+    // Patch call sites using marker bytes:
+    // E8 00 00 00 00 → call itoa
+    // E8 01 00 00 00 → call alloc
+    // E8 02 00 00 00 → call run_ref
     let code = &mut x.v;
     let mut i = 0;
     while i + 4 < code.len() {
-        if code[i] == 0xE8 && code[i + 1..i + 5] == [0, 0, 0, 0] {
-            // This is a call site — determine which helper based on context
-            // For now, patch all to itoa (we'll fix this later)
-            let rel = itoa_addr as i32 - (i as i32 + 5);
-            code[i + 1..i + 5].copy_from_slice(&rel.to_le_bytes());
+        if code[i] == 0xE8 {
+            let marker = code[i + 1];
+            if marker <= 2 && code[i + 2..i + 5] == [0, 0, 0] {
+                let target = match marker {
+                    0 => itoa_addr,
+                    1 => alloc_addr,
+                    2 => run_ref_addr,
+                    _ => continue,
+                };
+                let rel = target as i32 - (i as i32 + 5);
+                code[i + 1..i + 5].copy_from_slice(&rel.to_le_bytes());
+            }
         }
         i += 1;
     }
