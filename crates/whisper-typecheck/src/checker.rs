@@ -80,9 +80,23 @@ impl TypeChecker {
 
         let mut errors = Vec::new();
         let mut stack: Vec<Type> = Vec::new();
+        let mut min_depth: isize = 0;
+        let mut input_types: Vec<Type> = Vec::new();
 
         for node in body {
+            let depth_before = stack.len() as isize;
             self.check_node(node, &mut stack, &mut errors, "<word>");
+            let depth_after = stack.len() as isize;
+
+            // Track minimum depth — when it goes negative, those are inputs
+            if depth_after < min_depth {
+                // The difference represents consumed inputs
+                let consumed = (min_depth - depth_after) as usize;
+                for _ in 0..consumed {
+                    input_types.push(self.inferer.fresh_var());
+                }
+                min_depth = depth_after;
+            }
         }
 
         // Discard underflow errors from inference — they happen when
@@ -96,7 +110,7 @@ impl TypeChecker {
         // Restore the main inferer (discard inference temporaries)
         std::mem::swap(&mut self.inferer, &mut temp_inferer);
 
-        let inputs = vec![];
+        let inputs = input_types;
         let outputs = stack;
 
         WordSig { inputs, outputs }

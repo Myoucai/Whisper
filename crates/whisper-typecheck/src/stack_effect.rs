@@ -6,6 +6,16 @@
 
 use crate::types::Type;
 
+/// Counter for generating unique type variables in stack effects.
+static mut STACK_EFFECT_VAR_COUNTER: u64 = 1000;
+
+fn fresh_stack_var() -> Type {
+    unsafe {
+        STACK_EFFECT_VAR_COUNTER += 1;
+        Type::TypeVar(STACK_EFFECT_VAR_COUNTER)
+    }
+}
+
 /// Represents a stack effect: inputs (consumed) and outputs (produced).
 #[derive(Debug, Clone)]
 pub struct StackEffect {
@@ -19,19 +29,17 @@ impl StackEffect {
     }
 
     /// Create a stack effect from a simple function type.
-    /// e.g., [i64 i64] → [i64] for addition
+    /// Each input/output gets a unique type variable.
     pub fn simple(input_count: usize, output_count: usize) -> Self {
         StackEffect {
-            inputs: vec![Type::TypeVar(0); input_count],
-            outputs: vec![Type::TypeVar(0); output_count],
+            inputs: (0..input_count).map(|_| fresh_stack_var()).collect(),
+            outputs: (0..output_count).map(|_| fresh_stack_var()).collect(),
         }
     }
 
     /// Combine two stack effects sequentially (composition).
     /// Effect of A then B: check B's inputs match A's outputs.
     pub fn compose(&self, other: &StackEffect) -> Option<StackEffect> {
-        // The outputs of self become the inputs of other
-        // For now, just concatenate effects
         Some(StackEffect {
             inputs: self.inputs.clone(),
             outputs: other.outputs.clone(),
