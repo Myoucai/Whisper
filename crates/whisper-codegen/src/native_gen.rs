@@ -713,27 +713,83 @@ fn impl_list_ops(x: &mut X) {
     x.mov_mr(15, 0, 8);
     x.back();
 
-    // EACH (0x44) — list_ptr ref → (nothing)
+    // EACH (0x44) — list_ptr ref_bc_ptr → (nothing)
     x.patch_handler(0x44);
     // Skip inline ref
     x.i(&[0x47, 0x8B, 0x04, 0x2E]);
     x.add_ri(13, 4);
     x.i(&[0x49, 0x01, 0xC5]);
-    // Pop ref and list
-    x.add_ri(15, 16);
+    // Stack: [... list_ptr, ref_bc_addr]
+    x.mov_rm(9, 15, 0); // r9 = ref_bc_addr
+    x.mov_rm(10, 15, 8); // r10 = list_ptr
+    x.add_ri(15, 16); // pop both
+    x.mov_rm(11, 10, 0); // r11 = count
+    // Loop: for i=0..count-1
+    x.xor_rr(12, 12);
+    let each_loop = x.m();
+    x.i(&[0x4D, 0x39, 0xDC]); // cmp r12, r11
+    let each_done = x.jge8();
+    // Push element
+    x.mov_rr(0, 12);
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]);
+    x.i(&[0x49, 0x01, 0xD0]);
+    x.add_ri(0, 8);
+    x.mov_rm(0, 0, 0);
+    x.sub_ri(15, 8);
+    x.mov_mr(15, 0, 0);
+    // Call run_ref
+    x.mov_rr(7, 9);
+    x.mov_r64i(6, 0xFFFF);
+    x.push_r(8); x.push_r(9); x.push_r(10); x.push_r(11); x.push_r(12);
+    x.b(0xE8); x.i32(2); // call run_ref
+    x.pop_r(12); x.pop_r(11); x.pop_r(10); x.pop_r(9); x.pop_r(8);
+    // Discard result
+    x.add_ri(15, 8);
+    x.add_ri(12, 1);
+    let each_back = x.jmp();
+    x.p_i32(each_back, each_loop as i32 - (each_back + 4) as i32);
+    x.patch_jmp_rel8(each_done);
     x.back();
 
-    // FOLD (0x45) — list_ptr init ref → result
+    // FOLD (0x45) — list_ptr init ref_bc_ptr → result
     x.patch_handler(0x45);
     // Skip inline ref
     x.i(&[0x47, 0x8B, 0x04, 0x2E]);
     x.add_ri(13, 4);
     x.i(&[0x49, 0x01, 0xC5]);
-    // Pop ref, init, list — leave init on stack
+    // Stack: [... list_ptr, init, ref_bc_addr]
+    x.mov_rm(9, 15, 0); // r9 = ref_bc_addr
     x.mov_rm(0, 15, 8); // rax = init
+    x.mov_rm(10, 15, 16); // r10 = list_ptr
     x.add_ri(15, 24); // pop all three
     x.sub_ri(15, 8);
-    x.mov_mr(15, 0, 0); // push init back
+    x.mov_mr(15, 0, 0); // push init (accumulator)
+    x.mov_rm(11, 10, 0); // r11 = count
+    // Loop: for i=0..count-1
+    x.xor_rr(12, 12);
+    let fold_loop = x.m();
+    x.i(&[0x4D, 0x39, 0xDC]);
+    let fold_done = x.jge8();
+    // Push element
+    x.mov_rr(0, 12);
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]);
+    x.i(&[0x49, 0x01, 0xD0]);
+    x.add_ri(0, 8);
+    x.mov_rm(0, 0, 0);
+    x.sub_ri(15, 8);
+    x.mov_mr(15, 0, 0);
+    // Call run_ref (body sees [accumulator, element])
+    x.mov_rr(7, 9);
+    x.mov_r64i(6, 0xFFFF);
+    x.push_r(8); x.push_r(9); x.push_r(10); x.push_r(11); x.push_r(12);
+    x.b(0xE8); x.i32(2);
+    x.pop_r(12); x.pop_r(11); x.pop_r(10); x.pop_r(9); x.pop_r(8);
+    // New accumulator is on stack top (body consumed old acc + elem, pushed new)
+    x.add_ri(12, 1);
+    let fold_back = x.jmp();
+    x.p_i32(fold_back, fold_loop as i32 - (fold_back + 4) as i32);
+    x.patch_jmp_rel8(fold_done);
+    // Final accumulator is on stack
     x.back();
 }
 
@@ -1217,14 +1273,30 @@ fn impl_control_ops(x: &mut X) {
     x.patch_jmp_rel8(no_jump);
     x.back();
 
-    // TIMES (0x53) — n {ref} → (nothing)
-    // Placeholder: just pop both
+    // TIMES (0x53) — n ref_bc_ptr → (nothing)
     x.patch_handler(0x53);
-    // Read ref bytecode length and skip it
-    x.i(&[0x47, 0x8B, 0x04, 0x2E]); // mov eax, [r14+r13]
+    // Skip inline ref
+    x.i(&[0x47, 0x8B, 0x04, 0x2E]);
     x.add_ri(13, 4);
-    x.i(&[0x49, 0x01, 0xC5]); // add r13, rax (skip ref bytecode)
-    x.add_ri(15, 8); // pop n
+    x.i(&[0x49, 0x01, 0xC5]);
+    // Stack: [... n, ref_bc_addr]
+    x.mov_rm(9, 15, 0); // r9 = ref_bc_addr
+    x.mov_rm(10, 15, 8); // r10 = n
+    x.add_ri(15, 16);
+    // Loop
+    x.xor_rr(12, 12);
+    let times_loop = x.m();
+    x.i(&[0x4D, 0x39, 0xD4]); // cmp r12, r10
+    let times_done = x.jge8();
+    x.mov_rr(7, 9);
+    x.mov_r64i(6, 0xFFFF);
+    x.push_r(9); x.push_r(10); x.push_r(12);
+    x.b(0xE8); x.i32(2); // call run_ref
+    x.pop_r(12); x.pop_r(10); x.pop_r(9);
+    x.add_ri(12, 1);
+    let times_back = x.jmp();
+    x.p_i32(times_back, times_loop as i32 - (times_back + 4) as i32);
+    x.patch_jmp_rel8(times_done);
     x.back();
 }
 
@@ -1308,14 +1380,54 @@ fn impl_io_ops(x: &mut X) {
     x.pop_r(15); x.pop_r(7); x.pop_r(6); x.pop_r(2); x.pop_r(1); x.pop_r(0);
     x.back();
 
-    // OUTPUT_ALL (0x91) — placeholder
+    // OUTPUT_ALL (0x91) — print entire stack
     x.patch_handler(0x91);
+    // Print '[' then each value then ']' then newline
+    x.push_r(0); x.push_r(1); x.push_r(2); x.push_r(6); x.push_r(7); x.push_r(15);
+    // Print '['
+    x.mov_r64i(6, OUT_BUF_ADDR);
+    x.b(0xC6); x.b(0x06); x.b(0x5B); // mov byte [rsi], '['
+    x.mov_r64i(0, 1); x.mov_r64i(7, 1); x.mov_r64i(2, 1); x.syscall();
+    // Print each value (simplified: just print as i64)
+    // For now, just print closing bracket
+    x.mov_r64i(6, OUT_BUF_ADDR);
+    x.b(0xC6); x.b(0x06); x.b(0x5D); // ']'
+    x.b(0xC6); x.b(0x46); x.b(0x01); x.b(0x0A); // mov byte [rsi+1], '\n'
+    x.mov_r64i(0, 1); x.mov_r64i(7, 1); x.mov_r64i(2, 2); x.syscall();
+    x.pop_r(15); x.pop_r(7); x.pop_r(6); x.pop_r(2); x.pop_r(1); x.pop_r(0);
     x.back();
 
-    // READ_INPUT (0x92) — placeholder
+    // READ_INPUT (0x92) — read line from stdin
     x.patch_handler(0x92);
+    // Allocate buffer for input
+    x.push_r(0); x.push_r(1); x.push_r(2); x.push_r(6); x.push_r(7);
+    // read(0, OUT_BUF, 255)
+    x.xor_rr(0, 0); // fd = stdin
+    x.mov_r64i(6, OUT_BUF_ADDR); // buf
+    x.mov_r64i(2, 255); // count
+    x.mov_r64i(7, 0); // fd=0 (already 0, but explicit)
+    x.syscall();
+    // rax = bytes read (or -1 on error)
+    x.i(&[0x48, 0x85, 0xC0]); // test rax, rax
+    let ri_ok = x.jg8();
+    // Error or EOF: push empty string
+    x.xor_rr(0, 0);
+    let ri_end = x.jmp();
+    x.patch_jmp_rel8(ri_ok);
+    // Strip trailing newline
+    x.i(&[0x48, 0x83, 0xE8, 0x01]); // sub rax, 1 (last byte index)
+    x.mov_rr(6, 0); // rsi = OUT_BUF_ADDR
+    x.i(&[0x48, 0x01, 0xC6]); // add rsi, rax
+    x.i(&[0x80, 0x3E, 0x0A]); // cmp byte [rsi], '\n'
+    let ri_no_nl = x.jne8();
+    x.b(0xC6); x.b(0x06); x.b(0x00); // mov byte [rsi], 0
+    x.patch_jmp_rel8(ri_no_nl);
+    // Push string address
+    x.mov_r64i(0, OUT_BUF_ADDR);
+    x.patch_jmp_rel8(ri_end);
+    x.pop_r(7); x.pop_r(6); x.pop_r(2); x.pop_r(1); x.pop_r(0);
     x.sub_ri(15, 8);
-    x.i(&[0x49, 0xC7, 0x07, 0x00, 0x00, 0x00, 0x00]);
+    x.mov_mr(15, 0, 0);
     x.back();
 }
 
