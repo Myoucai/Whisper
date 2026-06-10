@@ -32,6 +32,7 @@ struct X {
     next_pos: usize,
 }
 
+#[allow(dead_code)]
 impl X {
     fn new() -> Self {
         X {
@@ -2378,7 +2379,7 @@ fn impl_itoa(x: &mut X) -> usize {
     x.push_r(6); // save buf start
     x.mov_rr(0, 7); // rax = value
     x.mov_r64i(1, 10); // rcx = 10
-    let loop_start = x.m();
+    let _loop_start = x.m();
     x.i(&[0x48, 0x99]); // cqo
     x.i(&[0x48, 0xF7, 0xF9]); // idiv rcx
     x.i(&[0x48, 0x83, 0xC2, 0x30]); // add rdx, '0'
@@ -2407,7 +2408,7 @@ fn impl_itoa(x: &mut X) -> usize {
     x.pop_r(2); // rdx = buf_start
     x.mov_rm(1, 6, 0); // rcx = buf_end - 1
     x.sub_ri(1, 1);
-    let rev_loop = x.m();
+    let _rev_loop = x.m();
     x.i(&[0x48, 0x39, 0xD1]); // cmp rcx, rdx
     let rev_done = x.jle8();
     // Swap bytes
@@ -2997,14 +2998,12 @@ fn patch_helper_calls(
 
 // ── Build word table from bytecode ──────────────────────────────────
 
+#[allow(dead_code)]
 fn build_word_table(bytecode: &[Opcode], table: &mut Vec<(String, usize)>) {
     let mut offset = 0;
     for op in bytecode {
-        match op {
-            Opcode::DefWord(name) => {
-                table.push((name.clone(), offset));
-            }
-            _ => {}
+        if let Opcode::DefWord(name) = op {
+            table.push((name.clone(), offset));
         }
         offset += op.byte_size();
     }
@@ -3024,7 +3023,7 @@ fn build_elf(code: &[u8], raw_bc: &[u8], word_entries: &[(String, Vec<u8>)]) -> 
     elf.extend_from_slice(&2u16.to_le_bytes()); // ET_EXEC
     elf.extend_from_slice(&62u16.to_le_bytes()); // EM_X86_64
     elf.extend_from_slice(&1u32.to_le_bytes()); // EV_CURRENT
-    elf.extend_from_slice(&(CODE_VADDR + code_sz as u64 + 8).to_le_bytes()); // entry
+    elf.extend_from_slice(&(CODE_VADDR + code_sz + 8).to_le_bytes()); // entry
     elf.extend_from_slice(&64u64.to_le_bytes()); // phoff
     elf.extend_from_slice(&0u64.to_le_bytes()); // shoff
     elf.extend_from_slice(&0u32.to_le_bytes()); // flags

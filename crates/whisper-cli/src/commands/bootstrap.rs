@@ -1,6 +1,11 @@
 //! whisper bootstrap — Self-hosting compiler pipeline
 //!
 //! Pipeline: Rust Lexer → Whisper Compiler → VM Execute
+#![allow(clippy::suspicious_else_formatting)]
+#![allow(clippy::collapsible_match)]
+#![allow(clippy::type_complexity)]
+#![allow(clippy::manual_strip)]
+#![allow(clippy::possible_missing_else)]
 //!
 //! Two-level compilation:
 //!   1. Rust pre-pass: compiles structural nodes (quotes, conds, loops)
@@ -736,7 +741,7 @@ fn recognize_patterns(chunks: &[Value]) -> Vec<Value> {
         // Pattern: ?? ... | ... ]  →  [7, then, else]
         if is_str_eq(&chunks[i], "??") {
             // Find | separator and closing ]
-            let (then_tokens, else_tokens, next) = split_cond(&chunks, i + 1);
+            let (then_tokens, else_tokens, next) = split_cond(chunks, i + 1);
             result.push(Value::List(Rc::new(vec![
                 Value::I64(7),
                 Value::List(Rc::new(recognize_patterns(&then_tokens))),
