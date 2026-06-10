@@ -22,6 +22,7 @@ const ALLOC_PTR_ADDR: u64 = 0x420000;
 const CALL_SP_ADDR: u64 = 0x420008;
 const CALL_STACK_ADDR: u64 = 0x420010;
 const OUT_BUF_ADDR: u64 = 0x430000;
+const WORD_TABLE_ADDR: u64 = 0x500000; // word dispatch table at start of data segment
 
 // ── x86-64 encoder ──────────────────────────────────────────────────
 
@@ -252,12 +253,12 @@ impl X {
 pub fn compile_to_native(bytecode: &[Opcode], defs: &[(String, Vec<Opcode>)]) -> Vec<u8> {
     let raw_bc = raw_bytecode(bytecode);
 
-    // Build word table: name → bytecode offset within embedded bytecode
-    let mut word_table: Vec<(String, usize)> = Vec::new();
-    build_word_table(bytecode, &mut word_table);
+    // Build word table: serialize names and bytecodes for embedding in ELF.
+    // Each entry: { name_ptr: u32, name_len: u32, bc_ptr: u32, bc_len: u32 }
+    // Stored as absolute addresses (patched after ELF layout is known).
+    let mut word_entries: Vec<(String, Vec<u8>)> = Vec::new();
     for (name, code) in defs {
-        let offset = raw_bc.len(); // approximate — we'll fix this
-        word_table.push((name.clone(), offset));
+        word_entries.push((name.clone(), raw_bytecode(code)));
     }
 
     let mut x = X::new();
@@ -292,7 +293,10 @@ pub fn compile_to_native(bytecode: &[Opcode], defs: &[(String, Vec<Opcode>)]) ->
     impl_list_ops(&mut x);
     impl_string_ops(&mut x);
     impl_control_ops(&mut x);
-    impl_call_return(&mut x);
+    // CALL/RETURN: pass word table info (will be at a known address in data segment)
+    // The actual address is WORD_TABLE_ADDR. The table is built in build_elf.
+    let word_count = word_entries.len();
+    impl_call_return(&mut x, WORD_TABLE_ADDR, word_count);
     impl_io_ops(&mut x);
     impl_float_ops(&mut x);
     impl_misc_ops(&mut x);
@@ -308,7 +312,7 @@ pub fn compile_to_native(bytecode: &[Opcode], defs: &[(String, Vec<Opcode>)]) ->
     patch_helper_calls(&mut x, itoa_addr, str_eq_addr, str_cmp_addr, alloc_addr, run_ref_addr);
 
     // ── Build ELF ────────────────────────────────────────────────
-    build_elf(&x.v, &raw_bc)
+    build_elf(&x.v, &raw_bc, &word_entries)
 }
 
 // ── Opcode registration ─────────────────────────────────────────────
@@ -662,7 +666,7 @@ fn impl_list_ops(x: &mut X) {
     // Write new element at [r8 + 8 + old_count*8]
     x.mov_rr(0, 2); // rax = old_count
     x.i(&[0x48, 0xC1, 0xE0, 0x03]);
-    x.i(&[0x49, 0x01, 0xC0]);
+    x.i(&[0x4C, 0x01, 0xC0]); // add rax, r8
     x.add_ri(0, 8);
     x.mov_rm(1, 15, 0); // rcx = elem (saved at [r15])
     x.mov_mr(0, 0, 1); // store elem
@@ -1431,13 +1435,111 @@ fn impl_control_ops(x: &mut X) {
 
 // ── Call/Return ─────────────────────────────────────────────────────
 
-fn impl_call_return(x: &mut X) {
+fn impl_call_return(x: &mut X, word_table_addr: u64, word_count: usize) {
     // CALL (0x60) — word dispatch via word table
-    // Placeholder: skip name bytes
+    // Word table layout at word_table_addr:
+    //   entry[i]: { name_ptr: u32, name_len: u32, bc_ptr: u32, bc_len: u32 } (16 bytes each)
+    // Names and bytecodes stored after the table.
+    //
+    // Strategy: linear scan, inline byte comparison (no function call overhead).
     x.patch_handler(0x60);
+    // Read name_len from bytecode
     x.i(&[0x43, 0x0F, 0xB6, 0x04, 0x2E]); // movzx eax, [r14+r13] (name_len)
-    x.add_ri(13, 1);
-    x.i(&[0x49, 0x01, 0xC5]); // add r13, rax (skip name)
+    x.add_ri(13, 1); // ip++ (past name_len byte)
+    // Save name start: r12 = r14 + r13 (points to name bytes in bytecode)
+    x.mov_rr(12, 14);
+    x.i(&[0x4D, 0x01, 0xEC]); // add r12, r13
+    // Save name_len: r11 = rax
+    x.mov_rr(11, 0);
+    // Advance ip past name bytes
+    x.i(&[0x49, 0x01, 0xC5]); // add r13, rax
+
+    // Linear scan through word table
+    x.mov_r64i(8, word_table_addr); // r8 = table base
+    x.xor_rr(9, 9); // r9 = entry index
+
+    let scan_loop = x.m();
+    if word_count > 0 {
+        x.mov_r64i(0, word_count as u64);
+        x.i(&[0x4D, 0x39, 0xC1]); // cmp r9, rax
+    }
+    let scan_done = x.jge8(); // if i >= count, not found
+
+    // Load entry: name_ptr, name_len, bc_ptr, bc_len
+    // entry_addr = table_base + i * 16
+    x.mov_rr(0, 9);
+    x.i(&[0x48, 0xC1, 0xE0, 0x04]); // shl rax, 4 (i * 16)
+    x.i(&[0x4C, 0x01, 0xC0]); // add rax, r8 (table_base + i*16)
+    // rax points to entry
+    // Read name_len from entry+4
+    x.mov_rm(1, 0, 4); // rcx = entry.name_len
+    // Quick check: name_len matches?
+    x.i(&[0x4C, 0x39, 0xD9]); // cmp rcx, r11
+    let len_mismatch = x.jne8();
+    // Lengths match — compare bytes
+    // Read name_ptr from entry+0
+    x.mov_rm(2, 0, 0); // rdx = entry.name_ptr (offset in data segment)
+    // rdx is relative to data segment base. Convert to absolute:
+    // Actually, name_ptr should be stored as absolute address.
+    // Let's store absolute addresses in the table.
+
+    // Byte-by-byte comparison: r12 = call_name, rdx = table_name, rcx = len
+    x.xor_rr(10, 10); // r10 = byte index
+    let byte_loop = x.m();
+    x.i(&[0x4D, 0x39, 0xD3]); // cmp r11, r10 (r11 = name_len)
+    let byte_match = x.jge8(); // all bytes matched!
+
+    // Load bytes
+    x.mov_rr(7, 12); // rdi = call_name
+    x.i(&[0x4C, 0x01, 0xD7]); // add rdi, r10
+    x.i(&[0x0F, 0xB6, 0x3F]); // movzx edi, byte [rdi]
+
+    x.mov_rr(6, 2); // rsi = table_name
+    x.i(&[0x4C, 0x01, 0xD6]); // add rsi, r10
+    x.i(&[0x0F, 0xB6, 0x36]); // movzx esi, byte [rsi]
+
+    x.i(&[0x48, 0x39, 0xF7]); // cmp rdi, rsi
+    let byte_neq = x.jne8();
+
+    x.add_ri(10, 1); // i++
+    let byte_back = x.jmp();
+    x.p_i32(byte_back, byte_loop as i32 - (byte_back + 4) as i32);
+
+    // Bytes not equal — skip to next entry
+    x.patch_jmp_rel8(byte_neq);
+    x.patch_jmp_rel8(len_mismatch);
+    x.add_ri(9, 1); // entry_idx++
+    let scan_back = x.jmp();
+    x.p_i32(scan_back, scan_loop as i32 - (scan_back + 4) as i32);
+
+    // All bytes matched! Found the word.
+    x.patch_jmp_rel8(byte_match);
+    // rax still points to entry. Read bc_ptr and bc_len.
+    x.mov_rm(2, 0, 8); // rdx = entry.bc_ptr (absolute address)
+    x.mov_rm(1, 0, 12); // rcx = entry.bc_len
+    // Save current state to call stack
+    x.mov_r64i(8, CALL_SP_ADDR);
+    x.mov_rm(0, 8, 0); // rax = call_sp
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3
+    x.mov_r64i(9, CALL_STACK_ADDR);
+    x.i(&[0x4D, 0x01, 0xC8]); // add r9, rax
+    // Save r14 (bc) and r13 (ip)
+    x.mov_mr(9, 0, 14); // call_stack[sp] = r14
+    x.mov_mr(9, 8, 13); // call_stack[sp+1] = r13
+    // Increment call_sp by 2
+    x.mov_r64i(8, CALL_SP_ADDR);
+    x.mov_rm(0, 8, 0);
+    x.add_ri(0, 2);
+    x.mov_mr(8, 0, 0);
+    // Switch to word's bytecode
+    x.mov_rr(14, 2); // r14 = bc_ptr
+    x.xor_rr(13, 13); // r13 = 0
+    let call_end = x.jmp();
+
+    // Word not found — skip name and continue
+    x.patch_jmp_rel8(scan_done);
+    // Name bytes already skipped (ip advanced earlier)
+    x.patch_jmp_rel8(call_end);
     x.back();
 
     // RETURN (0x61)
@@ -1450,12 +1552,12 @@ fn impl_call_return(x: &mut X) {
     x.mov_r64i(0, 60); x.xor_rr(7, 7); x.syscall();
     x.patch_jmp_rel8(has_frame);
     // Restore from call stack
-    x.sub_ri(0, 2);
-    x.i(&[0x48, 0xC1, 0xE0, 0x03]);
+    x.sub_ri(0, 2); // rax = call_sp - 2
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3
     x.mov_r64i(8, CALL_STACK_ADDR);
-    x.i(&[0x49, 0x01, 0xC0]);
-    x.mov_rm(14, 8, 0);
-    x.mov_rm(13, 8, 8);
+    x.i(&[0x4C, 0x01, 0xC0]); // add rax, r8
+    x.mov_rm(14, 0, 0); // r14 = saved_bc
+    x.mov_rm(13, 0, 8); // r13 = saved_ip
     x.mov_r64i(8, CALL_SP_ADDR);
     x.mov_rm(0, 8, 0);
     x.sub_ri(0, 2);
@@ -1468,12 +1570,12 @@ fn impl_call_return(x: &mut X) {
     x.mov_r64i(0, 60); x.xor_rr(7, 7); x.syscall();
     x.patch_jmp_rel8(has_frame);
     // Restore from call stack
-    x.sub_ri(0, 2);
-    x.i(&[0x48, 0xC1, 0xE0, 0x03]);
+    x.sub_ri(0, 2); // rax = call_sp - 2
+    x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3
     x.mov_r64i(8, CALL_STACK_ADDR);
-    x.i(&[0x49, 0x01, 0xC0]);
-    x.mov_rm(14, 8, 0);
-    x.mov_rm(13, 8, 8);
+    x.i(&[0x4C, 0x01, 0xC0]); // add rax, r8
+    x.mov_rm(14, 0, 0); // r14 = saved_bc
+    x.mov_rm(13, 0, 8); // r13 = saved_ip
     x.mov_r64i(8, CALL_SP_ADDR);
     x.mov_rm(0, 8, 0);
     x.sub_ri(0, 2);
@@ -2753,7 +2855,7 @@ fn build_word_table(bytecode: &[Opcode], table: &mut Vec<(String, usize)>) {
 
 // ── ELF builder ─────────────────────────────────────────────────────
 
-fn build_elf(code: &[u8], raw_bc: &[u8]) -> Vec<u8> {
+fn build_elf(code: &[u8], raw_bc: &[u8], word_entries: &[(String, Vec<u8>)]) -> Vec<u8> {
     let code_sz = code.len() as u64;
     let text_file_sz = align_up(code_sz + raw_bc.len() as u64 + 16, PAGE_SIZE);
     let data_vaddr = 0x500000u64;
@@ -2813,8 +2915,62 @@ fn build_elf(code: &[u8], raw_bc: &[u8]) -> Vec<u8> {
     while (elf.len() as u64) < PAGE_SIZE + text_file_sz {
         elf.push(0);
     }
-    // Data segment (zeros for stack/heap)
-    while (elf.len() as u64) < PAGE_SIZE + text_file_sz + STACK_SIZE as u64 + HEAP_SIZE as u64 {
+    // Data segment — build word table at WORD_TABLE_ADDR, then zero-fill rest
+    let data_seg_start = (PAGE_SIZE + text_file_sz) as usize;
+    let word_table_offset = (WORD_TABLE_ADDR - data_vaddr) as usize;
+
+    // Pad to word table position
+    while elf.len() < data_seg_start + word_table_offset {
+        elf.push(0);
+    }
+
+    // Build word table: [count:4B] then entries, then names, then bytecodes
+    let table_count = word_entries.len();
+    elf.extend_from_slice(&(table_count as u32).to_le_bytes());
+
+    // Calculate where names and bytecodes start (after all entries)
+    let entries_size = table_count * 16; // 16 bytes per entry
+    let names_start = WORD_TABLE_ADDR + 4 + entries_size as u64;
+
+    // Calculate name offsets
+    let mut name_offsets = Vec::new();
+    let mut offset = 0u64;
+    for (name, _) in word_entries {
+        name_offsets.push(names_start + offset);
+        offset += name.len() as u64 + 1; // +1 for null terminator
+    }
+
+    // Calculate bytecode offsets (after names)
+    let bc_start = names_start + offset;
+    let mut bc_offsets = Vec::new();
+    let mut bc_offset = 0u64;
+    for (_, bc) in word_entries {
+        bc_offsets.push(bc_start + bc_offset);
+        bc_offset += bc.len() as u64;
+    }
+
+    // Write entries: { name_ptr: u32, name_len: u32, bc_ptr: u32, bc_len: u32 }
+    for i in 0..table_count {
+        elf.extend_from_slice(&(name_offsets[i] as u32).to_le_bytes());
+        elf.extend_from_slice(&(word_entries[i].0.len() as u32).to_le_bytes());
+        elf.extend_from_slice(&(bc_offsets[i] as u32).to_le_bytes());
+        elf.extend_from_slice(&(word_entries[i].1.len() as u32).to_le_bytes());
+    }
+
+    // Write name data (null-terminated strings)
+    for (name, _) in word_entries {
+        elf.extend_from_slice(name.as_bytes());
+        elf.push(0); // null terminator
+    }
+
+    // Write bytecode data
+    for (_, bc) in word_entries {
+        elf.extend_from_slice(bc);
+    }
+
+    // Zero-fill rest of data segment
+    let data_seg_end = data_seg_start + STACK_SIZE as usize + HEAP_SIZE as usize;
+    while elf.len() < data_seg_end {
         elf.push(0);
     }
 
