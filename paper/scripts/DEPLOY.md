@@ -24,21 +24,7 @@ scp -r paper/ root@<autodl-ip>:~/whisper-paper/
 
 ## 微调步骤
 
-### Step 1: 先跑 Token 对比实验（不需要 GPU）
-
-```bash
-cd ~/whisper-paper
-python scripts/token_experiment.py \
-    --model Qwen/Qwen2.5-Coder-7B-Instruct \
-    --data data/benchmark.jsonl \
-    --output results/
-```
-
-输出：
-- Whisper vs Python/JS/Java 的 token 消耗对比表
-- LaTeX 表格文件 `results/token_table.tex`
-
-### Step 2: 微调模型
+### Step 1: 微调模型
 
 ```bash
 cd ~/whisper-paper
@@ -70,19 +56,27 @@ python scripts/finetune.py \
 
 **预计时间**: RTX A6000 约 20-40 分钟
 
-### Step 3: 评估微调模型
+### Step 2: Token 对比实验（微调后）
+
+用微调后的模型分别生成 Whisper 和 Python 代码，对比 token 数：
 
 ```bash
-python scripts/evaluate.py \
+python scripts/token_experiment.py \
     --model ./whisper-qwen-7b \
-    --data data/eval.jsonl \
-    --output results/eval.json
+    --base-model Qwen/Qwen2.5-Coder-7B-Instruct \
+    --data data/benchmark.jsonl \
+    --output results/
 ```
 
-### Step 4: 对比微调前后
+输出：
+- 每个任务的 Whisper vs Python token 对比
+- 平均 token 减少百分比
+- LaTeX 表格 `results/token_table.tex`
+
+### Step 3: 评估代码生成质量
 
 ```bash
-# 微调前
+# 微调前（基线）
 python scripts/evaluate.py \
     --model Qwen/Qwen2.5-Coder-7B-Instruct \
     --data data/eval.jsonl \
