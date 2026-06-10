@@ -16,6 +16,10 @@ import argparse
 import json
 import os
 import torch
+
+# AutoDL 国内镜像加速
+os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+
 from datasets import Dataset
 from transformers import (
     AutoModelForCausalLM,

@@ -20,6 +20,9 @@ import argparse
 import json
 import os
 import torch
+
+os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 
