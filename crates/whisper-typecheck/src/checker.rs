@@ -84,7 +84,7 @@ impl TypeChecker {
         let mut input_types: Vec<Type> = Vec::new();
 
         for node in body {
-            let depth_before = stack.len() as isize;
+            let _depth_before = stack.len() as isize;
             self.check_node(node, &mut stack, &mut errors, "<word>");
             let depth_after = stack.len() as isize;
 

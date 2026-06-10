@@ -851,6 +851,12 @@ impl Parser {
                 token: self.synthetic_eof(),
             });
         }
+        // Consume the closing ] that we stopped at (parse_until stops before it)
+        if is_rbracket && !inside_list
+            && matches!(self.current().kind, TokenKind::RBracket)
+        {
+            self.advance();
+        }
         Self::fold_syntax_sugar(nodes)
     }
 
