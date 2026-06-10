@@ -2544,52 +2544,25 @@ fn impl_run_ref(x: &mut X, _raw_bc: &[u8]) -> usize {
 
     // RETURN (0x61) → break out
     x.op(0x61);
-    // DUP (0x00)
-    x.op(0x00);
-    // SWAP (0x01)
-    x.op(0x01);
-    // DROP (0x02)
-    x.op(0x02);
-    // ROT (0x03)
-    x.op(0x03);
-    // ADD (0x10)
-    x.op(0x10);
-    // SUB (0x11)
-    x.op(0x11);
-    // MUL (0x12)
-    x.op(0x12);
-    // DIV (0x13)
-    x.op(0x13);
-    // MOD (0x14)
-    x.op(0x14);
-    // EQ..GE (0x18-0x1D)
+    // Register ALL opcodes (same set as main loop)
+    for op in [0x00, 0x01, 0x02, 0x03, 0x04] { x.op(op); }
+    for op in [0x10, 0x11, 0x12, 0x13, 0x14] { x.op(op); }
     for op in 0x18..=0x1D { x.op(op); }
-    // AND, OR, NOT (0x20-0x22)
     for op in 0x20..=0x22 { x.op(op); }
-    // PICK (0x04)
-    x.op(0x04);
-    // PUSH_I64 (0x30)
-    x.op(0x30);
-    // PUSH_F64 (0x31)
-    x.op(0x31);
-    // PUSH_STR (0x32)
-    x.op(0x32);
-    // PUSH_BOOL (0x33)
-    x.op(0x33);
-    // PUSH_LIST (0x34)
-    x.op(0x34);
-    // NTH (0x40), APPEND (0x41), LEN (0x42)
-    for op in 0x40..=0x42 { x.op(op); }
-    // STRLEN (0x46)
-    x.op(0x46);
-    // COND (0x50)
-    x.op(0x50);
-    // JUMP (0x51)
-    x.op(0x51);
-    // LOOP (0x52)
-    x.op(0x52);
-    // CALL (0x60)
-    x.op(0x60);
+    for op in 0x30..=0x35 { x.op(op); }
+    for op in 0x40..=0x45 { x.op(op); }
+    for op in 0x46..=0x4F { x.op(op); }
+    for op in [0x50, 0x51, 0x52, 0x53] { x.op(op); }
+    for op in [0x60, 0x61] { x.op(op); }
+    for op in [0x70, 0x71] { x.op(op); }
+    for op in [0x80, 0x81] { x.op(op); }
+    for op in [0x90, 0x91, 0x92] { x.op(op); }
+    for op in [0xA0, 0xA1, 0xA2, 0xA3] { x.op(op); }
+    for op in 0xB0..=0xB5 { x.op(op); }
+    for op in [0xB6, 0xB7] { x.op(op); }
+    for op in 0xB8..=0xBC { x.op(op); }
+    for op in 0xBD..=0xC0 { x.op(op); }
+    x.op(0xC1);
 
     x.done(); // back to mini fetch
 
@@ -2798,6 +2771,190 @@ fn impl_run_ref(x: &mut X, _raw_bc: &[u8]) -> usize {
     x.patch_handler(0x60);
     x.i(&[0x43, 0x0F, 0xB6, 0x04, 0x2E]);
     x.add_ri(13, 1);
+    x.i(&[0x49, 0x01, 0xC5]);
+    x.back();
+
+    // ── Remaining opcodes: skip inline data or no-op ──────────────
+
+    // PUSH_REF (0x35) — skip inline bytecode
+    x.patch_handler(0x35);
+    x.i(&[0x47, 0x8B, 0x04, 0x2E]); // read length
+    x.add_ri(13, 4);
+    x.i(&[0x49, 0x01, 0xC5]); // skip data
+    x.sub_ri(15, 8);
+    x.i(&[0x49, 0xC7, 0x07, 0x00, 0x00, 0x00, 0x00]); // push 0 (placeholder)
+    x.back();
+
+    // MAP (0x43) — skip inline ref, pop list
+    x.patch_handler(0x43);
+    x.i(&[0x47, 0x8B, 0x04, 0x2E]);
+    x.add_ri(13, 4);
+    x.i(&[0x49, 0x01, 0xC5]);
+    x.add_ri(15, 8); // pop list
+    x.sub_ri(15, 8);
+    x.i(&[0x49, 0xC7, 0x07, 0x00, 0x00, 0x00, 0x00]); // push 0
+    x.back();
+
+    // EACH (0x44) — skip inline ref, pop list
+    x.patch_handler(0x44);
+    x.i(&[0x47, 0x8B, 0x04, 0x2E]);
+    x.add_ri(13, 4);
+    x.i(&[0x49, 0x01, 0xC5]);
+    x.add_ri(15, 8);
+    x.back();
+
+    // FOLD (0x45) — skip inline ref, pop list+init
+    x.patch_handler(0x45);
+    x.i(&[0x47, 0x8B, 0x04, 0x2E]);
+    x.add_ri(13, 4);
+    x.i(&[0x49, 0x01, 0xC5]);
+    x.add_ri(15, 16); // pop list and init
+    x.sub_ri(15, 8);
+    x.i(&[0x49, 0xC7, 0x07, 0x00, 0x00, 0x00, 0x00]); // push 0
+    x.back();
+
+    // STRCAT (0x47) — placeholder: pop both, push 0
+    x.patch_handler(0x47);
+    x.add_ri(15, 8);
+    x.back();
+
+    // STRSLICE (0x48) — pop start and len
+    x.patch_handler(0x48);
+    x.add_ri(15, 16);
+    x.back();
+
+    // STREQ (0x49) — placeholder
+    x.patch_handler(0x49);
+    x.add_ri(15, 8);
+    x.sub_ri(15, 8);
+    x.i(&[0x49, 0xC7, 0x07, 0x00, 0x00, 0x00, 0x00]);
+    x.back();
+
+    // STRLT (0x4A) — placeholder
+    x.patch_handler(0x4A);
+    x.add_ri(15, 8);
+    x.sub_ri(15, 8);
+    x.i(&[0x49, 0xC7, 0x07, 0x00, 0x00, 0x00, 0x00]);
+    x.back();
+
+    // STRFIND (0x4B) — placeholder
+    x.patch_handler(0x4B);
+    x.add_ri(15, 8);
+    x.sub_ri(15, 8);
+    x.i(&[0x48, 0xC7, 0xC0, 0xFF, 0xFF, 0xFF, 0xFF]); // -1
+    x.mov_mr(15, 0, 0);
+    x.back();
+
+    // STRREPLACE (0x4C) — pop old and new
+    x.patch_handler(0x4C);
+    x.add_ri(15, 16);
+    x.back();
+
+    // STRTOI64 (0x4D) — simplified
+    x.patch_handler(0x4D);
+    x.mov_rm(0, 15, 0);
+    x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
+    x.i(&[0x48, 0x83, 0xE8, 0x30]); // sub rax, '0'
+    x.mov_mr(15, 0, 0);
+    x.back();
+
+    // I64TOSTR (0x4E) — no-op (leave value on stack)
+    x.patch_handler(0x4E);
+    x.back();
+
+    // STRNTH (0x4F)
+    x.patch_handler(0x4F);
+    x.mov_rm(0, 15, 0); // idx
+    x.add_ri(15, 8);
+    x.i(&[0x49, 0x03, 0x07]); // add rax, [r15]
+    x.add_ri(0, 8);
+    x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
+    x.mov_mr(15, 0, 0);
+    x.back();
+
+    // TIMES (0x53) — skip ref, pop n
+    x.patch_handler(0x53);
+    x.i(&[0x47, 0x8B, 0x04, 0x2E]);
+    x.add_ri(13, 4);
+    x.i(&[0x49, 0x01, 0xC5]);
+    x.add_ri(15, 8); // pop n
+    x.back();
+
+    // CapCall (0x70) — skip 2-byte ID, pop arg
+    x.patch_handler(0x70);
+    x.add_ri(13, 2);
+    x.add_ri(15, 8);
+    x.back();
+
+    // CapExec (0x71) — pop value
+    x.patch_handler(0x71);
+    x.add_ri(15, 8);
+    x.back();
+
+    // ConfLabel (0x80) — skip 8-byte operand
+    x.patch_handler(0x80);
+    x.add_ri(13, 8);
+    x.back();
+
+    // ProbChoice (0x81) — skip two refs, no-op
+    x.patch_handler(0x81);
+    x.i(&[0x47, 0x8B, 0x04, 0x2E]); x.add_ri(13, 4); x.i(&[0x49, 0x01, 0xC5]);
+    x.i(&[0x47, 0x8B, 0x04, 0x2E]); x.add_ri(13, 4); x.i(&[0x49, 0x01, 0xC5]);
+    x.back();
+
+    // OUTPUT_TOP (0x90) — no-op in ref context
+    x.patch_handler(0x90);
+    x.back();
+
+    // OUTPUT_ALL (0x91) — no-op
+    x.patch_handler(0x91);
+    x.back();
+
+    // READ_INPUT (0x92) — push 0
+    x.patch_handler(0x92);
+    x.sub_ri(15, 8);
+    x.i(&[0x49, 0xC7, 0x07, 0x00, 0x00, 0x00, 0x00]);
+    x.back();
+
+    // DefWord (0xA0) — skip name
+    x.patch_handler(0xA0);
+    x.i(&[0x43, 0x0F, 0xB6, 0x04, 0x2E]);
+    x.add_ri(13, 1);
+    x.i(&[0x49, 0x01, 0xC5]);
+    x.back();
+
+    // EndDef, Import, Export (0xA1-0xA3) — no-op
+    for op in [0xA1, 0xA2, 0xA3] {
+        x.patch_handler(op);
+        x.back();
+    }
+
+    // Float ops (0xB0-0xB5) — no-op
+    for op in 0xB0..=0xB5 {
+        x.patch_handler(op);
+        x.back();
+    }
+
+    // JSON (0xB6-0xB7) — no-op
+    x.patch_handler(0xB6); x.back();
+    x.patch_handler(0xB7); x.back();
+
+    // Extended string ops (0xB8-0xBC) — no-op
+    for op in 0xB8..=0xBC {
+        x.patch_handler(op);
+        x.back();
+    }
+
+    // Bytes ops (0xBD-0xC0) — no-op
+    for op in 0xBD..=0xC0 {
+        x.patch_handler(op);
+        x.back();
+    }
+
+    // Try (0xC1) — skip ref
+    x.patch_handler(0xC1);
+    x.i(&[0x47, 0x8B, 0x04, 0x2E]);
+    x.add_ri(13, 4);
     x.i(&[0x49, 0x01, 0xC5]);
     x.back();
 
