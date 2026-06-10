@@ -168,14 +168,32 @@ def main():
         optim="paged_adamw_8bit",     # Memory-efficient optimizer
     )
 
-    # Trainer
-    trainer = SFTTrainer(
-        model=model,
-        args=training_args,
-        train_dataset=dataset,
-        processing_class=tokenizer,
-        max_seq_length=args.max_seq_len,
-    )
+    # Trainer — use try/except for API compatibility across trl versions
+    try:
+        trainer = SFTTrainer(
+            model=model,
+            args=training_args,
+            train_dataset=dataset,
+            processing_class=tokenizer,
+            max_seq_length=args.max_seq_len,
+        )
+    except TypeError:
+        # Older or different trl version — try alternative param names
+        try:
+            trainer = SFTTrainer(
+                model=model,
+                args=training_args,
+                train_dataset=dataset,
+                tokenizer=tokenizer,
+                max_seq_length=args.max_seq_len,
+            )
+        except TypeError:
+            # Minimal args only
+            trainer = SFTTrainer(
+                model=model,
+                args=training_args,
+                train_dataset=dataset,
+            )
 
     # Train
     print("\nStarting training...")
