@@ -1,0 +1,52 @@
+{"instruction":"Add two numbers","input":"3 4","output":"7","whisper":"3 4 + .","python":"print(3 + 4)"}
+{"instruction":"Multiply two numbers","input":"5 6","output":"30","whisper":"5 6 * .","python":"print(5 * 6)"}
+{"instruction":"Subtract two numbers","input":"10 3","output":"7","whisper":"10 3 - .","python":"print(10 - 3)"}
+{"instruction":"Divide two numbers","input":"20 4","output":"5","whisper":"20 4 / .","python":"print(20 // 4)"}
+{"instruction":"Modulo operation","input":"17 5","output":"2","whisper":"17 5 % .","python":"print(17 % 5)"}
+{"instruction":"Duplicate top of stack and multiply (square)","input":"5","output":"25","whisper":"5 _ * .","python":"x=5; print(x*x)"}
+{"instruction":"Swap two values and subtract","input":"3 8","output":"5","whisper":"3 8 ` - .","python":"print(8 - 3)"}
+{"instruction":"Check if a is greater than b","input":"5 3","output":"true","whisper":"5 3 > .","python":"print(5 > 3)"}
+{"instruction":"Check equality","input":"7 7","output":"true","whisper":"7 7 = .","python":"print(7 == 7)"}
+{"instruction":"Logical AND","input":"true false","output":"false","whisper":"#t #f & .","python":"print(True and False)"}
+{"instruction":"Logical NOT","input":"true","output":"false","whisper":"#t ! .","python":"print(not True)"}
+{"instruction":"Conditional: if x > 5 print 100 else print 0","input":"7","output":"100","whisper":"7 5 > ?? 100 | 0 ] .","python":"print(100 if 7 > 5 else 0)"}
+{"instruction":"Define a function to square a number","input":"5","output":"25","whisper":": sq { _ * } ;\n5 sq .","python":"def sq(x): return x*x\nprint(sq(5))"}
+{"instruction":"Define a function to cube a number","input":"3","output":"27","whisper":": sq { _ * } ;\n: cube { _ sq * } ;\n3 cube .","python":"def sq(x): return x*x\ndef cube(x): return x*sq(x)\nprint(cube(3))"}
+{"instruction":"Calculate factorial of 5","input":"5","output":"120","whisper":": factorial { _ 1 > ?? _ 1 - factorial * | drop 1 ] } ;\n5 factorial .","python":"def factorial(n):\n    if n > 1: return n * factorial(n-1)\n    return 1\nprint(factorial(5))"}
+{"instruction":"Calculate 10th Fibonacci number","input":"10","output":"55","whisper":": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | drop ] } ;\n10 fib .","python":"def fib(n):\n    if n > 1: return fib(n-1) + fib(n-2)\n    return n\nprint(fib(10))"}
+{"instruction":"Sum all numbers from 1 to 10","input":"1 2 3 4 5 6 7 8 9 10","output":"55","whisper":"[1 2 3 4 5 6 7 8 9 10] 0 { + } @fold .","python":"print(sum(range(1,11)))"}
+{"instruction":"Map a list to squares","input":"[1 2 3 4 5]","output":"[1 4 9 16 25]","whisper":"[1 2 3 4 5] { _ * } @map .","python":"print([x**2 for x in [1,2,3,4,5]])"}
+{"instruction":"Filter: keep only even numbers","input":"[1 2 3 4 5 6]","output":"[2 4 6]","whisper":"[1 2 3 4 5 6] { _ 2 % 0 = } @filter .","python":"print([x for x in [1,2,3,4,5,6] if x%2==0])"}
+{"instruction":"Count length of a list","input":"[10 20 30 40 50]","output":"5","whisper":"[10 20 30 40 50] len .","python":"print(len([10,20,30,40,50]))"}
+{"instruction":"Get third element of a list","input":"[10 20 30 40 50]","output":"30","whisper":"[10 20 30 40 50] 2 @nth .","python":"print([10,20,30,40,50][2])"}
+{"instruction":"Append element to list","input":"[1 2 3] 4","output":"[1 2 3 4]","whisper":"[1 2 3] 4 append .","python":"print([1,2,3] + [4])"}
+{"instruction":"Calculate string length","input":"Hello","output":"5","whisper":"\"Hello\" strlen .","python":"print(len('Hello'))"}
+{"instruction":"Concatenate two strings","input":"Hello World","output":"HelloWorld","whisper":"\"Hello\" \"World\" strcat .","python":"print('Hello' + 'World')"}
+{"instruction":"Check if two strings are equal","input":"abc abc","output":"true","whisper":"\"abc\" \"abc\" streq .","python":"print('abc' == 'abc')"}
+{"instruction":"Convert integer to string","input":"42","output":"42","whisper":"42 i64tostr .","python":"print(str(42))"}
+{"instruction":"Convert string to integer","input":"123","output":"123","whisper":"\"123\" strtoi64 .","python":"print(int('123'))"}
+{"instruction":"Print Hello World","output":"Hello, World!","whisper":"\"Hello, World!\" .","python":"print('Hello, World!')"}
+{"instruction":"Repeat an operation 5 times","output":"5 5 5 5 5","whisper":"5 { . } @times","python":"for _ in range(5): print(5)"}
+{"instruction":"Calculate absolute value","input":"-7","output":"7","whisper":": abs { _ 0 < ?? 0 swap - ] } ;\n-7 abs .","python":"print(abs(-7))"}
+{"instruction":"Find maximum of two numbers","input":"3 7","output":"7","whisper":": max { _ over > ?? ] drop ] } ;\n3 7 max .","python":"print(max(3, 7))"}
+{"instruction":"Calculate power (x^n)","input":"2 10","output":"1024","whisper":": pow { _ 0 = ?? drop 1 | _ 1 - ` _ ` pow * ] } ;\n2 10 pow .","python":"print(2**10)"}
+{"instruction":"Reverse a string","input":"hello","output":"olleh","whisper":"\"hello\" { } @fold .","python":"print('hello'[::-1])"}
+{"instruction":"Check if number is even","input":"4","output":"true","whisper":": even { _ 2 % 0 = } ;\n4 even .","python":"print(4 % 2 == 0)"}
+{"instruction":"Check if number is odd","input":"7","output":"true","whisper":": odd { _ 2 % 1 = } ;\n7 odd .","python":"print(7 % 2 == 1)"}
+{"instruction":"Calculate GCD of two numbers","input":"12 8","output":"4","whisper":": gcd { _ 0 = ?? drop | ` over % gcd ] } ;\n12 8 gcd .","python":"from math import gcd; print(gcd(12, 8))"}
+{"instruction":"Sum of squares of first 5 numbers","input":"1 2 3 4 5","output":"55","whisper":"[1 2 3 4 5] { _ * } @map 0 { + } @fold .","python":"print(sum(x**2 for x in range(1,6)))"}
+{"instruction":"Convert temperature from Celsius to Fahrenheit","input":"100","output":"212","whisper":": c-to-f { 9 * 5 / 32 + } ;\n100 c-to-f .","python":"print(100 * 9/5 + 32)"}
+{"instruction":"Calculate area of circle given radius","input":"5","output":"78.53981633974483","whisper":": pi { 3.14159265358979 } ;\n: circle-area { _ * pi * } ;\n5 circle-area .","python":"import math; print(math.pi * 5**2)"}
+{"instruction":"Generate first 10 natural numbers","output":"[1 2 3 4 5 6 7 8 9 10]","whisper":"[1 2 3 4 5 6 7 8 9 10] .","python":"print(list(range(1, 11)))"}
+{"instruction":"Calculate compound interest","input":"1000 0.05 3","output":"1157.625","whisper":": compound { _ over 1 + ` * ` 1 - ` compound } ;","python":"print(1000 * (1.05)**3)"}
+{"instruction":"Check if string is palindrome","input":"racecar","output":"true","whisper":"\"racecar\" strchars ` strchars streq .","python":"print('racecar' == 'racecar'[::-1])"}
+{"instruction":"Join list of strings","input":"[\"hello\" \" \" \"world\"]","output":"hello world","whisper":"[\"hello\" \" \" \"world\"] strjoin .","python":"print(''.join(['hello', ' ', 'world']))"}
+{"instruction":"Parse JSON string","input":"{\"a\":1}","output":"[[\"a\" 1]]","whisper":"\"{\\\"a\\\":1}\" json-parse .","python":"import json; print(json.loads('{\"a\":1}'))"}
+{"instruction":"Stringify value to JSON","input":"42","output":"42","whisper":"42 json-stringify .","python":"import json; print(json.dumps(42))"}
+{"instruction":"Read environment variable","input":"HOME","output":"/home/user","whisper":"\"HOME\" getenv .","python":"import os; print(os.environ.get('HOME'))"}
+{"instruction":"HTTP GET request","input":"http://example.com","output":"<html>...</html>","whisper":"\"http://example.com\" http-get .","python":"import requests; print(requests.get('http://example.com').text)"}
+{"instruction":"Write to file","input":"test.txt Hello","output":"","whisper":"\"test.txt\" \"Hello\" write-file","python":"open('test.txt','w').write('Hello')"}
+{"instruction":"Read from file","input":"test.txt","output":"Hello","whisper":"\"test.txt\" read-file .","python":"print(open('test.txt').read())"}
+{"instruction":"FizzBuzz for numbers 1-15","output":"1 2 Fizz 4 Buzz Fizz 7 8 Fizz Buzz 11 Fizz 13 14 FizzBuzz","whisper":": fizzbuzz {\n  _ 15 > ?? drop ]\n  _ 15 % 0 = ?? \"FizzBuzz\" . drop\n  | _ 3 % 0 = ?? \"Fizz\" . drop\n  | _ 5 % 0 = ?? \"Buzz\" . drop\n  | . ] ] ]\n  1 + fizzbuzz\n} ;\n1 fizzbuzz","python":"for i in range(1,16):\n    if i%15==0: print('FizzBuzz')\n    elif i%3==0: print('Fizz')\n    elif i%5==0: print('Buzz')\n    else: print(i)"}
+{"instruction":"Bubble sort a list","input":"[3 1 4 1 5 9 2 6]","output":"[1 1 2 3 4 5 6 9]","whisper":": bubble-step {\n  // implementation\n} ;","python":"def bubble_sort(arr):\n    n = len(arr)\n    for i in range(n):\n        for j in range(0, n-i-1):\n            if arr[j] > arr[j+1]: arr[j], arr[j+1] = arr[j+1], arr[j]\n    return arr"}
+{"instruction":"Binary search in sorted list","input":"[1 3 5 7 9 11 13] 7","output":"3","whisper":": binsearch {\n  // implementation\n} ;","python":"def binary_search(arr, target):\n    lo, hi = 0, len(arr)-1\n    while lo <= hi:\n        mid = (lo+hi)//2\n        if arr[mid] == target: return mid\n        elif arr[mid] < target: lo = mid+1\n        else: hi = mid-1\n    return -1"}
