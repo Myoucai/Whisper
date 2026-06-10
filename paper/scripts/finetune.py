@@ -107,8 +107,10 @@ def main():
     else:
         bnb_config = None
 
-    # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
+    # Load tokenizer — local_files_only=True for pre-downloaded models
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.model, trust_remote_code=True, local_files_only=True
+    )
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -118,6 +120,7 @@ def main():
         "trust_remote_code": True,
         "torch_dtype": torch.bfloat16,
         "device_map": "auto",
+        "local_files_only": True,   # pre-downloaded on AutoDL
     }
     if bnb_config:
         model_kwargs["quantization_config"] = bnb_config

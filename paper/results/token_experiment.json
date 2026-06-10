@@ -1,0 +1,289 @@
+{
+  "fine_tuned_model": "./whisper-qwen-7b-v2",
+  "base_model": "Qwen/Qwen2.5-Coder-7B-Instruct",
+  "tasks": 25,
+  "summary": {
+    "whisper_total_tokens": 444,
+    "python_total_tokens": 1077,
+    "average_reduction_pct": 58.77437325905292,
+    "whisper_avg_per_task": 17.76,
+    "python_avg_per_task": 43.08
+  },
+  "results": [
+    {
+      "task": "hello_world",
+      "instruction": "Print 'Hello, World!'",
+      "whisper_generated": "\"Hello, World!\" .",
+      "python_generated": "```python\nprint('Hello, World!')\n```",
+      "whisper_tokens": 6,
+      "python_tokens": 10,
+      "reduction_pct": 40.0,
+      "ref_whisper_tokens": 6,
+      "ref_python_tokens": 7
+    },
+    {
+      "task": "add_two_numbers",
+      "instruction": "Add 3 and 4",
+      "whisper_generated": "3 4 + .",
+      "python_generated": "```python\nresult = 3 + 4\nprint(result)\n```",
+      "whisper_tokens": 5,
+      "python_tokens": 15,
+      "reduction_pct": 66.66666666666667,
+      "ref_whisper_tokens": 5,
+      "ref_python_tokens": 7
+    },
+    {
+      "task": "square",
+      "instruction": "Square the number 5",
+      "whisper_generated": "5 _ * .",
+      "python_generated": "```python\nresult = 5 ** 2\nprint(result)\n```",
+      "whisper_tokens": 4,
+      "python_tokens": 15,
+      "reduction_pct": 73.33333333333334,
+      "ref_whisper_tokens": 7,
+      "ref_python_tokens": 11
+    },
+    {
+      "task": "absolute_value",
+      "instruction": "Absolute value of -7",
+      "whisper_generated": "-7 _ 0 < ?? 0 swap - ] .",
+      "python_generated": "```python\nabs(-7)\n```",
+      "whisper_tokens": 13,
+      "python_tokens": 8,
+      "reduction_pct": -62.5,
+      "ref_whisper_tokens": 8,
+      "ref_python_tokens": 5
+    },
+    {
+      "task": "max_of_two",
+      "instruction": "Find the maximum of 3 and 7",
+      "whisper_generated": "3 7 > ?? 3 | 7 ] .",
+      "python_generated": "```python\nmax_value = max(3, 7)\nprint(max_value)\n```",
+      "whisper_tokens": 12,
+      "python_tokens": 18,
+      "reduction_pct": 33.333333333333336,
+      "ref_whisper_tokens": 9,
+      "ref_python_tokens": 8
+    },
+    {
+      "task": "min_of_two",
+      "instruction": "Find the minimum of 3 and 7",
+      "whisper_generated": "3 7 min .",
+      "python_generated": "```python\nmin_value = min(3, 7)\nprint(min_value)\n```",
+      "whisper_tokens": 5,
+      "python_tokens": 18,
+      "reduction_pct": 72.22222222222221,
+      "ref_whisper_tokens": 9,
+      "ref_python_tokens": 8
+    },
+    {
+      "task": "factorial",
+      "instruction": "Calculate the factorial of 5",
+      "whisper_generated": ": fact { _ 1 > ?? _ 1 - fact * | drop 1 ] } ;\n5 fact .",
+      "python_generated": "```python\ndef factorial(n):\n    if n == 0:\n        return 1\n    else:\n        return n * factorial(n-1)\n\n# Calculate the factorial of 5\nresult = factorial(5)\nprint(result)  # Output: 120\n```",
+      "whisper_tokens": 24,
+      "python_tokens": 58,
+      "reduction_pct": 58.62068965517242,
+      "ref_whisper_tokens": 7,
+      "ref_python_tokens": 28
+    },
+    {
+      "task": "fibonacci",
+      "instruction": "Calculate fibonacci of 10",
+      "whisper_generated": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | drop ] } ;\n10 fib .",
+      "python_generated": "```python\ndef fibonacci(n):\n    if n <= 0:\n        return \"Input should be a positive integer\"\n    elif n == 1:\n        return 0\n    elif n == 2:\n        return 1\n    else:\n        a, b = 0, 1\n        for _ in range(2, n):\n            a, b = b, a + b\n        return b\n\nprint(fibonacci(10))\n```",
+      "whisper_tokens": 28,
+      "python_tokens": 96,
+      "reduction_pct": 70.83333333333333,
+      "ref_whisper_tokens": 8,
+      "ref_python_tokens": 42
+    },
+    {
+      "task": "sum_list",
+      "instruction": "Sum a list of numbers",
+      "whisper_generated": "[1 2 3 4 5] 0 { + } @fold .",
+      "python_generated": "```python\ndef sum_list(numbers):\n    return sum(numbers)\n\n# Example usage:\ninput_list = [1, 2, 3, 4, 5]\nresult = sum_list(input_list)\nprint(result)  # Output: 15\n```",
+      "whisper_tokens": 19,
+      "python_tokens": 54,
+      "reduction_pct": 64.81481481481481,
+      "ref_whisper_tokens": 17,
+      "ref_python_tokens": 17
+    },
+    {
+      "task": "product_list",
+      "instruction": "Product of list elements",
+      "whisper_generated": "[2 3 4 5] 1 { * } @fold .",
+      "python_generated": "```python\ndef product_of_list_elements(lst):\n    return prod(lst)\n\nfrom functools import reduce\nprod = lambda x, y: x * y\n\ninput_list = [2, 3, 4, 5]\nresult = product_of_list_elements(input_list)\nprint(result)  # Output: 120\n```",
+      "whisper_tokens": 17,
+      "python_tokens": 68,
+      "reduction_pct": 75.0,
+      "ref_whisper_tokens": 15,
+      "ref_python_tokens": 28
+    },
+    {
+      "task": "map_squares",
+      "instruction": "Square every number in a list",
+      "whisper_generated": "[1 2 3 4 5] { _ * } @map .",
+      "python_generated": "```python\ninput_list = [1, 2, 3, 4, 5]\nsquared_list = [x**2 for x in input_list]\nprint(squared_list)\n```\n\nOutput:\n```\n[1, 4, 9, 16, 25]\n```",
+      "whisper_tokens": 18,
+      "python_tokens": 64,
+      "reduction_pct": 71.875,
+      "ref_whisper_tokens": 21,
+      "ref_python_tokens": 23
+    },
+    {
+      "task": "string_length",
+      "instruction": "Get the length of a string",
+      "whisper_generated": "\"Hello\" strlen .",
+      "python_generated": "```python\ninput_string = \"Hello\"\nlength_of_string = len(input_string)\nprint(length_of_string)\n```",
+      "whisper_tokens": 5,
+      "python_tokens": 23,
+      "reduction_pct": 78.26086956521739,
+      "ref_whisper_tokens": 5,
+      "ref_python_tokens": 5
+    },
+    {
+      "task": "string_concat",
+      "instruction": "Concatenate two strings",
+      "whisper_generated": "\"Hello\" \"World\" strcat .",
+      "python_generated": "```python\ndef concatenate_strings(str1, str2):\n    return str1 + \" \" + str2\n\n# Example usage:\nresult = concatenate_strings(\"Hello\", \"World\")\nprint(result)  # Output: Hello World\n```",
+      "whisper_tokens": 8,
+      "python_tokens": 48,
+      "reduction_pct": 83.33333333333334,
+      "ref_whisper_tokens": 8,
+      "ref_python_tokens": 8
+    },
+    {
+      "task": "list_length",
+      "instruction": "Get the length of a list",
+      "whisper_generated": "[10 20 30 40] len .",
+      "python_generated": "```python\nmy_list = [10, 20, 30, 40]\nlength_of_list = len(my_list)\nprint(length_of_list)\n```",
+      "whisper_tokens": 15,
+      "python_tokens": 36,
+      "reduction_pct": 58.33333333333333,
+      "ref_whisper_tokens": 15,
+      "ref_python_tokens": 18
+    },
+    {
+      "task": "is_even",
+      "instruction": "Check if a number is even",
+      "whisper_generated": "8 2 % 0 = .",
+      "python_generated": "```python\ndef is_even(number):\n    return number % 2 == 0\n\n# Test the function with the input 8\nprint(is_even(8))  # Output: True\n```",
+      "whisper_tokens": 8,
+      "python_tokens": 41,
+      "reduction_pct": 80.48780487804879,
+      "ref_whisper_tokens": 8,
+      "ref_python_tokens": 10
+    },
+    {
+      "task": "power",
+      "instruction": "Compute 2 to the power of 10",
+      "whisper_generated": "2 10 ** .",
+      "python_generated": "```python\nresult = 2 ** 10\nprint(result)\n```",
+      "whisper_tokens": 6,
+      "python_tokens": 16,
+      "reduction_pct": 62.5,
+      "ref_whisper_tokens": 10,
+      "ref_python_tokens": 8
+    },
+    {
+      "task": "range_sum",
+      "instruction": "Sum numbers from 1 to 10",
+      "whisper_generated": ": sum-to { _ 0 = ?? drop 0 | _ over 1 - sum-to + ] } ;\n10 sum-to .",
+      "python_generated": "```python\n# Sum numbers from 1 to 10\ntotal_sum = sum(range(1, 11))\nprint(total_sum)\n```",
+      "whisper_tokens": 29,
+      "python_tokens": 31,
+      "reduction_pct": 6.451612903225811,
+      "ref_whisper_tokens": 10,
+      "ref_python_tokens": 10
+    },
+    {
+      "task": "reverse_list",
+      "instruction": "Reverse a list",
+      "whisper_generated": "[1 2 3 4 5] rev .",
+      "python_generated": "```python\ninput_list = [1, 2, 3, 4, 5]\nreversed_list = input_list[::-1]\nprint(reversed_list)\n```",
+      "whisper_tokens": 13,
+      "python_tokens": 36,
+      "reduction_pct": 63.888888888888886,
+      "ref_whisper_tokens": 17,
+      "ref_python_tokens": 19
+    },
+    {
+      "task": "string_contains",
+      "instruction": "Check if a string contains a substring",
+      "whisper_generated": "\"hello world\" \"lo\" strfind 0 >= .",
+      "python_generated": "```python\ndef contains_substring(main_string, sub_string):\n    return sub_string in main_string\n\n# Test the function\nmain_string = \"hello world\"\nsub_string = \"lo\"\nprint(contains_substring(main_string, sub_string))  # Output: True\n```",
+      "whisper_tokens": 13,
+      "python_tokens": 57,
+      "reduction_pct": 77.19298245614034,
+      "ref_whisper_tokens": 13,
+      "ref_python_tokens": 9
+    },
+    {
+      "task": "last_element",
+      "instruction": "Get the last element of a list",
+      "whisper_generated": "[10 20 30 40] _ len 1 - @ .",
+      "python_generated": "```python\nmy_list = [10, 20, 30, 40]\nlast_element = my_list[-1]\nprint(last_element)\n```",
+      "whisper_tokens": 20,
+      "python_tokens": 35,
+      "reduction_pct": 42.85714285714286,
+      "ref_whisper_tokens": 19,
+      "ref_python_tokens": 19
+    },
+    {
+      "task": "string_reverse",
+      "instruction": "Reverse a string",
+      "whisper_generated": "\"hello\" str-rev .",
+      "python_generated": "Here is a simple Python function to reverse a string:\n\n```python\ndef reverse_string(s):\n    return s[::-1]\n\ninput_string = \"hello\"\nreversed_string = reverse_string(input_string)\nprint(reversed_string)  # Output: \"olleh\"\n```\n\nThis function uses Python's slicing feature to create a new string that is the reverse of the input string. The slice `s[::-1]` means start at the end of the string and end at position 0, move with the step -1 (which means one step backwards).",
+      "whisper_tokens": 7,
+      "python_tokens": 112,
+      "reduction_pct": 93.75,
+      "ref_whisper_tokens": 10,
+      "ref_python_tokens": 7
+    },
+    {
+      "task": "countdown",
+      "instruction": "Count down from 5",
+      "whisper_generated": ": cd { { _ 0 > } { _ . 1 - } # drop } ;\n5 cd .",
+      "python_generated": "```python\nfor i in range(5, -1, -1):\n    print(i)\n```",
+      "whisper_tokens": 23,
+      "python_tokens": 21,
+      "reduction_pct": -9.523809523809534,
+      "ref_whisper_tokens": 12,
+      "ref_python_tokens": 17
+    },
+    {
+      "task": "negate",
+      "instruction": "Negate a number",
+      "whisper_generated": "42 0 - .",
+      "python_generated": "```python\ndef negate_number(number):\n    return -number\n\n# Example usage:\ninput_number = 42\nnegated_number = negate_number(input_number)\nprint(negated_number)  # Output: -42\n```",
+      "whisper_tokens": 6,
+      "python_tokens": 48,
+      "reduction_pct": 87.5,
+      "ref_whisper_tokens": 8,
+      "ref_python_tokens": 5
+    },
+    {
+      "task": "is_prime",
+      "instruction": "Check if 17 is prime",
+      "whisper_generated": ": prime? { _ 2 < | _ 2 % 0 = ?? drop #f | _ 3 % 0 = ?? drop #f | _ 5 % 0 = ?? drop #f | _ 7 % 0 = ?? drop #f | _ 11 % 0 = ?? drop #f | _ 13 % 0 = ?? drop #f | _ 17 % 0 = ?? drop #f | drop #t ] ] ] ] ] ] ] ] ] ] } ;\n17 prime? .",
+      "python_generated": "```python\ndef is_prime(n):\n    if n <= 1:\n        return False\n    for i in range(2, int(n**0.5) + 1):\n        if n % i == 0:\n            return False\n    return True\n\n# Check if 17 is prime\nprint(is_prime(17))  # Output: True\n```",
+      "whisper_tokens": 116,
+      "python_tokens": 78,
+      "reduction_pct": -48.71794871794872,
+      "ref_whisper_tokens": 9,
+      "ref_python_tokens": 55
+    },
+    {
+      "task": "gcd",
+      "instruction": "Find GCD of 48 and 18",
+      "whisper_generated": ": gcd { _ 0 = ?? drop | over % swap gcd ] } ;\n48 18 gcd .",
+      "python_generated": "```python\ndef gcd(a, b):\n    while b:\n        a, b = b, a % b\n    return a\n\n# Input values\nnum1 = 48\nnum2 = 18\n\n# Calculate GCD\nresult = gcd(num1, num2)\nprint(result)  # Output: 6\n```",
+      "whisper_tokens": 24,
+      "python_tokens": 71,
+      "reduction_pct": 66.19718309859155,
+      "ref_whisper_tokens": 28,
+      "ref_python_tokens": 15
+    }
+  ]
+}

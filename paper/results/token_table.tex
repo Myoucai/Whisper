@@ -1,0 +1,38 @@
+\begin{table}[h]
+\centering
+\caption{Token Count: Fine-tuned Model Generated Code (Whisper vs Python)}
+\label{tab:token-comparison}
+\begin{tabular}{lrrr}
+\hline
+Task & Whisper & Python & Reduction \\
+\hline
+hello_world & 6 & 10 & +40.0\% \\
+add_two_numbers & 5 & 15 & +66.7\% \\
+square & 4 & 15 & +73.3\% \\
+absolute_value & 13 & 8 & -62.5\% \\
+max_of_two & 12 & 18 & +33.3\% \\
+min_of_two & 5 & 18 & +72.2\% \\
+factorial & 24 & 58 & +58.6\% \\
+fibonacci & 28 & 96 & +70.8\% \\
+sum_list & 19 & 54 & +64.8\% \\
+product_list & 17 & 68 & +75.0\% \\
+map_squares & 18 & 64 & +71.9\% \\
+string_length & 5 & 23 & +78.3\% \\
+string_concat & 8 & 48 & +83.3\% \\
+list_length & 15 & 36 & +58.3\% \\
+is_even & 8 & 41 & +80.5\% \\
+power & 6 & 16 & +62.5\% \\
+range_sum & 29 & 31 & +6.5\% \\
+reverse_list & 13 & 36 & +63.9\% \\
+string_contains & 13 & 57 & +77.2\% \\
+last_element & 20 & 35 & +42.9\% \\
+string_reverse & 7 & 112 & +93.8\% \\
+countdown & 23 & 21 & -9.5\% \\
+negate & 6 & 48 & +87.5\% \\
+is_prime & 116 & 78 & -48.7\% \\
+gcd & 24 & 71 & +66.2\% \\
+\hline
+\textbf{Total} & \textbf{444} & \textbf{1077} & \textbf{+58.8\%} \\
+\hline
+\end{tabular}
+\end{table}
