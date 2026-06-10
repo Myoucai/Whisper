@@ -173,7 +173,7 @@ def main():
         model=model,
         args=training_args,
         train_dataset=dataset,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         max_seq_length=args.max_seq_len,
     )
 
