@@ -1,15 +1,15 @@
 {"task":"eval_01","instruction":"Calculate the sum of 1 to 20","output":"210","whisper":"[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20] 0 { + } @fold ."}
-{"task":"eval_02","instruction":"Find the minimum of two numbers","input":"3 7","output":"3","whisper":"3 7 min ."}
+{"task":"eval_02","instruction":"Find the minimum of two numbers","input":"3 7","output":"3","whisper":"3 7 _ _ ` < ?? | drop ] ."}
 {"task":"eval_03","instruction":"Check if a number is positive","input":"5","output":"#t","whisper":"5 0 > ."}
-{"task":"eval_04","instruction":"Calculate 2^16","input":"2 16","output":"65536","whisper":": pow { _ 0 = ?? drop 1 | _ 1 - swap over swap pow * ] } ;\n2 16 pow ."}
-{"task":"eval_05","instruction":"Concatenate three strings","input":"a b c","output":"abc","whisper":"\"a\" \"b\" strcat \"c\" strcat ."}
+{"task":"eval_04","instruction":"Calculate 2^16","input":"2 16","output":"65536","whisper":": pow { _ 0 = ?? drop 1 | _ 1 - _ _ ` pow * ] } ;\n2 16 pow ."}
+{"task":"eval_05","instruction":"Concatenate three strings","input":"a b c","output":"\"abc\"","whisper":"\"a\" \"b\" strcat \"c\" strcat ."}
 {"task":"eval_06","instruction":"Get the last element of a list","input":"[10 20 30 40 50]","output":"50","whisper":"[10 20 30 40 50] _ len 1 - @nth ."}
-{"task":"eval_07","instruction":"Calculate the average of a list","input":"[2 4 6 8 10]","output":"6","whisper":"[2 4 6 8 10] _ 0 { + } @fold swap len / ."}
-{"task":"eval_08","instruction":"Repeat a string n times","input":"abc 3","output":"abcabcabc","whisper":": repeat { _ 0 = ?? drop drop \"\" | _ 1 - over swap repeat strcat ] } ;\n\"abc\" 3 repeat ."}
-{"task":"eval_09","instruction":"Convert a list of digits to a number","input":"[1 2 3]","output":"123","whisper":"[1 2 3] 0 { swap 10 * + } @fold ."}
+{"task":"eval_07","instruction":"Calculate the average of a list","input":"[2 4 6 8 10]","output":"6","whisper":"[2 4 6 8 10] _ 0 { + } @fold ` len / ."}
+{"task":"eval_08","instruction":"Repeat a string n times","input":"abc 3","output":"abcabcabc","whisper":": repeat { _ 0 = ?? drop drop \"\" | _ 1 - _ _ ` repeat strcat ] } ;\n\"abc\" 3 repeat ."}
+{"task":"eval_09","instruction":"Convert a list of digits to a number","input":"[1 2 3]","output":"123","whisper":"[1 2 3] 0 { ` 10 * + } @fold ."}
 {"task":"eval_10","instruction":"Check if a string contains a substring","input":"hello world lo","output":"#t","whisper":"\"hello world\" \"lo\" strfind 0 >= ."}
 {"task":"eval_11","instruction":"Calculate the product of all elements in a list","input":"[2 3 4 5]","output":"120","whisper":"[2 3 4 5] 1 { * } @fold ."}
-{"task":"eval_12","instruction":"Remove the first element from a list","input":"[1 2 3 4 5]","output":"[2 3 4 5]","whisper":"[1 2 3 4 5] tail ."}
-{"task":"eval_13","instruction":"Calculate the distance between two points","input":"0 0 3 4","output":"5","whisper":": dist { swap over - _ * rot rot - _ * + fsqrt } ;\n0 0 3 4 dist ."}
+{"task":"eval_12","instruction":"Remove the first element from a list","input":"[1 2 3 4 5]","output":"[2 3 4 5]","whisper":"[1 2 3 4 5] _ len 1 - 1 strslice ."}
+{"task":"eval_13","instruction":"Calculate the distance between two points","input":"0 0 3 4","output":"5","whisper":": dist { @ - _ * ` @ - _ * + fsqrt } ;\n0 0 3 4 dist ."}
 {"task":"eval_14","instruction":"Generate a list of squares from 1 to 10","output":"[1 4 9 16 25 36 49 64 81 100]","whisper":"[1 2 3 4 5 6 7 8 9 10] { _ * } @map ."}
-{"task":"eval_15","instruction":"Check if a number is prime","input":"17","output":"#t","whisper":": prime? { _ 2 < ?? drop #f | _ 2 = ?? drop #t | _ 2 % 0 = ?? drop #f | 3 { _ _ * over >= } { _ over % 0 = ?? drop drop #f | 2 + ] } # drop #t ] ] } ;\n17 prime? ."}
+{"task":"eval_15","instruction":"Check if a number is prime","input":"17","output":"#t","whisper":": prime? { _ 2 < ?? drop #f | _ 2 = ?? drop #t | _ 2 % 0 = ?? drop #f | 3 { _ _ * _ _ ` >= } { _ _ _ ` % 0 = ?? drop drop #f | 2 + ] } # drop #t ] ] } ;\n17 prime? ."}
