@@ -44,11 +44,11 @@ TASKS = [
     ("list_len",      "[10 20 30 40] len .",                  "print(len([10,20,30,40]))"),
     ("is_even",       "8 even? .",                            "print(8%2==0)"),
     ("power",         "2 10 pow .",                           "print(2**10)"),
-    ("range_sum",     "10 range-to sum .",                    "print(sum(range(1,11)))"),
+    ("range_sum",     "import std/list\n10 range-to sum .",   "print(sum(range(1,11)))"),
     ("rev_list",      "import std/list\n[1 2 3 4 5] rev .",  "print([*reversed([1,2,3,4,5])])"),
     ("str_has",       '"hello world" "lo" has? .',            "print('lo'in'hello world')"),
     ("last_elem",     "[10 20 30 40] last .",                "print([10,20,30,40][-1])"),
-    ("str_rev",       '"hello" strchars import std/list\nrev charsstr .', "print('hello'[::-1])")
+    ("str_rev",       "import std/list\n\"hello\" strchars rev charsstr .", "print('hello'[::-1])"),
     ("countdown",     "5 { _ 0 > } { _ . 1 - } #",           "for i in range(5,0,-1):print(i)"),
     ("negate",        "42 neg .",                             "print(-42)"),
     ("is_prime",      "import std/math\n17 prime? .",         "n=17\nprint(all(n%i for i in range(2,int(n**.5)+1))and n>1)"),
