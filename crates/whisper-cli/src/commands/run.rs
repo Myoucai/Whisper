@@ -16,6 +16,44 @@ pub struct RunConfig {
     pub trace: bool,
 }
 
+/// Register core built-in words that are always available without import.
+fn register_core_words(vm: &mut Vm) -> Result<(), String> {
+    let core_source = r#"
+: abs  { _ 0 < ?? 0 ` - | ] } ;
+: max  { _ $2 > ?? ` drop | drop ] } ;
+: min  { _ $2 ` < ?? drop | ` drop ] } ;
+: neg  { 0 ` - } ;
+: sq   { _ * } ;
+: cube { _ sq * } ;
+: even? { _ 2 % 0 = } ;
+: odd?  { _ 2 % 1 = } ;
+: zero? { _ 0 = } ;
+: positive? { _ 0 > } ;
+: negative? { _ 0 < } ;
+: inc  { 1 + } ;
+: dec  { 1 - } ;
+: double { _ + } ;
+: halve { 2 / } ;
+: sqrt { fsqrt } ;
+: sum  { 0 { + } @fold } ;
+: prod { 1 { * } @fold } ;
+: mean { _ sum ` len / } ;
+: first { 0 @nth } ;
+: last { _ len 1 - @nth } ;
+: rev { [] { append } @fold } ;
+: factorial { _ 1 > ?? _ 1 - factorial * | drop 1 ] } ;
+: fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;
+"#;
+    let ast = Parser::parse_source(core_source)
+        .map_err(|e| format!("Core word parse error at {}:{}: {}", e.token.span.line, e.token.span.column, e.message))?;
+    let mut gen = BytecodeGenerator::new();
+    let (_, defs) = gen.compile(&ast);
+    for (name, code) in defs {
+        vm.define_word(name, code);
+    }
+    Ok(())
+}
+
 /// Run a Whisper source file with optional capability bindings.
 pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result<(), String> {
     // Phase 1: Parse source to AST
@@ -95,6 +133,9 @@ pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result
         vm.trace = true;
         eprintln!("[trace] VM execution trace enabled");
     }
+
+    // Register core built-in words (available without import)
+    register_core_words(&mut vm)?;
 
     // Register optimized word definitions
     for (name, code) in &defs {

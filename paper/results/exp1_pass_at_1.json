@@ -1,0 +1,158 @@
+{
+  "experiment": "exp1_execution_pass_at_1",
+  "tasks": 5,
+  "pass_count": 4,
+  "pass_rate_pct": 80.0,
+  "results": [
+    {
+      "task": "eval_01",
+      "expected_ran": true,
+      "expected_error": null,
+      "generated_ran": false,
+      "generated_error": "Exit 1: Error: Runtime error: Undefined word: swap",
+      "expected_output": "210",
+      "generated_output": null,
+      "output_match": false
+    },
+    {
+      "task": "eval_02",
+      "expected_ran": true,
+      "expected_error": null,
+      "generated_ran": false,
+      "generated_error": "Exit 1: Error: Runtime error: Undefined word: min",
+      "expected_output": "3",
+      "generated_output": null,
+      "output_match": false
+    },
+    {
+      "task": "eval_03",
+      "expected_ran": true,
+      "expected_error": null,
+      "generated_ran": true,
+      "generated_error": null,
+      "expected_output": "#t",
+      "generated_output": "#t",
+      "output_match": true
+    },
+    {
+      "task": "eval_04",
+      "expected_ran": true,
+      "expected_error": null,
+      "generated_ran": true,
+      "generated_error": null,
+      "expected_output": "0",
+      "generated_output": "256",
+      "output_match": false
+    },
+    {
+      "task": "eval_05",
+      "expected_ran": true,
+      "expected_error": null,
+      "generated_ran": true,
+      "generated_error": null,
+      "expected_output": "\"abc\"",
+      "generated_output": "\"abc\"",
+      "output_match": true
+    },
+    {
+      "task": "eval_06",
+      "expected_ran": true,
+      "expected_error": null,
+      "generated_ran": false,
+      "generated_error": "Exit 1: Type error: Rot: need 3 values (in <main>)\nError: 1 type error(s) found",
+      "expected_output": "50",
+      "generated_output": null,
+      "output_match": false
+    },
+    {
+      "task": "eval_07",
+      "expected_ran": true,
+      "expected_error": null,
+      "generated_ran": false,
+      "generated_error": "Exit 1: Type error: arithmetic lhs: expected i64 | f64, got [i64] (in <main>)\nError: 1 type error(s) found",
+      "expected_output": "6",
+      "generated_output": null,
+      "output_match": false
+    },
+    {
+      "task": "eval_08",
+      "expected_ran": false,
+      "expected_error": "Exit 1: Error: Runtime error: Type mismatch: expected str, got i64",
+      "generated_ran": false,
+      "generated_error": "Exit 1: Error: Runtime error: Undefined word: abc",
+      "expected_output": null,
+      "generated_output": null,
+      "output_match": false
+    },
+    {
+      "task": "eval_09",
+      "expected_ran": false,
+      "expected_error": "Exit 1: Type error: [quote] Swap: need 2 values (in <main>/quote)\nError: 1 type error(s) found",
+      "generated_ran": false,
+      "generated_error": "Exit 1: Type error: Stack underflow: @fold list needs [T3] (in <main>)\nError: 1 type error(s) found",
+      "expected_output": null,
+      "generated_output": null,
+      "output_match": false
+    },
+    {
+      "task": "eval_10",
+      "expected_ran": true,
+      "expected_error": null,
+      "generated_ran": true,
+      "generated_error": null,
+      "expected_output": "#t",
+      "generated_output": "#t",
+      "output_match": true
+    },
+    {
+      "task": "eval_11",
+      "expected_ran": true,
+      "expected_error": null,
+      "generated_ran": false,
+      "generated_error": "Exit 1: Type error: Stack underflow: @fold list needs [T3] (in <main>)\nError: 1 type error(s) found",
+      "expected_output": "120",
+      "generated_output": null,
+      "output_match": false
+    },
+    {
+      "task": "eval_12",
+      "expected_ran": false,
+      "expected_error": "Exit 1: Type error: strslice string: expected str, got [i64] (in <main>)\nError: 1 type error(s) found",
+      "generated_ran": false,
+      "generated_error": "Exit 1: Error: Runtime error: Undefined word: tail",
+      "expected_output": null,
+      "generated_output": null,
+      "output_match": false
+    },
+    {
+      "task": "eval_13",
+      "expected_ran": true,
+      "expected_error": null,
+      "generated_ran": false,
+      "generated_error": "Exit 1: Error: Runtime error: Undefined word: over",
+      "expected_output": "5",
+      "generated_output": null,
+      "output_match": false
+    },
+    {
+      "task": "eval_14",
+      "expected_ran": true,
+      "expected_error": null,
+      "generated_ran": true,
+      "generated_error": null,
+      "expected_output": "[1 4 9 16 25 36 49 64 81 100]",
+      "generated_output": "[1 4 9 16 25 36 49 64 81 100]",
+      "output_match": true
+    },
+    {
+      "task": "eval_15",
+      "expected_ran": false,
+      "expected_error": "Exit 1: Error: Parse error at 1:150: Unexpected token: RBrace",
+      "generated_ran": false,
+      "generated_error": "Exit 1: Error: Parse error at 1:81: Unexpected token: RBracket",
+      "expected_output": null,
+      "generated_output": null,
+      "output_match": false
+    }
+  ]
+}
