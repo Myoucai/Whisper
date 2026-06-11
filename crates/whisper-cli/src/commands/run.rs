@@ -40,9 +40,11 @@ fn register_core_words(vm: &mut Vm) -> Result<(), String> {
 : mean { _ sum ` len / } ;
 : first { 0 @nth } ;
 : last { _ len 1 - @nth } ;
-: gcd { _ 0 = ?? drop | ` $1 % gcd ] } ;
+: over { $1 } ;
+: gcd { _ 0 = ?? drop | ` over % gcd ] } ;
 : has? { strfind 0 >= } ;
-: pow { _ 0 = ?? drop 1 | 1 ` { $1 * } @times ] } ;
+: pow { _ 0 = ?? drop 1 | 1 ` { over * } @times ] } ;
+: range-to { _ 0 > ?? _ 1 - range-to ` append | drop [] ] } ;
 : factorial { _ 1 > ?? _ 1 - factorial * | drop 1 ] } ;
 : fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;
 "#;
