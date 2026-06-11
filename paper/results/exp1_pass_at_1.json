@@ -1,8 +1,8 @@
 {
   "experiment": "exp1_execution_pass_at_1",
-  "tasks": 5,
-  "pass_count": 4,
-  "pass_rate_pct": 80.0,
+  "tasks": 6,
+  "pass_count": 5,
+  "pass_rate_pct": 83.33333333333333,
   "results": [
     {
       "task": "eval_01",
@@ -18,11 +18,11 @@
       "task": "eval_02",
       "expected_ran": true,
       "expected_error": null,
-      "generated_ran": false,
-      "generated_error": "Exit 1: Error: Runtime error: Undefined word: min",
+      "generated_ran": true,
+      "generated_error": null,
       "expected_output": "3",
-      "generated_output": null,
-      "output_match": false
+      "generated_output": "3",
+      "output_match": true
     },
     {
       "task": "eval_03",

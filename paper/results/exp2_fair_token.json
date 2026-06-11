@@ -2,11 +2,11 @@
   "experiment": "exp2_fair_token",
   "tokenizer": "Qwen2.5-Coder",
   "tasks": 25,
-  "whisper_total": 241,
+  "whisper_total": 212,
   "python_total": 279,
-  "reduction_pct": 13.62007168458781,
-  "whisper_wins": 14,
-  "python_wins": 11,
+  "reduction_pct": 24.01433691756273,
+  "whisper_wins": 17,
+  "python_wins": 8,
   "details": [
     {
       "task": "hello_world",
@@ -108,37 +108,37 @@
     },
     {
       "task": "is_even",
-      "whisper_tokens": 8,
+      "whisper_tokens": 4,
       "python_tokens": 8,
-      "whisper_code": "8 2 % 0 = .",
+      "whisper_code": "8 even? .",
       "python_code": "print(8%2==0)"
     },
     {
       "task": "power",
-      "whisper_tokens": 10,
+      "whisper_tokens": 6,
       "python_tokens": 7,
-      "whisper_code": "import std/math\n2 10 pow .",
+      "whisper_code": "2 10 pow .",
       "python_code": "print(2**10)"
     },
     {
       "task": "range_sum",
-      "whisper_tokens": 10,
+      "whisper_tokens": 6,
       "python_tokens": 9,
-      "whisper_code": "import std/list\n10 range-to sum .",
+      "whisper_code": "10 range-to sum .",
       "python_code": "print(sum(range(1,11)))"
     },
     {
       "task": "rev_list",
-      "whisper_tokens": 13,
+      "whisper_tokens": 17,
       "python_tokens": 17,
-      "whisper_code": "[1 2 3 4 5] rev .",
+      "whisper_code": "import std/list\n[1 2 3 4 5] rev .",
       "python_code": "print([*reversed([1,2,3,4,5])])"
     },
     {
       "task": "str_has",
-      "whisper_tokens": 13,
+      "whisper_tokens": 10,
       "python_tokens": 8,
-      "whisper_code": "\"hello world\" \"lo\" strfind 0 >= .",
+      "whisper_code": "\"hello world\" \"lo\" has? .",
       "python_code": "print('lo'in'hello world')"
     },
     {
@@ -150,9 +150,9 @@
     },
     {
       "task": "str_rev",
-      "whisper_tokens": 9,
+      "whisper_tokens": 13,
       "python_tokens": 7,
-      "whisper_code": "\"hello\" strchars rev charsstr .",
+      "whisper_code": "import std/list\n\"hello\" strchars rev charsstr .",
       "python_code": "print('hello'[::-1])"
     },
     {
@@ -178,9 +178,9 @@
     },
     {
       "task": "gcd",
-      "whisper_tokens": 29,
+      "whisper_tokens": 7,
       "python_tokens": 14,
-      "whisper_code": "import std/math\n: gcd { _ 0 = ?? drop | ` $1 % gcd ] } ;\n48 18 gcd .",
+      "whisper_code": "48 18 gcd .",
       "python_code": "import math\nprint(math.gcd(48,18))"
     }
   ]
