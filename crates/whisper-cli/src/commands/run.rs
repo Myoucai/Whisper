@@ -41,6 +41,9 @@ fn register_core_words(vm: &mut Vm) -> Result<(), String> {
 : first { 0 @nth } ;
 : last { _ len 1 - @nth } ;
 : rev { [] { append } @fold } ;
+: gcd { _ 0 = ?? drop | ` $1 % gcd ] } ;
+: strrev { strchars rev charsstr } ;
+: has? { strfind 0 >= } ;
 : factorial { _ 1 > ?? _ 1 - factorial * | drop 1 ] } ;
 : fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;
 "#;

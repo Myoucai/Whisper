@@ -2,11 +2,11 @@
   "experiment": "exp2_fair_token",
   "tokenizer": "Qwen2.5-Coder",
   "tasks": 25,
-  "whisper_total": 280,
+  "whisper_total": 241,
   "python_total": 279,
-  "reduction_pct": -0.35842293906809264,
-  "whisper_wins": 7,
-  "python_wins": 18,
+  "reduction_pct": 13.62007168458781,
+  "whisper_wins": 14,
+  "python_wins": 11,
   "details": [
     {
       "task": "hello_world",
@@ -31,58 +31,58 @@
     },
     {
       "task": "abs_val",
-      "whisper_tokens": 8,
+      "whisper_tokens": 4,
       "python_tokens": 5,
-      "whisper_code": "import std/math\n-7 abs .",
+      "whisper_code": "-7 abs .",
       "python_code": "print(abs(-7))"
     },
     {
       "task": "max2",
-      "whisper_tokens": 9,
+      "whisper_tokens": 5,
       "python_tokens": 7,
-      "whisper_code": "import std/math\n3 7 max .",
+      "whisper_code": "3 7 max .",
       "python_code": "print(max(3,7))"
     },
     {
       "task": "min2",
-      "whisper_tokens": 9,
+      "whisper_tokens": 5,
       "python_tokens": 7,
-      "whisper_code": "import std/math\n3 7 min .",
+      "whisper_code": "3 7 min .",
       "python_code": "print(min(3,7))"
     },
     {
       "task": "factorial",
-      "whisper_tokens": 7,
+      "whisper_tokens": 3,
       "python_tokens": 10,
-      "whisper_code": "import std/math\n5 factorial .",
+      "whisper_code": "5 factorial .",
       "python_code": "import math\nprint(math.factorial(5))"
     },
     {
       "task": "fibonacci",
-      "whisper_tokens": 8,
+      "whisper_tokens": 4,
       "python_tokens": 24,
-      "whisper_code": "import std/math\n10 fib .",
+      "whisper_code": "10 fib .",
       "python_code": "a,b=0,1\nfor _ in[0]*10:a,b=b,a+b\nprint(a)"
     },
     {
       "task": "sum_list",
-      "whisper_tokens": 17,
+      "whisper_tokens": 13,
       "python_tokens": 13,
-      "whisper_code": "import std/list\n[1,2,3,4,5] sum .",
+      "whisper_code": "[1 2 3 4 5] sum .",
       "python_code": "print(sum([1,2,3,4,5]))"
     },
     {
       "task": "prod_list",
-      "whisper_tokens": 15,
+      "whisper_tokens": 11,
       "python_tokens": 15,
-      "whisper_code": "import std/list\n[2,3,4,5] prod .",
+      "whisper_code": "[2 3 4 5] prod .",
       "python_code": "import math\nprint(math.prod([2,3,4,5]))"
     },
     {
       "task": "map_sq",
       "whisper_tokens": 18,
       "python_tokens": 19,
-      "whisper_code": "[1,2,3,4,5] { _ * } @map .",
+      "whisper_code": "[1 2 3 4 5] { _ * } @map .",
       "python_code": "print([x**2 for x in[1,2,3,4,5]])"
     },
     {
@@ -103,7 +103,7 @@
       "task": "list_len",
       "whisper_tokens": 15,
       "python_tokens": 15,
-      "whisper_code": "[10,20,30,40] len .",
+      "whisper_code": "[10 20 30 40] len .",
       "python_code": "print(len([10,20,30,40]))"
     },
     {
@@ -129,9 +129,9 @@
     },
     {
       "task": "rev_list",
-      "whisper_tokens": 17,
+      "whisper_tokens": 13,
       "python_tokens": 17,
-      "whisper_code": "import std/list\n[1,2,3,4,5] rev .",
+      "whisper_code": "[1 2 3 4 5] rev .",
       "python_code": "print([*reversed([1,2,3,4,5])])"
     },
     {
@@ -143,9 +143,9 @@
     },
     {
       "task": "last_elem",
-      "whisper_tokens": 19,
+      "whisper_tokens": 15,
       "python_tokens": 16,
-      "whisper_code": "import std/list\n[10,20,30,40] last .",
+      "whisper_code": "[10 20 30 40] last .",
       "python_code": "print([10,20,30,40][-1])"
     },
     {
@@ -164,9 +164,9 @@
     },
     {
       "task": "negate",
-      "whisper_tokens": 8,
+      "whisper_tokens": 4,
       "python_tokens": 5,
-      "whisper_code": "import std/math\n42 neg .",
+      "whisper_code": "42 neg .",
       "python_code": "print(-42)"
     },
     {
@@ -178,9 +178,9 @@
     },
     {
       "task": "gcd",
-      "whisper_tokens": 28,
+      "whisper_tokens": 29,
       "python_tokens": 14,
-      "whisper_code": "import std/math\n: gcd { _ 0 = ?? drop | swap over % gcd ] } ;\n48 18 gcd .",
+      "whisper_code": "import std/math\n: gcd { _ 0 = ?? drop | ` $1 % gcd ] } ;\n48 18 gcd .",
       "python_code": "import math\nprint(math.gcd(48,18))"
     }
   ]

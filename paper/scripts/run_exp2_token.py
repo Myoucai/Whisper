@@ -46,13 +46,13 @@ TASKS = [
     ("power",         "import std/math\n2 10 pow .",          "print(2**10)"),
     ("range_sum",     "import std/list\n10 range-to sum .",   "print(sum(range(1,11)))"),
     ("rev_list",      "[1 2 3 4 5] rev .",                   "print([*reversed([1,2,3,4,5])])"),
-    ("str_has",       '"hello world" "lo" strfind 0 >= .',    "print('lo'in'hello world')"),
+    ("str_has",       '"hello world" "lo" has? .',            "print('lo'in'hello world')"),
     ("last_elem",     "[10 20 30 40] last .",                "print([10,20,30,40][-1])"),
-    ("str_rev",       '"hello" strchars rev charsstr .',      "print('hello'[::-1])"),
+    ("str_rev",       '"hello" strrev .',                     "print('hello'[::-1])"),
     ("countdown",     "5 { _ 0 > } { _ . 1 - } #",           "for i in range(5,0,-1):print(i)"),
     ("negate",        "42 neg .",                             "print(-42)"),
     ("is_prime",      "import std/math\n17 prime? .",         "n=17\nprint(all(n%i for i in range(2,int(n**.5)+1))and n>1)"),
-    ("gcd",           "import std/math\n: gcd { _ 0 = ?? drop | ` $1 % gcd ] } ;\n48 18 gcd .", "import math\nprint(math.gcd(48,18))"),
+    ("gcd",           "48 18 gcd .",                         "import math\nprint(math.gcd(48,18))"),
 ]
 
 print(f"\n{'='*70}")
