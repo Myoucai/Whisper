@@ -122,6 +122,7 @@ the lexical elements.
 
 \begin{table}[ht]
 \centering
+\small
 \caption{Lexical elements in \textbf{Whisper}.}
 \label{tab:lexical}
 \begin{tabular}{lll}
@@ -155,7 +156,7 @@ and so on. Operations consume values from these implicit positions.
 Consider computing $(a + b) \times c$ with $a = 5$, $b = 3$, $c = 2$.
 In Python, one would write \texttt{(a + b) * c}. In \textbf{Whisper}:
 
-\begin{lstlisting}[language=C,basicstyle=\ttfamily]
+\begin{lstlisting}[language=C,basicstyle=\ttfamily\small]
 5 3 + 2 * .
 \end{lstlisting}
 
@@ -186,7 +187,7 @@ provide position-based access without naming:
 As a more complex example, computing $(a + b) \times (a - b)$ with $a = 5$,
 $b = 3$ requires both values twice, yet uses no variable names:
 
-\begin{lstlisting}[language=C,basicstyle=\ttfamily]
+\begin{lstlisting}[language=C,basicstyle=\ttfamily\small]
 5 3 _ over + ` over - * .
 \end{lstlisting}
 
@@ -206,13 +207,13 @@ approximately 15--20\% of tokens in typical Python functions.
 Traditional languages use \texttt{if/else} blocks (4--6 tokens per branch in
 Python). \textbf{Whisper} uses a compact ternary-style syntax:
 
-\begin{lstlisting}[language=C,basicstyle=\ttfamily]
+\begin{lstlisting}[language=C,basicstyle=\ttfamily\small]
 condition ?? true-branch | false-branch ]
 \end{lstlisting}
 
 For nested conditions, additional \texttt{]} terminators close each level:
 
-\begin{lstlisting}[language=C,basicstyle=\ttfamily]
+\begin{lstlisting}[language=C,basicstyle=\ttfamily\small]
 x _ 0 > ?? "positive"
 | x _ 0 < ?? "negative"
 | "zero" ] ] .
@@ -225,7 +226,7 @@ indentation---each of which costs a token in Python.
 
 Functions are defined using \texttt{: name \{ body \} ;}:
 
-\begin{lstlisting}[language=C,basicstyle=\ttfamily]
+\begin{lstlisting}[language=C,basicstyle=\ttfamily\small\small]
 : factorial { _ 1 > ?? _ 1 - factorial * | drop 1 ] } ;
 \end{lstlisting}
 
@@ -284,7 +285,7 @@ defense:
 
 A \textbf{Whisper} package declares its required capabilities in metadata:
 
-\begin{lstlisting}[language=C,basicstyle=\ttfamily]
+\begin{lstlisting}[language=C,basicstyle=\ttfamily\small]
 capabilities: ["@file_read", "@http_post"]
 \end{lstlisting}
 
