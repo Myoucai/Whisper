@@ -377,7 +377,16 @@ impl Lexer {
             let ch = self.current();
             // '$' is Pick only at token start; mid-word it is part of the
             // name (e.g. `is-$n?` in whisperc).
-            if ch.is_alphanumeric() || ch == '_' || ch == '-' || ch == '/' || ch == '?' || ch == '$'
+            // '>' and '<' are comparison ops only at token start;
+            // mid-word they are part of the name (e.g. i64>f64).
+            if ch.is_alphanumeric()
+                || ch == '_'
+                || ch == '-'
+                || ch == '/'
+                || ch == '?'
+                || ch == '$'
+                || ch == '>'
+                || ch == '<'
             {
                 name.push(ch);
                 self.advance();

@@ -7,15 +7,20 @@
 : dec       { 1 - } ;
 : neg       { 0 ` - } ;
 : abs       { _ 0 < ?? 0 ` - | ] } ;
-: max       { _ over > ?? | drop ] } ;
-: min       { _ over < ?? | drop ] } ;
-: clamp     { _ over > ?? drop ` | _ over < ?? drop | ] ] } ;
+: max       { _ $2 > ?? ` drop | drop ] } ;
+: min       { _ $2 < ?? ` drop | drop ] } ;
+: clamp     {
+    rot
+    _ $2 > ?? drop ` drop return ]
+    _ $3 < ?? drop drop return ]
+    ` drop ` drop
+} ;
 : even?     { _ 2 % 0 = } ;
 : odd?      { _ 2 % 1 = } ;
 : zero?     { _ 0 = } ;
 : positive? { _ 0 > } ;
 : negative? { _ 0 < } ;
-: pow       { _ 0 = ?? drop 1 | _ 1 - over ` pow * ] } ;
+: pow       { _ 0 = ?? drop 1 | 1 ` { over * } @times ] } ;
 : factorial { _ 1 > ?? _ 1 - factorial * | drop 1 ] } ;
 : fib       { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;
 : even      { even? } ;

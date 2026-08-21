@@ -1,0 +1,52 @@
+#!/bin/bash
+# Stdlib gate: compile every module through the self-hosted c2 chain
+# (Rust VM hosting compiler.all.ws -> C -> gcc -> run) and verify output.
+# Requires the whisper CLI built (cargo build -p whisper-cli) and gcc.
+set -u
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+BIN="${BIN:-$ROOT/target/debug/whisper.exe}"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+pass=0; fail=0
+
+t() {
+    local name="$1" src="$2" expected="$3"
+    printf '%s' "$src" > "$TMP/g.ws"
+    local c2out
+    c2out=$(timeout 180 "$BIN" build "$TMP/g.ws" -t c2 -o "$TMP/g.exe" 2>/dev/null >/dev/null \
+        && "$TMP/g.exe" 2>/dev/null | tr -d '\r')
+    if [ "$c2out" = "$expected" ]; then
+        pass=$((pass+1))
+    else
+        fail=$((fail+1))
+        echo "FAIL $name: expected [$expected] got [$c2out]"
+    fi
+}
+
+t math-sq      'import "std/math" 5 sq .' 25
+t math-pi      'import "std/math" pi floor f64toi64 .' 3
+t math-max     'import "std/math" 3 4 max .' 4
+t math-clamp   'import "std/math" 5 1 10 clamp .' 5
+t math-atan2   'import "std/math" 0 1 atan2 f64toi64 .' 0
+t math-bitand  'import "std/math" 12 10 bitand .' 8
+t list-mapsum  'import "std/list" [1 2 3 4 5] { _ _ * } @map 0 { + } @fold .' 55
+t list-filter  'import "std/list" [1 2 3 4 5 6] { _ 2 % 0 = } @filter len .' 3
+t list-nth     'import "std/list" [10 20 30] 1 @nth .' 20
+t list-range   'import "std/list" 5 range-to 2 @nth .' 3
+t list-maxval  'import "std/list" [3 1 4 1 5] max-val .' 5
+t list-rev     'import "std/list" [1 2 3] rev 0 @nth .' 3
+t list-sort    'import "std/list" [3 1 2] sort 0 @nth .' 1
+t str-len      'import "std/str" "hello" strlen .' 5
+t str-concat   'import "std/str" "hello" "world" strcat strlen .' 10
+t str-upper    'import "std/str" "hello" upper .' HELLO
+t str-split    'import "std/str" "a,b,c" "," strsplit len .' 3
+t str-contains 'import "std/str" "hello" "ell" contains? .' 1
+t str-fromint  'import "std/str" 42 from-int strlen .' 2
+t mathf-sqrt   'import "std/mathf" 9 i64>f64 fsqrt f64>i64 .' 3
+t core-gcd     'import "std/core" 12 18 gcd .' 6
+t core-fib     'import "std/math" 10 fib .' 55
+t core-pow     'import "std/math" 2 10 pow .' 1024
+t core-range   'import "std/list" 5 range-to len .' 5
+
+echo "=== stdlib gate: PASS=$pass FAIL=$fail ==="
+[ "$fail" -eq 0 ]
