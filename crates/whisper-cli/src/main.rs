@@ -9,7 +9,7 @@ fn help() {
     println!();
     println!("USAGE:");
     println!("  whisper run    <file.ws>    Execute a Whisper source file");
-    println!("  whisper build  <file.ws>    Compile to .wbin or native ELF");
+    println!("  whisper build  <file.ws>    Compile to .wbin bytecode or C source");
     println!("  whisper check  <file.ws>    Type-check without executing");
     println!("  whisper repl               Start interactive REPL");
     println!("  whisper fmt    <file.ws>    Format a source file");
@@ -22,7 +22,7 @@ fn help() {
     println!("  whisper test   [path]       Run test files (*_test.ws)");
     println!();
     println!("OPTIONS:");
-    println!("  --target wbin|native         Build target (default: wbin)");
+    println!("  --target wbin|c             Build target (default: wbin)");
     println!("  -o <file>                   Output file path");
     println!("  --allow-http                Enable HTTP capabilities");
     println!("  --allow-file-read           Enable file read capability");
@@ -121,7 +121,10 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
 }
 
 fn cmd_build(args: &[String]) -> Result<(), String> {
-    let target = get_opt(args, "--target").unwrap_or_else(|| "wbin".into());
+    // Accept both the long and short spelling of the target flag.
+    let target = get_opt(args, "--target")
+        .or_else(|| get_opt(args, "-t"))
+        .unwrap_or_else(|| "wbin".into());
     let output = get_opt(args, "-o");
     // Find the file argument: skip flag values (--target X, -o X)
     let output_val = output.as_deref();
@@ -132,10 +135,9 @@ fn cmd_build(args: &[String]) -> Result<(), String> {
         .filter(|a| Some(a.as_str()) != output_val) // exclude -o value
         .find(|a| a.ends_with(".ws") || a.ends_with(".whisper"))
         .ok_or("Expected: whisper build <file.ws>")?;
-    let ext = if target == "native" || target == "elf" {
-        "elf"
-    } else {
-        "wbin"
+    let ext = match target.as_str() {
+        "c" => "c",
+        _ => "wbin",
     };
     let output = output.unwrap_or_else(|| file.replace(".ws", &format!(".{ext}")));
     let source = std::fs::read_to_string(file).map_err(|e| format!("Cannot read '{file}': {e}"))?;

@@ -18,11 +18,10 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.0.0-7cffc4" alt="version">
-  <img src="https://img.shields.io/badge/tests-277%20passed-brightgreen" alt="tests">
+  <img src="https://img.shields.io/badge/tests-358%20passed-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
-  <img src="https://img.shields.io/badge/native-elf-blue" alt="native">
+  <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
   <img src="https://img.shields.io/badge/stdlib-9%20modules-blue" alt="stdlib">
-  <img src="https://img.shields.io/badge/opcodes-62-orange" alt="opcodes">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
 </p>
 
@@ -30,7 +29,7 @@
 
 Whisper 是一门**栈式、后置表示法**的编程语言，专为 **AI 生成和阅读**而设计。极简符号、零信任安全、原生置信度系统。
 
-**核心亮点**：编译器（lexer + parser + classifier + codegen）完全用 Whisper 自身编写，直接生成原生 ELF x86-64 可执行文件，**零外部依赖**。
+**核心亮点**：编译器（lexer + parser + classifier + cgen）完全用 Whisper 自身编写，生成 C 源码后经 gcc 编译为独立原生可执行文件；从手写 C 种子出发已达**自举固定点**（whisper2 重新编译自身，输出与来源逐字节一致，`scripts/verify-fixedpoint.sh` 可随时复验）。
 
 ## 设计哲学
 
@@ -133,10 +132,13 @@ whisper run hello.ws
 Whisper 实现了**硬自举**——编译器完全由自身编写，Rust 仅提供最小化 VM 执行字节码。
 
 ```
- .ws 源码 → [lexer.ws] → [classify.ws] → [parser.ws] → [main.ws] → 字节码 → 原生 ELF
-              ▲               ▲               ▲              ▲
-              └───────────────┴───────────────┴──────────────┘
-                          全部用 Whisper 编写 (whisperc/)
+手写 C 种子 (seed/compiler_seed.c, 冻结)
+    │  编译 whisperc/compiler.all.ws (用 Whisper 写的完整编译器)
+    ▼
+gen1.c → gcc → whisper1 ──再编译自身──▶ gen2.c → gcc → whisper2
+                                              │
+                            whisper2 编译 compiler.all.ws → gen3.c
+                            固定点: gen2.c == gen3.c (逐字节一致, 可复验)
 ```
 
 ```bash
@@ -165,24 +167,25 @@ whisper bootstrap --hard hello.ws
 | 目标 | 命令 | 输出 | 依赖 |
 |------|------|------|------|
 | 字节码 | `whisper build file.ws` | `.wbin` | Rust VM |
-| ELF 原生 | `whisper build file.ws -t native -o prog` | 可执行文件 | **零依赖** |
+| C 源码 | `whisper build file.ws -t c -o prog.c` | C 源码 | gcc 编译为原生可执行文件 |
+| 自举 C 链 | `scripts/verify-fixedpoint.sh` | 独立编译器 + 固定点验证 | gcc |
 
 ```bash
-# 直接生成独立 ELF 可执行文件 (Linux x86-64)
-whisper build hello.ws -t native -o hello && chmod +x hello && ./hello
+# 转译为 C 并编译为原生可执行文件
+whisper build hello.ws -t c -o hello.c && gcc -O2 -lm -o hello hello.c && ./hello
 # → "Hello, World!"
 ```
 
-原生 ELF 后端实现了全部 **62 个操作码**，包括：算术、比较、逻辑、栈操作、列表操作（含 `@map`/`@each`/`@fold`/`@times`）、字符串操作（14 个）、浮点数学（三角函数）、JSON 解析/序列化、文件 IO、条件/循环/调用/返回。程序完全独立运行，无需任何运行时。
+C 后端覆盖字符串/列表/Map/浮点等大部分 opcode；**自举 C 链**（`whisperc/`）从手写种子编译器出发，把用 Whisper 写的完整编译器编译成 C，固定点已达成并可字节级复验。
 
 ## 功能特性
 
 | 功能 | 状态 |
 |------|------|
-| 栈式虚拟机 (62 opcodes) | ✅ |
-| 硬自举编译器 (纯 Whisper) | ✅ |
-| ELF 原生二进制生成 (全部 62 opcode) | ✅ |
-| 静态类型推导 | ✅ |
+| 栈式虚拟机 (109 opcodes) | ✅ |
+| 硬自举编译器 (纯 Whisper + C 种子，固定点已验证) | ✅ |
+| C 转译后端 (gcc 编译为原生可执行) | ✅ |
+| 静态类型推导（当前仅警告） | ⚠️ |
 | 能力安全沙箱 (6 caps) | ✅ |
 | 置信度系统 + 概率选择 | ✅ |
 | .wbin 二进制格式 | ✅ |
@@ -203,7 +206,7 @@ whisper build hello.ws -t native -o hello && chmod +x hello && ./hello
 ```bash
 whisper run      hello.ws         # 运行源文件
 whisper build    hello.ws         # 编译为 .wbin
-whisper build    hello.ws -t native  # 编译为 ELF 原生
+whisper build    hello.ws -t c       # 转译为 C 源码 (gcc 编译为原生可执行)
 whisper check    hello.ws         # 类型检查
 whisper repl                     # 交互式 REPL
 whisper fmt      hello.ws         # 格式化
@@ -222,7 +225,7 @@ Whisper/
 │   ├── whisper-core/      # VM, Value, Opcode, Capability
 │   ├── whisper-parser/    # Lexer, Parser, AST, Resolver
 │   ├── whisper-typecheck/ # 类型推导引擎
-│   ├── whisper-codegen/   # 字节码, .wbin, ELF
+│   ├── whisper-codegen/   # 字节码, .wbin, C 转译
 │   ├── whisper-package/   # 包管理器
 │   ├── whisper-lsp/       # LSP 语言服务器
 │   └── whisper-cli/       # CLI 入口
@@ -241,17 +244,17 @@ Whisper/
 
 ```bash
 cargo test --workspace
-# 277 tests: 277 passed, 0 failed
+# 357 tests: all passed (Rust 侧)
+bash whisper_test/run_core.sh <seed-bin> run|c   # 自举链 22 核心用例 x2 模式
+bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验
 ```
 
 测试覆盖：
-- 31 个自举/自举验证测试（含硬自举管线对比）
-- 62 个原生 ELF 后端测试
-- 69 个核心 VM 测试
-- 38 个解析器测试
-- 43 个类型检查测试
-- 54 个代码生成测试
-- 模糊测试（2500+ 随机程序）
+- 34 个自举/自举验证测试（软/硬自举管线、双 VM 输出对比）
+- 92 个 CLI 集成测试（含 stdlib 导入冒烟、关键字作 def 名回归）
+- 87+ 个核心 VM 测试 + 模糊测试（2500+ 随机程序）
+- 优化器语义保持测试（优化前后执行结果必须一致）
+- CI 含 selfhost job：种子编译 → 22 核心用例双模式 → 固定点验证
 
 ## License
 
