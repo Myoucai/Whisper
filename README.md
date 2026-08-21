@@ -44,13 +44,25 @@ Whisper 是一门**栈式、后置表示法**的编程语言，专为 **AI 生�
 
 ## 快速开始
 
-### 安装
+### 安装（自举链，只需 gcc）
+
+```bash
+git clone https://github.com/Myoucai/Whisper.git
+cd Whisper
+bash scripts/bootstrap.sh
+# seed(C) -> whisper1 -> whisper2，固定点自检 + stdlib 冒烟
+./target/bootstrap/whisper2 -c < hello.ws > hello.c
+gcc -O2 -fno-strict-aliasing -o hello hello.c -I whisperc -lm && ./hello
+```
+
+### 安装（Rust 工具链，含 REPL/LSP/c2 一键编译）
 
 ```bash
 git clone https://github.com/Myoucai/Whisper.git
 cd Whisper
 cargo build --release
-./target/release/whisper --help
+./target/release/whisper --help          # run/build/check/repl/...
+./target/release/whisper build hello.ws -t c2 -o hello   # 自举链一键到底
 ```
 
 ### 第一段代码
