@@ -2,9 +2,18 @@
 //!
 //! Runs after bytecode generation, before execution.
 //! Each pass scans the opcode sequence and applies transformations.
+//!
+//! Jump-offset discipline: Cond/Jump/Loop offsets are relative to the
+//! instruction *after* the jump (VM: `frame.ip = ip + offset` with ip
+//! pre-incremented). Any pass that changes the instruction count must
+//! return an index map and `relocate` runs right after it, so offsets are
+//! always valid for the current sequence. A jump whose target was deleted
+//! falls through to the next surviving instruction.
 
 use std::rc::Rc;
 use whisper_core::opcode::Opcode;
+
+const DELETED: usize = usize::MAX;
 
 /// Optimize a bytecode sequence. Returns optimized bytecode.
 pub fn optimize(bytecode: &[Opcode]) -> Vec<Opcode> {
@@ -13,10 +22,14 @@ pub fn optimize(bytecode: &[Opcode]) -> Vec<Opcode> {
     // Run optimization passes until convergence (max 4 iterations)
     for _ in 0..4 {
         let before = ops.len();
-        ops = constant_folding(&ops);
-        ops = peephole(&ops);
-        ops = strength_reduction(&ops);
-        ops = dead_store_elimination(&ops);
+        let (next, map) = constant_folding(&ops);
+        ops = relocate(&ops, &map, next);
+        let (next, map) = peephole(&ops);
+        ops = relocate(&ops, &map, next);
+        let (next, map) = strength_reduction(&ops);
+        ops = relocate(&ops, &map, next);
+        let (next, map) = dead_store_elimination(&ops);
+        ops = relocate(&ops, &map, next);
         ops = optimize_refs(&ops);
         if ops.len() == before {
             break; // No further reduction
@@ -26,6 +39,50 @@ pub fn optimize(bytecode: &[Opcode]) -> Vec<Opcode> {
     ops
 }
 
+/// Patch jump offsets after a length-changing pass.
+///
+/// `map[k]` is the new index of input instruction `k` (DELETED if it was
+/// removed); `map[pre.len()]` is the new sequence length. For a surviving
+/// jump at old index `i` with offset `o`, the old target is `i + 1 + o`;
+/// the new offset is `map[target] - map[i] - 1`. A deleted target resolves
+/// to the next surviving instruction (fold sites collapse into one).
+fn relocate(pre: &[Opcode], map: &[usize], mut post: Vec<Opcode>) -> Vec<Opcode> {
+    debug_assert_eq!(map.len(), pre.len() + 1);
+    for (i, op) in pre.iter().enumerate() {
+        let offset = match op {
+            Opcode::Cond(o) | Opcode::Jump(o) | Opcode::Loop(o) => *o,
+            _ => continue,
+        };
+        let j = map[i];
+        if j == DELETED {
+            continue; // the jump itself was removed
+        }
+        let target_pre = i as i64 + 1 + offset as i64;
+        if !(0..=pre.len() as i64).contains(&target_pre) {
+            continue; // malformed offset; leave untouched
+        }
+        // Walk past deleted instructions to the next surviving position.
+        let mut t = target_pre as usize;
+        while map[t] == DELETED {
+            t += 1;
+        }
+        let new_offset = map[t] as i64 - j as i64 - 1;
+        let patched = match op {
+            Opcode::Cond(_) => Opcode::Cond(new_offset as i32),
+            Opcode::Jump(_) => Opcode::Jump(new_offset as i32),
+            _ => Opcode::Loop(new_offset as i32),
+        };
+        post[j] = patched;
+    }
+    post
+}
+
+/// Start a pass map: every input index DELETED, boundary at DELETED too —
+/// passes fill in survivors and set `map[in_len] = out_len` at the end.
+fn new_map(in_len: usize) -> Vec<usize> {
+    vec![DELETED; in_len + 1]
+}
+
 // ── Constant folding ──────────────────────────────────────────────────
 
 /// Evaluate constant expressions at compile time.
@@ -33,8 +90,9 @@ pub fn optimize(bytecode: &[Opcode]) -> Vec<Opcode> {
 /// Patterns:
 ///   PushI64(a) PushI64(b) BinOp  → PushResult
 ///   PushF64(a) PushF64(b) FBinOp → PushResult
-fn constant_folding(ops: &[Opcode]) -> Vec<Opcode> {
+fn constant_folding(ops: &[Opcode]) -> (Vec<Opcode>, Vec<usize>) {
     let mut result = Vec::with_capacity(ops.len());
+    let mut map = new_map(ops.len());
     let mut i = 0;
 
     while i < ops.len() {
@@ -45,6 +103,7 @@ fn constant_folding(ops: &[Opcode]) -> Vec<Opcode> {
             {
                 let folded = fold_i64_binary(*a, *b, binop);
                 if let Some(op) = folded {
+                    map[i] = result.len();
                     result.push(op);
                     i += 3;
                     continue;
@@ -56,6 +115,7 @@ fn constant_folding(ops: &[Opcode]) -> Vec<Opcode> {
             {
                 let folded = fold_f64_binary(*a, *b, binop);
                 if let Some(op) = folded {
+                    map[i] = result.len();
                     result.push(op);
                     i += 3;
                     continue;
@@ -66,6 +126,7 @@ fn constant_folding(ops: &[Opcode]) -> Vec<Opcode> {
                 (&ops[i], &ops[i + 1], &ops[i + 2])
             {
                 let concat = format!("{a}{b}");
+                map[i] = result.len();
                 result.push(Opcode::PushStr(Rc::new(concat)));
                 i += 3;
                 continue;
@@ -75,33 +136,39 @@ fn constant_folding(ops: &[Opcode]) -> Vec<Opcode> {
         // Single-arg folding: PushF64(x) FSqrt → PushF64(sqrt(x))
         if i + 1 < ops.len() {
             if let (Opcode::PushF64(x), Opcode::FSqrt) = (&ops[i], &ops[i + 1]) {
+                map[i] = result.len();
                 result.push(Opcode::PushF64(x.sqrt()));
                 i += 2;
                 continue;
             }
             if let (Opcode::PushF64(x), Opcode::FSin) = (&ops[i], &ops[i + 1]) {
+                map[i] = result.len();
                 result.push(Opcode::PushF64(x.sin()));
                 i += 2;
                 continue;
             }
             if let (Opcode::PushF64(x), Opcode::FCos) = (&ops[i], &ops[i + 1]) {
+                map[i] = result.len();
                 result.push(Opcode::PushF64(x.cos()));
                 i += 2;
                 continue;
             }
             if let (Opcode::PushF64(x), Opcode::FTan) = (&ops[i], &ops[i + 1]) {
+                map[i] = result.len();
                 result.push(Opcode::PushF64(x.tan()));
                 i += 2;
                 continue;
             }
             // PushI64(x) I64ToStr → PushStr(x.to_string())
             if let (Opcode::PushI64(x), Opcode::I64ToStr) = (&ops[i], &ops[i + 1]) {
+                map[i] = result.len();
                 result.push(Opcode::PushStr(Rc::new(x.to_string())));
                 i += 2;
                 continue;
             }
             // PushStr(s) StrLen → PushI64(s.len())
             if let (Opcode::PushStr(s), Opcode::StrLen) = (&ops[i], &ops[i + 1]) {
+                map[i] = result.len();
                 result.push(Opcode::PushI64(s.len() as i64));
                 i += 2;
                 continue;
@@ -109,6 +176,7 @@ fn constant_folding(ops: &[Opcode]) -> Vec<Opcode> {
             // PushStr(s) StrToI64 → PushI64(parsed)
             if let (Opcode::PushStr(s), Opcode::StrToI64) = (&ops[i], &ops[i + 1]) {
                 if let Ok(n) = s.parse::<i64>() {
+                    map[i] = result.len();
                     result.push(Opcode::PushI64(n));
                     i += 2;
                     continue;
@@ -116,11 +184,13 @@ fn constant_folding(ops: &[Opcode]) -> Vec<Opcode> {
             }
         }
 
+        map[i] = result.len();
         result.push(ops[i].clone());
         i += 1;
     }
 
-    result
+    map[ops.len()] = result.len();
+    (result, map)
 }
 
 fn fold_i64_binary(a: i64, b: i64, binop: &Opcode) -> Option<Opcode> {
@@ -169,8 +239,9 @@ fn fold_f64_binary(a: f64, b: f64, binop: &Opcode) -> Option<Opcode> {
 ///   PushI64(1) Mul     → (nothing)
 ///   Not Not            → (nothing)
 ///   Jump(0)            → (nothing)
-fn peephole(ops: &[Opcode]) -> Vec<Opcode> {
+fn peephole(ops: &[Opcode]) -> (Vec<Opcode>, Vec<usize>) {
     let mut result = Vec::with_capacity(ops.len());
+    let mut map = new_map(ops.len());
     let mut i = 0;
 
     while i < ops.len() {
@@ -213,6 +284,7 @@ fn peephole(ops: &[Opcode]) -> Vec<Opcode> {
                 }
                 // Jump(0) → no-op (skip the Jump, keep the next op)
                 (Opcode::Jump(0), _) => {
+                    map[i + 1] = result.len();
                     result.push(ops[i + 1].clone());
                     i += 2;
                     continue;
@@ -222,6 +294,8 @@ fn peephole(ops: &[Opcode]) -> Vec<Opcode> {
 
             // Dup + Dup → Dup + Pick(1) (save stack space)
             if ops[i] == Opcode::Dup && ops[i + 1] == Opcode::Dup {
+                map[i] = result.len();
+                map[i + 1] = result.len() + 1;
                 result.push(Opcode::Dup);
                 result.push(Opcode::Pick(1));
                 i += 2;
@@ -241,16 +315,19 @@ fn peephole(ops: &[Opcode]) -> Vec<Opcode> {
 
         // Pick(0) → Dup (canonical form)
         if let Opcode::Pick(0) = ops[i] {
+            map[i] = result.len();
             result.push(Opcode::Dup);
             i += 1;
             continue;
         }
 
+        map[i] = result.len();
         result.push(ops[i].clone());
         i += 1;
     }
 
-    result
+    map[ops.len()] = result.len();
+    (result, map)
 }
 
 // ── Strength reduction ────────────────────────────────────────────────
@@ -260,8 +337,9 @@ fn peephole(ops: &[Opcode]) -> Vec<Opcode> {
 /// Patterns:
 ///   PushI64(N) Add where N<0  → PushI64(-N) Sub
 ///   PushI64(2) Mul            → Dup Add
-fn strength_reduction(ops: &[Opcode]) -> Vec<Opcode> {
+fn strength_reduction(ops: &[Opcode]) -> (Vec<Opcode>, Vec<usize>) {
     let mut result = Vec::with_capacity(ops.len());
+    let mut map = new_map(ops.len());
     let mut i = 0;
 
     while i < ops.len() {
@@ -269,6 +347,8 @@ fn strength_reduction(ops: &[Opcode]) -> Vec<Opcode> {
             match (&ops[i], &ops[i + 1]) {
                 // PushI64(N) Add with N < 0 → PushI64(-N) Sub
                 (Opcode::PushI64(n), Opcode::Add) if *n < 0 => {
+                    map[i] = result.len();
+                    map[i + 1] = result.len() + 1;
                     result.push(Opcode::PushI64(-n));
                     result.push(Opcode::Sub);
                     i += 2;
@@ -283,11 +363,13 @@ fn strength_reduction(ops: &[Opcode]) -> Vec<Opcode> {
             }
         }
 
+        map[i] = result.len();
         result.push(ops[i].clone());
         i += 1;
     }
 
-    result
+    map[ops.len()] = result.len();
+    (result, map)
 }
 
 // ── Dead store elimination ────────────────────────────────────────────
@@ -299,8 +381,9 @@ fn strength_reduction(ops: &[Opcode]) -> Vec<Opcode> {
 ///   PushF64(x) Drop     → (nothing)
 ///   PushStr(s) Drop     → (nothing)
 ///   PushBool(b) Drop    → (nothing)  (already in peephole)
-fn dead_store_elimination(ops: &[Opcode]) -> Vec<Opcode> {
+fn dead_store_elimination(ops: &[Opcode]) -> (Vec<Opcode>, Vec<usize>) {
     let mut result = Vec::with_capacity(ops.len());
+    let mut map = new_map(ops.len());
     let mut i = 0;
 
     while i < ops.len() {
@@ -314,11 +397,13 @@ fn dead_store_elimination(ops: &[Opcode]) -> Vec<Opcode> {
             }
         }
 
+        map[i] = result.len();
         result.push(ops[i].clone());
         i += 1;
     }
 
-    result
+    map[ops.len()] = result.len();
+    (result, map)
 }
 
 // ── Recursive ref optimization ────────────────────────────────────────

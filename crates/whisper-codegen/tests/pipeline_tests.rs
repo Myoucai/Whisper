@@ -772,3 +772,92 @@ fn test_stdlib_str_words() {
 }
 // force recompile
 // trigger recompile 1784087990
+
+// ── Optimizer semantic-preservation tests ────────────────────────────
+// Every length-changing optimizer pass relocates Cond/Jump/Loop offsets;
+// these tests execute the same source with and without optimization and
+// require identical results (regression guard for the relocator).
+
+fn eval_pair(source: &str) -> (Result<Option<Value>, String>, Result<Option<Value>, String>) {
+    let ast = Parser::parse_source(source).expect("parse failed");
+    let mut gen = BytecodeGenerator::new();
+    let (bytecode, defs) = gen.compile(&ast);
+
+    let mut vm_raw = Vm::new();
+    for (name, code) in &defs {
+        vm_raw.define_word(name.clone(), code.clone());
+    }
+    let raw = vm_raw.execute(&bytecode).map_err(|e| e.to_string());
+
+    let opt_bytecode = whisper_codegen::optimize(&bytecode);
+    let opt_defs: Vec<(String, Vec<Opcode>)> = defs
+        .into_iter()
+        .map(|(n, c)| (n, whisper_codegen::optimize(&c)))
+        .collect();
+    let mut vm_opt = Vm::new();
+    for (name, code) in &opt_defs {
+        vm_opt.define_word(name.clone(), code.clone());
+    }
+    let opt = vm_opt.execute(&opt_bytecode).map_err(|e| e.to_string());
+    (raw, opt)
+}
+
+fn assert_opt_preserves(source: &str) {
+    let (raw, opt) = eval_pair(source);
+    let raw_v = raw.expect("raw execution failed");
+    let opt_v = opt.expect("optimized execution failed");
+    assert_eq!(raw_v, opt_v, "optimizer changed semantics of: {source}");
+}
+
+#[test]
+fn opt_preserves_countdown_loop() {
+    // Loop body contains a foldable triple (3 4 +) before the jump target.
+    assert_opt_preserves("0 { _ 5 + 3 4 + drop 1 + } { _ 5 < } #");
+}
+
+#[test]
+fn opt_preserves_loop_with_fold_around_jump() {
+    // The Jump(else) of the cond sits right after foldable code.
+    assert_opt_preserves("0 { _ 2 % 0 = ?? _ 10 + 3 4 + drop | 7 8 + drop 1 + ] } { _ 10 < } #");
+}
+
+#[test]
+fn opt_preserves_cond_with_constant_branches() {
+    // Then-branch fully constant (folded), else-branch folded after Jump.
+    assert_opt_preserves("5 3 > ?? 3 4 + | 9 1 - ]");
+    assert_opt_preserves("3 5 > ?? 3 4 + | 9 1 - ]");
+}
+
+#[test]
+fn opt_preserves_nested_cond() {
+    assert_opt_preserves("7 _ 0 > ?? _ 3 > ?? 30 4 + | 20 2 + ] | 10 5 + ]");
+}
+
+#[test]
+fn opt_preserves_times_with_foldable_body() {
+    assert_opt_preserves("0 5 { _ 1 + 3 4 + drop } @times");
+}
+
+#[test]
+fn opt_preserves_quote_with_cond_inside() {
+    // Quote bodies are optimized recursively; offsets inside must survive.
+    assert_opt_preserves("[1 2 3 4] { _ 2 > ?? _ 10 * | 0 ] } @map");
+}
+
+#[test]
+fn opt_preserves_recursive_word() {
+    assert_opt_preserves(": f { _ 1 > ?? _ 1 - f 2 3 + drop | 0 0 + ] } ; 8 f");
+}
+
+#[test]
+fn opt_actually_folds_inside_loop() {
+    // Sanity: the loop body's 3 4 + must be folded away (optimizer is live).
+    let ast = Parser::parse_source("0 { _ 5 + 3 4 + drop 1 + } { _ 5 < } #").unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bytecode, _) = gen.compile(&ast);
+    let opt = whisper_codegen::optimize(&bytecode);
+    assert!(
+        !opt.contains(&Opcode::PushI64(3)),
+        "3 4 + should be folded: {opt:?}"
+    );
+}
