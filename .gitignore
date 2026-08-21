@@ -32,3 +32,16 @@ Thumbs.db
 # Session-local
 .zcode/
 .prev/
+
+# AI session plans
+.claude/
+.zcode/
+
+# Python
+__pycache__/
+
+# Self-host chain outputs (regenerate: scripts/verify-fixedpoint.sh)
+whisperc/gen*.c
+whisperc/gen1.s
+whisperc/gen1.su
+whisper_test/tmp/
