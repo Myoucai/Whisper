@@ -27,9 +27,7 @@ pub struct Parser {
     brace_depth: usize,
     bracket_depth: usize,
     /// Conditional nesting depth (??...|...] blocks).
-    cond_depth: usize,
     /// Stack of bracket_depth values saved when entering each ?? block.
-    cond_bracket_stack: Vec<usize>,
     /// Whether we're in recovering mode (collect errors, don't abort).
     recovering: bool,
 }
@@ -57,8 +55,6 @@ impl Parser {
             errors: Vec::new(),
             brace_depth: 0,
             bracket_depth: 0,
-            cond_depth: 0,
-            cond_bracket_stack: Vec::new(),
             recovering: false,
         }
     }
@@ -295,38 +291,74 @@ impl Parser {
                 Ok(Some(AstNode::Def { name, body }))
             }
 
-            // Conditional: ??true-expr|false-expr]
+            // Conditional: ??then-expr|else-expr]
+            //
+            // Seed-compatible flat split (mirrors whisperc/runtime.c
+            // split_cond): scan raw tokens for the depth-1 `|` and the
+            // matching `]`; nested `??`/`|`/`]` stay inside the branch
+            // slices and are parsed recursively. This accepts both the
+            // strict one-`]`-per-`??` form and the seed's shared-closer
+            // elif chains (`?? A | B ?? C | D ]]`). An unterminated cond
+            // closes at end-of-scope (seed behavior). `]` inside a `[..]`
+            // list literal belongs to the list (list_depth guard).
             TokenKind::CondQ => {
                 self.advance();
-                self.cond_depth += 1;
-                self.cond_bracket_stack.push(self.bracket_depth);
-                self.bracket_depth = 0; // reset for inside ??
-                let then_branch =
-                    self.parse_until_any_recovering(&[TokenKind::Or, TokenKind::RBracket]);
-                let else_branch = if matches!(self.current().kind, TokenKind::Or) {
-                    self.advance();
-                    Some(self.parse_until_recovering(TokenKind::RBracket))
-                } else if matches!(self.current().kind, TokenKind::RBracket) {
-                    self.advance();
-                    None
-                } else {
-                    // Missing | or ] — recover
-                    if !self.is_at_end() {
-                        self.errors.push(ParseError {
-                            message: format!(
-                                "Expected '|' or ']' after conditional, got {:?}",
-                                self.current().kind
-                            ),
-                            token: self.current().clone(),
-                        });
+                let start = self.pos;
+                let mut depth = 1usize;
+                let mut list_depth = 0usize;
+                let mut brace_depth = 0usize;
+                let mut else_at: Option<usize> = None;
+                let mut close_at = self.tokens.len().saturating_sub(1); // at Eof
+                let mut i = self.pos;
+                while i < self.tokens.len() {
+                    match &self.tokens[i].kind {
+                        TokenKind::Eof => {
+                            close_at = i;
+                            break;
+                        }
+                        // Unterminated cond closes at its enclosing scope:
+                        // the `}` of the surrounding def/quote body (the
+                        // seed's split_cond ends at the token-list bound).
+                        TokenKind::RBrace if brace_depth == 0 => {
+                            close_at = i;
+                            break;
+                        }
+                        TokenKind::LBrace => brace_depth += 1,
+                        TokenKind::RBrace => brace_depth -= 1,
+                        TokenKind::LBracket => list_depth += 1,
+                        TokenKind::RBracket => {
+                            if list_depth > 0 {
+                                list_depth -= 1;
+                            } else {
+                                depth -= 1;
+                                if depth == 0 {
+                                    close_at = i;
+                                    break;
+                                }
+                            }
+                        }
+                        TokenKind::CondQ if list_depth == 0 => depth += 1,
+                        TokenKind::Or if list_depth == 0 && depth == 1 && else_at.is_none() => {
+                            else_at = Some(i);
+                        }
+                        _ => {}
                     }
-                    None
-                };
-                if self.cond_depth > 0 {
-                    self.cond_depth -= 1;
+                    i += 1;
                 }
-                if let Some(saved) = self.cond_bracket_stack.pop() {
-                    self.bracket_depth = saved;
+                let (then_end, else_start) = match else_at {
+                    Some(e) => (e, Some(e + 1)),
+                    None => (close_at, None),
+                };
+                let then_branch = self.parse_cond_range(start, then_end);
+                let else_branch = else_start.map(|s| self.parse_cond_range(s, close_at));
+                // Step past the closing ] (or land on Eof when unterminated).
+                if matches!(
+                    self.tokens.get(close_at).map(|t| &t.kind),
+                    Some(TokenKind::RBracket)
+                ) {
+                    self.pos = close_at + 1;
+                } else {
+                    self.pos = close_at;
                 }
                 Ok(Some(AstNode::Cond {
                     then_branch,
@@ -894,6 +926,35 @@ impl Parser {
         }
     }
 
+    /// Parse a cond branch slice `[from, to)` of the token stream on a
+    /// throwaway sub-parser. Stray `]` (a closer that belonged to an
+    /// enclosing cond in the seed's shared-closer style) is dropped
+    /// silently; all other errors are propagated to the parent.
+    fn parse_cond_range(&mut self, from: usize, to: usize) -> Vec<AstNode> {
+        if from >= to {
+            return Vec::new();
+        }
+        let slice: Vec<Token> = self.tokens[from..to].to_vec();
+        let mut sub = Parser::new(slice);
+        let mut nodes = Vec::new();
+        while !sub.is_at_end() {
+            if matches!(sub.current().kind, TokenKind::RBracket) {
+                sub.advance(); // stray closer — see comment above
+                continue;
+            }
+            match sub.parse_node() {
+                Ok(Some(node)) => nodes.push(node),
+                Ok(None) => {}
+                Err(err) => {
+                    sub.errors.push(err);
+                    sub.advance();
+                }
+            }
+        }
+        self.errors.append(&mut sub.errors);
+        nodes
+    }
+
     /// Parse nodes until a matching end delimiter, with error recovery.
     /// On missing closer: auto-recover at EOF or sync point.
     fn parse_until_recovering(&mut self, end: TokenKind) -> Vec<AstNode> {
@@ -957,36 +1018,6 @@ impl Parser {
         Self::fold_syntax_sugar(nodes)
     }
 
-    /// Parse nodes until any end token, with error recovery.
-    fn parse_until_any_recovering(&mut self, ends: &[TokenKind]) -> Vec<AstNode> {
-        let mut nodes = Vec::new();
-        while !self.is_at_end() {
-            let current_disc = std::mem::discriminant(&self.current().kind);
-            let should_stop = ends.iter().any(|e| {
-                let e_disc = std::mem::discriminant(e);
-                // Don't stop at RBracket if we're inside a [..] list (bracket_depth > 0).
-                // The ] belongs to the list, not to the ?? block.
-                if e_disc == std::mem::discriminant(&TokenKind::RBracket) && self.bracket_depth > 0
-                {
-                    false
-                } else {
-                    e_disc == current_disc
-                }
-            });
-            if should_stop {
-                return Self::fold_syntax_sugar(nodes);
-            }
-            match self.parse_node() {
-                Ok(Some(node)) => nodes.push(node),
-                Ok(None) => {}
-                Err(err) => {
-                    self.errors.push(err);
-                    self.advance();
-                }
-            }
-        }
-        Self::fold_syntax_sugar(nodes)
-    }
 
     fn synthetic_eof(&self) -> Token {
         let last = self.tokens.last().map(|t| t.span.end).unwrap_or(0);

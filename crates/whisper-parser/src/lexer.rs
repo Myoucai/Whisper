@@ -375,7 +375,10 @@ impl Lexer {
         let mut name = String::new();
         while self.pos < self.source.len() {
             let ch = self.current();
-            if ch.is_alphanumeric() || ch == '_' || ch == '-' || ch == '/' || ch == '?' {
+            // '$' is Pick only at token start; mid-word it is part of the
+            // name (e.g. `is-$n?` in whisperc).
+            if ch.is_alphanumeric() || ch == '_' || ch == '-' || ch == '/' || ch == '?' || ch == '$'
+            {
                 name.push(ch);
                 self.advance();
             } else {
