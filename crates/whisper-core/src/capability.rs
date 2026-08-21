@@ -94,6 +94,36 @@ pub struct FileReadCap {
     pub allowed_paths: Vec<std::path::PathBuf>,
 }
 
+/// Check a requested path against a whitelist of allowed directories.
+///
+/// The requested path is normalized (lexical `..`/`.` resolution) and must
+/// resolve *inside* one of the allowed roots after normalization. Plain
+/// prefix matching is not enough: it admits `..` traversal and,
+/// case-insensitively on Windows, sibling directories sharing a prefix.
+fn path_is_allowed(path: &std::path::Path, allowed_paths: &[std::path::PathBuf]) -> bool {
+    let normalized = normalize_path(path);
+    allowed_paths.iter().any(|root| {
+        let normalized_root = normalize_path(root);
+        normalized.starts_with(&normalized_root)
+    })
+}
+
+/// Lexically normalize a path (resolve `.` and `..` components without
+/// touching the filesystem, so missing files still classify correctly).
+fn normalize_path(path: &std::path::Path) -> std::path::PathBuf {
+    let mut out = std::path::PathBuf::new();
+    for comp in path.components() {
+        match comp {
+            std::path::Component::ParentDir => {
+                out.pop();
+            }
+            std::path::Component::CurDir => {}
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
+}
+
 impl Capability for FileReadCap {
     fn id(&self) -> u16 {
         self.id
@@ -121,12 +151,8 @@ impl Capability for FileReadCap {
         };
         let path = std::path::Path::new(&path_str);
 
-        // Check path whitelist
-        let allowed = self
-            .allowed_paths
-            .iter()
-            .any(|allowed| path.starts_with(allowed));
-        if !allowed {
+        // Check path whitelist (normalized; rejects `..` traversal)
+        if !path_is_allowed(path, &self.allowed_paths) {
             return Err(VmError::CapabilityDenied(format!(
                 "Path '{}' is not in allowed paths",
                 path.display()
@@ -185,11 +211,7 @@ impl Capability for FileWriteCap {
         };
         let path = std::path::Path::new(&path_str);
 
-        let allowed = self
-            .allowed_paths
-            .iter()
-            .any(|allowed| path.starts_with(allowed));
-        if !allowed {
+        if !path_is_allowed(path, &self.allowed_paths) {
             return Err(VmError::CapabilityDenied(format!(
                 "Path '{}' is not in allowed write paths",
                 path.display()
@@ -501,5 +523,71 @@ impl Capability for ExecCap {
             }
             Err(e) => Err(VmError::IoError(e.to_string())),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn read_cap() -> FileReadCap {
+        FileReadCap {
+            id: 0,
+            allowed_paths: vec![std::path::PathBuf::from("/allowed/dir")],
+        }
+    }
+
+    #[test]
+    fn path_inside_root_is_allowed() {
+        assert!(path_is_allowed(
+            std::path::Path::new("/allowed/dir/file.txt"),
+            &read_cap().allowed_paths
+        ));
+    }
+
+    #[test]
+    fn prefix_sibling_dir_is_denied() {
+        // "/allowed/dir-evil" shares a textual prefix with "/allowed/dir"
+        // but is a sibling — plain starts_with would admit it.
+        assert!(!path_is_allowed(
+            std::path::Path::new("/allowed/dir-evil/x"),
+            &read_cap().allowed_paths
+        ));
+    }
+
+    #[test]
+    fn parent_traversal_is_denied() {
+        assert!(!path_is_allowed(
+            std::path::Path::new("/allowed/dir/../../etc/passwd"),
+            &read_cap().allowed_paths
+        ));
+    }
+
+    #[test]
+    fn dot_traversal_still_inside_is_allowed() {
+        assert!(path_is_allowed(
+            std::path::Path::new("/allowed/dir/./sub/../file.txt"),
+            &read_cap().allowed_paths
+        ));
+    }
+
+    #[test]
+    fn unrelated_path_is_denied() {
+        assert!(!path_is_allowed(
+            std::path::Path::new("/etc/passwd"),
+            &read_cap().allowed_paths
+        ));
+    }
+
+    #[test]
+    fn read_denied_path_errors() {
+        use crate::value::Value;
+        let cap = read_cap();
+        let mut stack = Vec::new();
+        let args = vec![Value::Str(std::rc::Rc::new(
+            "/allowed/dir/../../etc/passwd".to_string(),
+        ))];
+        let err = cap.call(&mut stack, &args).unwrap_err();
+        assert!(matches!(err, VmError::CapabilityDenied(_)));
     }
 }

@@ -45,13 +45,13 @@ pub struct Vm {
     /// Call stack for nested word/block invocations
     pub call_stack: Vec<CallFrame>,
     /// Dictionary of user-defined words
-    pub word_dict: HashMap<String, Vec<Opcode>>,
+    pub word_dict: HashMap<String, Rc<[Opcode]>>,
     /// Capability table (IO capabilities bound at init)
     pub capability_table: CapabilityTable,
-    /// Linear memory for data structures (maps, arrays, etc.)
-    pub memory: Vec<Value>,
     /// Whether to trace execution (debug mode)
     pub trace: bool,
+    /// Current quotation-nesting depth (execute_ref), for recursion guard.
+    ref_depth: usize,
     /// PRNG state for probabilistic choice (`?|`)
     rng_state: u64,
     /// 4-entry word lookup cache: fixed-size array with round-robin replacement.
@@ -80,8 +80,8 @@ impl Vm {
             call_stack: Vec::new(),
             word_dict: HashMap::new(),
             capability_table: CapabilityTable::new(),
-            memory: Vec::new(),
             trace: false,
+            ref_depth: 0,
             rng_state: generate_rng_seed(),
             word_cache: [
                 const { None },
@@ -102,8 +102,8 @@ impl Vm {
             call_stack: Vec::new(),
             word_dict: HashMap::new(),
             capability_table,
-            memory: Vec::new(),
             trace: false,
+            ref_depth: 0,
             rng_state: generate_rng_seed(),
             word_cache: [
                 const { None },
@@ -126,7 +126,7 @@ impl Vm {
             const { None },
         ];
         self.word_cache_pos = 0;
-        self.word_dict.insert(name, code);
+        self.word_dict.insert(name, code.into());
     }
 
     /// Execute a program (sequence of opcodes).
@@ -216,17 +216,18 @@ impl Vm {
                 let quot = self.pop_ref()?;
                 let list = self.pop_list()?;
                 let mut results = Vec::with_capacity(list.len());
+                let parent = std::mem::take(&mut self.data_stack);
                 for item in list.iter() {
-                    // Isolated: predicate sees only the item
-                    let parent = self.data_stack.clone();
-                    self.data_stack = vec![item.clone()];
+                    // Predicate sees only the item
+                    self.data_stack.clear();
+                    self.data_stack.push(item.clone());
                     self.execute_ref(&quot)?;
                     let keep = self.pop_bool()?;
                     if keep {
                         results.push(item.clone());
                     }
-                    self.data_stack = parent;
                 }
+                self.data_stack = parent;
                 self.data_stack.push(Value::List(Rc::new(results)));
             }
             Opcode::StrSplit => {
@@ -466,13 +467,17 @@ impl Vm {
 
             // === List operations ===
             Opcode::Nth => {
-                let n = self.pop_i64()? as usize;
+                let n = self.pop_i64()?;
                 let list = self.pop_list()?;
+                if n < 0 {
+                    return Err(VmError::NegativeValue(n));
+                }
+                let n = n as usize;
                 if n >= list.len() {
-                    return Err(VmError::ProgramError(format!(
-                        "Index {n} out of bounds for list of length {}",
-                        list.len()
-                    )));
+                    return Err(VmError::IndexOutOfBounds {
+                        index: n as i64,
+                        length: list.len(),
+                    });
                 }
                 self.data_stack.push(list[n].clone());
             }
@@ -491,42 +496,46 @@ impl Vm {
                 let quot = self.pop_ref()?;
                 let list = self.pop_list()?;
                 let mut results = Vec::with_capacity(list.len());
+                // Stack isolation: park the parent stack (O(1) move), give the
+                // body a fresh frame per element (clear keeps capacity).
+                let parent = std::mem::take(&mut self.data_stack);
                 for item in list.iter() {
-                    // Stack isolation: save parent data, run body with only item
-                    let parent = self.data_stack.clone();
-                    self.data_stack = vec![item.clone()];
+                    self.data_stack.clear();
+                    self.data_stack.push(item.clone());
                     self.execute_ref(&quot)?;
                     if let Some(result) = self.data_stack.pop() {
                         results.push(result);
                     }
-                    self.data_stack = parent;
                 }
+                self.data_stack = parent;
                 self.data_stack.push(Value::List(Rc::new(results)));
             }
             Opcode::Each => {
                 let quot = self.pop_ref()?;
                 let list = self.pop_list()?;
+                let parent = std::mem::take(&mut self.data_stack);
                 for item in list.iter() {
-                    // Stack isolation: save parent data, run body with only item
-                    let parent = self.data_stack.clone();
-                    self.data_stack = vec![item.clone()];
+                    self.data_stack.clear();
+                    self.data_stack.push(item.clone());
                     self.execute_ref(&quot)?;
-                    self.data_stack = parent;
                 }
+                self.data_stack = parent;
             }
             Opcode::Fold => {
                 let quot = self.pop_ref()?;
                 let init = self.pop()?;
                 let list = self.pop_list()?;
                 let mut acc = init;
+                let parent = std::mem::take(&mut self.data_stack);
                 for item in list.iter() {
-                    // Stack isolation: body sees only acc and item
-                    let parent = self.data_stack.clone();
-                    self.data_stack = vec![acc.clone(), item.clone()];
+                    // Body sees only acc and item
+                    self.data_stack.clear();
+                    self.data_stack.push(acc);
+                    self.data_stack.push(item.clone());
                     self.execute_ref(&quot)?;
                     acc = self.pop()?;
-                    self.data_stack = parent;
                 }
+                self.data_stack = parent;
                 self.data_stack.push(acc);
             }
             Opcode::Prepend => {
@@ -553,10 +562,16 @@ impl Vm {
                 let len = self.pop_i64()?;
                 let start = self.pop_i64()?;
                 let s = self.pop_str()?;
-                let start = start.max(0) as usize;
+                if start < 0 {
+                    return Err(VmError::NegativeValue(start));
+                }
+                let start = start as usize;
                 let len = len.max(0) as usize;
                 let end = (start + len).min(s.len());
                 let start = start.min(s.len());
+                if !s.is_char_boundary(start) || !s.is_char_boundary(end) {
+                    return Err(VmError::InvalidCharBoundary { start, end });
+                }
                 let substr: String = s[start..end].to_string();
                 self.data_stack.push(Value::Str(Rc::new(substr)));
             }
@@ -896,15 +911,21 @@ impl Vm {
                 self.data_stack.push(Value::List(Rc::new(items)));
             }
             Opcode::Take => {
-                let n = self.pop_i64()? as usize;
+                let n = self.pop_i64()?;
                 let list = self.pop_list()?;
-                let taken: Vec<Value> = list.iter().take(n).cloned().collect();
+                if n < 0 {
+                    return Err(VmError::NegativeValue(n));
+                }
+                let taken: Vec<Value> = list.iter().take(n as usize).cloned().collect();
                 self.data_stack.push(Value::List(Rc::new(taken)));
             }
             Opcode::DropN => {
-                let n = self.pop_i64()? as usize;
+                let n = self.pop_i64()?;
                 let list = self.pop_list()?;
-                let dropped: Vec<Value> = list.iter().skip(n).cloned().collect();
+                if n < 0 {
+                    return Err(VmError::NegativeValue(n));
+                }
+                let dropped: Vec<Value> = list.iter().skip(n as usize).cloned().collect();
                 self.data_stack.push(Value::List(Rc::new(dropped)));
             }
 
@@ -959,12 +980,10 @@ impl Vm {
                 let word_code = if let Some(code) = self.word_cache_lookup(name) {
                     code
                 } else {
-                    let code: Rc<[Opcode]> = Rc::from(
+                    let code: Rc<[Opcode]> = Rc::clone(
                         self.word_dict
                             .get(name)
-                            .cloned()
-                            .ok_or_else(|| VmError::UndefinedWord(name.clone()))?
-                            .into_boxed_slice(),
+                            .ok_or_else(|| VmError::UndefinedWord(name.clone()))?,
                     );
                     self.word_cache_insert(name.clone(), code.clone());
                     code
@@ -1194,6 +1213,19 @@ impl Vm {
 
     /// Execute a quotation (ref block) by pushing a new call frame.
     pub fn execute_ref(&mut self, code: &Rc<[Opcode]>) -> Result<(), VmError> {
+        // Guard against runaway nesting (e.g. nested @map): fail with a
+        // proper error instead of overflowing the host stack.
+        const MAX_REF_DEPTH: usize = 512;
+        if self.ref_depth >= MAX_REF_DEPTH {
+            return Err(VmError::RecursionLimit(MAX_REF_DEPTH));
+        }
+        self.ref_depth += 1;
+        let result = self.execute_ref_inner(code);
+        self.ref_depth -= 1;
+        result
+    }
+
+    fn execute_ref_inner(&mut self, code: &Rc<[Opcode]>) -> Result<(), VmError> {
         let initial_depth = self.call_stack.len();
         let frame = CallFrame {
             word_name: Some("<block>".into()),
@@ -1386,6 +1418,82 @@ fn value_to_f64(v: &Value) -> Result<f64, VmError> {
 
 #[cfg(test)]
 mod tests {
+    fn push_list(items: &[i64]) -> Vec<Opcode> {
+        let mut ops: Vec<Opcode> = items.iter().map(|&n| Opcode::PushI64(n)).collect();
+        ops.push(Opcode::PushI64(items.len() as i64));
+        ops.push(Opcode::PushList);
+        ops
+    }
+
+    #[test]
+    fn list_equality_is_structural() {
+        let mut vm = Vm::new();
+        let mut prog = push_list(&[1, 2]);
+        prog.extend(push_list(&[1, 2]));
+        prog.push(Opcode::Eq);
+        let r = vm.execute(&prog).unwrap().unwrap();
+        assert_eq!(r, Value::Bool(true), "[1 2] = [1 2] should be #t");
+    }
+
+    #[test]
+    fn list_inequality_is_structural() {
+        let mut vm = Vm::new();
+        let mut prog = push_list(&[1, 2]);
+        prog.extend(push_list(&[1, 3]));
+        prog.push(Opcode::Eq);
+        let r = vm.execute(&prog).unwrap().unwrap();
+        assert_eq!(r, Value::Bool(false), "[1 2] = [1 3] should be #f");
+    }
+
+    #[test]
+    fn negative_nth_is_an_error() {
+        let mut vm = Vm::new();
+        let mut prog = push_list(&[1, 2]);
+        prog.push(Opcode::PushI64(-1));
+        prog.push(Opcode::Nth);
+        let err = vm.execute(&prog).unwrap_err();
+        assert!(matches!(err, VmError::NegativeValue(-1)));
+    }
+
+    #[test]
+    fn deep_quote_nesting_errors_instead_of_crashing() {
+        // 3000 nested `{ ... N @times }` frames must surface RecursionLimit,
+        // not blow the host stack (previously a hard crash). Run on a
+        // big-stack thread like the CLI does; the guard, not the OS, stops.
+        std::thread::Builder::new()
+            .stack_size(64 * 1024 * 1024)
+            .spawn(|| {
+                let mut code: Vec<Opcode> = vec![Opcode::PushI64(0)];
+                for _ in 0..3000 {
+                    code = vec![
+                        Opcode::PushI64(1),
+                        Opcode::PushRef(code.into()),
+                        Opcode::Times,
+                    ];
+                }
+                let mut vm = Vm::new();
+                let err = vm.execute(&code).unwrap_err();
+                assert!(matches!(err, VmError::RecursionLimit(512)));
+            })
+            .unwrap()
+            .join()
+            .unwrap();
+    }
+
+    #[test]
+    fn strslice_rejects_non_boundary() {
+        let mut vm = Vm::new();
+        let err = vm
+            .execute(&[
+                Opcode::PushStr(std::rc::Rc::new("héllo".to_string())),
+                Opcode::PushI64(2),
+                Opcode::PushI64(1),
+                Opcode::StrSlice,
+            ])
+            .unwrap_err();
+        assert!(matches!(err, VmError::InvalidCharBoundary { .. }));
+    }
+
     use super::*;
 
     #[test]

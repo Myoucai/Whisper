@@ -6,7 +6,6 @@
 pub mod builtins;
 pub mod checker;
 pub mod infer;
-pub mod stack_effect;
 pub mod types;
 
 pub use checker::TypeChecker;

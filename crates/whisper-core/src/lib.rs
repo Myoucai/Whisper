@@ -1,9 +1,8 @@
 // Whisper Core - Core data types and stack-based virtual machine
-// Provides Value, Opcode, Vm, Signal, and Capability primitives
+// Provides Value, Opcode, Vm, and Capability primitives
 
 pub mod capability;
 pub mod opcode;
-pub mod signal;
 pub mod value;
 pub mod vm;
 
@@ -38,4 +37,16 @@ pub enum VmError {
 
     #[error("Program error: {0}")]
     ProgramError(String),
+
+    #[error("Recursion limit exceeded: quotation nesting deeper than {0}")]
+    RecursionLimit(usize),
+
+    #[error("Index out of bounds: {index} (length {length})")]
+    IndexOutOfBounds { index: i64, length: usize },
+
+    #[error("Slice boundary is not a UTF-8 character boundary: {start}..{end}")]
+    InvalidCharBoundary { start: usize, end: usize },
+
+    #[error("Negative value not allowed here: {0}")]
+    NegativeValue(i64),
 }

@@ -65,12 +65,24 @@ impl Value {
     }
 
     /// Compare two values for equality (for Eq opcode).
+    /// Lists and Maps compare structurally (element-wise); Ref blocks never
+    /// compare equal (code identity, not value identity).
     pub fn equals(&self, other: &Value) -> bool {
         match (self.unwrap_signal_ref(), other.unwrap_signal_ref()) {
             (Value::I64(a), Value::I64(b)) => a == b,
             (Value::F64(a), Value::F64(b)) => a == b,
             (Value::Bool(a), Value::Bool(b)) => a == b,
             (Value::Str(a), Value::Str(b)) => Rc::ptr_eq(a, b) || a == b,
+            (Value::List(a), Value::List(b)) => {
+                Rc::ptr_eq(a, b)
+                    || (a.len() == b.len() && a.iter().zip(b.iter()).all(|(x, y)| x.equals(y)))
+            }
+            (Value::Map(a), Value::Map(b)) => {
+                Rc::ptr_eq(a, b)
+                    || (a.len() == b.len()
+                        && a.iter()
+                            .all(|(k, v)| b.get(k).map(|w| v.equals(w)).unwrap_or(false)))
+            }
             _ => false,
         }
     }
