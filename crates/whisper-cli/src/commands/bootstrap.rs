@@ -661,7 +661,7 @@ fn byte_to_opcode(byte: u8) -> Opcode {
 /// Host helper words used by the whisperc sources: `N PushList` collects
 /// N stack items into a list (same semantics as the PushList opcode).
 /// (`return` is a language keyword compiled inline to the Return opcode.)
-fn register_host_helpers(vm: &mut Vm) {
+pub(crate) fn register_host_helpers(vm: &mut Vm) {
     vm.define_word(
         "PushList".into(),
         vec![whisper_core::opcode::Opcode::PushList],

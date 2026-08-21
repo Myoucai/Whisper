@@ -54,9 +54,14 @@ pub fn build_file(
             println!("Transpiled {} bytes → {}", size, output);
             println!("Compile with: gcc -O2 -lm -o program {output}");
         }
+        "c2" => {
+            // Self-hosted chain: the whisperc compiler runs on the Rust VM
+            // and emits C; the system compiler produces the executable.
+            super::c2::build_c2(source, source_dir, output, true)?;
+        }
         other => {
             return Err(format!(
-                "Unknown target: {other}. Supported: wbin, c (self-hosted C chain: scripts/verify-fixedpoint.sh)"
+                "Unknown target: {other}. Supported: wbin, c, c2 (self-hosted chain)"
             ));
         }
     }

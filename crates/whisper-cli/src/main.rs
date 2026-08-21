@@ -22,7 +22,9 @@ fn help() {
     println!("  whisper test   [path]       Run test files (*_test.ws)");
     println!();
     println!("OPTIONS:");
-    println!("  --target wbin|c             Build target (default: wbin)");
+    println!(
+        "  --target wbin|c|c2           Build target (default: wbin; c2 = self-hosted chain + gcc)"
+    );
     println!("  -o <file>                   Output file path");
     println!("  --allow-http                Enable HTTP capabilities");
     println!("  --allow-file-read           Enable file read capability");
@@ -136,7 +138,7 @@ fn cmd_build(args: &[String]) -> Result<(), String> {
         .find(|a| a.ends_with(".ws") || a.ends_with(".whisper"))
         .ok_or("Expected: whisper build <file.ws>")?;
     let ext = match target.as_str() {
-        "c" => "c",
+        "c" | "c2" => "c",
         _ => "wbin",
     };
     let output = output.unwrap_or_else(|| file.replace(".ws", &format!(".{ext}")));

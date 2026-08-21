@@ -100,14 +100,12 @@
 // try-directive: handle export/import
 : try-directive {
     dup len 2 < ?? 0 return ]
-    dup 0 @nth dup "export" streq ??
-        drop tok-advance tok-advance 1 return
-    |
-    "import" streq ??
-        tok-advance tok-advance 1 return
-    |
+    dup 0 @nth _ str? ??
+        dup "export" streq ?? drop tok-advance tok-advance 1 return ]
+        "import" streq ?? tok-advance tok-advance 1 return ]
         0
-    ] ]
+    | drop 0
+    ]
 } ;
 
 // try-def: handle ": name {body} ;"

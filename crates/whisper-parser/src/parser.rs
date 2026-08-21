@@ -1018,7 +1018,6 @@ impl Parser {
         Self::fold_syntax_sugar(nodes)
     }
 
-
     fn synthetic_eof(&self) -> Token {
         let last = self.tokens.last().map(|t| t.span.end).unwrap_or(0);
         Token::new(

@@ -208,13 +208,11 @@ export ctos
 // try-directive: handle export/import
 : try-directive {
     dup len 2 < ?? 0 return ]
-    dup 0 @nth dup "export" streq ??
-        drop tok-advance tok-advance 1 return
-    |
-    "import" streq ??
-        tok-advance tok-advance 1 return
-    |
+    dup 0 @nth _ str? ??
+        dup "export" streq ?? drop tok-advance tok-advance 1 return ]
+        "import" streq ?? tok-advance tok-advance 1 return ]
         0
+    | drop 0
     ]
 } ;
 
@@ -239,7 +237,10 @@ export ctos
 
 : try-def {
     dup len 4 < ?? 0 return ]
-    dup 0 @nth ":" streq ?? try-def-colon | 0 ]
+    dup 0 @nth _ str? ??
+        ":" streq ?? try-def-colon | 0 ]
+    | drop 0
+    ]
 } ;
 
 // try-loop: handle "{body} {cond} #"
@@ -310,7 +311,10 @@ export ctos
     try-loop ?? rec-loop return ]
 
     // Try cond (?? ... ])
-    dup 0 @nth "??" streq ?? handle-cond return ]
+    dup 0 @nth _ str? ??
+        "??" streq ?? handle-cond return ]
+    | drop
+    ]
 
     // Regular token
     handle-regular
@@ -347,6 +351,21 @@ export group-paired-rec
     ]
 } ;
 
+// Float literal: exactly one '.', both halves numeric ("-0.5", "3.14").
+// Classified as [1, the-string]; the C emitter interpolates it as a C
+// double literal (no f64->bits conversion exists in the .ws runtime).
+: is-float-str {
+    dup "." strsplit
+    swap drop
+    dup len 2 = ??
+        dup 0 @nth is-num-str
+        over 1 @nth is-num-str
+        &
+        swap drop
+    | drop #f
+    ]
+} ;
+
 : is-$n? { _ 0 strnth 36 = ?? 1 999999 strslice is-num-str | drop #f ] } ;
 
 // ── Table-driven opcode lookup ──────────────────────────────────────
@@ -375,7 +394,7 @@ export group-paired-rec
     [212 "floor"] [213 "ceil"] [214 "round"]
     [215 "log"] [216 "exp"] [217 "atan2"]
     [218 "bitand"] [219 "bitor"] [220 "bitxor"] [221 "bitnot"]
-    [9 "shl"] [10 "shr"]
+    [9 "shl"] [10 "shr"] [9 "<<"] [10 ">>"]
     [223 "sort"] [224 "rev"] [225 "dedup"]
     [226 "take"] [227 "drop-n"]
     [194 "map-new"] [195 "map-get"] [196 "map-set"]
@@ -426,9 +445,10 @@ export group-paired-rec
             // Not in table — try $N / number / word
             drop
             _ is-$n?  ?? [15] ` 1 999999 strslice strtoi64 append
-            | _ is-num-str ?? [0] ` strtoi64 append
+            | _ is-float-str ?? [1] ` append
+| _ is-num-str ?? [0] ` strtoi64 append
             | [4] ` append
-            ]]
+            ]]]
         | // Found in table — emit [3, opcode]
             swap drop [3] swap append
         ]
@@ -528,11 +548,11 @@ export classify-nested
 : op-pick  { tk-val [4] swap append 1 PushList } ;     // [[4, N]]
 : op-op    { tk-val 1 PushList } ;                      // [[opcode]]
 
-// Quote: compile inner body, append [PushRef, inner_bc] instruction
+// Quote: compile inner body, emit single [PushRef, inner_bc] instruction
 : op-quote {
-    tk-val compile              // inner_bc_list (list of instructions)
-    53 $1 2 PushList            // [53, inner_bc_list]
-    append                      // inner_bc ++ [[53, inner_bc_list]]
+    tk-val compile              // inner_bc_list
+    53 swap 2 PushList          // [53, inner_bc_list]
+    1 PushList                  // [[53, inner_bc_list]]
 } ;
 
 // List literal: compile elements, append PushI64(count) + PushList
@@ -982,6 +1002,7 @@ export classify-full
     dup list? ??
         dup 0 @nth
         dup 48 = ?? drop 1 @nth i64tostr "w_push((wval)(int64_t)" swap "L);\n" strcat strcat return ]
+        dup 49 = ?? drop 1 @nth "{double _d=" swap "; w_push(*(wval*)&_d);}\n" strcat strcat return ]
         dup 50 = ?? drop 1 @nth escape-c-str "w_push((wval)w_str_from_cstr(\"" swap "\"));\n" strcat strcat return ]
         dup 51 = ?? drop 1 @nth i64tostr "w_push((wval)" swap "L);\n" strcat strcat return ]
         dup 96 = ?? drop 1 @nth safe-c-name "W_" swap "();\n" strcat strcat return ]
