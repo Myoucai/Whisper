@@ -7,6 +7,14 @@
 *.wasm
 *.wat
 
+# Native build debris (gcc/rustc outputs, debug logs)
+*.exe
+*.o
+*.su
+*.log
+stderr.tmp
+rustup-init-tmp.exe
+
 # IDE
 .idea/
 .vscode/
@@ -20,3 +28,6 @@ Thumbs.db
 
 # Whisper package cache
 .whisper/
+
+# Session-local
+.zcode/
