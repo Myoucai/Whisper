@@ -49,6 +49,35 @@ impl StringPool {
     }
 }
 
+/// Pool of quote blocks: every PushRef becomes a C function `W_qN` whose
+/// pointer is pushed on the stack; higher-order opcodes call back through
+/// it (mirrors the seed emitter over runtime.c).
+struct QuotePool {
+    quotes: Vec<std::rc::Rc<[Opcode]>>,
+    ids: HashMap<(usize, usize), usize>,
+}
+
+impl QuotePool {
+    fn new() -> Self {
+        QuotePool {
+            quotes: Vec::new(),
+            ids: HashMap::new(),
+        }
+    }
+
+    fn intern(&mut self, inner: &[Opcode]) -> usize {
+        let key = (inner.as_ptr() as usize, inner.len());
+        if let Some(&id) = self.ids.get(&key) {
+            return id;
+        }
+        let id = self.quotes.len();
+        self.quotes
+            .push(std::rc::Rc::from(inner.to_vec().into_boxed_slice()));
+        self.ids.insert(key, id);
+        id
+    }
+}
+
 /// Escape a string for C string literal.
 fn escape_c_string(s: &str) -> String {
     let mut out = String::new();
@@ -85,6 +114,16 @@ fn collect_strings(opcodes: &[Opcode], strings: &mut StringPool) {
     }
 }
 
+/// Recursively register every PushRef block (including nested ones).
+fn collect_quotes(opcodes: &[Opcode], pool: &mut QuotePool) {
+    for op in opcodes {
+        if let Opcode::PushRef(inner) = op {
+            pool.intern(inner);
+            collect_quotes(inner, pool);
+        }
+    }
+}
+
 /// Make a string safe for use as a C identifier.
 fn safe_c_name(name: &str) -> String {
     let mut out = String::new();
@@ -103,6 +142,7 @@ fn transpile_opcodes(
     opcodes: &[Opcode],
     out: &mut String,
     strings: &mut StringPool,
+    quotes: &mut QuotePool,
     indent: usize,
 ) {
     let pad = " ".repeat(indent);
@@ -149,11 +189,9 @@ fn transpile_opcodes(
                 let _ = writeln!(out, "}}");
             }
             Opcode::PushRef(inner) => {
-                // For inline quotes, we need to execute them as a block
-                // We'll use a label + goto pattern or a nested function
-                // For simplicity, we'll inline the block with a marker
-                let _ = writeln!(out, "{pad}// PushRef: inline quote block");
-                transpile_opcodes(inner, out, strings, indent);
+                // Quotes are first-class: push the C function pointer.
+                let id = quotes.intern(inner);
+                let _ = writeln!(out, "{pad}w_push((wval)(uintptr_t)W_q{id});");
             }
 
             // ── Stack operations ────────────────────────────────
@@ -243,12 +281,8 @@ fn transpile_opcodes(
                 );
             }
             Opcode::Times => {
-                // n {body} @times — body was already pushed as PushRef
-                // For now, generate a for loop
-                let _ = writeln!(out, "{pad}// @times: body should be inline before this");
-                let _ = writeln!(out, "{pad}{{ int64_t _n = (int64_t)w_pop(); for (int64_t _ti = 0; _ti < _n; _ti++) {{");
-                // The body was inlined before this opcode
-                let _ = writeln!(out, "{pad}}}}}");
+                // stack: n, quote -> call the quote n times
+                let _ = writeln!(out, "{{ wfn _f = (wfn)w_pop(); int64_t _n = (int64_t)w_pop(); for (int64_t _i = 0; _i < _n; _i++) _f(); }}");
             }
 
             // ── Call/Return ─────────────────────────────────────
@@ -277,18 +311,19 @@ fn transpile_opcodes(
                 );
             }
             Opcode::Map => {
-                // list {fn} @map — fn was inlined as PushRef before this
-                let _ = writeln!(out, "{pad}// @map: requires callback function");
-                let _ = writeln!(out, "{pad}{{ wval *_fn_ref = (wval *)w_pop(); wval *_list = (wval *)w_pop(); /* TODO: execute fn for each element */ w_push((wval)w_list_new(0)); }}");
+                let _ = writeln!(out, "{{ wfn _f = (wfn)w_pop(); wval *_l = (wval *)w_pop(); w_push((wval)w_map_over(_l, _f)); }}");
             }
             Opcode::Each => {
-                let _ = writeln!(out, "{pad}// @each: requires callback function");
+                let _ = writeln!(
+                    out,
+                    "{{ wfn _f = (wfn)w_pop(); wval *_l = (wval *)w_pop(); w_each_over(_l, _f); }}"
+                );
             }
             Opcode::Fold => {
-                let _ = writeln!(out, "{pad}// @fold: requires callback function");
+                let _ = writeln!(out, "{{ wfn _f = (wfn)w_pop(); wval _init = w_pop(); wval *_l = (wval *)w_pop(); w_push(w_fold_over(_l, _init, _f)); }}");
             }
             Opcode::Filter => {
-                let _ = writeln!(out, "{pad}// @filter: requires callback function");
+                let _ = writeln!(out, "{{ wfn _f = (wfn)w_pop(); wval *_l = (wval *)w_pop(); w_push((wval)w_filter_over(_l, _f)); }}");
             }
             Opcode::Sort => {
                 let _ = writeln!(
@@ -303,7 +338,10 @@ fn transpile_opcodes(
                 );
             }
             Opcode::Dedup => {
-                let _ = writeln!(out, "{pad}// @dedup: TODO");
+                let _ = writeln!(
+                    out,
+                    "{{ wval *_l = (wval *)w_pop(); w_push((wval)w_list_dedup(_l)); }}"
+                );
             }
             Opcode::Take => {
                 let _ = writeln!(out, "{{ int64_t _n = (int64_t)w_pop(); wval *_list = (wval *)w_pop(); w_push((wval)w_list_take(_list, _n)); }}");
@@ -315,7 +353,7 @@ fn transpile_opcodes(
                 let _ = writeln!(out, "{{ int64_t _len = (int64_t)w_pop(); int64_t _start = (int64_t)w_pop(); wval *_list = (wval *)w_pop(); w_push((wval)w_list_slice(_list, _start, _len)); }}");
             }
             Opcode::ListFind => {
-                let _ = writeln!(out, "{pad}// @listfind: TODO");
+                let _ = writeln!(out, "{{ wval _e = w_pop(); wval *_l = (wval *)w_pop(); w_push((wval)w_listfind(_l, _e)); }}");
             }
 
             // ── String operations ───────────────────────────────
@@ -353,7 +391,7 @@ fn transpile_opcodes(
                 );
             }
             Opcode::StrNth => {
-                let _ = writeln!(out, "{{ int64_t _idx = (int64_t)w_pop(); const char *_s = (const char *)w_pop(); w_push((wval)(int64_t)(_s[_idx])); }}");
+                let _ = writeln!(out, "{{ int64_t _idx = (int64_t)w_pop(); const char *_s = (const char *)w_pop(); w_push((wval)(int64_t)(unsigned char)_s[_idx]); }}");
             }
             Opcode::StrChars => {
                 let _ = writeln!(out, "{{ const char *_s = (const char *)w_pop(); uint32_t _len = w_str_len(_s); wval *_list = w_list_new(_len); for (uint32_t _i = 0; _i < _len; _i++) _list[1+_i] = (wval)(int64_t)_s[_i]; w_push((wval)_list); }}");
@@ -368,7 +406,7 @@ fn transpile_opcodes(
                 let _ = writeln!(out, "{{ wval *_list = (wval *)w_pop(); int64_t _count = w_list_len(_list); size_t _total = 0; for (int64_t _i = 0; _i < _count; _i++) _total += w_str_len((const char*)_list[1+_i]); char *_buf = w_alloc(_total); size_t _pos = 0; for (int64_t _i = 0; _i < _count; _i++) {{ const char *_s = (const char*)_list[1+_i]; uint32_t _l = w_str_len(_s); memcpy(_buf+_pos, _s, _l); _pos += _l; }} w_push((wval)w_str_new(_buf, _total)); }}");
             }
             Opcode::StrSplit => {
-                let _ = writeln!(out, "{pad}// @strsplit: TODO");
+                let _ = writeln!(out, "{{ const char *_d = (const char *)w_pop(); const char *_s = (const char *)w_pop(); w_push((wval)w_str_split(_s, _d)); }}");
             }
             Opcode::Ctos => {
                 let _ = writeln!(
@@ -463,7 +501,12 @@ fn transpile_opcodes(
 
             // ── JSON ────────────────────────────────────────────
             Opcode::JsonParse => {
-                let _ = writeln!(out, "{pad}// json_parse: TODO (simplified)");
+                // No JSON parser in runtime.c — fail loudly at C compile
+                // time instead of silently doing nothing.
+                let _ = writeln!(
+                    out,
+                    "#error \"json-parse is not supported by the C backend (runtime.c has no parser)\""
+                );
             }
             Opcode::JsonStringify => {
                 let _ = writeln!(
@@ -477,32 +520,28 @@ fn transpile_opcodes(
                 let _ = writeln!(out, "{pad}w_print_val(w_pop());");
             }
             Opcode::OutputAll => {
-                let _ = writeln!(out, "{pad}{{ printf(\"Stack: \"); for (int _i = 0; _i < w_sp; _i++) printf(\"%ld \", (int64_t)w_stack[_i]); printf(\"\\n\"); }}");
+                let _ = writeln!(out, "{pad}w_output_all();");
             }
             Opcode::ReadInput => {
                 let _ = writeln!(out, "{pad}w_push((wval)w_read_line());");
             }
 
             // ── Byte buffer ─────────────────────────────────────
-            Opcode::BytesNew => {
+            Opcode::BytesNew | Opcode::BytesPush | Opcode::BytesLen | Opcode::BytesWriteFile => {
                 let _ = writeln!(
                     out,
-                    "{pad}w_push((wval)w_list_new(0)); // byte buffer as list"
+                    "#error \"bytes-* opcodes are not supported by the C backend (no byte-buffer runtime)\""
                 );
-            }
-            Opcode::BytesPush => {
-                let _ = writeln!(out, "{pad}// bytes_push: TODO");
-            }
-            Opcode::BytesLen => {
-                let _ = writeln!(out, "{pad}// bytes_len: TODO");
-            }
-            Opcode::BytesWriteFile => {
-                let _ = writeln!(out, "{pad}// bytes_write_file: TODO");
             }
 
             // ── Try ─────────────────────────────────────────────
             Opcode::Try => {
-                let _ = writeln!(out, "{pad}// try: TODO (simplified — just execute)");
+                // The C backend has no exceptions: run the quote and push
+                // (true, result), matching the VM's success path.
+                let _ = writeln!(
+                    out,
+                    "{{ wfn _f = (wfn)w_pop(); _f(); wval _r = w_pop(); w_push((wval)1); w_push(_r); }}"
+                );
             }
 
             // ── Time/Random ─────────────────────────────────────
@@ -617,16 +656,19 @@ fn collect_labels(opcodes: &[Opcode]) -> Vec<usize> {
 pub fn transpile_to_c(main_bytecode: &[Opcode], defs: &[(String, Vec<Opcode>)]) -> String {
     let mut out = String::new();
     let mut strings = StringPool::new();
+    let mut quotes = QuotePool::new();
 
     // ── Header ──────────────────────────────────────────────────
     let _ = writeln!(out, "// Auto-generated by Whisper C transpiler");
     let _ = writeln!(out, "#include \"runtime.c\"");
     let _ = writeln!(out);
 
-    // ── Collect string constants ────────────────────────────────
+    // ── Collect string and quote constants ──────────────────────
     collect_strings(main_bytecode, &mut strings);
+    collect_quotes(main_bytecode, &mut quotes);
     for (_, code) in defs {
         collect_strings(code, &mut strings);
+        collect_quotes(code, &mut quotes);
     }
 
     // ── Emit string constants ───────────────────────────────────
@@ -638,22 +680,40 @@ pub fn transpile_to_c(main_bytecode: &[Opcode], defs: &[(String, Vec<Opcode>)]) 
         let cname = safe_c_name(name);
         let _ = writeln!(out, "static void w_{cname}(void);");
     }
+    for i in 0..quotes.quotes.len() {
+        let _ = writeln!(out, "static void W_q{i}(void);");
+    }
     let _ = writeln!(out);
 
     // ── Word function definitions ───────────────────────────────
     for (name, code) in defs {
         let cname = safe_c_name(name);
         let _ = writeln!(out, "static void w_{cname}(void) {{");
-        transpile_opcodes(code, &mut out, &mut strings, 2);
+        transpile_opcodes(code, &mut out, &mut strings, &mut quotes, 2);
         let _ = writeln!(out, "}}");
         let _ = writeln!(out);
+    }
+
+    // ── Quote function definitions (drain the pool: bodies may
+    //    register nested quotes, so loop until stable) ───────────
+    let mut emitted = 0;
+    while emitted < quotes.quotes.len() {
+        let take = quotes.quotes.len();
+        for i in emitted..take {
+            let _ = writeln!(out, "static void W_q{i}(void) {{");
+            let body = std::rc::Rc::clone(&quotes.quotes[i]);
+            transpile_opcodes(&body, &mut out, &mut strings, &mut quotes, 2);
+            let _ = writeln!(out, "}}");
+            let _ = writeln!(out);
+        }
+        emitted = take;
     }
 
     // ── main() ──────────────────────────────────────────────────
     let _ = writeln!(out, "int main(int argc, char **argv) {{");
     let _ = writeln!(out, "  w_init(argc, argv);");
     let _ = writeln!(out, "  w_init_strings();");
-    transpile_opcodes(main_bytecode, &mut out, &mut strings, 2);
+    transpile_opcodes(main_bytecode, &mut out, &mut strings, &mut quotes, 2);
     let _ = writeln!(out, "  return 0;");
     let _ = writeln!(out, "}}");
 

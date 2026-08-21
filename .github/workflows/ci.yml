@@ -54,6 +54,16 @@ jobs:
           printf '2 3 + .' > /tmp/bt.ws
           ./target/release/whisper bootstrap --hard /tmp/bt.ws
 
+  c-backend:
+    name: C transpiler end-to-end (gcc)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run C backend tests
+        run: cargo test -p whisper-codegen --test c_backend_tests -- --nocapture
+
   selfhost:
     name: Self-hosting chain (C seed)
     runs-on: ubuntu-latest
