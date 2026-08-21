@@ -90,6 +90,12 @@ pub enum Operator {
     Shl,
     Shr,
     Args,
+    SplitCond,
+    ListCheck,
+    I64Check,
+    StrCheck,
+    BoolCheck,
+    Return,
 
     // Arithmetic
     Add,

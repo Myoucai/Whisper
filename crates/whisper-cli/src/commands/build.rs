@@ -58,8 +58,7 @@ pub fn build_file(
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                std::fs::set_permissions(output,
-                    std::fs::Permissions::from_mode(0o755))
+                std::fs::set_permissions(output, std::fs::Permissions::from_mode(0o755))
                     .map_err(|e| format!("chmod: {e}"))?;
             }
             println!("Run: ./{output}");
@@ -142,7 +141,9 @@ pub fn build_file(
             println!("Usage: echo '42 .' | ./whisper");
         }
         other => {
-            return Err(format!("Unknown target: {other}. Supported: wbin, native, c"));
+            return Err(format!(
+                "Unknown target: {other}. Supported: wbin, native, c"
+            ));
         }
     }
 
@@ -155,8 +156,8 @@ pub fn build_file(
 fn build_native_compiler(output: &str) -> Result<(), String> {
     // Load the Whisper compiler (main.ws — bytecode compilation)
     let compiler_src = include_str!("../../../../whisperc/main.ws");
-    let compiler_ast = Parser::parse_source(compiler_src)
-        .map_err(|e| format!("whisperc parse: {}", e.message))?;
+    let compiler_ast =
+        Parser::parse_source(compiler_src).map_err(|e| format!("whisperc parse: {}", e.message))?;
     let mut cgen = BytecodeGenerator::new();
     let (compiler_bc, compiler_defs) = cgen.compile(&compiler_ast);
 
@@ -174,7 +175,7 @@ fn build_native_compiler(output: &str) -> Result<(), String> {
     let mut native_code = String::new();
     native_code.push_str("// Whisper Native Compiler — Self-Hosting\n\n");
     native_code.push_str(&c_code);
-    native_code.push_str("\n");
+    native_code.push('\n');
     // Include the native driver (C tokenizer + structifier + classifier)
     native_code.push_str(include_str!("../native_driver.c"));
 

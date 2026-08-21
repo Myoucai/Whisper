@@ -36,13 +36,31 @@ fn help() {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    // Deeply nested sources (long elif chains, nested quotes) recurse through
+    // the lexer, parser, type checker and code generator. Run all command
+    // work on a large-stack thread so compile-time recursion is bounded by
+    // the source, not the default 8 MB main-thread stack.
+    let child = std::thread::Builder::new()
+        .stack_size(256 * 1024 * 1024)
+        .spawn(move || run_cli(args))
+        .expect("failed to spawn CLI worker thread");
+    let result = child
+        .join()
+        .unwrap_or_else(|_| Err("internal panic".into()));
+    if let Err(e) = result {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
+    }
+}
+
+fn run_cli(args: Vec<String>) -> Result<(), String> {
     if args.len() < 2 {
         help();
         std::process::exit(1);
     }
 
     let cmd = &args[1];
-    let result = match cmd.as_str() {
+    match cmd.as_str() {
         "-h" | "--help" => {
             help();
             Ok(())
@@ -68,11 +86,6 @@ fn main() {
             help();
             std::process::exit(1);
         }
-    };
-
-    if let Err(e) = result {
-        eprintln!("Error: {e}");
-        std::process::exit(1);
     }
 }
 
@@ -119,7 +132,11 @@ fn cmd_build(args: &[String]) -> Result<(), String> {
         .filter(|a| Some(a.as_str()) != output_val) // exclude -o value
         .find(|a| a.ends_with(".ws") || a.ends_with(".whisper"))
         .ok_or("Expected: whisper build <file.ws>")?;
-    let ext = if target == "native" || target == "elf" { "elf" } else { "wbin" };
+    let ext = if target == "native" || target == "elf" {
+        "elf"
+    } else {
+        "wbin"
+    };
     let output = output.unwrap_or_else(|| file.replace(".ws", &format!(".{ext}")));
     let source = std::fs::read_to_string(file).map_err(|e| format!("Cannot read '{file}': {e}"))?;
     let source_dir = std::path::Path::new(file)
@@ -146,7 +163,8 @@ fn cmd_fmt(args: &[String]) -> Result<(), String> {
 }
 
 fn cmd_bootstrap(args: &[String]) -> Result<(), String> {
-    let file = args.iter()
+    let file = args
+        .iter()
         .skip(2)
         .find(|a| !a.starts_with('-'))
         .ok_or("Expected: whisper bootstrap <file.ws>")?;

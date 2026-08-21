@@ -149,8 +149,11 @@ impl Parser {
         while i < len {
             // Pattern: Quote(body) + Quote(condition) + Op(Hash)  →  Loop
             if i + 2 < len {
-                if let (AstNode::Quote(body), AstNode::Quote(condition), AstNode::Op(Operator::Hash)) =
-                    (&nodes[i], &nodes[i + 1], &nodes[i + 2])
+                if let (
+                    AstNode::Quote(body),
+                    AstNode::Quote(condition),
+                    AstNode::Op(Operator::Hash),
+                ) = (&nodes[i], &nodes[i + 1], &nodes[i + 2])
                 {
                     result.push(AstNode::Loop {
                         body: body.clone(),
@@ -557,6 +560,30 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::Args)))
             }
+            TokenKind::SplitCond => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::SplitCond)))
+            }
+            TokenKind::ListCheck => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::ListCheck)))
+            }
+            TokenKind::I64Check => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::I64Check)))
+            }
+            TokenKind::StrCheck => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::StrCheck)))
+            }
+            TokenKind::BoolCheck => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::BoolCheck)))
+            }
+            TokenKind::Return => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Return)))
+            }
             TokenKind::BytesNew => {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::BytesNew)))
@@ -825,209 +852,25 @@ impl Parser {
         self.pos >= self.tokens.len() || matches!(self.current().kind, TokenKind::Eof)
     }
 
-    /// Like expect_word but recovers: reports error and returns Err.
+    /// Expect a word name; keyword tokens lexed from identifiers (len, over,
+    /// floor, ...) are accepted and resolve to their canonical spelling via
+    /// TokenKind::keyword_name — the single source of truth in token.rs.
     fn recoverable_expect_word(&mut self) -> Result<String, ParseError> {
         let token = self.current().clone();
-        match &token.kind {
-            TokenKind::Word(name) => {
-                let n = name.clone();
-                self.advance();
-                Ok(n)
-            }
-            // Builtin operators that can also be used as definition/export names
-            TokenKind::StrLen => {
-                self.advance();
-                Ok("strlen".into())
-            }
-            TokenKind::StrCat => {
-                self.advance();
-                Ok("strcat".into())
-            }
-            TokenKind::StrSlice => {
-                self.advance();
-                Ok("strslice".into())
-            }
-            TokenKind::StrEq => {
-                self.advance();
-                Ok("streq".into())
-            }
-            TokenKind::StrLt => {
-                self.advance();
-                Ok("strlt".into())
-            }
-            TokenKind::StrFind => {
-                self.advance();
-                Ok("strfind".into())
-            }
-            TokenKind::StrReplace => {
-                self.advance();
-                Ok("strreplace".into())
-            }
-            TokenKind::StrToI64 => {
-                self.advance();
-                Ok("strtoi64".into())
-            }
-            TokenKind::I64ToStr => {
-                self.advance();
-                Ok("i64tostr".into())
-            }
-            TokenKind::I64ToF64 => {
-                self.advance();
-                Ok("i64tof64".into())
-            }
-            TokenKind::F64ToI64 => {
-                self.advance();
-                Ok("f64toi64".into())
-            }
-            TokenKind::FSqrt => {
-                self.advance();
-                Ok("fsqrt".into())
-            }
-            TokenKind::FSin => {
-                self.advance();
-                Ok("fsin".into())
-            }
-            TokenKind::FCos => {
-                self.advance();
-                Ok("fcos".into())
-            }
-            TokenKind::FTan => {
-                self.advance();
-                Ok("ftan".into())
-            }
-            TokenKind::JsonParse => {
-                self.advance();
-                Ok("json-parse".into())
-            }
-            TokenKind::JsonStringify => {
-                self.advance();
-                Ok("json-stringify".into())
-            }
-            TokenKind::StrSplit => {
-                self.advance();
-                Ok("strsplit".into())
-            }
-            TokenKind::Ctos => {
-                self.advance();
-                Ok("ctos".into())
-            }
-            TokenKind::Prepend => {
-                self.advance();
-                Ok("prepend".into())
-            }
-            TokenKind::ListSlice => {
-                self.advance();
-                Ok("list-slice".into())
-            }
-            TokenKind::Args => {
-                self.advance();
-                Ok("args".into())
-            }
-            TokenKind::MapNew => {
-                self.advance();
-                Ok("map-new".into())
-            }
-            TokenKind::MapGet => {
-                self.advance();
-                Ok("map-get".into())
-            }
-            TokenKind::MapSet => {
-                self.advance();
-                Ok("map-set".into())
-            }
-            TokenKind::MapDel => {
-                self.advance();
-                Ok("map-del".into())
-            }
-            TokenKind::MapKeys => {
-                self.advance();
-                Ok("map-keys".into())
-            }
-            TokenKind::MapHas => {
-                self.advance();
-                Ok("map-has".into())
-            }
-            TokenKind::Now => {
-                self.advance();
-                Ok("now".into())
-            }
-            TokenKind::Sleep => {
-                self.advance();
-                Ok("sleep".into())
-            }
-            TokenKind::Random => {
-                self.advance();
-                Ok("random".into())
-            }
-            TokenKind::RandInt => {
-                self.advance();
-                Ok("randint".into())
-            }
-            TokenKind::Floor => {
-                self.advance();
-                Ok("floor".into())
-            }
-            TokenKind::Ceil => {
-                self.advance();
-                Ok("ceil".into())
-            }
-            TokenKind::Round => {
-                self.advance();
-                Ok("round".into())
-            }
-            TokenKind::Log => {
-                self.advance();
-                Ok("log".into())
-            }
-            TokenKind::Exp => {
-                self.advance();
-                Ok("exp".into())
-            }
-            TokenKind::Atan2 => {
-                self.advance();
-                Ok("atan2".into())
-            }
-            TokenKind::BitAnd => {
-                self.advance();
-                Ok("bitand".into())
-            }
-            TokenKind::BitOr => {
-                self.advance();
-                Ok("bitor".into())
-            }
-            TokenKind::BitXor => {
-                self.advance();
-                Ok("bitxor".into())
-            }
-            TokenKind::BitNot => {
-                self.advance();
-                Ok("bitnot".into())
-            }
-            TokenKind::Sort => {
-                self.advance();
-                Ok("sort".into())
-            }
-            TokenKind::Rev => {
-                self.advance();
-                Ok("rev".into())
-            }
-            TokenKind::Dedup => {
-                self.advance();
-                Ok("dedup".into())
-            }
-            TokenKind::Take => {
-                self.advance();
-                Ok("take".into())
-            }
-            TokenKind::DropN => {
-                self.advance();
-                Ok("drop-n".into())
-            }
-            _ => Err(ParseError {
-                message: format!("Expected word, got {:?}", token.kind),
-                token,
-            }),
-        }
+        let name = match &token.kind {
+            TokenKind::Word(name) => name.clone(),
+            kind => match kind.keyword_name() {
+                Some(name) => name.to_string(),
+                None => {
+                    return Err(ParseError {
+                        message: format!("Expected word, got {kind:?}"),
+                        token,
+                    })
+                }
+            },
+        };
+        self.advance();
+        Ok(name)
     }
 
     /// Like expect_string but recovers: reports error and returns Err.
@@ -1059,13 +902,9 @@ impl Parser {
 
     /// Parse nodes until end delimiter. `inside_list` = true means we're inside
     /// a `[...]` list and `]` should always close it.
-    fn parse_until_recovering_inner(
-        &mut self,
-        end: TokenKind,
-        inside_list: bool,
-    ) -> Vec<AstNode> {
-        let is_rbracket = std::mem::discriminant(&end)
-            == std::mem::discriminant(&TokenKind::RBracket);
+    fn parse_until_recovering_inner(&mut self, end: TokenKind, inside_list: bool) -> Vec<AstNode> {
+        let is_rbracket =
+            std::mem::discriminant(&end) == std::mem::discriminant(&TokenKind::RBracket);
         // For RBracket: stop only when not inside a [..] list (bracket_depth == 0).
         // When bracket_depth > 0, ] belongs to the list, not to us.
         // Exception: if inside_list is true, always stop (we're the list parser).
@@ -1074,8 +913,7 @@ impl Parser {
         } else {
             true
         };
-        if can_stop
-            && std::mem::discriminant(&self.current().kind) == std::mem::discriminant(&end)
+        if can_stop && std::mem::discriminant(&self.current().kind) == std::mem::discriminant(&end)
         {
             self.advance();
             return Vec::new();
@@ -1086,8 +924,7 @@ impl Parser {
         while !self.is_at_end() {
             let should_stop = if is_rbracket && !inside_list {
                 self.bracket_depth == 0
-                    && std::mem::discriminant(&self.current().kind)
-                        == std::mem::discriminant(&end)
+                    && std::mem::discriminant(&self.current().kind) == std::mem::discriminant(&end)
             } else {
                 std::mem::discriminant(&self.current().kind) == std::mem::discriminant(&end)
             };
@@ -1114,9 +951,7 @@ impl Parser {
             });
         }
         // Consume the closing ] that we stopped at (parse_until stops before it)
-        if is_rbracket && !inside_list
-            && matches!(self.current().kind, TokenKind::RBracket)
-        {
+        if is_rbracket && !inside_list && matches!(self.current().kind, TokenKind::RBracket) {
             self.advance();
         }
         Self::fold_syntax_sugar(nodes)
@@ -1131,8 +966,7 @@ impl Parser {
                 let e_disc = std::mem::discriminant(e);
                 // Don't stop at RBracket if we're inside a [..] list (bracket_depth > 0).
                 // The ] belongs to the list, not to the ?? block.
-                if e_disc == std::mem::discriminant(&TokenKind::RBracket)
-                    && self.bracket_depth > 0
+                if e_disc == std::mem::discriminant(&TokenKind::RBracket) && self.bracket_depth > 0
                 {
                     false
                 } else {
@@ -1262,8 +1096,7 @@ mod tests {
     #[test]
     fn test_fold_loop_mixed_with_other_nodes() {
         // 5 { _ * } { _ 1 > } # .  →  5, Loop { body, condition }, .
-        let (ast, errors) =
-            Parser::parse_source_recovering("5 { _ * } { _ 1 > } # .");
+        let (ast, errors) = Parser::parse_source_recovering("5 { _ * } { _ 1 > } # .");
         assert!(errors.is_empty(), "should have no errors");
         assert_eq!(ast.len(), 3, "5 + Loop + . = 3 nodes, got {ast:?}");
         assert!(matches!(&ast[0], AstNode::Literal(_))); // 5
@@ -1289,8 +1122,7 @@ mod tests {
     fn test_loop_folding_preserves_nested_quotes() {
         // Nested: { { 1 } { 2 } # }  →  Quote(Loop)
         // The outer {} should remain a Quote; the inner ones should fold to Loop
-        let (ast, errors) =
-            Parser::parse_source_recovering("{ { 1 } { 2 } # }");
+        let (ast, errors) = Parser::parse_source_recovering("{ { 1 } { 2 } # }");
         assert!(errors.is_empty(), "should have no errors");
         assert_eq!(ast.len(), 1, "should be single Quote node, got {ast:?}");
         match &ast[0] {
@@ -1299,6 +1131,101 @@ mod tests {
                 assert!(matches!(&nodes[0], AstNode::Loop { .. }));
             }
             other => panic!("expected Quote, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_every_keyword_usable_as_def_name() {
+        // Guards the lexer <-> TokenKind::keyword_name invariant: any
+        // identifier that lexes to a keyword must round-trip back to its
+        // spelling so `: <keyword> { ... } ;` parses (the `over` regression).
+        let keywords = [
+            "import",
+            "export",
+            "append",
+            "prepend",
+            "len",
+            "drop",
+            "dup",
+            "swap",
+            "rot",
+            "over",
+            "mod",
+            "strlen",
+            "strcat",
+            "strslice",
+            "streq",
+            "strlt",
+            "strfind",
+            "strreplace",
+            "strtoi64",
+            "i64tostr",
+            "strnth",
+            "strchars",
+            "charsstr",
+            "striter",
+            "listfind",
+            "strjoin",
+            "strsplit",
+            "ctos",
+            "list-slice",
+            "args",
+            "map-new",
+            "map-get",
+            "map-set",
+            "map-del",
+            "map-keys",
+            "map-has",
+            "bytes-new",
+            "bytes-push",
+            "bytes-len",
+            "bytes-write",
+            "try",
+            "i64tof64",
+            "f64toi64",
+            "fsqrt",
+            "fsin",
+            "fcos",
+            "ftan",
+            "json-parse",
+            "json-stringify",
+            "now",
+            "sleep",
+            "random",
+            "randint",
+            "floor",
+            "ceil",
+            "round",
+            "log",
+            "exp",
+            "atan2",
+            "bitand",
+            "bitor",
+            "bitxor",
+            "bitnot",
+            "sort",
+            "rev",
+            "dedup",
+            "take",
+            "drop-n",
+            "split-cond",
+            "list?",
+            "i64?",
+            "str?",
+            "bool?",
+            "return",
+        ];
+        for kw in keywords {
+            let src = format!(": {kw} {{ 1 }} ;");
+            let (ast, errors) = Parser::parse_source_recovering(&src);
+            assert!(
+                errors.is_empty(),
+                "keyword '{kw}' should parse as def name: {errors:?}"
+            );
+            assert!(
+                matches!(&ast[0], AstNode::Def { name, .. } if name == kw),
+                "def name should round-trip to '{kw}', got {ast:?}"
+            );
         }
     }
 }

@@ -420,7 +420,10 @@ mod tests {
 
     #[test]
     fn test_constant_folding_strlen() {
-        let ops = vec![Opcode::PushStr(Rc::new("hello".to_string())), Opcode::StrLen];
+        let ops = vec![
+            Opcode::PushStr(Rc::new("hello".to_string())),
+            Opcode::StrLen,
+        ];
         let opt = optimize(&ops);
         assert_eq!(opt, vec![Opcode::PushI64(5)]);
     }
@@ -433,7 +436,10 @@ mod tests {
             Opcode::StrCat,
         ];
         let opt = optimize(&ops);
-        assert_eq!(opt, vec![Opcode::PushStr(Rc::new("Hello, World!".to_string()))]);
+        assert_eq!(
+            opt,
+            vec![Opcode::PushStr(Rc::new("Hello, World!".to_string()))]
+        );
     }
 
     #[test]

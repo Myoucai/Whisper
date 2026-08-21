@@ -345,10 +345,8 @@ struct ParsedUrl {
 fn parse_url(url: &str) -> Option<ParsedUrl> {
     let (use_tls, rest) = if let Some(r) = url.strip_prefix("https://") {
         (true, r)
-    } else if let Some(r) = url.strip_prefix("http://") {
-        (false, r)
     } else {
-        return None;
+        (false, url.strip_prefix("http://")?)
     };
 
     let (host_port, path) = rest.split_once('/').unwrap_or((rest, ""));

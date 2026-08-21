@@ -83,7 +83,12 @@ impl Vm {
             memory: Vec::new(),
             trace: false,
             rng_state: generate_rng_seed(),
-            word_cache: [const { None }, const { None }, const { None }, const { None }],
+            word_cache: [
+                const { None },
+                const { None },
+                const { None },
+                const { None },
+            ],
             word_cache_pos: 0,
             byte_buffers: Vec::new(),
             program_args: Vec::new(),
@@ -100,7 +105,12 @@ impl Vm {
             memory: Vec::new(),
             trace: false,
             rng_state: generate_rng_seed(),
-            word_cache: [const { None }, const { None }, const { None }, const { None }],
+            word_cache: [
+                const { None },
+                const { None },
+                const { None },
+                const { None },
+            ],
             word_cache_pos: 0,
             byte_buffers: Vec::new(),
             program_args: Vec::new(),
@@ -109,7 +119,12 @@ impl Vm {
 
     /// Define a word in the dictionary. Invalidate all cache entries.
     pub fn define_word(&mut self, name: String, code: Vec<Opcode>) {
-        self.word_cache = [const { None }, const { None }, const { None }, const { None }];
+        self.word_cache = [
+            const { None },
+            const { None },
+            const { None },
+            const { None },
+        ];
         self.word_cache_pos = 0;
         self.word_dict.insert(name, code);
     }
@@ -218,7 +233,9 @@ impl Vm {
                 let delim = self.pop_str()?;
                 let s = self.pop_str()?;
                 let parts: Vec<Value> = if delim.is_empty() {
-                    s.chars().map(|c| Value::Str(Rc::new(c.to_string()))).collect()
+                    s.chars()
+                        .map(|c| Value::Str(Rc::new(c.to_string())))
+                        .collect()
                 } else {
                     s.split(delim.as_ref())
                         .map(|part| Value::Str(Rc::new(part.to_string())))
@@ -245,16 +262,95 @@ impl Vm {
             Opcode::Shl => {
                 let shift = self.pop_i64()?;
                 let val = self.pop_i64()?;
-                self.data_stack.push(Value::I64(val.wrapping_shl(shift as u32)));
+                self.data_stack
+                    .push(Value::I64(val.wrapping_shl(shift as u32)));
             }
             Opcode::Shr => {
                 let shift = self.pop_i64()?;
                 let val = self.pop_i64()?;
-                self.data_stack.push(Value::I64(val.wrapping_shr(shift as u32)));
+                self.data_stack
+                    .push(Value::I64(val.wrapping_shr(shift as u32)));
             }
             Opcode::Args => {
                 let args = self.program_args.clone();
                 self.data_stack.push(Value::List(Rc::new(args)));
+            }
+            // Split `?? then | else ]` tokens at depth 1 (seed-compatible):
+            // tokens start → [then, else, next-index-past-closing-]
+            Opcode::SplitCond => {
+                let start = self.pop_i64()?.max(0) as usize;
+                let tokens = self.pop_list()?;
+                let mut then_branch: Vec<Value> = Vec::new();
+                let mut else_branch: Vec<Value> = Vec::new();
+                let mut depth: i64 = 1;
+                let mut in_else = false;
+                let mut i = start;
+                while i < tokens.len() && depth > 0 {
+                    let tok = tokens[i].clone();
+                    let s = match &tok {
+                        Value::Str(s) => Some(s.as_str()),
+                        _ => None,
+                    };
+                    let dst = if in_else {
+                        &mut else_branch
+                    } else {
+                        &mut then_branch
+                    };
+                    match s {
+                        Some("??") => {
+                            depth += 1;
+                            dst.push(tok);
+                        }
+                        Some("]") => {
+                            depth -= 1;
+                            if depth == 0 {
+                                break;
+                            }
+                            dst.push(tok);
+                        }
+                        Some("|") if depth == 1 => in_else = true,
+                        _ => dst.push(tok),
+                    }
+                    i += 1;
+                }
+                let next = (i + 1) as i64;
+                self.data_stack.push(Value::List(Rc::new(vec![
+                    Value::List(Rc::new(then_branch)),
+                    Value::List(Rc::new(else_branch)),
+                    Value::I64(next),
+                ])));
+            }
+            Opcode::ListCheck => {
+                let v = self.data_stack.pop().ok_or(VmError::StackUnderflow {
+                    expected: 1,
+                    actual: self.data_stack.len(),
+                })?;
+                let is_list = matches!(v, Value::List(_));
+                self.data_stack.push(Value::Bool(is_list));
+            }
+            Opcode::I64Check => {
+                let v = self.data_stack.pop().ok_or(VmError::StackUnderflow {
+                    expected: 1,
+                    actual: self.data_stack.len(),
+                })?;
+                let is_int = matches!(v, Value::I64(_));
+                self.data_stack.push(Value::Bool(is_int));
+            }
+            Opcode::StrCheck => {
+                let v = self.data_stack.pop().ok_or(VmError::StackUnderflow {
+                    expected: 1,
+                    actual: self.data_stack.len(),
+                })?;
+                let is_str = matches!(v, Value::Str(_));
+                self.data_stack.push(Value::Bool(is_str));
+            }
+            Opcode::BoolCheck => {
+                let v = self.data_stack.pop().ok_or(VmError::StackUnderflow {
+                    expected: 1,
+                    actual: self.data_stack.len(),
+                })?;
+                let is_bool = matches!(v, Value::Bool(_));
+                self.data_stack.push(Value::Bool(is_bool));
             }
 
             // === Arithmetic ===
@@ -646,10 +742,7 @@ impl Vm {
             }
             Opcode::MapKeys => {
                 let map = self.pop_map()?;
-                let keys: Vec<Value> = map
-                    .keys()
-                    .map(|k| Value::Str(Rc::new(k.clone())))
-                    .collect();
+                let keys: Vec<Value> = map.keys().map(|k| Value::Str(Rc::new(k.clone()))).collect();
                 self.data_stack.push(Value::List(Rc::new(keys)));
             }
             Opcode::MapHas => {
@@ -1025,8 +1118,12 @@ impl Vm {
     }
 
     fn pop_bool(&mut self) -> Result<bool, VmError> {
+        // C-style truthiness (seed-runtime compatible): integers/floats are
+        // true when non-zero, so guard words can return 0/1 flags.
         match self.pop()?.unwrap_signal() {
             Value::Bool(b) => Ok(b),
+            Value::I64(n) => Ok(n != 0),
+            Value::F64(x) => Ok(x != 0.0),
             other => Err(VmError::TypeMismatch {
                 expected: "bool".into(),
                 actual: other.type_name().into(),
@@ -1982,11 +2079,13 @@ mod tests {
         let mut vm = Vm::new();
         // [3 1 4 1 5] { _ 2 > } @filter -> [3 4 5]
         vm.data_stack.push(Value::List(Rc::new(vec![
-            Value::I64(3), Value::I64(1), Value::I64(4), Value::I64(1), Value::I64(5),
+            Value::I64(3),
+            Value::I64(1),
+            Value::I64(4),
+            Value::I64(1),
+            Value::I64(5),
         ])));
-        let pred: Rc<[Opcode]> = Rc::from(vec![
-            Opcode::PushI64(2), Opcode::Gt,
-        ].into_boxed_slice());
+        let pred: Rc<[Opcode]> = Rc::from(vec![Opcode::PushI64(2), Opcode::Gt].into_boxed_slice());
         vm.data_stack.push(Value::Ref(pred));
         let r = vm.execute(&[Opcode::Filter]).unwrap().unwrap();
         match r {
@@ -2003,12 +2102,9 @@ mod tests {
     #[test]
     fn test_filter_empty_result() {
         let mut vm = Vm::new();
-        vm.data_stack.push(Value::List(Rc::new(vec![
-            Value::I64(1), Value::I64(2),
-        ])));
-        let pred: Rc<[Opcode]> = Rc::from(vec![
-            Opcode::PushI64(10), Opcode::Gt,
-        ].into_boxed_slice());
+        vm.data_stack
+            .push(Value::List(Rc::new(vec![Value::I64(1), Value::I64(2)])));
+        let pred: Rc<[Opcode]> = Rc::from(vec![Opcode::PushI64(10), Opcode::Gt].into_boxed_slice());
         vm.data_stack.push(Value::Ref(pred));
         let r = vm.execute(&[Opcode::Filter]).unwrap().unwrap();
         match r {
@@ -2020,7 +2116,8 @@ mod tests {
     #[test]
     fn test_strsplit_basic() {
         let mut vm = Vm::new();
-        vm.data_stack.push(Value::Str(Rc::new("hello world".into())));
+        vm.data_stack
+            .push(Value::Str(Rc::new("hello world".into())));
         vm.data_stack.push(Value::Str(Rc::new(" ".into())));
         let r = vm.execute(&[Opcode::StrSplit]).unwrap().unwrap();
         match r {
@@ -2036,11 +2133,17 @@ mod tests {
     #[test]
     fn test_strsplit_newlines() {
         let mut vm = Vm::new();
-        vm.data_stack.push(Value::Str(Rc::new("a
+        vm.data_stack.push(Value::Str(Rc::new(
+            "a
 b
-c".into())));
-        vm.data_stack.push(Value::Str(Rc::new("
-".into())));
+c"
+            .into(),
+        )));
+        vm.data_stack.push(Value::Str(Rc::new(
+            "
+"
+            .into(),
+        )));
         let r = vm.execute(&[Opcode::StrSplit]).unwrap().unwrap();
         match r {
             Value::List(items) => {
@@ -2085,7 +2188,11 @@ c".into())));
     fn test_listslice_basic() {
         let mut vm = Vm::new();
         vm.data_stack.push(Value::List(Rc::new(vec![
-            Value::I64(1), Value::I64(2), Value::I64(3), Value::I64(4), Value::I64(5),
+            Value::I64(1),
+            Value::I64(2),
+            Value::I64(3),
+            Value::I64(4),
+            Value::I64(5),
         ])));
         vm.data_stack.push(Value::I64(1)); // start
         vm.data_stack.push(Value::I64(3)); // len
@@ -2106,7 +2213,10 @@ c".into())));
         let mut vm = Vm::new();
         // [1 2 3 4] 1 3 listslice -> [2 3 4]
         vm.data_stack.push(Value::List(Rc::new(vec![
-            Value::I64(1), Value::I64(2), Value::I64(3), Value::I64(4),
+            Value::I64(1),
+            Value::I64(2),
+            Value::I64(3),
+            Value::I64(4),
         ])));
         vm.data_stack.push(Value::I64(1));
         vm.data_stack.push(Value::I64(3));
@@ -2123,9 +2233,8 @@ c".into())));
     #[test]
     fn test_listslice_clamp() {
         let mut vm = Vm::new();
-        vm.data_stack.push(Value::List(Rc::new(vec![
-            Value::I64(1), Value::I64(2),
-        ])));
+        vm.data_stack
+            .push(Value::List(Rc::new(vec![Value::I64(1), Value::I64(2)])));
         vm.data_stack.push(Value::I64(0));
         vm.data_stack.push(Value::I64(100)); // exceeds length
         let r = vm.execute(&[Opcode::ListSlice]).unwrap().unwrap();
@@ -2241,9 +2350,7 @@ c".into())));
             Value::I64(4),
             Value::I64(5),
         ])));
-        let pred: Rc<[Opcode]> = Rc::from(
-            vec![Opcode::PushI64(3), Opcode::Gt].into_boxed_slice(),
-        );
+        let pred: Rc<[Opcode]> = Rc::from(vec![Opcode::PushI64(3), Opcode::Gt].into_boxed_slice());
         vm.data_stack.push(Value::Ref(pred));
         let r = vm.execute(&[Opcode::Filter]).unwrap().unwrap();
         match r {
@@ -2272,7 +2379,10 @@ c".into())));
             .as_secs() as i64;
         match r {
             Value::I64(ts) => {
-                assert!(ts >= before && ts <= after, "timestamp {ts} not in [{before}, {after}]");
+                assert!(
+                    ts >= before && ts <= after,
+                    "timestamp {ts} not in [{before}, {after}]"
+                );
             }
             _ => panic!("expected I64, got {:?}", r),
         }
@@ -2329,7 +2439,10 @@ c".into())));
         vm.data_stack.push(Value::F64(1.0));
         let r = vm.execute(&[Opcode::Exp]).unwrap().unwrap();
         match r {
-            Value::F64(v) => assert!((v - std::f64::consts::E).abs() < 1e-10, "exp(1) should be e"),
+            Value::F64(v) => assert!(
+                (v - std::f64::consts::E).abs() < 1e-10,
+                "exp(1) should be e"
+            ),
             _ => panic!("expected F64"),
         }
     }
@@ -2343,7 +2456,10 @@ c".into())));
         match r {
             Value::F64(v) => {
                 let expected = std::f64::consts::FRAC_PI_4;
-                assert!((v - expected).abs() < 1e-10, "atan2(1,1) should be pi/4, got {v}");
+                assert!(
+                    (v - expected).abs() < 1e-10,
+                    "atan2(1,1) should be pi/4, got {v}"
+                );
             }
             _ => panic!("expected F64"),
         }
@@ -2402,5 +2518,4 @@ c".into())));
         let r = vm.execute(&[Opcode::BitNot, Opcode::BitNot]).unwrap();
         assert_eq!(r, Some(Value::I64(42))); // double NOT is identity
     }
-
 }

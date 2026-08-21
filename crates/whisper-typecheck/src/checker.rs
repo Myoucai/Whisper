@@ -108,7 +108,10 @@ impl TypeChecker {
         });
 
         // Resolve type variables using the temp inferer before swapping back
-        let inputs: Vec<Type> = input_types.iter().map(|t| self.inferer.resolve(t)).collect();
+        let inputs: Vec<Type> = input_types
+            .iter()
+            .map(|t| self.inferer.resolve(t))
+            .collect();
         let outputs: Vec<Type> = stack.iter().map(|t| self.inferer.resolve(t)).collect();
 
         // Restore the main inferer (discard inference temporaries)
@@ -638,19 +641,37 @@ impl TypeChecker {
             }
             Operator::Dedup => {
                 let t = self.inferer.fresh_var();
-                self.expect(stack, &Type::List(Box::new(t.clone())), errors, ctx, "dedup");
+                self.expect(
+                    stack,
+                    &Type::List(Box::new(t.clone())),
+                    errors,
+                    ctx,
+                    "dedup",
+                );
                 stack.push(Type::List(Box::new(t)));
             }
             Operator::Take => {
                 self.expect(stack, &Type::I64, errors, ctx, "take n");
                 let t = self.inferer.fresh_var();
-                self.expect(stack, &Type::List(Box::new(t.clone())), errors, ctx, "take list");
+                self.expect(
+                    stack,
+                    &Type::List(Box::new(t.clone())),
+                    errors,
+                    ctx,
+                    "take list",
+                );
                 stack.push(Type::List(Box::new(t)));
             }
             Operator::DropN => {
                 self.expect(stack, &Type::I64, errors, ctx, "drop-n n");
                 let t = self.inferer.fresh_var();
-                self.expect(stack, &Type::List(Box::new(t.clone())), errors, ctx, "drop-n list");
+                self.expect(
+                    stack,
+                    &Type::List(Box::new(t.clone())),
+                    errors,
+                    ctx,
+                    "drop-n list",
+                );
                 stack.push(Type::List(Box::new(t)));
             }
 
@@ -670,7 +691,13 @@ impl TypeChecker {
             }
             Operator::Prepend => {
                 let t = self.inferer.fresh_var();
-                self.expect(stack, &Type::List(Box::new(t.clone())), errors, ctx, "prepend list");
+                self.expect(
+                    stack,
+                    &Type::List(Box::new(t.clone())),
+                    errors,
+                    ctx,
+                    "prepend list",
+                );
                 self.expect(stack, &t, errors, ctx, "prepend elem");
                 stack.push(Type::List(Box::new(t)));
             }

@@ -297,6 +297,13 @@ impl WbinReader {
             0xE2 => Ok(Opcode::Take),
             0xE3 => Ok(Opcode::DropN),
 
+            // Seed-runtime natives
+            0xF0 => Ok(Opcode::SplitCond),
+            0xE4 => Ok(Opcode::ListCheck),
+            0xE5 => Ok(Opcode::I64Check),
+            0xE6 => Ok(Opcode::StrCheck),
+            0xE7 => Ok(Opcode::BoolCheck),
+
             // Control flow
             0x50 => {
                 let offset = leb128::read::signed(cursor)

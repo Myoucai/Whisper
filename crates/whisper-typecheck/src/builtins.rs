@@ -53,10 +53,16 @@ pub fn get_builtin_signature(name: &str) -> Option<(Vec<Type>, Vec<Type>)> {
         )),
         "len" => Some((vec![Type::List(Box::new(tv()))], vec![i64.clone()])),
         "@filter" => Some((
-            vec![Type::List(Box::new(tv())), Type::Ref(vec![tv()], vec![Type::Bool])],
+            vec![
+                Type::List(Box::new(tv())),
+                Type::Ref(vec![tv()], vec![Type::Bool]),
+            ],
             vec![Type::List(Box::new(tv()))],
         )),
-        "strsplit" => Some((vec![Type::Str, Type::Str], vec![Type::List(Box::new(Type::Str))])),
+        "strsplit" => Some((
+            vec![Type::Str, Type::Str],
+            vec![Type::List(Box::new(Type::Str))],
+        )),
         "ctos" => Some((vec![Type::I64], vec![Type::Str])),
         "listslice" => Some((
             vec![Type::List(Box::new(tv())), Type::I64, Type::I64],
@@ -136,9 +142,18 @@ pub fn get_builtin_signature(name: &str) -> Option<(Vec<Type>, Vec<Type>)> {
         "bitnot" => Some((vec![Type::I64], vec![Type::I64])),
 
         // Sort
-        "sort" => Some((vec![Type::List(Box::new(tv()))], vec![Type::List(Box::new(tv()))])),
-        "rev" => Some((vec![Type::List(Box::new(tv()))], vec![Type::List(Box::new(tv()))])),
-        "dedup" => Some((vec![Type::List(Box::new(tv()))], vec![Type::List(Box::new(tv()))])),
+        "sort" => Some((
+            vec![Type::List(Box::new(tv()))],
+            vec![Type::List(Box::new(tv()))],
+        )),
+        "rev" => Some((
+            vec![Type::List(Box::new(tv()))],
+            vec![Type::List(Box::new(tv()))],
+        )),
+        "dedup" => Some((
+            vec![Type::List(Box::new(tv()))],
+            vec![Type::List(Box::new(tv()))],
+        )),
         "take" => Some((
             vec![Type::List(Box::new(tv())), Type::I64],
             vec![Type::List(Box::new(tv()))],

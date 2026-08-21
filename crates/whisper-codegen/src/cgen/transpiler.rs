@@ -74,8 +74,12 @@ fn escape_c_string(s: &str) -> String {
 fn collect_strings(opcodes: &[Opcode], strings: &mut StringPool) {
     for op in opcodes {
         match op {
-            Opcode::PushStr(s) => { strings.intern(s); }
-            Opcode::PushRef(inner) => { collect_strings(inner, strings); }
+            Opcode::PushStr(s) => {
+                strings.intern(s);
+            }
+            Opcode::PushRef(inner) => {
+                collect_strings(inner, strings);
+            }
             _ => {}
         }
     }
@@ -95,12 +99,15 @@ fn safe_c_name(name: &str) -> String {
 }
 
 /// Translate a sequence of opcodes to C statements.
-fn transpile_opcodes(opcodes: &[Opcode], out: &mut String, strings: &mut StringPool, indent: usize) {
+fn transpile_opcodes(
+    opcodes: &[Opcode],
+    out: &mut String,
+    strings: &mut StringPool,
+    indent: usize,
+) {
     let pad = " ".repeat(indent);
     let labels = collect_labels(opcodes);
     let label_set: std::collections::HashSet<usize> = labels.iter().copied().collect();
-
-    let max_label = labels.last().copied().unwrap_or(0);
 
     let mut i = 0;
     while i < opcodes.len() {
@@ -132,7 +139,10 @@ fn transpile_opcodes(opcodes: &[Opcode], out: &mut String, strings: &mut StringP
                 let _ = writeln!(out, "{{");
                 let _ = writeln!(out, "{pad}  int64_t _count = (int64_t)w_pop();");
                 let _ = writeln!(out, "{pad}  wval *_list = w_list_new(_count);");
-                let _ = writeln!(out, "{pad}  for (int64_t _i = _count - 1; _i >= 0; _i--) {{");
+                let _ = writeln!(
+                    out,
+                    "{pad}  for (int64_t _i = _count - 1; _i >= 0; _i--) {{"
+                );
                 let _ = writeln!(out, "{pad}    _list[1 + _i] = w_pop();");
                 let _ = writeln!(out, "{pad}  }}");
                 let _ = writeln!(out, "{pad}  w_push((wval)_list);");
@@ -147,11 +157,21 @@ fn transpile_opcodes(opcodes: &[Opcode], out: &mut String, strings: &mut StringP
             }
 
             // ── Stack operations ────────────────────────────────
-            Opcode::Dup => { let _ = writeln!(out, "{pad}w_dup();"); }
-            Opcode::Swap => { let _ = writeln!(out, "{pad}w_swap();"); }
-            Opcode::Drop => { let _ = writeln!(out, "{pad}w_drop();"); }
-            Opcode::Rot => { let _ = writeln!(out, "{pad}w_rot();"); }
-            Opcode::Pick(n) => { let _ = writeln!(out, "{pad}w_pick_n({n});"); }
+            Opcode::Dup => {
+                let _ = writeln!(out, "{pad}w_dup();");
+            }
+            Opcode::Swap => {
+                let _ = writeln!(out, "{pad}w_swap();");
+            }
+            Opcode::Drop => {
+                let _ = writeln!(out, "{pad}w_drop();");
+            }
+            Opcode::Rot => {
+                let _ = writeln!(out, "{pad}w_rot();");
+            }
+            Opcode::Pick(n) => {
+                let _ = writeln!(out, "{pad}w_pick_n({n});");
+            }
 
             // ── Arithmetic ──────────────────────────────────────
             Opcode::Add => {
@@ -198,18 +218,29 @@ fn transpile_opcodes(opcodes: &[Opcode], out: &mut String, strings: &mut StringP
                 let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); w_push((wval)((int64_t)_a || (int64_t)_b ? 1L : 0L)); }}");
             }
             Opcode::Not => {
-                let _ = writeln!(out, "{{ wval _a = w_pop(); w_push((wval)((int64_t)_a == 0 ? 1L : 0L)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ wval _a = w_pop(); w_push((wval)((int64_t)_a == 0 ? 1L : 0L)); }}"
+                );
             }
 
             // ── Control flow ────────────────────────────────────
             Opcode::Cond(offset) => {
-                let _ = writeln!(out, "{{ wval _cond = w_pop(); if ((int64_t)_cond == 0) goto L_{}; }}", i as i32 + 1 + offset);
+                let _ = writeln!(
+                    out,
+                    "{{ wval _cond = w_pop(); if ((int64_t)_cond == 0) goto L_{}; }}",
+                    i as i32 + 1 + offset
+                );
             }
             Opcode::Jump(offset) => {
                 let _ = writeln!(out, "{pad}goto L_{};", i as i32 + 1 + offset);
             }
             Opcode::Loop(offset) => {
-                let _ = writeln!(out, "{{ wval _cond = w_pop(); if ((int64_t)_cond != 0) goto L_{}; }}", i as i32 + 1 + offset);
+                let _ = writeln!(
+                    out,
+                    "{{ wval _cond = w_pop(); if ((int64_t)_cond != 0) goto L_{}; }}",
+                    i as i32 + 1 + offset
+                );
             }
             Opcode::Times => {
                 // n {body} @times — body was already pushed as PushRef
@@ -240,7 +271,10 @@ fn transpile_opcodes(opcodes: &[Opcode], out: &mut String, strings: &mut StringP
                 let _ = writeln!(out, "{{ wval *_list = (wval *)w_pop(); wval _elem = w_pop(); w_push((wval)w_list_prepend(_elem, _list)); }}");
             }
             Opcode::Len => {
-                let _ = writeln!(out, "{{ wval *_list = (wval *)w_pop(); w_push((wval)w_list_len(_list)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ wval *_list = (wval *)w_pop(); w_push((wval)w_list_len(_list)); }}"
+                );
             }
             Opcode::Map => {
                 // list {fn} @map — fn was inlined as PushRef before this
@@ -257,10 +291,16 @@ fn transpile_opcodes(opcodes: &[Opcode], out: &mut String, strings: &mut StringP
                 let _ = writeln!(out, "{pad}// @filter: requires callback function");
             }
             Opcode::Sort => {
-                let _ = writeln!(out, "{{ wval *_list = (wval *)w_pop(); w_push((wval)w_list_sort(_list)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ wval *_list = (wval *)w_pop(); w_push((wval)w_list_sort(_list)); }}"
+                );
             }
             Opcode::Rev => {
-                let _ = writeln!(out, "{{ wval *_list = (wval *)w_pop(); w_push((wval)w_list_rev(_list)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ wval *_list = (wval *)w_pop(); w_push((wval)w_list_rev(_list)); }}"
+                );
             }
             Opcode::Dedup => {
                 let _ = writeln!(out, "{pad}// @dedup: TODO");
@@ -301,10 +341,16 @@ fn transpile_opcodes(opcodes: &[Opcode], out: &mut String, strings: &mut StringP
                 let _ = writeln!(out, "{{ const char *_new = (const char *)w_pop(); const char *_old = (const char *)w_pop(); const char *_src = (const char *)w_pop(); w_push((wval)w_str_replace(_src, _old, _new)); }}");
             }
             Opcode::StrToI64 => {
-                let _ = writeln!(out, "{{ const char *_s = (const char *)w_pop(); w_push((wval)w_str_to_i64(_s)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ const char *_s = (const char *)w_pop(); w_push((wval)w_str_to_i64(_s)); }}"
+                );
             }
             Opcode::I64ToStr => {
-                let _ = writeln!(out, "{{ int64_t _n = (int64_t)w_pop(); w_push((wval)w_i64_to_str(_n)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ int64_t _n = (int64_t)w_pop(); w_push((wval)w_i64_to_str(_n)); }}"
+                );
             }
             Opcode::StrNth => {
                 let _ = writeln!(out, "{{ int64_t _idx = (int64_t)w_pop(); const char *_s = (const char *)w_pop(); w_push((wval)(int64_t)(_s[_idx])); }}");
@@ -325,7 +371,10 @@ fn transpile_opcodes(opcodes: &[Opcode], out: &mut String, strings: &mut StringP
                 let _ = writeln!(out, "{pad}// @strsplit: TODO");
             }
             Opcode::Ctos => {
-                let _ = writeln!(out, "{{ int64_t _c = (int64_t)w_pop(); w_push((wval)rt_ctos(_c)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ int64_t _c = (int64_t)w_pop(); w_push((wval)rt_ctos(_c)); }}"
+                );
             }
 
             // ── Map operations ──────────────────────────────────
@@ -342,7 +391,10 @@ fn transpile_opcodes(opcodes: &[Opcode], out: &mut String, strings: &mut StringP
                 let _ = writeln!(out, "{{ const char *_key = (const char *)w_pop(); wval *_map = (wval *)w_pop(); w_push((wval)w_map_del(_map, _key)); }}");
             }
             Opcode::MapKeys => {
-                let _ = writeln!(out, "{{ wval *_map = (wval *)w_pop(); w_push((wval)w_map_keys(_map)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ wval *_map = (wval *)w_pop(); w_push((wval)w_map_keys(_map)); }}"
+                );
             }
             Opcode::MapHas => {
                 let _ = writeln!(out, "{{ const char *_key = (const char *)w_pop(); wval *_map = (wval *)w_pop(); w_push((wval)w_map_has(_map, _key)); }}");
@@ -403,7 +455,10 @@ fn transpile_opcodes(opcodes: &[Opcode], out: &mut String, strings: &mut StringP
                 let _ = writeln!(out, "{{ int64_t _b = (int64_t)w_pop(); int64_t _a = (int64_t)w_pop(); w_push((wval)w_bitxor(_a, _b)); }}");
             }
             Opcode::BitNot => {
-                let _ = writeln!(out, "{{ int64_t _a = (int64_t)w_pop(); w_push((wval)w_bitnot(_a)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ int64_t _a = (int64_t)w_pop(); w_push((wval)w_bitnot(_a)); }}"
+                );
             }
 
             // ── JSON ────────────────────────────────────────────
@@ -411,7 +466,10 @@ fn transpile_opcodes(opcodes: &[Opcode], out: &mut String, strings: &mut StringP
                 let _ = writeln!(out, "{pad}// json_parse: TODO (simplified)");
             }
             Opcode::JsonStringify => {
-                let _ = writeln!(out, "{{ wval _v = w_pop(); w_push((wval)w_json_stringify(_v)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ wval _v = w_pop(); w_push((wval)w_json_stringify(_v)); }}"
+                );
             }
 
             // ── IO ──────────────────────────────────────────────
@@ -427,7 +485,10 @@ fn transpile_opcodes(opcodes: &[Opcode], out: &mut String, strings: &mut StringP
 
             // ── Byte buffer ─────────────────────────────────────
             Opcode::BytesNew => {
-                let _ = writeln!(out, "{pad}w_push((wval)w_list_new(0)); // byte buffer as list");
+                let _ = writeln!(
+                    out,
+                    "{pad}w_push((wval)w_list_new(0)); // byte buffer as list"
+                );
             }
             Opcode::BytesPush => {
                 let _ = writeln!(out, "{pad}// bytes_push: TODO");
@@ -452,7 +513,10 @@ fn transpile_opcodes(opcodes: &[Opcode], out: &mut String, strings: &mut StringP
                 let _ = writeln!(out, "{{ int64_t _ms = (int64_t)w_pop(); w_sleep(_ms); }}");
             }
             Opcode::Random => {
-                let _ = writeln!(out, "{{ double _f = w_random(); w_push((wval)*(uint64_t*)&_f); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ double _f = w_random(); w_push((wval)*(uint64_t*)&_f); }}"
+                );
             }
             Opcode::RandInt => {
                 let _ = writeln!(out, "{{ int64_t _max = (int64_t)w_pop(); int64_t _min = (int64_t)w_pop(); w_push((wval)w_randint(_min, _max)); }}");
@@ -461,6 +525,29 @@ fn transpile_opcodes(opcodes: &[Opcode], out: &mut String, strings: &mut StringP
             // ── Args ────────────────────────────────────────────
             Opcode::Args => {
                 let _ = writeln!(out, "{pad}w_push((wval)w_args());");
+            }
+
+            // ── Seed-runtime natives ────────────────────────────
+            Opcode::SplitCond => {
+                let _ = writeln!(out, "{pad}{{int64_t _start=(int64_t)w_pop();wval *_toks=(wval*)w_pop();wval *_th=0,*_el=0;int _next=0;split_cond(_toks,(int)_start,&_th,&_el,&_next);wval *_r=w_list_new(3);_r[1]=(wval)_th;_r[2]=(wval)_el;_r[3]=(wval)(int64_t)_next;w_push((wval)_r);}}");
+            }
+            Opcode::ListCheck => {
+                let _ = writeln!(out, "{pad}w_push((wval)(w_is_list_val(w_pop()) ? 1 : 0));");
+            }
+            Opcode::I64Check => {
+                let _ = writeln!(
+                    out,
+                    "{pad}{{wval _v=w_pop();w_push((wval)(_v < (wval)w_heap || _v >= (wval)(w_heap + HEAP_SIZE) ? 1 : 0));}}"
+                );
+            }
+            Opcode::StrCheck => {
+                let _ = writeln!(out, "{pad}w_push((wval)(wval_is_str(w_pop()) ? 1 : 0));");
+            }
+            Opcode::BoolCheck => {
+                let _ = writeln!(
+                    out,
+                    "{pad}{{wval _v=w_pop();w_push((wval)(_v == 0 || _v == 1 ? 1 : 0));}}"
+                );
             }
 
             // ── Capability (no-op in native) ────────────────────
@@ -527,10 +614,7 @@ fn collect_labels(opcodes: &[Opcode]) -> Vec<usize> {
 
 /// Generate a complete C program from bytecodes and definitions.
 /// This is the main entry point for the C transpiler.
-pub fn transpile_to_c(
-    main_bytecode: &[Opcode],
-    defs: &[(String, Vec<Opcode>)],
-) -> String {
+pub fn transpile_to_c(main_bytecode: &[Opcode], defs: &[(String, Vec<Opcode>)]) -> String {
     let mut out = String::new();
     let mut strings = StringPool::new();
 

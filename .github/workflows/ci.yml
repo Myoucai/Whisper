@@ -29,7 +29,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run tests
-        run: cargo test --workspace --exclude whisper-cli
+        run: cargo test --workspace
 
       - name: Build CLI
         run: cargo build --release -p whisper-cli
@@ -39,6 +39,34 @@ jobs:
           ./target/release/whisper run docs/examples/hello.ws
           ./target/release/whisper run docs/examples/sum.ws
           ./target/release/whisper run docs/examples/factorial.ws
+
+      - name: Stdlib smoke (import + keyword-named defs)
+        run: |
+          printf 'import "std/math"\npi floor .' > /tmp/sm1.ws
+          ./target/release/whisper run /tmp/sm1.ws
+          printf 'import "std/list"\n[1 2 3 4 5] { _ * } @map sum .' > /tmp/sm2.ws
+          ./target/release/whisper run /tmp/sm2.ws
+          printf 'import "std/str"\n"hello" strlen .' > /tmp/sm3.ws
+          ./target/release/whisper run /tmp/sm3.ws
+
+      - name: Hard self-hosting smoke
+        run: |
+          printf '2 3 + .' > /tmp/bt.ws
+          ./target/release/whisper bootstrap --hard /tmp/bt.ws
+
+  selfhost:
+    name: Self-hosting chain (C seed)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build seed compiler
+        run: gcc -O2 -o whisper0 whisperc/seed/compiler_seed.c -lm
+      - name: Core tests (interpreter mode)
+        run: bash whisper_test/run_core.sh ./whisper0 run
+      - name: Core tests (C-emission mode)
+        run: bash whisper_test/run_core.sh ./whisper0 c
+      - name: Verify self-hosting fixed point
+        run: bash scripts/verify-fixedpoint.sh
 
   lint:
     name: Lint

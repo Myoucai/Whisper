@@ -40,7 +40,6 @@ fn register_core_words(vm: &mut Vm) -> Result<(), String> {
 : mean { _ sum ` len / } ;
 : first { 0 @nth } ;
 : last { _ len 1 - @nth } ;
-: over { $1 } ;
 : gcd { _ 0 = ?? drop | ` over % gcd ] } ;
 : has? { strfind 0 >= } ;
 : pow { _ 0 = ?? drop 1 | 1 ` { over * } @times ] } ;
@@ -48,8 +47,12 @@ fn register_core_words(vm: &mut Vm) -> Result<(), String> {
 : factorial { _ 1 > ?? _ 1 - factorial * | drop 1 ] } ;
 : fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;
 "#;
-    let ast = Parser::parse_source(core_source)
-        .map_err(|e| format!("Core word parse error at {}:{}: {}", e.token.span.line, e.token.span.column, e.message))?;
+    let ast = Parser::parse_source(core_source).map_err(|e| {
+        format!(
+            "Core word parse error at {}:{}: {}",
+            e.token.span.line, e.token.span.column, e.message
+        )
+    })?;
     let mut gen = BytecodeGenerator::new();
     let (_, defs) = gen.compile(&ast);
     for (name, code) in defs {

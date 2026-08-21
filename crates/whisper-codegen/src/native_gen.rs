@@ -63,14 +63,26 @@ impl X {
         self.next_pos = self.v.len();
     }
     // REX prefix helpers: W=1 always (64-bit), R extends reg, B extends r/m
-    fn rex_w(&self) -> u8 { 0x48 } // REX.W only
-    fn rex_wr(&self, reg: u8) -> u8 { 0x48 | ((reg >> 3) & 1) << 2 } // REX.W + R (extends reg field)
-    fn rex_wb(&self, rm: u8) -> u8 { 0x48 | ((rm >> 3) & 1) } // REX.W + B (extends r/m field)
-    fn rex_wrb(&self, reg: u8, rm: u8) -> u8 { 0x48 | ((reg >> 3) & 1) << 2 | ((rm >> 3) & 1) } // REX.W + R + B
+    fn rex_w(&self) -> u8 {
+        0x48
+    } // REX.W only
+    fn rex_wr(&self, reg: u8) -> u8 {
+        0x48 | ((reg >> 3) & 1) << 2
+    } // REX.W + R (extends reg field)
+    fn rex_wb(&self, rm: u8) -> u8 {
+        0x48 | ((rm >> 3) & 1)
+    } // REX.W + B (extends r/m field)
+    fn rex_wrb(&self, reg: u8, rm: u8) -> u8 {
+        0x48 | ((reg >> 3) & 1) << 2 | ((rm >> 3) & 1)
+    } // REX.W + R + B
 
     fn mov_r64i(&mut self, r: u8, v: u64) {
         // mov r64, imm64: REX.W[B] + B8+rd
-        if r >= 8 { self.b(0x49); } else { self.b(0x48); }
+        if r >= 8 {
+            self.b(0x49);
+        } else {
+            self.b(0x48);
+        }
         self.b(0xB8 | (r & 7));
         self.u64(v);
     }
@@ -124,12 +136,16 @@ impl X {
     }
     fn push_r(&mut self, r: u8) {
         // push r64: REX.B + 50+rd (only needs REX if r8-r15)
-        if r >= 8 { self.b(0x41); }
+        if r >= 8 {
+            self.b(0x41);
+        }
         self.b(0x50 | (r & 7));
     }
     fn pop_r(&mut self, r: u8) {
         // pop r64: REX.B + 58+rd
-        if r >= 8 { self.b(0x41); }
+        if r >= 8 {
+            self.b(0x41);
+        }
         self.b(0x58 | (r & 7));
     }
     fn xor_rr(&mut self, a: u8, b: u8) {
@@ -268,10 +284,10 @@ pub fn compile_to_native(bytecode: &[Opcode], defs: &[(String, Vec<Opcode>)]) ->
     x.mov_r64i(15, CODE_VADDR + 0x80000 - 8); // r15 = stack top
     x.mov_r64i(14, CODE_VADDR + 0x1000); // r14 = bytecode base
     x.xor_rr(13, 13); // r13 = 0 (ip)
-    // Initialize alloc_ptr
+                      // Initialize alloc_ptr
     x.mov_r64i(0, HEAP_VADDR);
     x.i(&[0x49, 0xA3]); // mov [ALLOC_PTR_ADDR], rax (uses REX.WR prefix)
-    // Actually, let's use a simpler approach: store via indirect
+                        // Actually, let's use a simpler approach: store via indirect
     x.mov_r64i(8, ALLOC_PTR_ADDR);
     x.mov_mr(8, 0, 0); // [r8] = rax = HEAP_VADDR
 
@@ -310,7 +326,14 @@ pub fn compile_to_native(bytecode: &[Opcode], defs: &[(String, Vec<Opcode>)]) ->
     let run_ref_addr = impl_run_ref(&mut x, &raw_bc);
 
     // Patch helper call sites (marker 0=itoa, 1=alloc, 2=run_ref)
-    patch_helper_calls(&mut x, itoa_addr, str_eq_addr, str_cmp_addr, alloc_addr, run_ref_addr);
+    patch_helper_calls(
+        &mut x,
+        itoa_addr,
+        str_eq_addr,
+        str_cmp_addr,
+        alloc_addr,
+        run_ref_addr,
+    );
 
     // ── Build ELF ────────────────────────────────────────────────
     build_elf(&x.v, &raw_bc, &word_entries)
@@ -320,41 +343,77 @@ pub fn compile_to_native(bytecode: &[Opcode], defs: &[(String, Vec<Opcode>)]) ->
 
 fn register_all_opcodes(x: &mut X) {
     // Stack
-    for op in [0x00, 0x01, 0x02, 0x03, 0x04] { x.op(op); }
+    for op in [0x00, 0x01, 0x02, 0x03, 0x04] {
+        x.op(op);
+    }
     // Extended ops (Filter, StrSplit, Ctos, ListSlice, Shl, Shr)
-    for op in [0x05, 0x06, 0x07, 0x08, 0x09, 0x0A] { x.op(op); }
+    for op in [0x05, 0x06, 0x07, 0x08, 0x09, 0x0A] {
+        x.op(op);
+    }
     // Arith
-    for op in [0x10, 0x11, 0x12, 0x13, 0x14] { x.op(op); }
+    for op in [0x10, 0x11, 0x12, 0x13, 0x14] {
+        x.op(op);
+    }
     // Compare
-    for op in [0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D] { x.op(op); }
+    for op in [0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D] {
+        x.op(op);
+    }
     // Logic
-    for op in [0x20, 0x21, 0x22] { x.op(op); }
+    for op in [0x20, 0x21, 0x22] {
+        x.op(op);
+    }
     // Literals
-    for op in [0x30, 0x31, 0x32, 0x33, 0x34, 0x35] { x.op(op); }
+    for op in [0x30, 0x31, 0x32, 0x33, 0x34, 0x35] {
+        x.op(op);
+    }
     // List ops
-    for op in [0x40, 0x41, 0x42, 0x43, 0x44, 0x45] { x.op(op); }
+    for op in [0x40, 0x41, 0x42, 0x43, 0x44, 0x45] {
+        x.op(op);
+    }
     // String ops 0x46-0x4F
-    for op in 0x46..=0x4F { x.op(op); }
+    for op in 0x46..=0x4F {
+        x.op(op);
+    }
     // Control
-    for op in [0x50, 0x51, 0x52, 0x53] { x.op(op); }
+    for op in [0x50, 0x51, 0x52, 0x53] {
+        x.op(op);
+    }
     // Call/Return
-    for op in [0x60, 0x61] { x.op(op); }
+    for op in [0x60, 0x61] {
+        x.op(op);
+    }
     // Capability
-    for op in [0x70, 0x71] { x.op(op); }
+    for op in [0x70, 0x71] {
+        x.op(op);
+    }
     // Confidence
-    for op in [0x80, 0x81] { x.op(op); }
+    for op in [0x80, 0x81] {
+        x.op(op);
+    }
     // IO
-    for op in [0x90, 0x91, 0x92] { x.op(op); }
+    for op in [0x90, 0x91, 0x92] {
+        x.op(op);
+    }
     // Definitions (no-ops at runtime)
-    for op in [0xA0, 0xA1, 0xA2, 0xA3] { x.op(op); }
+    for op in [0xA0, 0xA1, 0xA2, 0xA3] {
+        x.op(op);
+    }
     // Float ops
-    for op in [0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5] { x.op(op); }
+    for op in [0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5] {
+        x.op(op);
+    }
     // JSON
-    for op in [0xB6, 0xB7] { x.op(op); }
+    for op in [0xB6, 0xB7] {
+        x.op(op);
+    }
     // Extended string ops
-    for op in [0xB8, 0xB9, 0xBA, 0xBB, 0xBC] { x.op(op); }
+    for op in [0xB8, 0xB9, 0xBA, 0xBB, 0xBC] {
+        x.op(op);
+    }
     // Bytes
-    for op in [0xBD, 0xBE, 0xBF, 0xC0] { x.op(op); }
+    for op in [0xBD, 0xBE, 0xBF, 0xC0] {
+        x.op(op);
+    }
     // Try
     x.op(0xC1);
 }
@@ -365,36 +424,44 @@ fn impl_stack_ops(x: &mut X) {
     // Stub handlers for new opcodes (0x05-0x0A)
     // FILTER (0x05) — stub: exit with code 2
     x.patch_handler(0x05);
-    x.mov_r64i(0, 60); x.mov_r64i(7, 2); x.syscall();
+    x.mov_r64i(0, 60);
+    x.mov_r64i(7, 2);
+    x.syscall();
 
     // STRSPLIT (0x06) — stub
     x.patch_handler(0x06);
-    x.mov_r64i(0, 60); x.mov_r64i(7, 2); x.syscall();
+    x.mov_r64i(0, 60);
+    x.mov_r64i(7, 2);
+    x.syscall();
 
     // CTOS (0x07) — stub
     x.patch_handler(0x07);
-    x.mov_r64i(0, 60); x.mov_r64i(7, 2); x.syscall();
+    x.mov_r64i(0, 60);
+    x.mov_r64i(7, 2);
+    x.syscall();
 
     // LISTSLICE (0x08) — stub
     x.patch_handler(0x08);
-    x.mov_r64i(0, 60); x.mov_r64i(7, 2); x.syscall();
+    x.mov_r64i(0, 60);
+    x.mov_r64i(7, 2);
+    x.syscall();
 
     // SHL (0x09) — value shift_amount -> result
     x.patch_handler(0x09);
-    x.mov_rm(1, 15, 0);   // rcx = shift amount
-    x.add_ri(15, 8);       // pop shift amount
-    x.mov_rm(0, 15, 0);   // rax = value
+    x.mov_rm(1, 15, 0); // rcx = shift amount
+    x.add_ri(15, 8); // pop shift amount
+    x.mov_rm(0, 15, 0); // rax = value
     x.i(&[0x48, 0xD3, 0xE0]); // shl rax, cl
-    x.mov_mr(15, 0, 0);   // [r15] = result
+    x.mov_mr(15, 0, 0); // [r15] = result
     x.back();
 
     // SHR (0x0A) — value shift_amount -> result
     x.patch_handler(0x0A);
-    x.mov_rm(1, 15, 0);   // rcx = shift amount
-    x.add_ri(15, 8);       // pop shift amount
-    x.mov_rm(0, 15, 0);   // rax = value
+    x.mov_rm(1, 15, 0); // rcx = shift amount
+    x.add_ri(15, 8); // pop shift amount
+    x.mov_rm(0, 15, 0); // rax = value
     x.i(&[0x48, 0xD3, 0xF8]); // sar rax, cl (arithmetic shift right)
-    x.mov_mr(15, 0, 0);   // [r15] = result
+    x.mov_mr(15, 0, 0); // [r15] = result
     x.back();
 
     // DUP (0x00)
@@ -471,7 +538,9 @@ fn impl_arith_ops(x: &mut X) {
     x.mov_rm(1, 15, 0); // rcx = a (new top = dividend)
     x.i(&[0x48, 0x85, 0xC0]); // test rax, rax (check divisor)
     let ok2 = x.jne8();
-    x.mov_r64i(0, 60); x.xor_rr(7, 7); x.syscall(); // exit(1)
+    x.mov_r64i(0, 60);
+    x.xor_rr(7, 7);
+    x.syscall(); // exit(1)
     x.patch_jmp_rel8(ok2);
     x.mov_rr(7, 0); // rdi = divisor (save)
     x.mov_rr(0, 1); // rax = dividend
@@ -583,16 +652,21 @@ fn impl_push_ops(x: &mut X, _raw_bc: &[u8]) {
     x.mov_rm(0, 15, 0); // rax = count
     x.add_ri(15, 8); // pop count
     x.mov_rr(9, 0); // r9 = count
-    // Allocate (count+1)*8 bytes
+                    // Allocate (count+1)*8 bytes
     x.add_ri(0, 1);
     x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3
     x.mov_rr(7, 0);
-    x.push_r(9); x.push_r(14); x.push_r(13);
-    x.b(0xE8); x.i32(1); // call alloc
-    x.pop_r(13); x.pop_r(14); x.pop_r(9);
+    x.push_r(9);
+    x.push_r(14);
+    x.push_r(13);
+    x.b(0xE8);
+    x.i32(1); // call alloc
+    x.pop_r(13);
+    x.pop_r(14);
+    x.pop_r(9);
     x.mov_rr(8, 0); // r8 = list_ptr
     x.mov_mr(8, 0, 9); // [r8] = count
-    // Copy elements in correct order: heap[i] = [r15 + (count-1-i)*8]
+                       // Copy elements in correct order: heap[i] = [r15 + (count-1-i)*8]
     x.xor_rr(10, 10); // r10 = i (heap index)
     let pl_loop = x.m();
     x.i(&[0x4D, 0x39, 0xCA]); // cmp r10, r9
@@ -604,7 +678,7 @@ fn impl_push_ops(x: &mut X, _raw_bc: &[u8]) {
     x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3
     x.i(&[0x49, 0x01, 0xF8]); // add rax, r15
     x.mov_rm(0, 0, 0); // rax = [r15 + (count-1-i)*8]
-    // Write to heap: [r8 + 8 + i*8]
+                       // Write to heap: [r8 + 8 + i*8]
     x.mov_rr(11, 10);
     x.i(&[0x49, 0xC1, 0xE3, 0x03]); // shl r11, 3
     x.i(&[0x4D, 0x01, 0xC3]); // add r11, r8
@@ -627,7 +701,7 @@ fn impl_push_ops(x: &mut X, _raw_bc: &[u8]) {
     // Read the ref bytecode length
     x.i(&[0x47, 0x8B, 0x04, 0x2E]); // mov eax, [r14+r13]
     x.mov_rr(8, 0); // r8 = length
-    // Compute address of ref bytecode: rax = r14 + r13 + 4
+                    // Compute address of ref bytecode: rax = r14 + r13 + 4
     x.mov_rr(0, 13);
     x.i(&[0x4C, 0x01, 0xF0]); // add rax, r14
     x.add_ri(0, 4);
@@ -658,29 +732,36 @@ fn impl_list_ops(x: &mut X) {
     x.patch_handler(0x41);
     x.mov_rm(0, 15, 0); // rax = elem
     x.add_ri(15, 8); // pop elem
-    // Save elem to [r15] temporarily (we'll overwrite this slot with result later)
+                     // Save elem to [r15] temporarily (we'll overwrite this slot with result later)
     x.mov_mr(15, 0, 0); // [r15] = elem (temporary save)
     x.mov_rm(1, 15, 8); // rcx = old list_ptr (at [r15+8])
     x.mov_rm(2, 1, 0); // rdx = old count
-    // Allocate (old_count+2)*8
+                       // Allocate (old_count+2)*8
     x.mov_rr(0, 2);
     x.add_ri(0, 2);
     x.i(&[0x48, 0xC1, 0xE0, 0x03]);
     x.mov_rr(7, 0);
-    x.push_r(14); x.push_r(13); x.push_r(1); x.push_r(2);
-    x.b(0xE8); x.i32(1); // call alloc
-    x.pop_r(2); x.pop_r(1); x.pop_r(13); x.pop_r(14);
+    x.push_r(14);
+    x.push_r(13);
+    x.push_r(1);
+    x.push_r(2);
+    x.b(0xE8);
+    x.i32(1); // call alloc
+    x.pop_r(2);
+    x.pop_r(1);
+    x.pop_r(13);
+    x.pop_r(14);
     // rax = new_ptr, rcx = old_ptr, rdx = old_count
     x.mov_rr(8, 0); // r8 = new_ptr
     x.mov_mr(8, 0, 2); // write old_count as new count (old_count = old_count, same value)
-    // Actually, new count = old_count + 1. But rdx = old_count.
-    // The new element adds 1, so new count should be old_count + 1.
-    // But APPEND creates a new list with all old elements + 1 new element.
-    // So new count = old_count + 1. But we wrote old_count. Fix:
+                       // Actually, new count = old_count + 1. But rdx = old_count.
+                       // The new element adds 1, so new count should be old_count + 1.
+                       // But APPEND creates a new list with all old elements + 1 new element.
+                       // So new count = old_count + 1. But we wrote old_count. Fix:
     x.mov_rm(0, 8, 0); // rax = old count (from what we just wrote)
     x.add_ri(0, 1);
     x.mov_mr(8, 0, 0); // write correct new count
-    // Copy old elements
+                       // Copy old elements
     x.xor_rr(10, 10);
     let ap_loop = x.m();
     x.i(&[0x4D, 0x39, 0xD2]); // cmp r10, rdx
@@ -708,12 +789,12 @@ fn impl_list_ops(x: &mut X) {
     x.add_ri(0, 8);
     x.mov_rm(1, 15, 0); // rcx = elem (saved at [r15])
     x.mov_mr(0, 0, 1); // store elem
-    // Replace old list_ptr on stack with new_ptr
+                       // Replace old list_ptr on stack with new_ptr
     x.mov_mr(15, 8, 8); // [r15+8] = new_ptr
-    // Remove elem from stack (it was at [r15], old list at [r15+8])
-    // Actually, we want: stack has new_list_ptr at top
-    // Current: [r15] = elem(saved), [r15+8] = old_list_ptr
-    // After: [r15] = new_list_ptr
+                        // Remove elem from stack (it was at [r15], old list at [r15+8])
+                        // Actually, we want: stack has new_list_ptr at top
+                        // Current: [r15] = elem(saved), [r15+8] = old_list_ptr
+                        // After: [r15] = new_list_ptr
     x.add_ri(15, 8); // remove saved elem, now [r15] = old_list_ptr slot
     x.mov_mr(15, 0, 8); // [r15] = new_ptr
     x.back();
@@ -731,23 +812,28 @@ fn impl_list_ops(x: &mut X) {
     x.i(&[0x47, 0x8B, 0x04, 0x2E]); // mov eax, [r14+r13]
     x.add_ri(13, 4);
     x.i(&[0x49, 0x01, 0xC5]); // add r13, rax
-    // Stack: [... list_ptr, ref_bc_addr]
+                              // Stack: [... list_ptr, ref_bc_addr]
     x.mov_rm(9, 15, 0); // r9 = ref_bc_addr
     x.mov_rm(10, 15, 8); // r10 = list_ptr
     x.add_ri(15, 16); // pop both
     x.mov_rm(11, 10, 0); // r11 = count
-    // Allocate result list: (count+1)*8
+                         // Allocate result list: (count+1)*8
     x.mov_rr(0, 11);
     x.add_ri(0, 1);
     x.i(&[0x48, 0xC1, 0xE0, 0x03]);
     x.mov_rr(7, 0);
-    x.push_r(9); x.push_r(10); x.push_r(11);
-    x.b(0xE8); x.i32(1); // call alloc (marker 1)
-    x.pop_r(11); x.pop_r(10); x.pop_r(9);
+    x.push_r(9);
+    x.push_r(10);
+    x.push_r(11);
+    x.b(0xE8);
+    x.i32(1); // call alloc (marker 1)
+    x.pop_r(11);
+    x.pop_r(10);
+    x.pop_r(9);
     // rax = result list ptr
     x.mov_rr(8, 0); // r8 = result list ptr
     x.mov_mr(8, 0, 11); // write count
-    // Loop: for i=0..count-1
+                        // Loop: for i=0..count-1
     x.xor_rr(12, 12); // r12 = i
     let map_loop = x.m();
     x.i(&[0x4D, 0x39, 0xDC]); // cmp r12, r11
@@ -763,13 +849,22 @@ fn impl_list_ops(x: &mut X) {
     // Call run_ref: rdi = ref_bc_addr, rsi = ref_len
     x.mov_rr(7, 9); // rdi = ref_bc_addr
     x.mov_r64i(6, 0xFFFF); // rsi = large (RETURN breaks out)
-    x.push_r(8); x.push_r(9); x.push_r(10); x.push_r(11); x.push_r(12);
-    x.b(0xE8); x.i32(2); // call run_ref (marker 2)
-    x.pop_r(12); x.pop_r(11); x.pop_r(10); x.pop_r(9); x.pop_r(8);
+    x.push_r(8);
+    x.push_r(9);
+    x.push_r(10);
+    x.push_r(11);
+    x.push_r(12);
+    x.b(0xE8);
+    x.i32(2); // call run_ref (marker 2)
+    x.pop_r(12);
+    x.pop_r(11);
+    x.pop_r(10);
+    x.pop_r(9);
+    x.pop_r(8);
     // Result is on data stack top
     x.mov_rm(0, 15, 0); // rax = result
     x.add_ri(15, 8); // pop result
-    // Store in result list at [r8 + 8 + i*8]
+                     // Store in result list at [r8 + 8 + i*8]
     x.mov_rr(1, 12);
     x.i(&[0x48, 0xC1, 0xE1, 0x03]);
     x.i(&[0x49, 0x01, 0xC1]); // add rcx, r8
@@ -795,7 +890,7 @@ fn impl_list_ops(x: &mut X) {
     x.mov_rm(10, 15, 8); // r10 = list_ptr
     x.add_ri(15, 16); // pop both
     x.mov_rm(11, 10, 0); // r11 = count
-    // Loop: for i=0..count-1
+                         // Loop: for i=0..count-1
     x.xor_rr(12, 12);
     let each_loop = x.m();
     x.i(&[0x4D, 0x39, 0xDC]); // cmp r12, r11
@@ -811,9 +906,18 @@ fn impl_list_ops(x: &mut X) {
     // Call run_ref
     x.mov_rr(7, 9);
     x.mov_r64i(6, 0xFFFF);
-    x.push_r(8); x.push_r(9); x.push_r(10); x.push_r(11); x.push_r(12);
-    x.b(0xE8); x.i32(2); // call run_ref
-    x.pop_r(12); x.pop_r(11); x.pop_r(10); x.pop_r(9); x.pop_r(8);
+    x.push_r(8);
+    x.push_r(9);
+    x.push_r(10);
+    x.push_r(11);
+    x.push_r(12);
+    x.b(0xE8);
+    x.i32(2); // call run_ref
+    x.pop_r(12);
+    x.pop_r(11);
+    x.pop_r(10);
+    x.pop_r(9);
+    x.pop_r(8);
     // Discard result
     x.add_ri(15, 8);
     x.add_ri(12, 1);
@@ -836,7 +940,7 @@ fn impl_list_ops(x: &mut X) {
     x.sub_ri(15, 8);
     x.mov_mr(15, 0, 0); // push init (accumulator)
     x.mov_rm(11, 10, 0); // r11 = count
-    // Loop: for i=0..count-1
+                         // Loop: for i=0..count-1
     x.xor_rr(12, 12);
     let fold_loop = x.m();
     x.i(&[0x4D, 0x39, 0xDC]);
@@ -852,9 +956,18 @@ fn impl_list_ops(x: &mut X) {
     // Call run_ref (body sees [accumulator, element])
     x.mov_rr(7, 9);
     x.mov_r64i(6, 0xFFFF);
-    x.push_r(8); x.push_r(9); x.push_r(10); x.push_r(11); x.push_r(12);
-    x.b(0xE8); x.i32(2);
-    x.pop_r(12); x.pop_r(11); x.pop_r(10); x.pop_r(9); x.pop_r(8);
+    x.push_r(8);
+    x.push_r(9);
+    x.push_r(10);
+    x.push_r(11);
+    x.push_r(12);
+    x.b(0xE8);
+    x.i32(2);
+    x.pop_r(12);
+    x.pop_r(11);
+    x.pop_r(10);
+    x.pop_r(9);
+    x.pop_r(8);
     // New accumulator is on stack top (body consumed old acc + elem, pushed new)
     x.add_ri(12, 1);
     let fold_back = x.jmp();
@@ -881,17 +994,24 @@ fn impl_string_ops(x: &mut X) {
     x.mov_rm(6, 15, 0); // r6 = s2 addr
     x.mov_rm(7, 15, 8); // r7 = s1 addr
     x.add_ri(15, 8); // pop s2, reuse slot
-    // Read len1 from [s1-4], len2 from [s2-4]
+                     // Read len1 from [s1-4], len2 from [s2-4]
     x.mov_rm(0, 7, -4); // rax = len1
     x.mov_rm(1, 6, -4); // rcx = len2
-    // Allocate len1+len2+5 bytes (4 for length prefix + data + null)
+                        // Allocate len1+len2+5 bytes (4 for length prefix + data + null)
     x.mov_rr(2, 0); // rdx = len1
     x.i(&[0x48, 0x01, 0xC8]); // add rax, rcx (len1+len2)
     x.add_ri(0, 5); // +5 (4 prefix + 1 null)
     x.mov_rr(7, 0); // rdi = alloc size
-    x.push_r(14); x.push_r(13); x.push_r(6); x.push_r(2);
-    x.b(0xE8); x.i32(1); // call alloc
-    x.pop_r(2); x.pop_r(6); x.pop_r(13); x.pop_r(14);
+    x.push_r(14);
+    x.push_r(13);
+    x.push_r(6);
+    x.push_r(2);
+    x.b(0xE8);
+    x.i32(1); // call alloc
+    x.pop_r(2);
+    x.pop_r(6);
+    x.pop_r(13);
+    x.pop_r(14);
     // rax = alloc'd ptr (points to length prefix)
     // Write total length: len1+len2
     x.mov_rr(8, 0); // r8 = new str ptr
@@ -899,20 +1019,20 @@ fn impl_string_ops(x: &mut X) {
     x.mov_rm(1, 6, -4); // rcx = len2
     x.i(&[0x48, 0x01, 0xC8]); // add rax, rcx
     x.i(&[0x41, 0x89, 0x00]); // mov [r8], eax (write 4-byte length)
-    // Copy s1 data
+                              // Copy s1 data
     x.add_ri(8, 4); // r8 points to data area
-    // memcpy(r8, s1, len1) — use rep movsb
+                    // memcpy(r8, s1, len1) — use rep movsb
     x.mov_rr(7, 6); // rdi = r8? No, rdi is already used. Let me use different regs.
-    // Actually: r8 = dest, s1 = r7 (original s1 addr), len = rdx
-    // rep movsb: rdi=dest, rsi=src, rcx=count
+                    // Actually: r8 = dest, s1 = r7 (original s1 addr), len = rdx
+                    // rep movsb: rdi=dest, rsi=src, rcx=count
     x.push_r(0); // save rax
     x.i(&[0x49, 0x89, 0xC7]); // mov rdi, r8 (dest)
     x.i(&[0x49, 0x89, 0xDE]); // mov rsi, r7? No — r6=s2, r7=s1
-    // Wait, I used r7 for s1 addr. But rdi is register 7. Conflict!
-    // Let me use different registers: s1 in r12, s2 in r13? But r13=ip.
-    // I'll use r9 for s1, r10 for s2.
-    // Actually, let me just do byte-by-byte copy with a loop.
-    // Copy s1: for i=0..len1-1: [r8+i] = [s1+i]
+                              // Wait, I used r7 for s1 addr. But rdi is register 7. Conflict!
+                              // Let me use different registers: s1 in r12, s2 in r13? But r13=ip.
+                              // I'll use r9 for s1, r10 for s2.
+                              // Actually, let me just do byte-by-byte copy with a loop.
+                              // Copy s1: for i=0..len1-1: [r8+i] = [s1+i]
     x.xor_rr(9, 9); // r9 = 0 (index)
     let sc_loop1 = x.m();
     x.mov_rm(0, 7, -4); // rax = len1
@@ -922,7 +1042,7 @@ fn impl_string_ops(x: &mut X) {
     x.mov_rr(0, 7);
     x.i(&[0x4C, 0x01, 0xC8]); // add rax, r9
     x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
-    // Write byte: [r8 + r9] = al
+                              // Write byte: [r8 + r9] = al
     x.mov_rr(1, 8);
     x.i(&[0x4C, 0x01, 0xC9]); // add rcx, r9
     x.i(&[0x88, 0x01]); // mov [rcx], al
@@ -941,7 +1061,7 @@ fn impl_string_ops(x: &mut X) {
     x.mov_rr(0, 6);
     x.i(&[0x4C, 0x01, 0xD0]); // add rax, r10
     x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
-    // Write to [r8 + len1 + r10]
+                              // Write to [r8 + len1 + r10]
     x.mov_rr(1, 8);
     x.i(&[0x4C, 0x01, 0xC9]); // add rcx, r9 (r9 = len1)
     x.i(&[0x4C, 0x01, 0xD1]); // add rcx, r10
@@ -956,10 +1076,10 @@ fn impl_string_ops(x: &mut X) {
     x.mov_rm(1, 6, -4); // rcx = len2
     x.i(&[0x48, 0x01, 0xC8]); // add rax, rcx
     x.i(&[0xC6, 0x00, 0x00]); // mov byte [rax], 0
-    // Push new string address (r8 points to data area, which is alloc+4)
-    // Wait — r8 was set to alloc'd ptr + 4 earlier. But alloc'd ptr is the start.
-    // The string address should be alloc'd_ptr + 4 (past the length prefix).
-    // But we already did add_ri(8, 4). So r8 = data area. Good.
+                              // Push new string address (r8 points to data area, which is alloc+4)
+                              // Wait — r8 was set to alloc'd ptr + 4 earlier. But alloc'd ptr is the start.
+                              // The string address should be alloc'd_ptr + 4 (past the length prefix).
+                              // But we already did add_ri(8, 4). So r8 = data area. Good.
     x.pop_r(0); // restore rax
     x.mov_mr(15, 0, 8); // [r15] = r8 (string data addr)
     x.back();
@@ -970,7 +1090,7 @@ fn impl_string_ops(x: &mut X) {
     x.mov_rm(1, 15, 8); // rcx = start
     x.mov_rm(2, 15, 16); // rdx = str addr
     x.add_ri(15, 16); // pop start and len, reuse slot for result
-    // Clamp: if start < 0, start = 0
+                      // Clamp: if start < 0, start = 0
     x.i(&[0x48, 0x85, 0xC9]); // test rcx, rcx
     let ss_start_ok = x.jge8();
     x.xor_rr(1, 1);
@@ -982,7 +1102,7 @@ fn impl_string_ops(x: &mut X) {
     x.patch_jmp_rel8(ss_len_ok);
     // Read string length
     x.mov_rm(8, 2, -4); // r8 = str_len
-    // Clamp: if start > str_len, start = str_len
+                        // Clamp: if start > str_len, start = str_len
     x.i(&[0x4C, 0x39, 0xC1]); // cmp rcx, r8
     let ss_start_ok2 = x.jle8();
     x.mov_rr(1, 8); // rcx = str_len
@@ -990,10 +1110,10 @@ fn impl_string_ops(x: &mut X) {
     // Clamp: if start+len > str_len, len = str_len - start
     x.mov_rr(9, 1); // r9 = start
     x.i(&[0x4C, 0x01, 0xC9]); // add r9, r8? No — add start+len
-    // Check: start + len > str_len
+                              // Check: start + len > str_len
     x.mov_rr(9, 1); // r9 = start
     x.i(&[0x48, 0x01, 0xC1]); // add rcx_temp? No.
-    // Simpler: remaining = str_len - start; if len > remaining, len = remaining
+                              // Simpler: remaining = str_len - start; if len > remaining, len = remaining
     x.mov_rr(9, 8); // r9 = str_len
     x.i(&[0x4C, 0x29, 0xC9]); // sub r9, rcx (r9 = str_len - start)
     x.i(&[0x4C, 0x39, 0xC8]); // cmp rax, r9
@@ -1004,15 +1124,24 @@ fn impl_string_ops(x: &mut X) {
     x.mov_rr(8, 0); // r8 = result len
     x.add_ri(0, 5);
     x.mov_rr(7, 0);
-    x.push_r(14); x.push_r(13); x.push_r(2); x.push_r(1); x.push_r(8);
-    x.b(0xE8); x.i32(1); // call alloc
-    x.pop_r(8); x.pop_r(1); x.pop_r(2); x.pop_r(13); x.pop_r(14);
+    x.push_r(14);
+    x.push_r(13);
+    x.push_r(2);
+    x.push_r(1);
+    x.push_r(8);
+    x.b(0xE8);
+    x.i32(1); // call alloc
+    x.pop_r(8);
+    x.pop_r(1);
+    x.pop_r(2);
+    x.pop_r(13);
+    x.pop_r(14);
     // rax = alloc ptr, r8 = result len, rcx = start, rdx = str addr
     x.mov_rr(9, 0); // r9 = alloc ptr
-    // Write length
+                    // Write length
     x.i(&[0x45, 0x89, 0x01]); // mov [r9], r8d (write 4-byte length)
     x.add_ri(9, 4); // r9 points to data
-    // Copy bytes: for i=0..len-1: [r9+i] = [str+start+i]
+                    // Copy bytes: for i=0..len-1: [r9+i] = [str+start+i]
     x.xor_rr(10, 10);
     let ss_loop = x.m();
     x.i(&[0x4D, 0x39, 0xC2]); // cmp r10, r8
@@ -1022,12 +1151,12 @@ fn impl_string_ops(x: &mut X) {
     x.i(&[0x48, 0x01, 0xC8]); // add rax, rcx (start)
     x.i(&[0x4C, 0x01, 0xD0]); // add rax, r10
     x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
-    // Write: [r9 + r10] = al
+                              // Write: [r9 + r10] = al
     x.mov_rr(1, 9);
     x.i(&[0x4C, 0x01, 0xD1]); // add rcx, r10
     x.i(&[0x88, 0x01]); // mov [rcx], al
     x.sub_ri(1, 0); // restore? This is getting messy.
-    // Actually, the write destination is r9 + r10, not rcx + r10.
+                    // Actually, the write destination is r9 + r10, not rcx + r10.
     x.mov_rr(1, 9); // rcx = r9
     x.i(&[0x4C, 0x01, 0xD1]); // add rcx, r10
     x.i(&[0x88, 0x01]); // mov [rcx], al
@@ -1039,7 +1168,7 @@ fn impl_string_ops(x: &mut X) {
     x.mov_rr(0, 9);
     x.i(&[0x4C, 0x01, 0xC0]); // add rax, r8
     x.i(&[0xC6, 0x00, 0x00]); // mov byte [rax], 0
-    // Push result (r9 = data area = alloc+4)
+                              // Push result (r9 = data area = alloc+4)
     x.mov_mr(15, 0, 9);
     x.back();
 
@@ -1048,7 +1177,7 @@ fn impl_string_ops(x: &mut X) {
     x.mov_rm(6, 15, 0); // r6 = s2
     x.mov_rm(7, 15, 8); // r7 = s1
     x.add_ri(15, 8); // pop one, reuse slot
-    // Compare lengths
+                     // Compare lengths
     x.mov_rm(0, 7, -4); // rax = len1
     x.mov_rm(1, 6, -4); // rcx = len2
     x.i(&[0x48, 0x39, 0xC8]); // cmp rax, rcx
@@ -1098,7 +1227,7 @@ fn impl_string_ops(x: &mut X) {
     // Read bytes
     x.i(&[0x41, 0x0F, 0xB6, 0x07]); // movzx eax, byte [r7] (s1)
     x.i(&[0x41, 0x0F, 0xB6, 0x0E]); // movzx ecx, byte [r6] (s2)
-    // Check if s1 ended
+                                    // Check if s1 ended
     x.i(&[0x48, 0x85, 0xC0]); // test rax, rax
     let slt_s1_end = x.je8();
     // Check if s2 ended
@@ -1141,7 +1270,7 @@ fn impl_string_ops(x: &mut X) {
     x.mov_rm(6, 15, 0); // r6 = needle
     x.mov_rm(7, 15, 8); // r7 = haystack
     x.add_ri(15, 8); // pop needle, reuse slot
-    // Linear search: for each position in haystack, check if needle matches
+                     // Linear search: for each position in haystack, check if needle matches
     x.mov_rm(8, 7, -4); // r8 = haystack len
     x.mov_rm(9, 6, -4); // r9 = needle len
     x.xor_rr(10, 10); // r10 = haystack index
@@ -1160,17 +1289,17 @@ fn impl_string_ops(x: &mut X) {
     x.mov_rr(0, 7);
     x.i(&[0x4C, 0x01, 0xD0]); // add rax, r10
     x.i(&[0x4C, 0x01, 0xD8]); // add rax, r11? No — r10 is haystack pos, r11 is needle pos
-    // Actually: haystack[r10 + r11]
+                              // Actually: haystack[r10 + r11]
     x.mov_rr(0, 10);
     x.i(&[0x4C, 0x01, 0xD8]); // add rax, r11
     x.i(&[0x48, 0x01, 0xF8]); // add rax, rdi? No — haystack is in r7
     x.i(&[0x49, 0x01, 0xF8]); // add rax, r15? No.
-    // I need: rax = r7 + r10 + r11
+                              // I need: rax = r7 + r10 + r11
     x.mov_rr(0, 7);
     x.i(&[0x4C, 0x01, 0xD0]); // add rax, r10
     x.i(&[0x4C, 0x01, 0xD8]); // add rax, r11
     x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
-    // needle[r11]
+                              // needle[r11]
     x.mov_rr(1, 6);
     x.i(&[0x4C, 0x01, 0xD9]); // add rcx, r11
     x.i(&[0x0F, 0xB6, 0x09]); // movzx ecx, byte [rcx]
@@ -1200,11 +1329,11 @@ fn impl_string_ops(x: &mut X) {
     x.mov_rm(7, 15, 8); // r7 = old
     x.mov_rm(8, 15, 16); // r8 = src
     x.add_ri(15, 16); // pop old and new, reuse slot for result
-    // Use OUT_BUF as temp buffer, then allocate result in heap
+                      // Use OUT_BUF as temp buffer, then allocate result in heap
     x.mov_r64i(9, OUT_BUF_ADDR); // r9 = dest pointer
     x.mov_rr(10, 8); // r10 = src scan pointer
     x.mov_rm(11, 7, -4); // r11 = old_len
-    // Main loop: scan src for old
+                         // Main loop: scan src for old
     let sr_outer = x.m();
     // Check if *src == 0 (end of string)
     x.i(&[0x41, 0x0F, 0xB6, 0x02]); // movzx eax, byte [r10]
@@ -1215,7 +1344,7 @@ fn impl_string_ops(x: &mut X) {
     let sr_match = x.m();
     x.i(&[0x4D, 0x39, 0xDC]); // cmp r12, r11 (old_len)
     let sr_matched = x.jge8(); // all bytes matched
-    // Compare src[pos+idx] with old[idx]
+                               // Compare src[pos+idx] with old[idx]
     x.mov_rr(0, 10); // rax = src pos
     x.i(&[0x4C, 0x01, 0xE0]); // add rax, r12
     x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
@@ -1241,7 +1370,10 @@ fn impl_string_ops(x: &mut X) {
     x.add_ri(9, 1);
     x.add_ri(12, 1);
     let sr_cpy_new_back = x.jmp();
-    x.p_i32(sr_cpy_new_back, sr_cpy_new as i32 - (sr_cpy_new_back + 4) as i32);
+    x.p_i32(
+        sr_cpy_new_back,
+        sr_cpy_new as i32 - (sr_cpy_new_back + 4) as i32,
+    );
     x.patch_jmp_rel8(sr_cpy_new_done);
     // Advance src past the matched 'old'
     x.mov_rm(0, 7, -4); // rax = old_len
@@ -1257,26 +1389,37 @@ fn impl_string_ops(x: &mut X) {
     // Done: write null terminator
     x.patch_jmp_rel8(sr_done);
     x.i(&[0x41, 0xC6, 0x01, 0x00]); // mov byte [r9], 0
-    // Calculate result length
+                                    // Calculate result length
     x.mov_r64i(0, OUT_BUF_ADDR);
     x.i(&[0x4C, 0x29, 0xC8]); // sub rax, r9? No — r9 is dest, rax is start
-    // Actually: result_len = r9 - OUT_BUF_ADDR
+                              // Actually: result_len = r9 - OUT_BUF_ADDR
     x.mov_rr(0, 9);
     x.mov_r64i(1, OUT_BUF_ADDR);
     x.i(&[0x48, 0x29, 0xC8]); // sub rax, rcx (result_len = dest - start)
-    // Allocate string in heap: result_len + 5
+                              // Allocate string in heap: result_len + 5
     x.mov_rr(12, 0); // r12 = result_len
     x.add_ri(0, 5);
     x.mov_rr(7, 0);
-    x.push_r(6); x.push_r(8); x.push_r(9); x.push_r(10); x.push_r(11); x.push_r(12);
-    x.b(0xE8); x.i32(1); // call alloc
-    x.pop_r(12); x.pop_r(11); x.pop_r(10); x.pop_r(9); x.pop_r(8); x.pop_r(6);
+    x.push_r(6);
+    x.push_r(8);
+    x.push_r(9);
+    x.push_r(10);
+    x.push_r(11);
+    x.push_r(12);
+    x.b(0xE8);
+    x.i32(1); // call alloc
+    x.pop_r(12);
+    x.pop_r(11);
+    x.pop_r(10);
+    x.pop_r(9);
+    x.pop_r(8);
+    x.pop_r(6);
     // rax = alloc ptr
     x.mov_rr(8, 0); // r8 = alloc ptr
-    // Write length
+                    // Write length
     x.i(&[0x45, 0x89, 0x20]); // mov [r8], r12d
     x.add_ri(8, 4); // r8 = data area
-    // Copy from OUT_BUF to heap
+                    // Copy from OUT_BUF to heap
     x.mov_r64i(6, OUT_BUF_ADDR);
     x.xor_rr(10, 10);
     let sr_copy = x.m();
@@ -1306,7 +1449,7 @@ fn impl_string_ops(x: &mut X) {
     x.xor_rr(0, 0); // rax = 0 (result)
     x.xor_rr(8, 8); // r8 = 0 (index)
     x.xor_rr(9, 9); // r9 = 0 (negative flag)
-    // Check for '-'
+                    // Check for '-'
     x.i(&[0x41, 0x0F, 0xB6, 0x0F]); // movzx ecx, byte [r7]
     x.i(&[0x48, 0x83, 0xF9, 0x2D]); // cmp rcx, '-'
     let sti_not_neg = x.jne8();
@@ -1319,7 +1462,7 @@ fn impl_string_ops(x: &mut X) {
     x.mov_rr(1, 7);
     x.i(&[0x4C, 0x01, 0xC1]); // add rcx, r8
     x.i(&[0x0F, 0xB6, 0x09]); // movzx ecx, byte [rcx]
-    // Check if digit
+                              // Check if digit
     x.i(&[0x48, 0x83, 0xF9, 0x30]); // cmp rcx, '0'
     let sti_done = x.jb8();
     x.i(&[0x48, 0x83, 0xF9, 0x39]); // cmp rcx, '9'
@@ -1343,25 +1486,35 @@ fn impl_string_ops(x: &mut X) {
 
     // I64TOSTR (0x4E) — i64 → str
     x.patch_handler(0x4E);
-    x.push_r(0); x.push_r(1); x.push_r(2); x.push_r(6); x.push_r(7);
+    x.push_r(0);
+    x.push_r(1);
+    x.push_r(2);
+    x.push_r(6);
+    x.push_r(7);
     x.mov_rm(0, 15, 0); // rax = value
     x.mov_rr(7, 0); // rdi = value
     x.mov_r64i(6, OUT_BUF_ADDR); // rsi = output buffer
-    x.b(0xE8); x.i32(0); // call itoa (patched)
-    // Allocate string in heap
-    // rax = length from itoa, rsi = buffer start
+    x.b(0xE8);
+    x.i32(0); // call itoa (patched)
+              // Allocate string in heap
+              // rax = length from itoa, rsi = buffer start
     x.mov_rr(2, 0); // rdx = length
     x.add_ri(0, 5); // +5 for length prefix + null
     x.mov_rr(7, 0); // rdi = alloc size
-    x.push_r(14); x.push_r(13); x.push_r(2);
-    x.b(0xE8); x.i32(1); // call alloc
-    x.pop_r(2); x.pop_r(13); x.pop_r(14);
+    x.push_r(14);
+    x.push_r(13);
+    x.push_r(2);
+    x.b(0xE8);
+    x.i32(1); // call alloc
+    x.pop_r(2);
+    x.pop_r(13);
+    x.pop_r(14);
     // rax = alloc ptr, rdx = length
     x.mov_rr(8, 0); // r8 = alloc ptr
-    // Write length
+                    // Write length
     x.i(&[0x41, 0x89, 0x10]); // mov [r8], edx
     x.add_ri(8, 4); // r8 = data area
-    // Copy from OUT_BUF to heap
+                    // Copy from OUT_BUF to heap
     x.mov_r64i(6, OUT_BUF_ADDR);
     x.xor_rr(9, 9);
     let i2s_loop = x.m();
@@ -1382,7 +1535,11 @@ fn impl_string_ops(x: &mut X) {
     x.i(&[0x4C, 0x01, 0xC8]); // add rax, r9? No — r9 = length
     x.i(&[0x48, 0x01, 0xD0]); // add rax, rdx
     x.i(&[0xC6, 0x00, 0x00]); // mov byte [rax], 0
-    x.pop_r(7); x.pop_r(6); x.pop_r(2); x.pop_r(1); x.pop_r(0);
+    x.pop_r(7);
+    x.pop_r(6);
+    x.pop_r(2);
+    x.pop_r(1);
+    x.pop_r(0);
     // Push string address (r8 = data area = alloc+4)
     x.mov_mr(15, 0, 8);
     x.back();
@@ -1416,7 +1573,7 @@ fn impl_control_ops(x: &mut X) {
     x.patch_handler(0x50); // re-patch
     x.mov_rm(0, 15, 0); // rax = condition
     x.add_ri(15, 8); // pop
-    // Read offset regardless
+                     // Read offset regardless
     x.i(&[0x47, 0x8B, 0x0C, 0x2E]); // mov ecx, [r14+r13]
     x.add_ri(13, 4); // skip offset bytes
     x.i(&[0x48, 0x85, 0xC0]); // test rax, rax
@@ -1461,9 +1618,14 @@ fn impl_control_ops(x: &mut X) {
     let times_done = x.jge8();
     x.mov_rr(7, 9);
     x.mov_r64i(6, 0xFFFF);
-    x.push_r(9); x.push_r(10); x.push_r(12);
-    x.b(0xE8); x.i32(2); // call run_ref
-    x.pop_r(12); x.pop_r(10); x.pop_r(9);
+    x.push_r(9);
+    x.push_r(10);
+    x.push_r(12);
+    x.b(0xE8);
+    x.i32(2); // call run_ref
+    x.pop_r(12);
+    x.pop_r(10);
+    x.pop_r(9);
     x.add_ri(12, 1);
     let times_back = x.jmp();
     x.p_i32(times_back, times_loop as i32 - (times_back + 4) as i32);
@@ -1484,10 +1646,10 @@ fn impl_call_return(x: &mut X, word_table_addr: u64, word_count: usize) {
     // Read name_len from bytecode
     x.i(&[0x43, 0x0F, 0xB6, 0x04, 0x2E]); // movzx eax, [r14+r13] (name_len)
     x.add_ri(13, 1); // ip++ (past name_len byte)
-    // Save name start: r12 = r14 + r13 (points to name bytes in bytecode)
+                     // Save name start: r12 = r14 + r13 (points to name bytes in bytecode)
     x.mov_rr(12, 14);
     x.i(&[0x4D, 0x01, 0xEC]); // add r12, r13
-    // Save name_len: r11 = rax
+                              // Save name_len: r11 = rax
     x.mov_rr(11, 0);
     // Advance ip past name bytes
     x.i(&[0x49, 0x01, 0xC5]); // add r13, rax
@@ -1508,18 +1670,18 @@ fn impl_call_return(x: &mut X, word_table_addr: u64, word_count: usize) {
     x.mov_rr(0, 9);
     x.i(&[0x48, 0xC1, 0xE0, 0x04]); // shl rax, 4 (i * 16)
     x.i(&[0x4C, 0x01, 0xC0]); // add rax, r8 (table_base + i*16)
-    // rax points to entry
-    // Read name_len from entry+4
+                              // rax points to entry
+                              // Read name_len from entry+4
     x.mov_rm(1, 0, 4); // rcx = entry.name_len
-    // Quick check: name_len matches?
+                       // Quick check: name_len matches?
     x.i(&[0x4C, 0x39, 0xD9]); // cmp rcx, r11
     let len_mismatch = x.jne8();
     // Lengths match — compare bytes
     // Read name_ptr from entry+0
     x.mov_rm(2, 0, 0); // rdx = entry.name_ptr (offset in data segment)
-    // rdx is relative to data segment base. Convert to absolute:
-    // Actually, name_ptr should be stored as absolute address.
-    // Let's store absolute addresses in the table.
+                       // rdx is relative to data segment base. Convert to absolute:
+                       // Actually, name_ptr should be stored as absolute address.
+                       // Let's store absolute addresses in the table.
 
     // Byte-by-byte comparison: r12 = call_name, rdx = table_name, rcx = len
     x.xor_rr(10, 10); // r10 = byte index
@@ -1555,16 +1717,16 @@ fn impl_call_return(x: &mut X, word_table_addr: u64, word_count: usize) {
     // rax still points to entry. Read bc_ptr and bc_len.
     x.mov_rm(2, 0, 8); // rdx = entry.bc_ptr (absolute address)
     x.mov_rm(1, 0, 12); // rcx = entry.bc_len
-    // Save current state to call stack
+                        // Save current state to call stack
     x.mov_r64i(8, CALL_SP_ADDR);
     x.mov_rm(0, 8, 0); // rax = call_sp
     x.i(&[0x48, 0xC1, 0xE0, 0x03]); // shl rax, 3
     x.mov_r64i(9, CALL_STACK_ADDR);
     x.i(&[0x4D, 0x01, 0xC8]); // add r9, rax
-    // Save r14 (bc) and r13 (ip)
+                              // Save r14 (bc) and r13 (ip)
     x.mov_mr(9, 0, 14); // call_stack[sp] = r14
     x.mov_mr(9, 8, 13); // call_stack[sp+1] = r13
-    // Increment call_sp by 2
+                        // Increment call_sp by 2
     x.mov_r64i(8, CALL_SP_ADDR);
     x.mov_rm(0, 8, 0);
     x.add_ri(0, 2);
@@ -1587,7 +1749,9 @@ fn impl_call_return(x: &mut X, word_table_addr: u64, word_count: usize) {
     x.mov_rm(0, 8, 0);
     x.i(&[0x48, 0x85, 0xC0]);
     let has_frame = x.jne8();
-    x.mov_r64i(0, 60); x.xor_rr(7, 7); x.syscall();
+    x.mov_r64i(0, 60);
+    x.xor_rr(7, 7);
+    x.syscall();
     x.patch_jmp_rel8(has_frame);
     // Restore from call stack
     x.sub_ri(0, 2); // rax = call_sp - 2
@@ -1605,7 +1769,9 @@ fn impl_call_return(x: &mut X, word_table_addr: u64, word_count: usize) {
     x.mov_rm(0, 8, 0);
     x.i(&[0x48, 0x85, 0xC0]);
     let has_frame = x.jne8();
-    x.mov_r64i(0, 60); x.xor_rr(7, 7); x.syscall();
+    x.mov_r64i(0, 60);
+    x.xor_rr(7, 7);
+    x.syscall();
     x.patch_jmp_rel8(has_frame);
     // Restore from call stack
     x.sub_ri(0, 2); // rax = call_sp - 2
@@ -1626,50 +1792,91 @@ fn impl_call_return(x: &mut X, word_table_addr: u64, word_count: usize) {
 fn impl_io_ops(x: &mut X) {
     // OUTPUT_TOP (0x90)
     x.patch_handler(0x90);
-    x.push_r(0); x.push_r(1); x.push_r(2); x.push_r(6); x.push_r(7); x.push_r(15);
+    x.push_r(0);
+    x.push_r(1);
+    x.push_r(2);
+    x.push_r(6);
+    x.push_r(7);
+    x.push_r(15);
     x.mov_rm(0, 15, 0);
     x.add_ri(15, 8); // pop value
-    // Call itoa: rdi=value, rsi=buf → rax=len
+                     // Call itoa: rdi=value, rsi=buf → rax=len
     x.mov_rr(7, 0); // rdi = value
     x.mov_r64i(6, OUT_BUF_ADDR); // rsi = buffer
-    x.b(0xE8); x.i32(0); // call itoa (will be patched)
-    // write(1, buf, len)
+    x.b(0xE8);
+    x.i32(0); // call itoa (will be patched)
+              // write(1, buf, len)
     x.mov_r64i(0, 1); // syscall: write
     x.mov_r64i(7, 1); // fd: stdout
-    // rsi already set from itoa
+                      // rsi already set from itoa
     x.mov_rr(2, 0); // rdx = length
     x.syscall();
     // Write newline
     x.mov_r64i(6, OUT_BUF_ADDR + 256);
-    x.b(0xC6); x.b(0x06); x.b(0x0A); // mov byte [rsi], '\n'
-    x.mov_r64i(0, 1); x.mov_r64i(7, 1);
+    x.b(0xC6);
+    x.b(0x06);
+    x.b(0x0A); // mov byte [rsi], '\n'
+    x.mov_r64i(0, 1);
+    x.mov_r64i(7, 1);
     x.mov_r64i(6, OUT_BUF_ADDR + 256);
     x.mov_r64i(2, 1);
     x.syscall();
-    x.pop_r(15); x.pop_r(7); x.pop_r(6); x.pop_r(2); x.pop_r(1); x.pop_r(0);
+    x.pop_r(15);
+    x.pop_r(7);
+    x.pop_r(6);
+    x.pop_r(2);
+    x.pop_r(1);
+    x.pop_r(0);
     x.back();
 
     // OUTPUT_ALL (0x91) — print entire stack
     x.patch_handler(0x91);
     // Print '[' then each value then ']' then newline
-    x.push_r(0); x.push_r(1); x.push_r(2); x.push_r(6); x.push_r(7); x.push_r(15);
+    x.push_r(0);
+    x.push_r(1);
+    x.push_r(2);
+    x.push_r(6);
+    x.push_r(7);
+    x.push_r(15);
     // Print '['
     x.mov_r64i(6, OUT_BUF_ADDR);
-    x.b(0xC6); x.b(0x06); x.b(0x5B); // mov byte [rsi], '['
-    x.mov_r64i(0, 1); x.mov_r64i(7, 1); x.mov_r64i(2, 1); x.syscall();
+    x.b(0xC6);
+    x.b(0x06);
+    x.b(0x5B); // mov byte [rsi], '['
+    x.mov_r64i(0, 1);
+    x.mov_r64i(7, 1);
+    x.mov_r64i(2, 1);
+    x.syscall();
     // Print each value (simplified: just print as i64)
     // For now, just print closing bracket
     x.mov_r64i(6, OUT_BUF_ADDR);
-    x.b(0xC6); x.b(0x06); x.b(0x5D); // ']'
-    x.b(0xC6); x.b(0x46); x.b(0x01); x.b(0x0A); // mov byte [rsi+1], '\n'
-    x.mov_r64i(0, 1); x.mov_r64i(7, 1); x.mov_r64i(2, 2); x.syscall();
-    x.pop_r(15); x.pop_r(7); x.pop_r(6); x.pop_r(2); x.pop_r(1); x.pop_r(0);
+    x.b(0xC6);
+    x.b(0x06);
+    x.b(0x5D); // ']'
+    x.b(0xC6);
+    x.b(0x46);
+    x.b(0x01);
+    x.b(0x0A); // mov byte [rsi+1], '\n'
+    x.mov_r64i(0, 1);
+    x.mov_r64i(7, 1);
+    x.mov_r64i(2, 2);
+    x.syscall();
+    x.pop_r(15);
+    x.pop_r(7);
+    x.pop_r(6);
+    x.pop_r(2);
+    x.pop_r(1);
+    x.pop_r(0);
     x.back();
 
     // READ_INPUT (0x92) — read line from stdin
     x.patch_handler(0x92);
     // Allocate buffer for input
-    x.push_r(0); x.push_r(1); x.push_r(2); x.push_r(6); x.push_r(7);
+    x.push_r(0);
+    x.push_r(1);
+    x.push_r(2);
+    x.push_r(6);
+    x.push_r(7);
     // read(0, OUT_BUF, 255)
     x.xor_rr(0, 0); // fd = stdin
     x.mov_r64i(6, OUT_BUF_ADDR); // buf
@@ -1689,12 +1896,18 @@ fn impl_io_ops(x: &mut X) {
     x.i(&[0x48, 0x01, 0xC6]); // add rsi, rax
     x.i(&[0x80, 0x3E, 0x0A]); // cmp byte [rsi], '\n'
     let ri_no_nl = x.jne8();
-    x.b(0xC6); x.b(0x06); x.b(0x00); // mov byte [rsi], 0
+    x.b(0xC6);
+    x.b(0x06);
+    x.b(0x00); // mov byte [rsi], 0
     x.patch_jmp_rel8(ri_no_nl);
     // Push string address
     x.mov_r64i(0, OUT_BUF_ADDR);
     x.patch_jmp_rel8(ri_end);
-    x.pop_r(7); x.pop_r(6); x.pop_r(2); x.pop_r(1); x.pop_r(0);
+    x.pop_r(7);
+    x.pop_r(6);
+    x.pop_r(2);
+    x.pop_r(1);
+    x.pop_r(0);
     x.sub_ri(15, 8);
     x.mov_mr(15, 0, 0);
     x.back();
@@ -1773,14 +1986,14 @@ fn impl_float_ops(x: &mut X) {
     x.patch_handler(0xB6);
     x.mov_rm(0, 15, 0); // rax = json string addr
     x.add_ri(15, 8); // pop string
-    // Check first char
+                     // Check first char
     x.i(&[0x0F, 0xB6, 0x08]); // movzx ecx, byte [rax]
-    // Check for '"'
+                              // Check for '"'
     x.i(&[0x48, 0x83, 0xF9, 0x22]); // cmp rcx, '"'
     let jp_not_str = x.jne8();
     // String: skip opening '"', read until closing '"'
     x.add_ri(0, 1); // skip '"'
-    // Find closing '"' and copy to OUT_BUF
+                    // Find closing '"' and copy to OUT_BUF
     x.mov_r64i(6, OUT_BUF_ADDR); // dest
     let jp_str_loop = x.m();
     x.i(&[0x0F, 0xB6, 0x08]); // movzx ecx, byte [rax]
@@ -1794,14 +2007,15 @@ fn impl_float_ops(x: &mut X) {
     x.patch_jmp_rel8(jp_str_end);
     // Write null
     x.i(&[0xC6, 0x06, 0x00]); // mov byte [rsi], 0
-    // Allocate string in heap
+                              // Allocate string in heap
     x.mov_rr(7, 6); // rdi = dest (length = dest - OUT_BUF)
     x.mov_r64i(0, OUT_BUF_ADDR);
     x.i(&[0x48, 0x29, 0xC7]); // sub rdi, rax (length)
     x.mov_rr(12, 7); // r12 = length
     x.add_ri(7, 5); // +5 for prefix+null
     x.push_r(12);
-    x.b(0xE8); x.i32(1); // call alloc
+    x.b(0xE8);
+    x.i32(1); // call alloc
     x.pop_r(12);
     x.mov_rr(8, 0); // r8 = alloc ptr
     x.i(&[0x44, 0x89, 0x20]); // mov [rax], r12d (write length)
@@ -1850,7 +2064,7 @@ fn impl_float_ops(x: &mut X) {
     // Parse as number (integer)
     x.xor_rr(8, 8); // r8 = result
     x.xor_rr(9, 9); // r9 = negative flag
-    // Check for '-'
+                    // Check for '-'
     x.i(&[0x48, 0x83, 0xF9, 0x2D]); // cmp rcx, '-'
     let jp_not_neg = x.jne8();
     x.mov_r64i(9, 1);
@@ -1890,19 +2104,25 @@ fn impl_float_ops(x: &mut X) {
     // Simplified: convert i64 to string, or pass through strings
     x.patch_handler(0xB7);
     x.mov_rm(0, 15, 0); // rax = value
-    // For now, just call I64TOSTR logic (convert number to string)
+                        // For now, just call I64TOSTR logic (convert number to string)
     x.mov_rr(7, 0); // rdi = value
     x.mov_r64i(6, OUT_BUF_ADDR);
-    x.push_r(0); x.push_r(1); x.push_r(2);
-    x.b(0xE8); x.i32(0); // call itoa
-    x.pop_r(2); x.pop_r(1); x.pop_r(0);
+    x.push_r(0);
+    x.push_r(1);
+    x.push_r(2);
+    x.b(0xE8);
+    x.i32(0); // call itoa
+    x.pop_r(2);
+    x.pop_r(1);
+    x.pop_r(0);
     // rax = length, rsi = buffer
     x.mov_rr(12, 0); // r12 = length
-    // Allocate string
+                     // Allocate string
     x.add_ri(0, 5);
     x.mov_rr(7, 0);
     x.push_r(12);
-    x.b(0xE8); x.i32(1); // call alloc
+    x.b(0xE8);
+    x.i32(1); // call alloc
     x.pop_r(12);
     x.mov_rr(8, 0);
     x.i(&[0x44, 0x89, 0x20]); // write length
@@ -1945,7 +2165,7 @@ fn impl_misc_ops(x: &mut X) {
     x.patch_handler(0x71);
     x.mov_rm(0, 15, 0); // rax = value (cap or ref)
     x.add_ri(15, 8); // pop
-    // For now, just no-op (native mode has full privileges)
+                     // For now, just no-op (native mode has full privileges)
     x.back();
 
     // ConfLabel (0x80) — value → signal(value, confidence)
@@ -1962,47 +2182,50 @@ fn impl_misc_ops(x: &mut X) {
     x.i(&[0x47, 0x8B, 0x04, 0x2E]); // mov eax, [r14+r13] (ref2_len)
     x.add_ri(13, 4);
     x.i(&[0x49, 0x01, 0xC5]); // skip ref2 data
-    // Read ref1
+                              // Read ref1
     x.i(&[0x47, 0x8B, 0x04, 0x2E]); // mov eax, [r14+r13] (ref1_len)
     x.mov_rr(8, 0); // r8 = ref1_len
     x.add_ri(13, 4);
     // r13 now points to ref1 data
     x.mov_rr(9, 13); // r9 = ref1 data address (relative to r14)
     x.i(&[0x4D, 0x01, 0xC5]); // add r13, r8 (skip ref1 data)
-    // Call run_ref with ref1
+                              // Call run_ref with ref1
     x.mov_rr(7, 14); // rdi = bytecode base
     x.i(&[0x4C, 0x01, 0xCF]); // add rdi, r9? No — need absolute address
-    // Actually: ref1 data is at r14 + (r13 - ref1_len - 4)
-    // We saved r9 = r13 before skipping. So ref1_addr = r14 + r9.
-    // But r9 was set to r13 (the ip), not the offset.
-    // Let me recalculate: after reading ref1_len and advancing ip by 4,
-    // r13 points to the start of ref1 data. We saved r13 to r9.
-    // So ref1_addr = r14 + r9. But r14 is the bytecode base.
-    // Actually, the bytecode is at CODE_VADDR + 0x1000, and r14 = CODE_VADDR + 0x1000.
-    // The ref1 data is at [r14 + old_r13]. But old_r13 was the ip before reading ref1.
-    // After: ip += 4 (read len), then ip += ref1_len (skip data).
-    // We saved ip at the point after reading len (before skipping data) to r9.
-    // So ref1_data_addr = r14 + r9. Wait, r13 is an offset from r14.
-    // Let me use: rdi = r14 + saved_offset.
-    // r9 = r13 at the point after reading len. So ref1_data = r14 + r9.
-    // But we already advanced r13 past ref1. We need the address before advancing.
-    // Let me restructure: save the offset before advancing.
-    // Actually, I already did: x.mov_rr(9, 13) before x.add_ri(13, ...).
-    // So r9 = offset of ref1 data within bytecode.
-    // ref1 absolute address = r14 + r9.
-    // But wait — r14 = CODE_VADDR + 0x1000. The bytecode starts at r14.
-    // So ref1_addr = r14 + r9.
-    // However, run_ref expects rdi = absolute address of ref bytecode.
-    // So: rdi = r14 + r9. But we need to compute this.
-    // x.mov_rr(7, 14); then x.i(add rdi, r9) — but r9 is not a register we can add.
-    // Actually, r9 IS a register. add rdi, r9 = add r7, r9.
+                              // Actually: ref1 data is at r14 + (r13 - ref1_len - 4)
+                              // We saved r9 = r13 before skipping. So ref1_addr = r14 + r9.
+                              // But r9 was set to r13 (the ip), not the offset.
+                              // Let me recalculate: after reading ref1_len and advancing ip by 4,
+                              // r13 points to the start of ref1 data. We saved r13 to r9.
+                              // So ref1_addr = r14 + r9. But r14 is the bytecode base.
+                              // Actually, the bytecode is at CODE_VADDR + 0x1000, and r14 = CODE_VADDR + 0x1000.
+                              // The ref1 data is at [r14 + old_r13]. But old_r13 was the ip before reading ref1.
+                              // After: ip += 4 (read len), then ip += ref1_len (skip data).
+                              // We saved ip at the point after reading len (before skipping data) to r9.
+                              // So ref1_data_addr = r14 + r9. Wait, r13 is an offset from r14.
+                              // Let me use: rdi = r14 + saved_offset.
+                              // r9 = r13 at the point after reading len. So ref1_data = r14 + r9.
+                              // But we already advanced r13 past ref1. We need the address before advancing.
+                              // Let me restructure: save the offset before advancing.
+                              // Actually, I already did: x.mov_rr(9, 13) before x.add_ri(13, ...).
+                              // So r9 = offset of ref1 data within bytecode.
+                              // ref1 absolute address = r14 + r9.
+                              // But wait — r14 = CODE_VADDR + 0x1000. The bytecode starts at r14.
+                              // So ref1_addr = r14 + r9.
+                              // However, run_ref expects rdi = absolute address of ref bytecode.
+                              // So: rdi = r14 + r9. But we need to compute this.
+                              // x.mov_rr(7, 14); then x.i(add rdi, r9) — but r9 is not a register we can add.
+                              // Actually, r9 IS a register. add rdi, r9 = add r7, r9.
     x.mov_rr(7, 14); // rdi = r14 (bytecode base)
     x.i(&[0x4C, 0x01, 0xCF]); // add rdi, r9
-    // rdi now = absolute address of ref1 data
+                              // rdi now = absolute address of ref1 data
     x.mov_rr(6, 8); // rsi = ref1_len
-    x.push_r(8); x.push_r(9);
-    x.b(0xE8); x.i32(2); // call run_ref
-    x.pop_r(9); x.pop_r(8);
+    x.push_r(8);
+    x.push_r(9);
+    x.b(0xE8);
+    x.i32(2); // call run_ref
+    x.pop_r(9);
+    x.pop_r(8);
     x.back();
 
     // Definition ops (0xA0-0xA3) — no-ops at runtime
@@ -2021,19 +2244,22 @@ fn impl_misc_ops(x: &mut X) {
     x.patch_handler(0xB8);
     x.mov_rm(7, 15, 0); // r7 = str addr
     x.mov_rm(8, 7, -4); // r8 = str len
-    // Allocate list: (len+1)*8 bytes
+                        // Allocate list: (len+1)*8 bytes
     x.mov_rr(0, 8);
     x.add_ri(0, 1);
     x.i(&[0x48, 0xC1, 0xE0, 0x03]);
     x.mov_rr(7, 0);
-    x.push_r(14); x.push_r(13);
-    x.b(0xE8); x.i32(1); // call alloc
-    x.pop_r(13); x.pop_r(14);
+    x.push_r(14);
+    x.push_r(13);
+    x.b(0xE8);
+    x.i32(1); // call alloc
+    x.pop_r(13);
+    x.pop_r(14);
     // rax = list ptr
     x.mov_rr(9, 0); // r9 = list ptr
     x.mov_mr(9, 0, 8); // write count
     x.add_ri(9, 8); // r9 points to elements
-    // Copy char codes
+                    // Copy char codes
     x.xor_rr(10, 10);
     let sch_loop = x.m();
     x.i(&[0x4D, 0x39, 0xC2]); // cmp r10, r8
@@ -2042,10 +2268,10 @@ fn impl_misc_ops(x: &mut X) {
     x.mov_rm(0, 15, 0); // rax = str addr (still on stack)
     x.i(&[0x4C, 0x01, 0xD0]); // add rax, r10
     x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
-    // Write to list[r10]
+                              // Write to list[r10]
     x.mov_rr(1, 9);
     x.i(&[0x49, 0xC1, 0xE2, 0x03]); // shl r10_temp? No — r10 is index
-    // Actually: [r9 + r10*8] = rax
+                                    // Actually: [r9 + r10*8] = rax
     x.mov_rr(1, 10);
     x.i(&[0x48, 0xC1, 0xE1, 0x03]); // shl rcx, 3
     x.i(&[0x49, 0x01, 0xC9]); // add rcx, r9
@@ -2069,19 +2295,22 @@ fn impl_misc_ops(x: &mut X) {
     x.patch_handler(0xB9);
     x.mov_rm(7, 15, 0); // r7 = list ptr
     x.mov_rm(8, 7, 0); // r8 = count
-    // Allocate string: count+5 bytes
+                       // Allocate string: count+5 bytes
     x.mov_rr(0, 8);
     x.add_ri(0, 5);
     x.mov_rr(7, 0);
-    x.push_r(14); x.push_r(13);
-    x.b(0xE8); x.i32(1); // call alloc
-    x.pop_r(13); x.pop_r(14);
+    x.push_r(14);
+    x.push_r(13);
+    x.b(0xE8);
+    x.i32(1); // call alloc
+    x.pop_r(13);
+    x.pop_r(14);
     // rax = alloc ptr
     x.mov_rr(9, 0); // r9 = alloc ptr
-    // Write length
+                    // Write length
     x.i(&[0x45, 0x89, 0x01]); // mov [r9], r8d
     x.add_ri(9, 4); // r9 = data area
-    // Copy bytes
+                    // Copy bytes
     x.mov_rm(7, 15, 0); // r7 = list ptr (re-read)
     x.xor_rr(10, 10);
     let cs_loop = x.m();
@@ -2093,7 +2322,7 @@ fn impl_misc_ops(x: &mut X) {
     x.i(&[0x48, 0x01, 0xF8]); // add rax, r7
     x.add_ri(0, 8);
     x.mov_rm(0, 0, 0); // rax = element value
-    // Write byte
+                       // Write byte
     x.mov_rr(1, 9);
     x.i(&[0x4C, 0x01, 0xD1]); // add rcx, r10
     x.i(&[0x88, 0x01]); // mov [rcx], al
@@ -2107,14 +2336,14 @@ fn impl_misc_ops(x: &mut X) {
     x.mov_rm(1, 1, 0); // count
     x.i(&[0x48, 0x01, 0xC8]); // add rax, rcx
     x.i(&[0xC6, 0x00, 0x00]); // mov byte [rax], 0
-    // Push string addr (r9 = data area)
+                              // Push string addr (r9 = data area)
     x.mov_mr(15, 0, 9);
     x.back();
 
     // STRITER (0xBA) — str → char_code rest_str (pushes TWO values)
     x.patch_handler(0xBA);
     x.mov_rm(7, 15, 0); // r7 = str addr
-    // Read first byte
+                        // Read first byte
     x.i(&[0x41, 0x0F, 0xB6, 0x07]); // movzx eax, byte [r7]
     x.i(&[0x48, 0x85, 0xC0]); // test rax, rax
     let si_empty = x.je8();
@@ -2153,7 +2382,7 @@ fn impl_misc_ops(x: &mut X) {
     x.i(&[0x4C, 0x01, 0xC8]); // add rax, r9 (list_ptr)
     x.add_ri(0, 8); // skip count
     x.mov_rm(0, 0, 0); // rax = element (list ptr)
-    // Check if element is a list (ptr >= HEAP_VADDR = 0x500000)
+                       // Check if element is a list (ptr >= HEAP_VADDR = 0x500000)
     x.i(&[0x48, 0x3D, 0x00, 0x00, 0x50, 0x00]); // cmp rax, 0x500000
     let lf_skip = x.jb8();
     // It's a list ptr — read count
@@ -2162,7 +2391,7 @@ fn impl_misc_ops(x: &mut X) {
     let lf_skip2 = x.jne8();
     // Read first element (key of association pair)
     x.mov_rm(1, 0, 8); // rcx = first element (assoc key)
-    // Compare with search key (r8)
+                       // Compare with search key (r8)
     x.i(&[0x49, 0x39, 0xC8]); // cmp r8, rcx
     let lf_found = x.je8();
     // Not a match — continue
@@ -2194,7 +2423,7 @@ fn impl_misc_ops(x: &mut X) {
     x.mov_rr(8, 0); // r8 = list ptr (save in r8)
     x.mov_rm(9, 8, 0); // r9 = count
     x.add_ri(15, 8); // pop list
-    // Use OUT_BUF as temp buffer
+                     // Use OUT_BUF as temp buffer
     x.mov_r64i(10, OUT_BUF_ADDR); // r10 = dest pointer
     x.xor_rr(11, 11); // r11 = total length
     x.xor_rr(12, 12); // r12 = index
@@ -2207,7 +2436,7 @@ fn impl_misc_ops(x: &mut X) {
     x.i(&[0x4C, 0x01, 0xC0]); // add rax, r8 (list ptr)
     x.add_ri(0, 8); // skip count
     x.mov_rm(0, 0, 0); // rax = element (string addr)
-    // Copy string to dest
+                       // Copy string to dest
     let sj_cpy = x.m();
     x.i(&[0x0F, 0xB6, 0x08]); // movzx ecx, byte [rax]
     x.i(&[0x48, 0x85, 0xC9]); // test rcx, rcx
@@ -2226,19 +2455,28 @@ fn impl_misc_ops(x: &mut X) {
     x.patch_jmp_rel8(sj_done);
     // Write null terminator at [r10]
     x.i(&[0x41, 0xC6, 0x02, 0x00]); // mov byte [r10], 0
-    // Allocate string in heap: total_len + 5
+                                    // Allocate string in heap: total_len + 5
     x.mov_rr(0, 11); // rax = total_len
     x.add_ri(0, 5);
     x.mov_rr(7, 0); // rdi = alloc size
-    x.push_r(8); x.push_r(9); x.push_r(10); x.push_r(11); x.push_r(12);
-    x.b(0xE8); x.i32(1); // call alloc
-    x.pop_r(12); x.pop_r(11); x.pop_r(10); x.pop_r(9); x.pop_r(8);
+    x.push_r(8);
+    x.push_r(9);
+    x.push_r(10);
+    x.push_r(11);
+    x.push_r(12);
+    x.b(0xE8);
+    x.i32(1); // call alloc
+    x.pop_r(12);
+    x.pop_r(11);
+    x.pop_r(10);
+    x.pop_r(9);
+    x.pop_r(8);
     // rax = alloc ptr, r11 = total_len
     x.mov_rr(8, 0); // r8 = alloc ptr
-    // Write length
+                    // Write length
     x.i(&[0x44, 0x89, 0x18]); // mov [rax], r11d
     x.add_ri(8, 4); // r8 = data area
-    // Copy from OUT_BUF to heap
+                    // Copy from OUT_BUF to heap
     x.mov_r64i(10, OUT_BUF_ADDR); // r10 = source
     x.xor_rr(12, 12); // r12 = index
     let sj_copy = x.m();
@@ -2248,7 +2486,7 @@ fn impl_misc_ops(x: &mut X) {
     x.mov_rr(0, 10); // rax = OUT_BUF_ADDR
     x.i(&[0x4C, 0x01, 0xE0]); // add rax, r12 (idx)
     x.i(&[0x0F, 0xB6, 0x00]); // movzx eax, byte [rax]
-    // Write byte: [r8 + idx]
+                              // Write byte: [r8 + idx]
     x.mov_rr(1, 8); // rcx = heap dest
     x.i(&[0x4C, 0x01, 0xE1]); // add rcx, r12 (idx)
     x.i(&[0x88, 0x01]); // mov [rcx], al
@@ -2260,7 +2498,7 @@ fn impl_misc_ops(x: &mut X) {
     x.mov_rr(0, 8); // rax = data area
     x.i(&[0x4C, 0x01, 0xD8]); // add rax, r11 (total_len)
     x.i(&[0xC6, 0x00, 0x00]); // mov byte [rax], 0
-    // Push result (r8 = data area = string address)
+                              // Push result (r8 = data area = string address)
     x.mov_mr(15, 0, 8);
     x.back();
 
@@ -2269,9 +2507,12 @@ fn impl_misc_ops(x: &mut X) {
     x.patch_handler(0xBD);
     // Allocate 4096 bytes for buffer
     x.mov_r64i(7, 4096);
-    x.push_r(14); x.push_r(13);
-    x.b(0xE8); x.i32(1); // call alloc
-    x.pop_r(13); x.pop_r(14);
+    x.push_r(14);
+    x.push_r(13);
+    x.b(0xE8);
+    x.i32(1); // call alloc
+    x.pop_r(13);
+    x.pop_r(14);
     // rax = buffer ptr, write length = 0
     x.i(&[0x48, 0xC7, 0x00, 0x00, 0x00, 0x00, 0x00]); // mov qword [rax], 0
     x.sub_ri(15, 8);
@@ -2284,24 +2525,24 @@ fn impl_misc_ops(x: &mut X) {
     x.add_ri(15, 8); // pop byte
     x.mov_rm(1, 15, 0); // rcx = buffer ptr
     x.mov_rm(2, 1, 0); // rdx = length
-    // Write byte at [buf + 8 + length]
-    // Use r8 = buf + 8, then add length
+                       // Write byte at [buf + 8 + length]
+                       // Use r8 = buf + 8, then add length
     x.mov_rr(8, 1); // r8 = buf
     x.add_ri(8, 8); // r8 = buf + 8 (data area)
     x.i(&[0x4C, 0x01, 0xD0]); // add rax? No — we need r8+rdx
-    // Actually: write to [r8 + rdx]
+                              // Actually: write to [r8 + rdx]
     x.mov_rr(11, 8); // r11 = buf + 8
     x.i(&[0x4C, 0x01, 0xD3]); // add r11, r10? No — add r11, rdx
-    // Use: r11 = r8 + rdx
+                              // Use: r11 = r8 + rdx
     x.i(&[0x49, 0x01, 0xD3]); // add r11, rdx
-    // Wait, rdx is register 2, not r10. The add encoding: add r11, rdx
-    // REX.WRB + 01 + ModR/M (mod=11, reg=rdx, r/m=r11)
-    // r11 = 11, rdx = 2. REX = 0x48 | (2>>3)<<2 | (11>>3) = 0x48 | 0 | 1 = 0x49
-    // ModR/M = 0xC0 | (2<<3) | (11&7) = 0xC0 | 0x10 | 3 = 0xD3
-    // So: 0x49, 0x01, 0xD3 — correct!
-    // Store byte: mov [r11], al
+                              // Wait, rdx is register 2, not r10. The add encoding: add r11, rdx
+                              // REX.WRB + 01 + ModR/M (mod=11, reg=rdx, r/m=r11)
+                              // r11 = 11, rdx = 2. REX = 0x48 | (2>>3)<<2 | (11>>3) = 0x48 | 0 | 1 = 0x49
+                              // ModR/M = 0xC0 | (2<<3) | (11&7) = 0xC0 | 0x10 | 3 = 0xD3
+                              // So: 0x49, 0x01, 0xD3 — correct!
+                              // Store byte: mov [r11], al
     x.i(&[0x41, 0x88, 0x03]); // mov [r11], al
-    // Increment length
+                              // Increment length
     x.add_ri(2, 1);
     x.mov_mr(1, 0, 2); // [buf] = new length (rcx = buf)
     x.back();
@@ -2318,8 +2559,8 @@ fn impl_misc_ops(x: &mut X) {
     x.mov_rm(8, 15, 0); // r8 = path string addr
     x.mov_rm(9, 15, 8); // r9 = buffer ptr
     x.add_ri(15, 16); // pop both
-    // open(path, O_WRONLY|O_CREAT|O_TRUNC, 0644)
-    // syscall 2 on x86-64 Linux
+                      // open(path, O_WRONLY|O_CREAT|O_TRUNC, 0644)
+                      // syscall 2 on x86-64 Linux
     x.mov_r64i(0, 2); // rax = 2 (open)
     x.mov_rr(7, 8); // rdi = path (r8→rdi)
     x.mov_r64i(6, 0x241); // rsi = flags (O_WRONLY|O_CREAT|O_TRUNC = 0x241)
@@ -2332,7 +2573,7 @@ fn impl_misc_ops(x: &mut X) {
     x.patch_jmp_rel8(bw_ok);
     // Save fd
     x.mov_rr(10, 0); // r10 = fd
-    // write(fd, buf+8, length)
+                     // write(fd, buf+8, length)
     x.mov_r64i(0, 1); // rax = 1 (write)
     x.mov_rr(7, 10); // rdi = fd
     x.mov_rr(6, 9); // rsi = buf+8 (data area)
@@ -2351,14 +2592,15 @@ fn impl_misc_ops(x: &mut X) {
     x.i(&[0x47, 0x8B, 0x04, 0x2E]); // mov eax, [r14+r13]
     x.add_ri(13, 4);
     x.i(&[0x49, 0x01, 0xC5]); // skip ref data
-    // Stack: [... ref_bc_addr]
+                              // Stack: [... ref_bc_addr]
     x.mov_rm(8, 15, 0); // r8 = ref_bc_addr
     x.add_ri(15, 8); // pop ref
-    // Call run_ref to execute the quotation
+                     // Call run_ref to execute the quotation
     x.mov_rr(7, 8); // rdi = ref_bc_addr
     x.mov_r64i(6, 0xFFFF); // rsi = large len
     x.push_r(8);
-    x.b(0xE8); x.i32(2); // call run_ref
+    x.b(0xE8);
+    x.i32(2); // call run_ref
     x.pop_r(8);
     // Result is on stack top
     // Push true below it: stack becomes [..., true, result]
@@ -2368,27 +2610,27 @@ fn impl_misc_ops(x: &mut X) {
     x.i(&[0x49, 0xC7, 0x07, 0x01, 0x00, 0x00, 0x00]); // mov qword [r15], 1 (true)
     x.sub_ri(15, 8); // allocate slot
     x.mov_mr(15, 0, 0); // push result (true is now below)
-    // Wait — the order is wrong. Let me restructure:
-    // Current stack: [... result]  (result at [r15])
-    // We want: [... true, result]  (true at [r15], result at [r15-8])
-    // Actually: we need to shift. Let me just:
-    // 1. Save result
-    // 2. Push true
-    // 3. Push result
+                        // Wait — the order is wrong. Let me restructure:
+                        // Current stack: [... result]  (result at [r15])
+                        // We want: [... true, result]  (true at [r15], result at [r15-8])
+                        // Actually: we need to shift. Let me just:
+                        // 1. Save result
+                        // 2. Push true
+                        // 3. Push result
     x.mov_rm(0, 15, 0); // rax = result (from run_ref)
     x.add_ri(15, 8); // pop result
     x.sub_ri(15, 8); // push true
     x.i(&[0x49, 0xC7, 0x07, 0x01, 0x00, 0x00, 0x00]); // [r15] = 1 (true)
     x.sub_ri(15, 8); // push result
     x.mov_mr(15, 0, 0); // [r15] = result
-    // Now stack: [... true, result] — but we want true ON TOP
-    // The Rust VM does: push true, push result → stack has [true, result]
-    // With true on top. Let me swap:
+                        // Now stack: [... true, result] — but we want true ON TOP
+                        // The Rust VM does: push true, push result → stack has [true, result]
+                        // With true on top. Let me swap:
     x.mov_rm(0, 15, 0); // rax = result
     x.mov_rm(1, 15, 8); // rcx = true
     x.mov_mr(15, 8, 0); // [r15+8] = result
     x.mov_mr(15, 0, 1); // [r15] = true
-    // Now stack: [... result, true] — true on top. Correct!
+                        // Now stack: [... result, true] — true on top. Correct!
     x.back();
 }
 
@@ -2475,7 +2717,8 @@ fn impl_str_eq(x: &mut X) -> usize {
     x.mov_rm(1, 6, -4); // rcx = len2
     x.i(&[0x48, 0x39, 0xC8]); // cmp rax, rcx
     let len_ok = x.je8();
-    x.xor_rr(0, 0); x.ret(); // lengths differ → false
+    x.xor_rr(0, 0);
+    x.ret(); // lengths differ → false
     x.patch_jmp_rel8(len_ok);
     // Compare byte by byte
     x.mov_rr(2, 0); // rdx = length
@@ -2492,9 +2735,11 @@ fn impl_str_eq(x: &mut X) -> usize {
     x.i(&[0x48, 0x85, 0xD2]); // test rdx, rdx
     let continue_loop = x.jne8();
     // All bytes matched
-    x.mov_r64i(0, 1); x.ret();
+    x.mov_r64i(0, 1);
+    x.ret();
     x.patch_jmp_rel8(not_eq);
-    x.xor_rr(0, 0); x.ret();
+    x.xor_rr(0, 0);
+    x.ret();
     x.patch_jmp_rel8(continue_loop);
     // Jump back to byte_loop
     let back = x.jmp();
@@ -2532,12 +2777,14 @@ fn impl_str_cmp(x: &mut X) -> usize {
     x.mov_r64i(0, u64::MAX as i64 as u64); // -1
     x.ret();
     x.patch_jmp_rel8(equal);
-    x.xor_rr(0, 0); x.ret();
+    x.xor_rr(0, 0);
+    x.ret();
     x.patch_jmp_rel8(less);
     x.mov_r64i(0, u64::MAX as i64 as u64); // -1
     x.ret();
     x.patch_jmp_rel8(greater);
-    x.mov_r64i(0, 1); x.ret();
+    x.mov_r64i(0, 1);
+    x.ret();
     start
 }
 
@@ -2550,7 +2797,7 @@ fn impl_alloc(x: &mut X) -> usize {
     x.mov_rm(0, 8, 0); // rax = alloc_ptr
     x.i(&[0x49, 0x01, 0xF8]); // add rax, rdi
     x.mov_mr(8, 0, 0); // store new alloc_ptr
-    // Return old alloc_ptr (before adding size)
+                       // Return old alloc_ptr (before adding size)
     x.i(&[0x48, 0x29, 0xF8]); // sub rax, rdi
     x.ret();
     start
@@ -2583,23 +2830,57 @@ fn impl_run_ref(x: &mut X, _raw_bc: &[u8]) -> usize {
     // RETURN (0x61) → break out
     x.op(0x61);
     // Register ALL opcodes (same set as main loop)
-    for op in [0x00, 0x01, 0x02, 0x03, 0x04] { x.op(op); }
-    for op in [0x10, 0x11, 0x12, 0x13, 0x14] { x.op(op); }
-    for op in 0x18..=0x1D { x.op(op); }
-    for op in 0x20..=0x22 { x.op(op); }
-    for op in 0x30..=0x35 { x.op(op); }
-    for op in 0x40..=0x45 { x.op(op); }
-    for op in 0x46..=0x4F { x.op(op); }
-    for op in [0x50, 0x51, 0x52, 0x53] { x.op(op); }
-    for op in [0x60, 0x61] { x.op(op); }
-    for op in [0x70, 0x71] { x.op(op); }
-    for op in [0x80, 0x81] { x.op(op); }
-    for op in [0x90, 0x91, 0x92] { x.op(op); }
-    for op in [0xA0, 0xA1, 0xA2, 0xA3] { x.op(op); }
-    for op in 0xB0..=0xB5 { x.op(op); }
-    for op in [0xB6, 0xB7] { x.op(op); }
-    for op in 0xB8..=0xBC { x.op(op); }
-    for op in 0xBD..=0xC0 { x.op(op); }
+    for op in [0x00, 0x01, 0x02, 0x03, 0x04] {
+        x.op(op);
+    }
+    for op in [0x10, 0x11, 0x12, 0x13, 0x14] {
+        x.op(op);
+    }
+    for op in 0x18..=0x1D {
+        x.op(op);
+    }
+    for op in 0x20..=0x22 {
+        x.op(op);
+    }
+    for op in 0x30..=0x35 {
+        x.op(op);
+    }
+    for op in 0x40..=0x45 {
+        x.op(op);
+    }
+    for op in 0x46..=0x4F {
+        x.op(op);
+    }
+    for op in [0x50, 0x51, 0x52, 0x53] {
+        x.op(op);
+    }
+    for op in [0x60, 0x61] {
+        x.op(op);
+    }
+    for op in [0x70, 0x71] {
+        x.op(op);
+    }
+    for op in [0x80, 0x81] {
+        x.op(op);
+    }
+    for op in [0x90, 0x91, 0x92] {
+        x.op(op);
+    }
+    for op in [0xA0, 0xA1, 0xA2, 0xA3] {
+        x.op(op);
+    }
+    for op in 0xB0..=0xB5 {
+        x.op(op);
+    }
+    for op in [0xB6, 0xB7] {
+        x.op(op);
+    }
+    for op in 0xB8..=0xBC {
+        x.op(op);
+    }
+    for op in 0xBD..=0xC0 {
+        x.op(op);
+    }
     x.op(0xC1);
 
     x.done(); // back to mini fetch
@@ -2615,87 +2896,126 @@ fn impl_run_ref(x: &mut X, _raw_bc: &[u8]) -> usize {
 
     // DUP
     x.patch_handler(0x00);
-    x.mov_rm(0, 15, 0); x.sub_ri(15, 8); x.mov_mr(15, 0, 0);
+    x.mov_rm(0, 15, 0);
+    x.sub_ri(15, 8);
+    x.mov_mr(15, 0, 0);
     x.back();
 
     // SWAP
     x.patch_handler(0x01);
-    x.mov_rm(0, 15, 0); x.mov_rm(1, 15, 8);
-    x.mov_mr(15, 8, 0); x.mov_mr(15, 0, 1);
+    x.mov_rm(0, 15, 0);
+    x.mov_rm(1, 15, 8);
+    x.mov_mr(15, 8, 0);
+    x.mov_mr(15, 0, 1);
     x.back();
 
     // DROP
     x.patch_handler(0x02);
-    x.add_ri(15, 8); x.back();
+    x.add_ri(15, 8);
+    x.back();
 
     // ROT
     x.patch_handler(0x03);
-    x.mov_rm(0, 15, 0); x.mov_rm(1, 15, 8); x.mov_rm(2, 15, 16);
-    x.mov_mr(15, 0, 1); x.mov_mr(15, 8, 0); x.mov_mr(15, 16, 2);
+    x.mov_rm(0, 15, 0);
+    x.mov_rm(1, 15, 8);
+    x.mov_rm(2, 15, 16);
+    x.mov_mr(15, 0, 1);
+    x.mov_mr(15, 8, 0);
+    x.mov_mr(15, 16, 2);
     x.back();
 
     // ADD
     x.patch_handler(0x10);
-    x.mov_rm(0, 15, 0); x.add_ri(15, 8);
-    x.i(&[0x49, 0x01, 0x07]); x.back();
+    x.mov_rm(0, 15, 0);
+    x.add_ri(15, 8);
+    x.i(&[0x49, 0x01, 0x07]);
+    x.back();
 
     // SUB
     x.patch_handler(0x11);
-    x.mov_rm(0, 15, 0); x.add_ri(15, 8);
-    x.i(&[0x49, 0x29, 0x07]); x.back();
+    x.mov_rm(0, 15, 0);
+    x.add_ri(15, 8);
+    x.i(&[0x49, 0x29, 0x07]);
+    x.back();
 
     // MUL
     x.patch_handler(0x12);
-    x.mov_rm(0, 15, 0); x.add_ri(15, 8);
+    x.mov_rm(0, 15, 0);
+    x.add_ri(15, 8);
     x.i(&[0x49, 0x0F, 0xAF, 0x07]);
-    x.mov_mr(15, 0, 0); x.back();
+    x.mov_mr(15, 0, 0);
+    x.back();
 
     // DIV
     x.patch_handler(0x13);
-    x.mov_rm(0, 15, 0); x.add_ri(15, 8);
+    x.mov_rm(0, 15, 0);
+    x.add_ri(15, 8);
     x.mov_rm(1, 15, 0);
-    x.i(&[0x48, 0x85, 0xC0]); let m_ok = x.jne8();
-    x.mov_r64i(0, 60); x.xor_rr(7, 7); x.syscall();
+    x.i(&[0x48, 0x85, 0xC0]);
+    let m_ok = x.jne8();
+    x.mov_r64i(0, 60);
+    x.xor_rr(7, 7);
+    x.syscall();
     x.patch_jmp_rel8(m_ok);
-    x.mov_rr(7, 0); x.mov_rr(0, 1);
-    x.i(&[0x48, 0x99]); x.i(&[0x48, 0xF7, 0xFF]);
-    x.mov_mr(15, 0, 0); x.back();
+    x.mov_rr(7, 0);
+    x.mov_rr(0, 1);
+    x.i(&[0x48, 0x99]);
+    x.i(&[0x48, 0xF7, 0xFF]);
+    x.mov_mr(15, 0, 0);
+    x.back();
 
     // MOD
     x.patch_handler(0x14);
-    x.mov_rm(0, 15, 0); x.add_ri(15, 8);
+    x.mov_rm(0, 15, 0);
+    x.add_ri(15, 8);
     x.mov_rm(1, 15, 0);
-    x.mov_rr(7, 0); x.mov_rr(0, 1);
-    x.i(&[0x48, 0x99]); x.i(&[0x48, 0xF7, 0xFF]);
-    x.mov_mr(15, 0, 2); x.back();
+    x.mov_rr(7, 0);
+    x.mov_rr(0, 1);
+    x.i(&[0x48, 0x99]);
+    x.i(&[0x48, 0xF7, 0xFF]);
+    x.mov_mr(15, 0, 2);
+    x.back();
 
     // CMP ops
     let cmps: [(u8, u8); 6] = [
-        (0x18, 0x94), (0x19, 0x9C), (0x1A, 0x9F),
-        (0x1B, 0x95), (0x1C, 0x9E), (0x1D, 0x9D),
+        (0x18, 0x94),
+        (0x19, 0x9C),
+        (0x1A, 0x9F),
+        (0x1B, 0x95),
+        (0x1C, 0x9E),
+        (0x1D, 0x9D),
     ];
     for (opc, cc) in &cmps {
         x.patch_handler(*opc);
-        x.mov_rm(0, 15, 0); x.add_ri(15, 8);
+        x.mov_rm(0, 15, 0);
+        x.add_ri(15, 8);
         x.i(&[0x49, 0x39, 0x07]);
-        x.b(0x0F); x.b(*cc); x.b(0xC0);
+        x.b(0x0F);
+        x.b(*cc);
+        x.b(0xC0);
         x.i(&[0x48, 0x0F, 0xB6, 0xC0]);
-        x.mov_mr(15, 0, 0); x.back();
+        x.mov_mr(15, 0, 0);
+        x.back();
     }
 
     // AND
     x.patch_handler(0x20);
-    x.mov_rm(0, 15, 0); x.add_ri(15, 8);
-    x.i(&[0x49, 0x21, 0x07]); x.back();
+    x.mov_rm(0, 15, 0);
+    x.add_ri(15, 8);
+    x.i(&[0x49, 0x21, 0x07]);
+    x.back();
 
     // OR
     x.patch_handler(0x21);
-    x.mov_rm(0, 15, 0); x.add_ri(15, 8);
-    x.i(&[0x49, 0x09, 0x07]); x.back();
+    x.mov_rm(0, 15, 0);
+    x.add_ri(15, 8);
+    x.i(&[0x49, 0x09, 0x07]);
+    x.back();
 
     // NOT
     x.patch_handler(0x22);
-    x.i(&[0x49, 0x83, 0x37, 0x01]); x.back();
+    x.i(&[0x49, 0x83, 0x37, 0x01]);
+    x.back();
 
     // PICK
     x.patch_handler(0x04);
@@ -2710,13 +3030,19 @@ fn impl_run_ref(x: &mut X, _raw_bc: &[u8]) -> usize {
 
     // PUSH_I64
     x.patch_handler(0x30);
-    x.i(&[0x4B, 0x8B, 0x04, 0x2E]); x.add_ri(13, 8);
-    x.sub_ri(15, 8); x.mov_mr(15, 0, 0); x.back();
+    x.i(&[0x4B, 0x8B, 0x04, 0x2E]);
+    x.add_ri(13, 8);
+    x.sub_ri(15, 8);
+    x.mov_mr(15, 0, 0);
+    x.back();
 
     // PUSH_F64
     x.patch_handler(0x31);
-    x.i(&[0x4B, 0x8B, 0x04, 0x2E]); x.add_ri(13, 8);
-    x.sub_ri(15, 8); x.mov_mr(15, 0, 0); x.back();
+    x.i(&[0x4B, 0x8B, 0x04, 0x2E]);
+    x.add_ri(13, 8);
+    x.sub_ri(15, 8);
+    x.mov_mr(15, 0, 0);
+    x.back();
 
     // PUSH_STR
     x.patch_handler(0x32);
@@ -2778,7 +3104,8 @@ fn impl_run_ref(x: &mut X, _raw_bc: &[u8]) -> usize {
 
     // COND
     x.patch_handler(0x50);
-    x.mov_rm(0, 15, 0); x.add_ri(15, 8);
+    x.mov_rm(0, 15, 0);
+    x.add_ri(15, 8);
     x.i(&[0x47, 0x8B, 0x0C, 0x2E]);
     x.add_ri(13, 4);
     x.i(&[0x48, 0x85, 0xC0]);
@@ -2796,7 +3123,8 @@ fn impl_run_ref(x: &mut X, _raw_bc: &[u8]) -> usize {
 
     // LOOP
     x.patch_handler(0x52);
-    x.mov_rm(0, 15, 0); x.add_ri(15, 8);
+    x.mov_rm(0, 15, 0);
+    x.add_ri(15, 8);
     x.i(&[0x47, 0x8B, 0x0C, 0x2E]);
     x.add_ri(13, 4);
     x.i(&[0x48, 0x85, 0xC0]);
@@ -2936,8 +3264,12 @@ fn impl_run_ref(x: &mut X, _raw_bc: &[u8]) -> usize {
 
     // ProbChoice (0x81) — skip two refs, no-op
     x.patch_handler(0x81);
-    x.i(&[0x47, 0x8B, 0x04, 0x2E]); x.add_ri(13, 4); x.i(&[0x49, 0x01, 0xC5]);
-    x.i(&[0x47, 0x8B, 0x04, 0x2E]); x.add_ri(13, 4); x.i(&[0x49, 0x01, 0xC5]);
+    x.i(&[0x47, 0x8B, 0x04, 0x2E]);
+    x.add_ri(13, 4);
+    x.i(&[0x49, 0x01, 0xC5]);
+    x.i(&[0x47, 0x8B, 0x04, 0x2E]);
+    x.add_ri(13, 4);
+    x.i(&[0x49, 0x01, 0xC5]);
     x.back();
 
     // OUTPUT_TOP (0x90) — no-op in ref context
@@ -2974,8 +3306,10 @@ fn impl_run_ref(x: &mut X, _raw_bc: &[u8]) -> usize {
     }
 
     // JSON (0xB6-0xB7) — no-op
-    x.patch_handler(0xB6); x.back();
-    x.patch_handler(0xB7); x.back();
+    x.patch_handler(0xB6);
+    x.back();
+    x.patch_handler(0xB7);
+    x.back();
 
     // Extended string ops (0xB8-0xBC) — no-op
     for op in 0xB8..=0xBC {
@@ -3214,7 +3548,15 @@ mod tests {
     fn test_native_hello() {
         let ops = vec![Opcode::PushI64(42), Opcode::OutputTop];
         let elf = compile_to_native(&ops, &[]);
-        assert!(elf.len() > 0x1000, "ELF should be at least 4KB, got {}", elf.len());
-        assert_eq!(&elf[0..4], &[0x7F, b'E', b'L', b'F'], "should start with ELF magic");
+        assert!(
+            elf.len() > 0x1000,
+            "ELF should be at least 4KB, got {}",
+            elf.len()
+        );
+        assert_eq!(
+            &elf[0..4],
+            &[0x7F, b'E', b'L', b'F'],
+            "should start with ELF magic"
+        );
     }
 }

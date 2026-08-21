@@ -35,6 +35,95 @@ impl Token {
     }
 }
 
+impl TokenKind {
+    /// Canonical source-level spelling for keyword tokens that lex from an
+    /// identifier (or the `over` alias of `Pick(1)`).
+    ///
+    /// Invariant: this must stay in sync with the keyword map in
+    /// `lexer.rs::read_word` — every identifier that lexes to a non-`Word`
+    /// kind must round-trip back to its spelling here. `parser_tests` guards
+    /// this: each keyword must be usable as a definition name.
+    pub fn keyword_name(&self) -> Option<&'static str> {
+        Some(match self {
+            Self::Import => "import",
+            Self::Export => "export",
+            Self::Append => "append",
+            Self::Prepend => "prepend",
+            Self::Len => "len",
+            Self::Drop => "drop",
+            Self::Dup => "dup",
+            Self::Swap => "swap",
+            Self::Rot => "rot",
+            Self::Pick(1) => "over",
+            Self::Mod => "mod",
+            Self::StrLen => "strlen",
+            Self::StrCat => "strcat",
+            Self::StrSlice => "strslice",
+            Self::StrEq => "streq",
+            Self::StrLt => "strlt",
+            Self::StrFind => "strfind",
+            Self::StrReplace => "strreplace",
+            Self::StrToI64 => "strtoi64",
+            Self::I64ToStr => "i64tostr",
+            Self::StrNth => "strnth",
+            Self::StrChars => "strchars",
+            Self::CharsStr => "charsstr",
+            Self::StrIter => "striter",
+            Self::ListFind => "listfind",
+            Self::StrJoin => "strjoin",
+            Self::StrSplit => "strsplit",
+            Self::Ctos => "ctos",
+            Self::ListSlice => "list-slice",
+            Self::Args => "args",
+            Self::SplitCond => "split-cond",
+            Self::ListCheck => "list?",
+            Self::I64Check => "i64?",
+            Self::StrCheck => "str?",
+            Self::BoolCheck => "bool?",
+            Self::Return => "return",
+            Self::MapNew => "map-new",
+            Self::MapGet => "map-get",
+            Self::MapSet => "map-set",
+            Self::MapDel => "map-del",
+            Self::MapKeys => "map-keys",
+            Self::MapHas => "map-has",
+            Self::BytesNew => "bytes-new",
+            Self::BytesPush => "bytes-push",
+            Self::BytesLen => "bytes-len",
+            Self::BytesWriteFile => "bytes-write",
+            Self::Try => "try",
+            Self::I64ToF64 => "i64tof64",
+            Self::F64ToI64 => "f64toi64",
+            Self::FSqrt => "fsqrt",
+            Self::FSin => "fsin",
+            Self::FCos => "fcos",
+            Self::FTan => "ftan",
+            Self::JsonParse => "json-parse",
+            Self::JsonStringify => "json-stringify",
+            Self::Now => "now",
+            Self::Sleep => "sleep",
+            Self::Random => "random",
+            Self::RandInt => "randint",
+            Self::Floor => "floor",
+            Self::Ceil => "ceil",
+            Self::Round => "round",
+            Self::Log => "log",
+            Self::Exp => "exp",
+            Self::Atan2 => "atan2",
+            Self::BitAnd => "bitand",
+            Self::BitOr => "bitor",
+            Self::BitXor => "bitxor",
+            Self::BitNot => "bitnot",
+            Self::Sort => "sort",
+            Self::Rev => "rev",
+            Self::Dedup => "dedup",
+            Self::Take => "take",
+            Self::DropN => "drop-n",
+            _ => return None,
+        })
+    }
+}
+
 /// All token kinds in the Whisper language.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
@@ -133,7 +222,7 @@ pub enum TokenKind {
     StrJoin,
     StrSplit,
     Ctos,
-    Chr,     // alias for ctos (legacy)
+    Chr, // alias for ctos (legacy)
     ListSlice,
     Shl,
     Shr,
@@ -149,6 +238,12 @@ pub enum TokenKind {
     BytesLen,
     BytesWriteFile,
     Try,
+    SplitCond,
+    ListCheck,
+    I64Check,
+    StrCheck,
+    BoolCheck,
+    Return,
 
     // Float operations
     I64ToF64,

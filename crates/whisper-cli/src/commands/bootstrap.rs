@@ -133,10 +133,7 @@ fn ast_to_whisper_tokens(nodes: &[AstNode]) -> Value {
                 // Nested token: [5, [...inner_tokens...]]
                 // whisperc compiles recursively and wraps in PushRef
                 let inner = ast_to_whisper_tokens(body);
-                tokens.push(Value::List(Rc::new(vec![
-                    Value::I64(5),
-                    inner,
-                ])));
+                tokens.push(Value::List(Rc::new(vec![Value::I64(5), inner])));
             }
             _ => {}
         }
@@ -181,7 +178,8 @@ fn split_defs(tokens: &Value) -> (Vec<Value>, Vec<(String, Vec<Value>)>) {
 /// Compile a list of classified tokens into Opcodes via whisperc compile.
 fn compile_tokens(vm: &mut Vm, tokens: &[Value]) -> Result<Vec<Opcode>, String> {
     vm.data_stack.push(Value::List(Rc::new(tokens.to_vec())));
-    let bc = vm.execute(&[Opcode::Call("compile".to_string())])
+    let bc = vm
+        .execute(&[Opcode::Call("compile".to_string())])
         .map_err(|e| format!("compile: {e}"))?
         .ok_or("compile: no output")?;
     match bc {
@@ -195,10 +193,14 @@ fn compile_tokens(vm: &mut Vm, tokens: &[Value]) -> Result<Vec<Opcode>, String> 
 /// The Whisper compiler handles tokenization, structural parsing, and classification.
 /// Rust handles definition splitting (which is just list filtering) and orchestrates
 /// the compilation of main tokens and each def body via the Whisper `compile` word.
-fn compile_via_whisperc_full(vm: &mut Vm, source: &str) -> Result<(Vec<Opcode>, Vec<(String, Vec<Opcode>)>), String> {
+fn compile_via_whisperc_full(
+    vm: &mut Vm,
+    source: &str,
+) -> Result<(Vec<Opcode>, Vec<(String, Vec<Opcode>)>), String> {
     // Phase 1: Whisper handles tokenize → structify → classify-nested
     vm.data_stack.push(Value::Str(Rc::new(source.to_string())));
-    let tokens = vm.execute(&[Opcode::Call("classify-full".to_string())])
+    let tokens = vm
+        .execute(&[Opcode::Call("classify-full".to_string())])
         .map_err(|e| format!("classify-full: {e}"))?
         .ok_or("classify-full: no output")?;
 
@@ -228,24 +230,45 @@ pub fn hard_bootstrap_compile(source: &str) -> Result<(), String> {
 
     // Phase 3: Full whisperc compilation (lex → structify → classify → split → compile)
     let (whisperc_ops, whisperc_defs) = compile_via_whisperc_full(&mut vm, source)?;
-    println!("whisperc: {} main ops, {} defs", whisperc_ops.len(), whisperc_defs.len());
-    println!("rust:     {} main ops, {} defs", ref_bytecode.len(), ref_defs.len());
+    println!(
+        "whisperc: {} main ops, {} defs",
+        whisperc_ops.len(),
+        whisperc_defs.len()
+    );
+    println!(
+        "rust:     {} main ops, {} defs",
+        ref_bytecode.len(),
+        ref_defs.len()
+    );
 
     // Phase 4: Execute Rust reference
     let mut vm_ref = Vm::new();
-    for (name, code) in &ref_defs { vm_ref.define_word(name.clone(), code.clone()); }
+    for (name, code) in &ref_defs {
+        vm_ref.define_word(name.clone(), code.clone());
+    }
     print!("Rust VM output: ");
-    vm_ref.execute(&ref_bytecode).map_err(|e| format!("Rust VM: {e}"))?;
+    vm_ref
+        .execute(&ref_bytecode)
+        .map_err(|e| format!("Rust VM: {e}"))?;
 
     // Phase 5: Execute whisperc-compiled bytecode
     let mut vm_wc = Vm::new();
-    for (name, code) in &whisperc_defs { vm_wc.define_word(name.clone(), code.clone()); }
+    for (name, code) in &whisperc_defs {
+        vm_wc.define_word(name.clone(), code.clone());
+    }
     print!("whisperc VM output: ");
-    vm_wc.execute(&whisperc_ops).map_err(|e| format!("whisperc VM: {e}"))?;
+    vm_wc
+        .execute(&whisperc_ops)
+        .map_err(|e| format!("whisperc VM: {e}"))?;
     println!();
 
-    assert_eq!(whisperc_defs.len(), ref_defs.len(),
-        "def count: whisperc={} vs rust={}", whisperc_defs.len(), ref_defs.len());
+    assert_eq!(
+        whisperc_defs.len(),
+        ref_defs.len(),
+        "def count: whisperc={} vs rust={}",
+        whisperc_defs.len(),
+        ref_defs.len()
+    );
     println!("Hard self-hosting pipeline complete.");
     Ok(())
 }
@@ -278,7 +301,10 @@ fn nodes_to_source_string(nodes: &[AstNode]) -> String {
                 }
                 s.push_str("] ");
             }
-            AstNode::Cond { then_branch, else_branch } => {
+            AstNode::Cond {
+                then_branch,
+                else_branch,
+            } => {
                 s.push_str("?? ");
                 s.push_str(&nodes_to_source_string(then_branch));
                 if let Some(ref eb) = else_branch {
@@ -335,7 +361,8 @@ fn operator_to_str(op: Operator) -> &'static str {
 #[allow(dead_code)]
 fn compile_via_whisperc_pipeline(vm: &mut Vm, source: &str) -> Result<Vec<Opcode>, String> {
     vm.data_stack.push(Value::Str(Rc::new(source.to_string())));
-    let chunks = vm.execute(&[Opcode::Call("tokenize".to_string())])
+    let chunks = vm
+        .execute(&[Opcode::Call("tokenize".to_string())])
         .map_err(|e| format!("lex: {e}"))?
         .ok_or("lex: no output")?;
 
@@ -347,7 +374,8 @@ fn compile_via_whisperc_pipeline(vm: &mut Vm, source: &str) -> Result<Vec<Opcode
     let tokens = classify_nested(vm, &nested);
 
     vm.data_stack.push(tokens);
-    let bytecode_vals = vm.execute(&[Opcode::Call("compile".to_string())])
+    let bytecode_vals = vm
+        .execute(&[Opcode::Call("compile".to_string())])
         .map_err(|e| format!("compile: {e}"))?
         .ok_or("compile: no output")?;
 
@@ -381,25 +409,16 @@ pub fn bootstrap_compile(source: &str) -> Result<(), String> {
     };
     println!("Tokens: {} items, {} defs", token_count, def_nodes.len());
 
-    // Phase 3: Load whisperc compiler
-    let compiler_src = include_str!("../../../../whisperc/main.ws");
-    let compiler_ast =
-        Parser::parse_source(compiler_src).map_err(|e| format!("whisperc parse: {}", e.message))?;
-    let mut cgen = BytecodeGenerator::new();
-    let (compiler_bc, compiler_defs) = cgen.compile(&compiler_ast);
-
-    // Phase 4: Run whisperc on tokens (main body + each def body)
+    // Phase 3+4: Load the full whisperc pipeline (lexer/classify/parser/compile)
+    // and run it on the token lists.
     let mut vm = Vm::new();
-    for (name, code) in compiler_defs {
-        vm.define_word(name, code);
-    }
-    vm.execute(&compiler_bc)
-        .map_err(|e| format!("whisperc init: {e}"))?;
+    load_whisperc_pipeline(&mut vm);
 
     // Phase 4a: Compile main body
     vm.data_stack.push(tokens);
     let call_compile = [Opcode::Call("compile".to_string())];
-    let whisperc_result = vm.execute(&call_compile)
+    let whisperc_result = vm
+        .execute(&call_compile)
         .map_err(|e| format!("whisperc compile main: {e}"))?;
 
     // Phase 4b: Compile each word definition body with whisperc
@@ -407,7 +426,8 @@ pub fn bootstrap_compile(source: &str) -> Result<(), String> {
     for (def_name, def_body) in &def_nodes {
         let body_tokens = ast_to_whisper_tokens(def_body);
         vm.data_stack.push(body_tokens);
-        let result = vm.execute(&call_compile)
+        let result = vm
+            .execute(&call_compile)
             .map_err(|e| format!("whisperc compile def '{}': {e}", def_name))?;
         if let Some(Value::List(vals)) = result {
             let ops = values_to_opcodes(vals.to_vec());
@@ -442,7 +462,11 @@ pub fn bootstrap_compile(source: &str) -> Result<(), String> {
     vm2.execute(&ref_bytecode).map_err(|e| format!("VM: {e}"))?;
 
     // Phase 8: Execute whisperc-compiled bytecode (with whisperc-compiled defs!)
-    println!("\nwhisperc bytecode: {} opcodes, {} defs", whisperc_ops.len(), whisperc_defs.len());
+    println!(
+        "\nwhisperc bytecode: {} opcodes, {} defs",
+        whisperc_ops.len(),
+        whisperc_defs.len()
+    );
     let mut vm3 = Vm::new();
     for (name, code) in &whisperc_defs {
         vm3.define_word(name.clone(), code.clone());
@@ -568,6 +592,8 @@ fn byte_to_opcode(byte: u8) -> Opcode {
         0x01 => Opcode::Swap,
         0x02 => Opcode::Drop,
         0x03 => Opcode::Rot,
+        0x05 => Opcode::Filter,
+        0x0B => Opcode::Args,
         0x10 => Opcode::Add,
         0x11 => Opcode::Sub,
         0x12 => Opcode::Mul,
@@ -585,6 +611,7 @@ fn byte_to_opcode(byte: u8) -> Opcode {
         0x40 => Opcode::Nth,
         0x41 => Opcode::Append,
         0x42 => Opcode::Len,
+        0x34 => Opcode::PushList,
         0x43 => Opcode::Map,
         0x44 => Opcode::Each,
         0x45 => Opcode::Fold,
@@ -622,16 +649,35 @@ fn byte_to_opcode(byte: u8) -> Opcode {
         0x90 => Opcode::OutputTop,
         0x91 => Opcode::OutputAll,
         0x92 => Opcode::ReadInput,
+        0xF0 => Opcode::SplitCond,
+        0xE4 => Opcode::ListCheck,
+        0xE5 => Opcode::I64Check,
+        0xE6 => Opcode::StrCheck,
+        0xE7 => Opcode::BoolCheck,
         _ => Opcode::PushI64(byte as i64),
     }
 }
 
+/// Host helper words used by the whisperc sources: `N PushList` collects
+/// N stack items into a list (same semantics as the PushList opcode).
+/// (`return` is a language keyword compiled inline to the Return opcode.)
+fn register_host_helpers(vm: &mut Vm) {
+    vm.define_word(
+        "PushList".into(),
+        vec![whisper_core::opcode::Opcode::PushList],
+    );
+}
+
 /// Load all whisperc components (lexer + classify + parser + compiler) into one VM.
 fn load_whisperc_pipeline(vm: &mut Vm) {
+    register_host_helpers(vm);
     let files = [
         include_str!("../../../../whisperc/lexer.ws"),
         include_str!("../../../../whisperc/classify.ws"),
         include_str!("../../../../whisperc/parser.ws"),
+        // Bytecode compiler lives in src/compile.ws since the August split;
+        // main.ws only assembles the pipeline around it.
+        include_str!("../../../../whisperc/src/compile.ws"),
         include_str!("../../../../whisperc/main.ws"),
     ];
     for src in files {
@@ -685,7 +731,12 @@ fn group_paired_delimiters(chunks: &[Value]) -> Vec<Value> {
 }
 
 /// Collect balanced delimiters, returning (inner_chunks, next_index).
-fn collect_balanced(chunks: &[Value], start: usize, open: &str, close: &str) -> (Vec<Value>, usize) {
+fn collect_balanced(
+    chunks: &[Value],
+    start: usize,
+    open: &str,
+    close: &str,
+) -> (Vec<Value>, usize) {
     let mut inner = Vec::new();
     let mut depth = 1;
     let mut i = start;
@@ -693,11 +744,15 @@ fn collect_balanced(chunks: &[Value], start: usize, open: &str, close: &str) -> 
         match &chunks[i] {
             Value::Str(s) if s.as_ref() == open => {
                 depth += 1;
-                if depth > 1 { inner.push(chunks[i].clone()); }
+                if depth > 1 {
+                    inner.push(chunks[i].clone());
+                }
             }
             Value::Str(s) if s.as_ref() == close => {
                 depth -= 1;
-                if depth > 0 { inner.push(chunks[i].clone()); }
+                if depth > 0 {
+                    inner.push(chunks[i].clone());
+                }
             }
             _ => inner.push(chunks[i].clone()),
         }
@@ -784,12 +839,34 @@ fn split_cond(chunks: &[Value], start: usize) -> (Vec<Value>, Vec<Value>, usize)
     let mut in_else = false;
     while i < chunks.len() && depth > 0 {
         match &chunks[i] {
-            Value::Str(s) if s.as_ref() == "??" => { depth += 1; if !in_else { then_tokens.push(chunks[i].clone()); } else { else_tokens.push(chunks[i].clone()); } }
-            Value::Str(s) if s.as_ref() == "]" => { depth -= 1; if depth == 0 { break; } if !in_else { then_tokens.push(chunks[i].clone()); } else { else_tokens.push(chunks[i].clone()); } }
-            Value::Str(s) if s.as_ref() == "|" && depth == 1 => { in_else = true; }
+            Value::Str(s) if s.as_ref() == "??" => {
+                depth += 1;
+                if !in_else {
+                    then_tokens.push(chunks[i].clone());
+                } else {
+                    else_tokens.push(chunks[i].clone());
+                }
+            }
+            Value::Str(s) if s.as_ref() == "]" => {
+                depth -= 1;
+                if depth == 0 {
+                    break;
+                }
+                if !in_else {
+                    then_tokens.push(chunks[i].clone());
+                } else {
+                    else_tokens.push(chunks[i].clone());
+                }
+            }
+            Value::Str(s) if s.as_ref() == "|" && depth == 1 => {
+                in_else = true;
+            }
             _ => {
-                if !in_else { then_tokens.push(chunks[i].clone()); }
-                else { else_tokens.push(chunks[i].clone()); }
+                if !in_else {
+                    then_tokens.push(chunks[i].clone());
+                } else {
+                    else_tokens.push(chunks[i].clone());
+                }
             }
         }
         i += 1;
@@ -834,9 +911,8 @@ fn classify_nested(vm: &mut Vm, nested: &Value) -> Value {
                         // List: [6, elements] → [6, classified_elements]
                         6 => {
                             if let Value::List(elems) = &items[1] {
-                                let classified: Vec<Value> = elems.iter()
-                                    .map(|e| classify_nested(vm, e))
-                                    .collect();
+                                let classified: Vec<Value> =
+                                    elems.iter().map(|e| classify_nested(vm, e)).collect();
                                 return Value::List(Rc::new(vec![
                                     Value::I64(6),
                                     Value::List(Rc::new(classified)),
@@ -868,9 +944,8 @@ fn classify_nested(vm: &mut Vm, nested: &Value) -> Value {
                     }
                 }
             }
-            let classified: Vec<Value> = items.iter()
-                .map(|item| classify_nested(vm, item))
-                .collect();
+            let classified: Vec<Value> =
+                items.iter().map(|item| classify_nested(vm, item)).collect();
             Value::List(Rc::new(classified))
         }
         Value::Str(s) => {
@@ -925,15 +1000,9 @@ mod tests {
         let ast = Parser::parse_source(source).unwrap();
         let tokens = ast_to_whisper_tokens(&ast);
 
-        // Load whisperc compiler
-        let compiler_src = include_str!("../../../../whisperc/main.ws");
-        let compiler_ast = Parser::parse_source(compiler_src).unwrap();
-        let mut cgen = BytecodeGenerator::new();
-        let (compiler_bc, compiler_defs) = cgen.compile(&compiler_ast);
-
+        // Load whisperc pipeline (lexer + classify + parser + compile + main)
         let mut vm = Vm::new();
-        for (n, c) in compiler_defs { vm.define_word(n, c.clone()); }
-        vm.execute(&compiler_bc).unwrap();
+        load_whisperc_pipeline(&mut vm);
         vm.data_stack.push(tokens);
 
         match vm.execute(&[Opcode::Call("compile".to_string())]) {
@@ -979,14 +1048,9 @@ mod tests {
             }
         }
 
-        // Load whisperc compiler
-        let compiler_src = include_str!("../../../../whisperc/main.ws");
-        let compiler_ast = Parser::parse_source(compiler_src).unwrap();
-        let mut cgen = BytecodeGenerator::new();
-        let (compiler_bc, compiler_defs) = cgen.compile(&compiler_ast);
+        // Load the full whisperc pipeline
         let mut vm = Vm::new();
-        for (n, c) in compiler_defs { vm.define_word(n, c.clone()); }
-        vm.execute(&compiler_bc).unwrap();
+        load_whisperc_pipeline(&mut vm);
 
         // Compile main body
         let main_tokens = ast_to_whisper_tokens(&main_body);
@@ -1017,8 +1081,13 @@ mod tests {
         println!("rust:     main={} defs={}", rust_ops.len(), rust_defs.len());
 
         // Both should produce same number of definitions
-        assert_eq!(wdefs.len(), rust_defs.len(),
-            "def count mismatch: whisperc={} rust={}", wdefs.len(), rust_defs.len());
+        assert_eq!(
+            wdefs.len(),
+            rust_defs.len(),
+            "def count mismatch: whisperc={} rust={}",
+            wdefs.len(),
+            rust_defs.len()
+        );
 
         // Execute whisperc-compiled main with whisperc-compiled defs
         let mut vm2 = Vm::new();
@@ -1058,38 +1127,103 @@ mod tests {
                     tokens.push(Value::List(Rc::new(vec![Value::I64(13), Value::I64(0)])));
                     i += 1;
                 }
-                "+" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x10)]))); i += 1; }
-                "-" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x11)]))); i += 1; }
-                "*" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x12)]))); i += 1; }
-                "/" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x13)]))); i += 1; }
-                "=" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x18)]))); i += 1; }
-                "<" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x19)]))); i += 1; }
-                ">" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1A)]))); i += 1; }
-                "!=" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1B)]))); i += 1; }
-                "<=" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1C)]))); i += 1; }
-                ">=" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1D)]))); i += 1; }
-                "&" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x20)]))); i += 1; }
-                "|" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x21)]))); i += 1; }
-                "!" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x22)]))); i += 1; }
-                "_" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x00)]))); i += 1; }
-                "`" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x01)]))); i += 1; }
-                "@" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x03)]))); i += 1; }
-                "." => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x90)]))); i += 1; }
-                "," => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x92)]))); i += 1; }
-                ".." => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x91)]))); i += 1; }
-                "%" => { tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x14)]))); i += 1; }
-                ":" | ";" | "[" | "]" => { i += 1; }
-                "dup" | "drop" | "swap" | "rot" | "mod" | "len" | "append"
-                | "strlen" | "strcat" | "strslice" | "streq" | "strlt"
-                | "strfind" | "strreplace" | "strtoi64" | "i64tostr"
-                | "strnth" | "strchars" | "charsstr" | "striter"
+                "+" => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x10)])));
+                    i += 1;
+                }
+                "-" => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x11)])));
+                    i += 1;
+                }
+                "*" => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x12)])));
+                    i += 1;
+                }
+                "/" => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x13)])));
+                    i += 1;
+                }
+                "=" => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x18)])));
+                    i += 1;
+                }
+                "<" => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x19)])));
+                    i += 1;
+                }
+                ">" => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1A)])));
+                    i += 1;
+                }
+                "!=" => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1B)])));
+                    i += 1;
+                }
+                "<=" => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1C)])));
+                    i += 1;
+                }
+                ">=" => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x1D)])));
+                    i += 1;
+                }
+                "&" => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x20)])));
+                    i += 1;
+                }
+                "|" => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x21)])));
+                    i += 1;
+                }
+                "!" => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x22)])));
+                    i += 1;
+                }
+                "_" => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x00)])));
+                    i += 1;
+                }
+                "`" => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x01)])));
+                    i += 1;
+                }
+                "@" => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x03)])));
+                    i += 1;
+                }
+                "." => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x90)])));
+                    i += 1;
+                }
+                "," => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x92)])));
+                    i += 1;
+                }
+                ".." => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x91)])));
+                    i += 1;
+                }
+                "%" => {
+                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(0x14)])));
+                    i += 1;
+                }
+                ":" | ";" | "[" | "]" => {
+                    i += 1;
+                }
+                "dup" | "drop" | "swap" | "rot" | "mod" | "len" | "append" | "strlen"
+                | "strcat" | "strslice" | "streq" | "strlt" | "strfind" | "strreplace"
+                | "strtoi64" | "i64tostr" | "strnth" | "strchars" | "charsstr" | "striter"
                 | "listfind" | "strjoin" | "output" | "return" | "times" => {
                     let byte = word_to_op_byte(chunk);
-                    tokens.push(Value::List(Rc::new(vec![Value::I64(3), Value::I64(byte as i64)])));
+                    tokens.push(Value::List(Rc::new(vec![
+                        Value::I64(3),
+                        Value::I64(byte as i64),
+                    ])));
                     i += 1;
                 }
                 _ if chunk.starts_with(|c: char| c.is_ascii_digit())
-                    || (chunk.starts_with('-') && chunk.len() > 1
+                    || (chunk.starts_with('-')
+                        && chunk.len() > 1
                         && chunk[1..].starts_with(|c: char| c.is_ascii_digit())) =>
                 {
                     if chunk.contains('.') {
@@ -1136,14 +1270,30 @@ mod tests {
 
     fn word_to_op_byte(word: &str) -> u8 {
         match word {
-            "dup" => 0x00, "swap" => 0x01, "drop" => 0x02, "rot" => 0x03,
-            "mod" => 0x14, "len" => 0x42, "append" => 0x41,
-            "strlen" => 0x46, "strcat" => 0x47, "strslice" => 0x48,
-            "streq" => 0x49, "strlt" => 0x4A, "strfind" => 0x4B,
-            "strreplace" => 0x4C, "strtoi64" => 0x4D, "i64tostr" => 0x4E,
-            "strnth" => 0x4F, "strchars" => 0xB8, "charsstr" => 0xB9,
-            "striter" => 0xBA, "listfind" => 0xBB, "strjoin" => 0xBC,
-            "times" => 0x53, "return" => 0x61,
+            "dup" => 0x00,
+            "swap" => 0x01,
+            "drop" => 0x02,
+            "rot" => 0x03,
+            "mod" => 0x14,
+            "len" => 0x42,
+            "append" => 0x41,
+            "strlen" => 0x46,
+            "strcat" => 0x47,
+            "strslice" => 0x48,
+            "streq" => 0x49,
+            "strlt" => 0x4A,
+            "strfind" => 0x4B,
+            "strreplace" => 0x4C,
+            "strtoi64" => 0x4D,
+            "i64tostr" => 0x4E,
+            "strnth" => 0x4F,
+            "strchars" => 0xB8,
+            "charsstr" => 0xB9,
+            "striter" => 0xBA,
+            "listfind" => 0xBB,
+            "strjoin" => 0xBC,
+            "times" => 0x53,
+            "return" => 0x61,
             _ => 0x00,
         }
     }
@@ -1152,20 +1302,22 @@ mod tests {
     #[test]
     fn test_full_pipeline_with_parser() {
         let chunks = vec!["3", "4", "+"];
-        let tokens_rust: Vec<Value> = classify_chunks(&chunks.iter().map(|s| s.to_string()).collect::<Vec<_>>());
+        let tokens_rust: Vec<Value> =
+            classify_chunks(&chunks.iter().map(|s| s.to_string()).collect::<Vec<_>>());
 
-        // Compile with whisperc
-        let compiler_src = include_str!("../../../../whisperc/main.ws");
-        let compiler_ast = Parser::parse_source(compiler_src).unwrap();
-        let mut cgen = BytecodeGenerator::new();
-        let (compiler_bc, compiler_defs) = cgen.compile(&compiler_ast);
+        // Compile with whisperc (full pipeline)
         let mut vm = Vm::new();
-        for (n, c) in compiler_defs { vm.define_word(n, c.clone()); }
-        vm.execute(&compiler_bc).unwrap();
+        load_whisperc_pipeline(&mut vm);
         vm.data_stack.push(Value::List(Rc::new(tokens_rust)));
 
-        let r = vm.execute(&[Opcode::Call("compile".to_string())]).unwrap().unwrap();
-        let ops = values_to_opcodes(match r { Value::List(v) => v.to_vec(), _ => panic!() });
+        let r = vm
+            .execute(&[Opcode::Call("compile".to_string())])
+            .unwrap()
+            .unwrap();
+        let ops = values_to_opcodes(match r {
+            Value::List(v) => v.to_vec(),
+            _ => panic!(),
+        });
         let mut vm2 = Vm::new();
         let result = vm2.execute(&ops).unwrap().unwrap();
         assert_eq!(result.unwrap_signal(), Value::I64(7));
@@ -1182,7 +1334,9 @@ mod tests {
         let (bc, defs) = gen.compile(&ast);
         let mut vm = Vm::new();
         // vm.trace = true;
-        for (n, c) in defs { vm.define_word(n, c); }
+        for (n, c) in defs {
+            vm.define_word(n, c);
+        }
         vm.execute(&bc).unwrap();
         vm.data_stack.push(Value::Str(Rc::new(input.to_string())));
         vm.execute(&[Opcode::Call("tokenize".to_string())])
@@ -1233,7 +1387,10 @@ mod tests {
             assert_eq!(items.len(), 3, "expected 3 chunks, got {items:?}");
             // Each chunk is a string
             for item in items.iter() {
-                assert!(matches!(item, Value::Str(_)), "each chunk should be a string");
+                assert!(
+                    matches!(item, Value::Str(_)),
+                    "each chunk should be a string"
+                );
             }
         } else {
             panic!("expected list, got {result:?}");
@@ -1260,8 +1417,10 @@ mod tests {
         let mut vm = Vm::new();
         load_whisperc_pipeline(&mut vm);
         vm.data_stack.push(Value::Str(Rc::new(source.to_string())));
-        let chunks = vm.execute(&[Opcode::Call("tokenize".to_string())])
-            .unwrap().unwrap();
+        let chunks = vm
+            .execute(&[Opcode::Call("tokenize".to_string())])
+            .unwrap()
+            .unwrap();
         let nested = if let Value::List(ref items) = chunks {
             structify_chunks(items)
         } else {
@@ -1269,8 +1428,7 @@ mod tests {
         };
         let tokens = classify_nested(&mut vm, &nested);
         vm.data_stack.push(tokens);
-        let bytecode_vals = vm.execute(&[Opcode::Call("compile".to_string())])
-            .unwrap();
+        let bytecode_vals = vm.execute(&[Opcode::Call("compile".to_string())]).unwrap();
         match bytecode_vals {
             Some(Value::List(vals)) => values_to_opcodes(vals.to_vec()),
             other => panic!("expected list, got {other:?}"),
@@ -1285,7 +1443,9 @@ mod tests {
         let mut gen = BytecodeGenerator::new();
         let (bc, defs) = gen.compile(&ast);
         let mut vm = Vm::new();
-        for (n, c) in defs { vm.define_word(n, c); }
+        for (n, c) in defs {
+            vm.define_word(n, c);
+        }
         vm.execute(&bc).unwrap();
         // Build chunk list
         let chunk_vals: Vec<Value> = chunks
@@ -1330,10 +1490,13 @@ mod tests {
         let mut gen = BytecodeGenerator::new();
         let (bc, defs) = gen.compile(&ast);
         let mut vm = Vm::new();
-        for (n, c) in defs { vm.define_word(n, c); }
+        for (n, c) in defs {
+            vm.define_word(n, c);
+        }
         vm.execute(&bc).unwrap();
         vm.data_stack.push(Value::Str(Rc::new("42".to_string())));
-        let result = vm.execute(&[Opcode::Call("classify-one".to_string())])
+        let result = vm
+            .execute(&[Opcode::Call("classify-one".to_string())])
             .unwrap()
             .unwrap_or(Value::List(Rc::new(vec![])));
         eprintln!("classify_one('42') = {result:?}");
@@ -1372,8 +1535,11 @@ mod tests {
 
         let mut vm = Vm::new();
         let result = vm.execute(&ops).unwrap().unwrap();
-        assert_eq!(result.unwrap_signal(), Value::I64(7),
-            "3 4 + should equal 7");
+        assert_eq!(
+            result.unwrap_signal(),
+            Value::I64(7),
+            "3 4 + should equal 7"
+        );
     }
 
     #[test]
@@ -1450,8 +1616,11 @@ mod tests {
         let r1 = vm1.execute(&whisperc_ops).unwrap().unwrap();
         let mut vm2 = Vm::new();
         let r2 = vm2.execute(&rust_ops).unwrap().unwrap();
-        assert_eq!(r1.unwrap_signal(), r2.unwrap_signal(),
-            "whisperc and Rust should produce same result");
+        assert_eq!(
+            r1.unwrap_signal(),
+            r2.unwrap_signal(),
+            "whisperc and Rust should produce same result"
+        );
     }
 
     /// Self-hosting test: whisperc compiles a flat subset of main.ws tokens
@@ -1464,13 +1633,14 @@ mod tests {
         let ops = whisperc_compile("0 @nth");
         let mut vm = Vm::new();
         // Push a [type, value] pair and extract type (first element)
-        vm.data_stack.push(Value::List(Rc::new(vec![
-            Value::I64(0),
-            Value::I64(42),
-        ])));
+        vm.data_stack
+            .push(Value::List(Rc::new(vec![Value::I64(0), Value::I64(42)])));
         let result = vm.execute(&ops).unwrap().unwrap();
-        assert_eq!(result.unwrap_signal(), Value::I64(0),
-            "0 @nth on [0, 42] should give 0");
+        assert_eq!(
+            result.unwrap_signal(),
+            Value::I64(0),
+            "0 @nth on [0, 42] should give 0"
+        );
     }
 
     /// Self-hosting: token access patterns used in main.ws
@@ -1479,9 +1649,8 @@ mod tests {
         // tk-type: 0 @nth  (extracts type from [type, value] pair)
         let ops = whisperc_compile("0 @nth");
         let mut vm = Vm::new();
-        vm.data_stack.push(Value::List(Rc::new(vec![
-            Value::I64(0), Value::I64(42),
-        ])));
+        vm.data_stack
+            .push(Value::List(Rc::new(vec![Value::I64(0), Value::I64(42)])));
         let result = vm.execute(&ops).unwrap().unwrap();
         assert_eq!(result.unwrap_signal(), Value::I64(0));
 
@@ -1489,7 +1658,8 @@ mod tests {
         let ops2 = whisperc_compile("1 @nth");
         let mut vm2 = Vm::new();
         vm2.data_stack.push(Value::List(Rc::new(vec![
-            Value::I64(3), Value::I64(16),  // [type=3, value=16] = operator +
+            Value::I64(3),
+            Value::I64(16), // [type=3, value=16] = operator +
         ])));
         let result2 = vm2.execute(&ops2).unwrap().unwrap();
         assert_eq!(result2.unwrap_signal(), Value::I64(16));
@@ -1513,5 +1683,4 @@ mod tests {
         let result2 = vm2.execute(&ops2).unwrap().unwrap();
         assert_eq!(result2.unwrap_signal(), Value::Bool(false));
     }
-
 }

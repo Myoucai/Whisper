@@ -38,7 +38,7 @@
         rot swap append swap
         tok-advance
         gp-loop
-    ]
+    ] ]
 } ;
 
 : collect-brace { [] swap cb-loop } ;
@@ -59,7 +59,7 @@
         rot swap append swap
         tok-advance
         cb-loop
-    ]
+    ] ]
 } ;
 
 : collect-bracket { [] swap cbr-loop } ;
@@ -80,7 +80,7 @@
         rot swap append swap
         tok-advance
         cbr-loop
-    ]
+    ] ]
 } ;
 
 // ══════════════════════════════════════════════════════════════════════
@@ -107,7 +107,7 @@
         tok-advance tok-advance 1 return
     |
         0
-    ]
+    ] ]
 } ;
 
 // try-def: handle ": name {body} ;"

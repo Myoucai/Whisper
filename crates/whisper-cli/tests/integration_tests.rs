@@ -486,7 +486,6 @@ fn capability_bound_executes() {
 
 #[test]
 // ── .wbin roundtrip ──────────────────────────────────────────────────
-
 #[test]
 fn wbin_roundtrip_program() {
     let source = "3 4 + 2 *";
@@ -641,4 +640,59 @@ fn wbin_roundtrip_new_opcodes() {
     let data = whisper_codegen::wbin::WbinWriter::write(&ops);
     let decoded = whisper_codegen::wbin::WbinReader::decode(&data).unwrap();
     assert_eq!(ops, decoded);
+}
+
+// ── Stdlib import smoke tests ────────────────────────────────────────
+// These exercise the resolver against the real stdlib/ directory and catch
+// regressions where a lexer keyword breaks a stdlib definition name.
+
+fn run_with_imports(source: &str) -> Result<Option<Value>, String> {
+    let ast = Parser::parse_source(source).map_err(|e| e.message)?;
+    let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../");
+    let resolved =
+        whisper_parser::resolve_imports(ast, &manifest).map_err(|e| format!("import: {e:?}"))?;
+    let mut gen = BytecodeGenerator::new();
+    let (bc, defs) = gen.compile(&resolved.ast);
+    let mut vm = Vm::new();
+    for (name, code) in defs {
+        vm.define_word(name, code);
+    }
+    vm.execute(&bc).map_err(|e| format!("{e}"))
+}
+
+#[test]
+fn test_stdlib_math_smoke() {
+    // math.ws defines words whose names are now lexer keywords
+    // (floor, ceil, round, log, exp, atan2, bitand, ...) — this guards the
+    // keyword_name round-trip against real stdlib sources.
+    let r = run_with_imports(
+        "import \"std/math\"
+pi floor",
+    )
+    .expect("math import failed");
+    assert_eq!(r, Some(Value::F64(3.0)), "floor(pi) should be 3.0");
+}
+
+#[test]
+fn test_stdlib_list_smoke() {
+    let r = run_with_imports(
+        "import \"std/list\"
+[1 2 3 4 5] { _ * } @map sum",
+    )
+    .expect("list import failed");
+    assert_eq!(
+        r,
+        Some(Value::I64(55)),
+        "sum of squares of [1..5] should be 55"
+    );
+}
+
+#[test]
+fn test_stdlib_str_smoke() {
+    let r = run_with_imports(
+        "import \"std/str\"
+\"hello\" strlen",
+    )
+    .expect("str import failed");
+    assert_eq!(r, Some(Value::I64(5)), "strlen(hello) should be 5");
 }

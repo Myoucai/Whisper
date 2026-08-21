@@ -6,13 +6,13 @@
 //! - Safe C identifier generation for Call opcodes
 //! - Whisper VM loading and execution
 
+use crate::bytecode_gen::BytecodeGenerator;
 use std::collections::HashSet;
 use std::rc::Rc;
 use whisper_core::opcode::Opcode;
 use whisper_core::value::Value;
 use whisper_core::vm::Vm;
 use whisper_parser::Parser;
-use crate::bytecode_gen::BytecodeGenerator;
 
 /// Convert an Opcode to a Whisper Value (list of integers/strings).
 fn opcode_to_value(op: &Opcode) -> Value {
@@ -66,13 +66,28 @@ fn opcode_to_value(op: &Opcode) -> Value {
 
         // Opcodes with operands — replace offset with absolute label position
         Opcode::PushI64(n) => Value::List(Rc::new(vec![Value::I64(0x30), Value::I64(*n)])),
-        Opcode::PushBool(b) => Value::List(Rc::new(vec![Value::I64(0x33), Value::I64(if *b { 1 } else { 0 })])),
-        Opcode::PushStr(s) => Value::List(Rc::new(vec![Value::I64(0x32), Value::Str(Rc::new(s.as_ref().clone()))])),
-        Opcode::Call(name) => Value::List(Rc::new(vec![Value::I64(0x60), Value::Str(Rc::new(name.clone()))])),
+        Opcode::PushBool(b) => Value::List(Rc::new(vec![
+            Value::I64(0x33),
+            Value::I64(if *b { 1 } else { 0 }),
+        ])),
+        Opcode::PushStr(s) => Value::List(Rc::new(vec![
+            Value::I64(0x32),
+            Value::Str(Rc::new(s.as_ref().clone())),
+        ])),
+        Opcode::Call(name) => Value::List(Rc::new(vec![
+            Value::I64(0x60),
+            Value::Str(Rc::new(name.clone())),
+        ])),
         // Cond/Jump/Loop: offset will be replaced with absolute position by caller
-        Opcode::Cond(offset) => Value::List(Rc::new(vec![Value::I64(0x50), Value::I64(*offset as i64)])),
-        Opcode::Jump(offset) => Value::List(Rc::new(vec![Value::I64(0x51), Value::I64(*offset as i64)])),
-        Opcode::Loop(offset) => Value::List(Rc::new(vec![Value::I64(0x52), Value::I64(*offset as i64)])),
+        Opcode::Cond(offset) => {
+            Value::List(Rc::new(vec![Value::I64(0x50), Value::I64(*offset as i64)]))
+        }
+        Opcode::Jump(offset) => {
+            Value::List(Rc::new(vec![Value::I64(0x51), Value::I64(*offset as i64)]))
+        }
+        Opcode::Loop(offset) => {
+            Value::List(Rc::new(vec![Value::I64(0x52), Value::I64(*offset as i64)]))
+        }
 
         _ => Value::List(Rc::new(vec![Value::I64(0xFF)])),
     }
@@ -112,13 +127,13 @@ fn collect_labels(opcodes: &[Opcode]) -> HashSet<usize> {
 fn emit_opcode(vm: &mut Vm, op: &Opcode) -> Result<String, String> {
     let op_val = match op {
         // Replace offset with absolute label position
-        Opcode::Cond(offset) => {
+        Opcode::Cond(_offset) => {
             // The caller will handle label emission; pass offset as-is
             // The Whisper cgen emits `goto L_OFFSET;` — we'll fix up in post-processing
             opcode_to_value(op)
         }
-        Opcode::Jump(offset) => opcode_to_value(op),
-        Opcode::Loop(offset) => opcode_to_value(op),
+        Opcode::Jump(_) => opcode_to_value(op),
+        Opcode::Loop(_) => opcode_to_value(op),
         // Replace Call name with safe_c_name
         Opcode::Call(name) => {
             let cname = safe_c_name(name);
@@ -128,7 +143,8 @@ fn emit_opcode(vm: &mut Vm, op: &Opcode) -> Result<String, String> {
     };
 
     vm.data_stack.push(op_val);
-    let result = vm.execute(&[Opcode::Call("emit-one".to_string())])
+    let result = vm
+        .execute(&[Opcode::Call("emit-one".to_string())])
         .map_err(|e| format!("emit-one: {e}"))?;
     match result {
         Some(Value::Str(s)) => Ok(s.as_ref().clone()),

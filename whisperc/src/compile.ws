@@ -19,20 +19,31 @@
 : op-pick  { tk-val [4] swap append 1 PushList } ;     // [[4, N]]
 : op-op    { tk-val 1 PushList } ;                      // [[opcode]]
 
-// Quote: compile inner body, append [PushRef, inner_bc] instruction
+// Quote: compile inner body, emit single [PushRef, inner_bc] instruction
 : op-quote {
-    tk-val compile              // inner_bc_list (list of instructions)
-    53 $1 2 PushList            // [53, inner_bc_list]
-    append                      // inner_bc ++ [[53, inner_bc_list]]
+    tk-val compile              // inner_bc_list
+    53 swap 2 PushList          // [53, inner_bc_list]
+    1 PushList                  // [[53, inner_bc_list]]
 } ;
 
-// List literal: compile elements, append PushI64(count) + PushList
+// List literal (source syntax "[a b c]"): compile elements, append
+// PushI64(count) + PushList. Token: [6, [elements...]]
 : op-list6 {
     tk-val compile              // element_bc_list
     dup len                     // [bc, count]
     [48] swap append            // [bc, [48, count]]
     append                      // bc ++ [[48, count]]
     52 append                   // bc ++ [[48, count]] ++ [52]
+} ;
+
+// List marker from the soft-bootstrap token encoder (elements already
+// emitted as separate instructions): emit [[48, count], 52].
+// Token: [14, count]
+: op-list14 {
+    tk-val                      // count
+    [48] ` append               // [48, count]
+    1 PushList                  // [[48, count]]
+    52 append                   // [[48, count], 52]
 } ;
 
 // Conditional: Cond(then_len+1) + then_bc + Jump(else_len) + else_bc
@@ -85,7 +96,8 @@
     dup 3 =   ?? drop op-op    return ]
     dup 4 =   ?? drop op-call  return ]
     dup 5 =   ?? drop op-quote return ]
-    dup 6 =   ?? drop op-list6 return ]
+    dup 6 =   ?? drop op-list6  return ]
+    dup 14 =  ?? drop op-list14 return ]
     dup 7 =   ?? drop op-cond  return ]
     dup 8 =   ?? drop op-loop  return ]
     dup 13 =  ?? drop op-bool  return ]

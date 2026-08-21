@@ -46,6 +46,17 @@ pub enum Opcode {
     Shr,
     /// Push CLI arguments as a list of strings: → [str]
     Args,
+    /// Split a `?? then | else ]` token sequence at depth 1.
+    /// tokens start → [then, else, next]  (seed-compatible, opcode 0xF0)
+    SplitCond,
+    /// Type predicate: value → bool (is this a list?)  (seed opcode 228)
+    ListCheck,
+    /// Type predicate: value → bool (is this an i64?)  (seed opcode 229)
+    I64Check,
+    /// Type predicate: value → bool (is this a string?)  (seed opcode 230)
+    StrCheck,
+    /// Type predicate: value → bool (is this a bool?)  (seed opcode 231)
+    BoolCheck,
 
     // === Arithmetic (0x10-0x17) ===
     /// Addition: a b → (a+b)
@@ -301,6 +312,12 @@ impl Opcode {
             Opcode::Shl => 0x09,
             Opcode::Shr => 0x0A,
             Opcode::Args => 0x0B,
+            // Seed-runtime natives (byte values mirror whisperc/runtime.c)
+            Opcode::SplitCond => 0xF0,
+            Opcode::ListCheck => 0xE4,
+            Opcode::I64Check => 0xE5,
+            Opcode::StrCheck => 0xE6,
+            Opcode::BoolCheck => 0xE7,
 
             // Arithmetic
             Opcode::Add => 0x10,
@@ -471,6 +488,11 @@ impl Opcode {
             Opcode::Shl => "shl",
             Opcode::Shr => "shr",
             Opcode::Args => "args",
+            Opcode::SplitCond => "split-cond",
+            Opcode::ListCheck => "list?",
+            Opcode::I64Check => "i64?",
+            Opcode::StrCheck => "str?",
+            Opcode::BoolCheck => "bool?",
             Opcode::Add => "add",
             Opcode::Sub => "sub",
             Opcode::Mul => "mul",
