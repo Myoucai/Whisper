@@ -60,6 +60,8 @@ pub struct Vm {
     word_cache_pos: usize,
     /// Byte buffers for binary output (BytesNew, BytesPush, etc.).
     byte_buffers: Vec<Vec<u8>>,
+    /// CLI arguments set before execution (used by the Args opcode).
+    pub program_args: Vec<Value>,
 }
 
 fn generate_rng_seed() -> u64 {
@@ -84,6 +86,7 @@ impl Vm {
             word_cache: [const { None }, const { None }, const { None }, const { None }],
             word_cache_pos: 0,
             byte_buffers: Vec::new(),
+            program_args: Vec::new(),
         }
     }
 
@@ -100,6 +103,7 @@ impl Vm {
             word_cache: [const { None }, const { None }, const { None }, const { None }],
             word_cache_pos: 0,
             byte_buffers: Vec::new(),
+            program_args: Vec::new(),
         }
     }
 
@@ -190,6 +194,67 @@ impl Vm {
                 )?;
                 let v = self.data_stack[idx].clone();
                 self.data_stack.push(v);
+            }
+
+            // === New operations ===
+            Opcode::Filter => {
+                let quot = self.pop_ref()?;
+                let list = self.pop_list()?;
+                let mut results = Vec::with_capacity(list.len());
+                for item in list.iter() {
+                    // Isolated: predicate sees only the item
+                    let parent = self.data_stack.clone();
+                    self.data_stack = vec![item.clone()];
+                    self.execute_ref(&quot)?;
+                    let keep = self.pop_bool()?;
+                    if keep {
+                        results.push(item.clone());
+                    }
+                    self.data_stack = parent;
+                }
+                self.data_stack.push(Value::List(Rc::new(results)));
+            }
+            Opcode::StrSplit => {
+                let delim = self.pop_str()?;
+                let s = self.pop_str()?;
+                let parts: Vec<Value> = if delim.is_empty() {
+                    s.chars().map(|c| Value::Str(Rc::new(c.to_string()))).collect()
+                } else {
+                    s.split(delim.as_ref())
+                        .map(|part| Value::Str(Rc::new(part.to_string())))
+                        .collect()
+                };
+                self.data_stack.push(Value::List(Rc::new(parts)));
+            }
+            Opcode::Ctos => {
+                let code = self.pop_i64()?;
+                let ch = std::char::from_u32(code as u32).unwrap_or('\u{FFFD}');
+                self.data_stack.push(Value::Str(Rc::new(ch.to_string())));
+            }
+            Opcode::ListSlice => {
+                let len = self.pop_i64()?;
+                let start = self.pop_i64()?;
+                let list = self.pop_list()?;
+                let start = start.max(0) as usize;
+                let len = len.max(0) as usize;
+                let end = (start + len).min(list.len());
+                let start = start.min(list.len());
+                let sub = list[start..end].to_vec();
+                self.data_stack.push(Value::List(Rc::new(sub)));
+            }
+            Opcode::Shl => {
+                let shift = self.pop_i64()?;
+                let val = self.pop_i64()?;
+                self.data_stack.push(Value::I64(val.wrapping_shl(shift as u32)));
+            }
+            Opcode::Shr => {
+                let shift = self.pop_i64()?;
+                let val = self.pop_i64()?;
+                self.data_stack.push(Value::I64(val.wrapping_shr(shift as u32)));
+            }
+            Opcode::Args => {
+                let args = self.program_args.clone();
+                self.data_stack.push(Value::List(Rc::new(args)));
             }
 
             // === Arithmetic ===
@@ -331,11 +396,14 @@ impl Vm {
                 let list = self.pop_list()?;
                 let mut results = Vec::with_capacity(list.len());
                 for item in list.iter() {
-                    self.data_stack.push(item.clone());
+                    // Stack isolation: save parent data, run body with only item
+                    let parent = self.data_stack.clone();
+                    self.data_stack = vec![item.clone()];
                     self.execute_ref(&quot)?;
                     if let Some(result) = self.data_stack.pop() {
                         results.push(result);
                     }
+                    self.data_stack = parent;
                 }
                 self.data_stack.push(Value::List(Rc::new(results)));
             }
@@ -343,8 +411,11 @@ impl Vm {
                 let quot = self.pop_ref()?;
                 let list = self.pop_list()?;
                 for item in list.iter() {
-                    self.data_stack.push(item.clone());
+                    // Stack isolation: save parent data, run body with only item
+                    let parent = self.data_stack.clone();
+                    self.data_stack = vec![item.clone()];
                     self.execute_ref(&quot)?;
+                    self.data_stack = parent;
                 }
             }
             Opcode::Fold => {
@@ -353,12 +424,22 @@ impl Vm {
                 let list = self.pop_list()?;
                 let mut acc = init;
                 for item in list.iter() {
-                    self.data_stack.push(acc.clone());
-                    self.data_stack.push(item.clone());
+                    // Stack isolation: body sees only acc and item
+                    let parent = self.data_stack.clone();
+                    self.data_stack = vec![acc.clone(), item.clone()];
                     self.execute_ref(&quot)?;
                     acc = self.pop()?;
+                    self.data_stack = parent;
                 }
                 self.data_stack.push(acc);
+            }
+            Opcode::Prepend => {
+                let list = self.pop_list()?;
+                let elem = self.pop()?;
+                let mut new_vec = Vec::with_capacity(list.len() + 1);
+                new_vec.push(elem);
+                new_vec.extend(list.iter().cloned());
+                self.data_stack.push(Value::List(Rc::new(new_vec)));
             }
 
             // === String operations ===
@@ -537,6 +618,47 @@ impl Vm {
                 }
             }
 
+            // === Map operations ===
+            Opcode::MapNew => {
+                let map = HashMap::new();
+                self.data_stack.push(Value::Map(Rc::new(map)));
+            }
+            Opcode::MapGet => {
+                let key = self.pop_str()?;
+                let map = self.pop_map()?;
+                let val = map.get(key.as_ref()).cloned().unwrap_or(Value::I64(0));
+                self.data_stack.push(val);
+            }
+            Opcode::MapSet => {
+                let val = self.pop()?;
+                let key = self.pop_str()?;
+                let map = self.pop_map()?;
+                let mut new_map = (*map).clone();
+                new_map.insert(key.as_ref().clone(), val);
+                self.data_stack.push(Value::Map(Rc::new(new_map)));
+            }
+            Opcode::MapDel => {
+                let key = self.pop_str()?;
+                let map = self.pop_map()?;
+                let mut new_map = (*map).clone();
+                new_map.remove(key.as_ref());
+                self.data_stack.push(Value::Map(Rc::new(new_map)));
+            }
+            Opcode::MapKeys => {
+                let map = self.pop_map()?;
+                let keys: Vec<Value> = map
+                    .keys()
+                    .map(|k| Value::Str(Rc::new(k.clone())))
+                    .collect();
+                self.data_stack.push(Value::List(Rc::new(keys)));
+            }
+            Opcode::MapHas => {
+                let key = self.pop_str()?;
+                let map = self.pop_map()?;
+                let has = map.contains_key(key.as_ref());
+                self.data_stack.push(Value::Bool(has));
+            }
+
             // === Float operations ===
             Opcode::I64ToF64 => {
                 let n = self.pop_i64()?;
@@ -561,6 +683,136 @@ impl Vm {
             Opcode::FTan => {
                 let f = self.pop_f64()?;
                 self.data_stack.push(Value::F64(f.tan()));
+            }
+
+            // === Time operations ===
+            Opcode::Now => {
+                let duration = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default();
+                self.data_stack.push(Value::I64(duration.as_secs() as i64));
+            }
+            Opcode::Sleep => {
+                let ms = self.pop_i64()?;
+                if ms > 0 {
+                    std::thread::sleep(std::time::Duration::from_millis(ms as u64));
+                }
+            }
+
+            // === Random operations ===
+            Opcode::Random => {
+                let bits = self.xorshift64_next();
+                let val = (bits >> 11) as f64 / (1u64 << 53) as f64;
+                self.data_stack.push(Value::F64(val));
+            }
+            Opcode::RandInt => {
+                let max = self.pop_i64()?;
+                let min = self.pop_i64()?;
+                if min >= max {
+                    self.data_stack.push(Value::I64(min));
+                } else {
+                    let range = (max - min) as u64;
+                    let bits = self.xorshift64_next();
+                    let val = min + (bits % range) as i64;
+                    self.data_stack.push(Value::I64(val));
+                }
+            }
+
+            // === Float math operations ===
+            Opcode::Floor => {
+                let val = self.pop_f64()?;
+                self.data_stack.push(Value::F64(val.floor()));
+            }
+            Opcode::Ceil => {
+                let val = self.pop_f64()?;
+                self.data_stack.push(Value::F64(val.ceil()));
+            }
+            Opcode::Round => {
+                let val = self.pop_f64()?;
+                self.data_stack.push(Value::F64(val.round()));
+            }
+            Opcode::Log => {
+                let val = self.pop_f64()?;
+                self.data_stack.push(Value::F64(val.ln()));
+            }
+            Opcode::Exp => {
+                let val = self.pop_f64()?;
+                self.data_stack.push(Value::F64(val.exp()));
+            }
+            Opcode::Atan2 => {
+                let x = self.pop_f64()?;
+                let y = self.pop_f64()?;
+                self.data_stack.push(Value::F64(y.atan2(x)));
+            }
+
+            // === Bitwise operations ===
+            Opcode::BitAnd => {
+                let b = self.pop_i64()?;
+                let a = self.pop_i64()?;
+                self.data_stack.push(Value::I64(a & b));
+            }
+            Opcode::BitOr => {
+                let b = self.pop_i64()?;
+                let a = self.pop_i64()?;
+                self.data_stack.push(Value::I64(a | b));
+            }
+            Opcode::BitXor => {
+                let b = self.pop_i64()?;
+                let a = self.pop_i64()?;
+                self.data_stack.push(Value::I64(a ^ b));
+            }
+            Opcode::BitNot => {
+                let a = self.pop_i64()?;
+                self.data_stack.push(Value::I64(!a));
+            }
+
+            // === Sort operation ===
+            Opcode::Sort => {
+                let list = self.pop_list()?;
+                let mut items: Vec<Value> = list.iter().cloned().collect();
+                // Simple insertion sort that handles both i64 and f64
+                items.sort_by(|a, b| {
+                    let cmp_f64 = |a: &Value, b: &Value| -> Option<std::cmp::Ordering> {
+                        match (a, b) {
+                            (Value::I64(a), Value::I64(b)) => a.partial_cmp(b),
+                            (Value::F64(a), Value::F64(b)) => a.partial_cmp(b),
+                            (Value::I64(a), Value::F64(b)) => (*a as f64).partial_cmp(b),
+                            (Value::F64(a), Value::I64(b)) => a.partial_cmp(&(*b as f64)),
+                            (Value::Str(a), Value::Str(b)) => a.partial_cmp(b),
+                            _ => None,
+                        }
+                    };
+                    cmp_f64(a, b).unwrap_or(std::cmp::Ordering::Equal)
+                });
+                self.data_stack.push(Value::List(Rc::new(items)));
+            }
+            Opcode::Rev => {
+                let list = self.pop_list()?;
+                let mut items: Vec<Value> = list.iter().cloned().collect();
+                items.reverse();
+                self.data_stack.push(Value::List(Rc::new(items)));
+            }
+            Opcode::Dedup => {
+                let list = self.pop_list()?;
+                let mut items: Vec<Value> = Vec::new();
+                for item in list.iter() {
+                    if items.last().map(|last| last != item).unwrap_or(true) {
+                        items.push(item.clone());
+                    }
+                }
+                self.data_stack.push(Value::List(Rc::new(items)));
+            }
+            Opcode::Take => {
+                let n = self.pop_i64()? as usize;
+                let list = self.pop_list()?;
+                let taken: Vec<Value> = list.iter().take(n).cloned().collect();
+                self.data_stack.push(Value::List(Rc::new(taken)));
+            }
+            Opcode::DropN => {
+                let n = self.pop_i64()? as usize;
+                let list = self.pop_list()?;
+                let dropped: Vec<Value> = list.iter().skip(n).cloned().collect();
+                self.data_stack.push(Value::List(Rc::new(dropped)));
             }
 
             // === JSON ===
@@ -719,6 +971,14 @@ impl Vm {
 
     // === Helper methods ===
 
+    /// Xorshift64* PRNG returning raw 64-bit value (for Random/RandInt).
+    fn xorshift64_next(&mut self) -> u64 {
+        self.rng_state ^= self.rng_state >> 12;
+        self.rng_state ^= self.rng_state << 25;
+        self.rng_state ^= self.rng_state >> 27;
+        self.rng_state.wrapping_mul(0x2545F4914F6CDD1D)
+    }
+
     /// Look up a word in the 4-slot cache. Returns None on miss.
     fn word_cache_lookup(&self, name: &str) -> Option<Rc<[Opcode]>> {
         for (cached_name, cached_code) in self.word_cache.iter().flatten() {
@@ -813,6 +1073,23 @@ impl Vm {
             },
             other => Err(VmError::TypeMismatch {
                 expected: "ref".into(),
+                actual: other.type_name().into(),
+            }),
+        }
+    }
+
+    fn pop_map(&mut self) -> Result<Rc<HashMap<String, Value>>, VmError> {
+        match self.pop()? {
+            Value::Map(m) => Ok(m),
+            Value::Signal(v, _) => match *v {
+                Value::Map(m) => Ok(m),
+                other => Err(VmError::TypeMismatch {
+                    expected: "map".into(),
+                    actual: other.type_name().into(),
+                }),
+            },
+            other => Err(VmError::TypeMismatch {
+                expected: "map".into(),
                 actual: other.type_name().into(),
             }),
         }
@@ -1698,4 +1975,432 @@ mod tests {
         let reparsed = vm.execute(&[Opcode::JsonParse]).unwrap();
         assert!(reparsed.is_some());
     }
+    // === New opcode tests ===
+
+    #[test]
+    fn test_filter_basic() {
+        let mut vm = Vm::new();
+        // [3 1 4 1 5] { _ 2 > } @filter -> [3 4 5]
+        vm.data_stack.push(Value::List(Rc::new(vec![
+            Value::I64(3), Value::I64(1), Value::I64(4), Value::I64(1), Value::I64(5),
+        ])));
+        let pred: Rc<[Opcode]> = Rc::from(vec![
+            Opcode::PushI64(2), Opcode::Gt,
+        ].into_boxed_slice());
+        vm.data_stack.push(Value::Ref(pred));
+        let r = vm.execute(&[Opcode::Filter]).unwrap().unwrap();
+        match r {
+            Value::List(items) => {
+                assert_eq!(items.len(), 3);
+                assert_eq!(items[0], Value::I64(3));
+                assert_eq!(items[1], Value::I64(4));
+                assert_eq!(items[2], Value::I64(5));
+            }
+            _ => panic!("expected list, got {:?}", r),
+        }
+    }
+
+    #[test]
+    fn test_filter_empty_result() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::List(Rc::new(vec![
+            Value::I64(1), Value::I64(2),
+        ])));
+        let pred: Rc<[Opcode]> = Rc::from(vec![
+            Opcode::PushI64(10), Opcode::Gt,
+        ].into_boxed_slice());
+        vm.data_stack.push(Value::Ref(pred));
+        let r = vm.execute(&[Opcode::Filter]).unwrap().unwrap();
+        match r {
+            Value::List(items) => assert_eq!(items.len(), 0),
+            _ => panic!("expected empty list"),
+        }
+    }
+
+    #[test]
+    fn test_strsplit_basic() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("hello world".into())));
+        vm.data_stack.push(Value::Str(Rc::new(" ".into())));
+        let r = vm.execute(&[Opcode::StrSplit]).unwrap().unwrap();
+        match r {
+            Value::List(items) => {
+                assert_eq!(items.len(), 2);
+                assert_eq!(items[0], Value::Str(Rc::new("hello".into())));
+                assert_eq!(items[1], Value::Str(Rc::new("world".into())));
+            }
+            _ => panic!("expected list, got {:?}", r),
+        }
+    }
+
+    #[test]
+    fn test_strsplit_newlines() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("a
+b
+c".into())));
+        vm.data_stack.push(Value::Str(Rc::new("
+".into())));
+        let r = vm.execute(&[Opcode::StrSplit]).unwrap().unwrap();
+        match r {
+            Value::List(items) => {
+                assert_eq!(items.len(), 3);
+            }
+            _ => panic!("expected list"),
+        }
+    }
+
+    #[test]
+    fn test_strsplit_no_match() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("hello".into())));
+        vm.data_stack.push(Value::Str(Rc::new(",".into())));
+        let r = vm.execute(&[Opcode::StrSplit]).unwrap().unwrap();
+        match r {
+            Value::List(items) => {
+                assert_eq!(items.len(), 1);
+                assert_eq!(items[0], Value::Str(Rc::new("hello".into())));
+            }
+            _ => panic!("expected list"),
+        }
+    }
+
+    #[test]
+    fn test_ctos_basic() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(65)); // 'A'
+        let r = vm.execute(&[Opcode::Ctos]).unwrap().unwrap();
+        assert_eq!(r, Value::Str(Rc::new("A".into())));
+    }
+
+    #[test]
+    fn test_ctos_lowercase() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(97)); // 'a'
+        let r = vm.execute(&[Opcode::Ctos]).unwrap().unwrap();
+        assert_eq!(r, Value::Str(Rc::new("a".into())));
+    }
+
+    #[test]
+    fn test_listslice_basic() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::List(Rc::new(vec![
+            Value::I64(1), Value::I64(2), Value::I64(3), Value::I64(4), Value::I64(5),
+        ])));
+        vm.data_stack.push(Value::I64(1)); // start
+        vm.data_stack.push(Value::I64(3)); // len
+        let r = vm.execute(&[Opcode::ListSlice]).unwrap().unwrap();
+        match r {
+            Value::List(items) => {
+                assert_eq!(items.len(), 3);
+                assert_eq!(items[0], Value::I64(2));
+                assert_eq!(items[1], Value::I64(3));
+                assert_eq!(items[2], Value::I64(4));
+            }
+            _ => panic!("expected list"),
+        }
+    }
+
+    #[test]
+    fn test_listslice_tail() {
+        let mut vm = Vm::new();
+        // [1 2 3 4] 1 3 listslice -> [2 3 4]
+        vm.data_stack.push(Value::List(Rc::new(vec![
+            Value::I64(1), Value::I64(2), Value::I64(3), Value::I64(4),
+        ])));
+        vm.data_stack.push(Value::I64(1));
+        vm.data_stack.push(Value::I64(3));
+        let r = vm.execute(&[Opcode::ListSlice]).unwrap().unwrap();
+        match r {
+            Value::List(items) => {
+                assert_eq!(items.len(), 3);
+                assert_eq!(items[0], Value::I64(2));
+            }
+            _ => panic!("expected list"),
+        }
+    }
+
+    #[test]
+    fn test_listslice_clamp() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::List(Rc::new(vec![
+            Value::I64(1), Value::I64(2),
+        ])));
+        vm.data_stack.push(Value::I64(0));
+        vm.data_stack.push(Value::I64(100)); // exceeds length
+        let r = vm.execute(&[Opcode::ListSlice]).unwrap().unwrap();
+        match r {
+            Value::List(items) => assert_eq!(items.len(), 2),
+            _ => panic!("expected list"),
+        }
+    }
+
+    #[test]
+    fn test_shl_basic() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(1));
+        vm.data_stack.push(Value::I64(3));
+        let r = vm.execute(&[Opcode::Shl]).unwrap().unwrap();
+        assert_eq!(r, Value::I64(8));
+    }
+
+    #[test]
+    fn test_shr_basic() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(8));
+        vm.data_stack.push(Value::I64(2));
+        let r = vm.execute(&[Opcode::Shr]).unwrap().unwrap();
+        assert_eq!(r, Value::I64(2));
+    }
+
+    #[test]
+    fn test_shr_arithmetic() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(16));
+        vm.data_stack.push(Value::I64(4));
+        let r = vm.execute(&[Opcode::Shr]).unwrap().unwrap();
+        assert_eq!(r, Value::I64(1));
+    }
+
+    #[test]
+    fn test_shl_zero_shift() {
+        // Shifting by 0 should leave the value unchanged
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(42));
+        vm.data_stack.push(Value::I64(0));
+        let r = vm.execute(&[Opcode::Shl]).unwrap().unwrap();
+        assert_eq!(r, Value::I64(42));
+    }
+
+    #[test]
+    fn test_shr_zero_shift() {
+        // Shifting by 0 should leave the value unchanged
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(42));
+        vm.data_stack.push(Value::I64(0));
+        let r = vm.execute(&[Opcode::Shr]).unwrap().unwrap();
+        assert_eq!(r, Value::I64(42));
+    }
+
+    #[test]
+    fn test_strsplit_dash_separator() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::Str(Rc::new("a-b-c".into())));
+        vm.data_stack.push(Value::Str(Rc::new("-".into())));
+        let r = vm.execute(&[Opcode::StrSplit]).unwrap().unwrap();
+        match r {
+            Value::List(items) => {
+                assert_eq!(items.len(), 3);
+                assert_eq!(items[0], Value::Str(Rc::new("a".into())));
+                assert_eq!(items[1], Value::Str(Rc::new("b".into())));
+                assert_eq!(items[2], Value::Str(Rc::new("c".into())));
+            }
+            _ => panic!("expected list, got {:?}", r),
+        }
+    }
+
+    #[test]
+    fn test_listslice_first_element() {
+        // Slice [10 20 30] from index 0, length 2 → [10 20], then nth 1 → 20
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::List(Rc::new(vec![
+            Value::I64(10),
+            Value::I64(20),
+            Value::I64(30),
+        ])));
+        vm.data_stack.push(Value::I64(0)); // start
+        vm.data_stack.push(Value::I64(2)); // length
+        let r = vm.execute(&[Opcode::ListSlice]).unwrap().unwrap();
+        match r {
+            Value::List(items) => {
+                assert_eq!(items.len(), 2);
+                assert_eq!(items[0], Value::I64(10));
+                assert_eq!(items[1], Value::I64(20));
+            }
+            _ => panic!("expected list, got {:?}", r),
+        }
+    }
+
+    #[test]
+    fn test_ctos_digit_char() {
+        // ASCII 48 = '0'
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(48));
+        let r = vm.execute(&[Opcode::Ctos]).unwrap().unwrap();
+        assert_eq!(r, Value::Str(Rc::new("0".into())));
+    }
+
+    #[test]
+    fn test_filter_keeps_matching_elements() {
+        // Filter [1 2 3 4 5] keeping elements > 3 → [4 5]
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::List(Rc::new(vec![
+            Value::I64(1),
+            Value::I64(2),
+            Value::I64(3),
+            Value::I64(4),
+            Value::I64(5),
+        ])));
+        let pred: Rc<[Opcode]> = Rc::from(
+            vec![Opcode::PushI64(3), Opcode::Gt].into_boxed_slice(),
+        );
+        vm.data_stack.push(Value::Ref(pred));
+        let r = vm.execute(&[Opcode::Filter]).unwrap().unwrap();
+        match r {
+            Value::List(items) => {
+                assert_eq!(items.len(), 2);
+                assert_eq!(items[0], Value::I64(4));
+                assert_eq!(items[1], Value::I64(5));
+            }
+            _ => panic!("expected list, got {:?}", r),
+        }
+    }
+
+    // === Time operation tests ===
+
+    #[test]
+    fn test_now_returns_unix_timestamp() {
+        let mut vm = Vm::new();
+        let before = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        let r = vm.execute(&[Opcode::Now]).unwrap().unwrap();
+        let after = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        match r {
+            Value::I64(ts) => {
+                assert!(ts >= before && ts <= after, "timestamp {ts} not in [{before}, {after}]");
+            }
+            _ => panic!("expected I64, got {:?}", r),
+        }
+    }
+
+    // === Float math tests ===
+
+    #[test]
+    fn test_floor() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::F64(3.7));
+        let r = vm.execute(&[Opcode::Floor]).unwrap();
+        assert_eq!(r, Some(Value::F64(3.0)));
+    }
+
+    #[test]
+    fn test_floor_negative() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::F64(-2.3));
+        let r = vm.execute(&[Opcode::Floor]).unwrap();
+        assert_eq!(r, Some(Value::F64(-3.0)));
+    }
+
+    #[test]
+    fn test_ceil() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::F64(3.2));
+        let r = vm.execute(&[Opcode::Ceil]).unwrap();
+        assert_eq!(r, Some(Value::F64(4.0)));
+    }
+
+    #[test]
+    fn test_round() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::F64(3.5));
+        let r = vm.execute(&[Opcode::Round]).unwrap();
+        assert_eq!(r, Some(Value::F64(4.0)));
+    }
+
+    #[test]
+    fn test_log() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::F64(std::f64::consts::E));
+        let r = vm.execute(&[Opcode::Log]).unwrap().unwrap();
+        match r {
+            Value::F64(v) => assert!((v - 1.0).abs() < 1e-10, "ln(e) should be 1.0, got {v}"),
+            _ => panic!("expected F64"),
+        }
+    }
+
+    #[test]
+    fn test_exp() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::F64(1.0));
+        let r = vm.execute(&[Opcode::Exp]).unwrap().unwrap();
+        match r {
+            Value::F64(v) => assert!((v - std::f64::consts::E).abs() < 1e-10, "exp(1) should be e"),
+            _ => panic!("expected F64"),
+        }
+    }
+
+    #[test]
+    fn test_atan2() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::F64(1.0)); // x
+        vm.data_stack.push(Value::F64(1.0)); // y
+        let r = vm.execute(&[Opcode::Atan2]).unwrap().unwrap();
+        match r {
+            Value::F64(v) => {
+                let expected = std::f64::consts::FRAC_PI_4;
+                assert!((v - expected).abs() < 1e-10, "atan2(1,1) should be pi/4, got {v}");
+            }
+            _ => panic!("expected F64"),
+        }
+    }
+
+    // === Bitwise operation tests ===
+
+    #[test]
+    fn test_bitand() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(0xFF));
+        vm.data_stack.push(Value::I64(0x0F));
+        let r = vm.execute(&[Opcode::BitAnd]).unwrap();
+        assert_eq!(r, Some(Value::I64(0x0F)));
+    }
+
+    #[test]
+    fn test_bitand_no_overlap() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(0xF0));
+        vm.data_stack.push(Value::I64(0x0F));
+        let r = vm.execute(&[Opcode::BitAnd]).unwrap();
+        assert_eq!(r, Some(Value::I64(0x00)));
+    }
+
+    #[test]
+    fn test_bitor() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(0xF0));
+        vm.data_stack.push(Value::I64(0x0F));
+        let r = vm.execute(&[Opcode::BitOr]).unwrap();
+        assert_eq!(r, Some(Value::I64(0xFF)));
+    }
+
+    #[test]
+    fn test_bitxor() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(0xFF));
+        vm.data_stack.push(Value::I64(0x0F));
+        let r = vm.execute(&[Opcode::BitXor]).unwrap();
+        assert_eq!(r, Some(Value::I64(0xF0)));
+    }
+
+    #[test]
+    fn test_bitnot() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(0));
+        let r = vm.execute(&[Opcode::BitNot]).unwrap();
+        assert_eq!(r, Some(Value::I64(-1))); // !0 == -1 in two's complement
+    }
+
+    #[test]
+    fn test_bitnot_roundtrip() {
+        let mut vm = Vm::new();
+        vm.data_stack.push(Value::I64(42));
+        let r = vm.execute(&[Opcode::BitNot, Opcode::BitNot]).unwrap();
+        assert_eq!(r, Some(Value::I64(42))); // double NOT is identity
+    }
+
 }

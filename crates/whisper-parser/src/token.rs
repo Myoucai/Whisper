@@ -88,6 +88,8 @@ pub enum TokenKind {
     AtEach,    // @each
     AtFold,    // @fold
     AtNth,     // @nth
+    AtFilter,  // @filter
+    Filter,    // filter keyword
 
     // Definitions
     Colon,     // :
@@ -110,6 +112,7 @@ pub enum TokenKind {
 
     // List operations
     Append,
+    Prepend,
     Len,
 
     // String operations
@@ -128,6 +131,19 @@ pub enum TokenKind {
     StrIter,
     ListFind,
     StrJoin,
+    StrSplit,
+    Ctos,
+    Chr,     // alias for ctos (legacy)
+    ListSlice,
+    Shl,
+    Shr,
+    Args,
+    MapNew,
+    MapGet,
+    MapSet,
+    MapDel,
+    MapKeys,
+    MapHas,
     BytesNew,
     BytesPush,
     BytesLen,
@@ -145,6 +161,37 @@ pub enum TokenKind {
     // JSON
     JsonParse,
     JsonStringify,
+
+    // Time
+    Now,
+    Sleep,
+
+    // Random
+    Random,
+    RandInt,
+
+    // Float math
+    Floor,
+    Ceil,
+    Round,
+    Log,
+    Exp,
+    Atan2,
+
+    // Bitwise
+    BitAnd,
+    BitOr,
+    BitXor,
+    BitNot,
+
+    // Sort
+    Sort,
+    Rev,
+    Dedup,
+
+    // List take/drop
+    Take,
+    DropN,
 
     // Word reference (any identifier not matching keywords)
     Word(String),

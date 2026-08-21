@@ -321,6 +321,8 @@ pub fn compile_to_native(bytecode: &[Opcode], defs: &[(String, Vec<Opcode>)]) ->
 fn register_all_opcodes(x: &mut X) {
     // Stack
     for op in [0x00, 0x01, 0x02, 0x03, 0x04] { x.op(op); }
+    // Extended ops (Filter, StrSplit, Ctos, ListSlice, Shl, Shr)
+    for op in [0x05, 0x06, 0x07, 0x08, 0x09, 0x0A] { x.op(op); }
     // Arith
     for op in [0x10, 0x11, 0x12, 0x13, 0x14] { x.op(op); }
     // Compare
@@ -360,6 +362,41 @@ fn register_all_opcodes(x: &mut X) {
 // ── Stack operations ────────────────────────────────────────────────
 
 fn impl_stack_ops(x: &mut X) {
+    // Stub handlers for new opcodes (0x05-0x0A)
+    // FILTER (0x05) — stub: exit with code 2
+    x.patch_handler(0x05);
+    x.mov_r64i(0, 60); x.mov_r64i(7, 2); x.syscall();
+
+    // STRSPLIT (0x06) — stub
+    x.patch_handler(0x06);
+    x.mov_r64i(0, 60); x.mov_r64i(7, 2); x.syscall();
+
+    // CTOS (0x07) — stub
+    x.patch_handler(0x07);
+    x.mov_r64i(0, 60); x.mov_r64i(7, 2); x.syscall();
+
+    // LISTSLICE (0x08) — stub
+    x.patch_handler(0x08);
+    x.mov_r64i(0, 60); x.mov_r64i(7, 2); x.syscall();
+
+    // SHL (0x09) — value shift_amount -> result
+    x.patch_handler(0x09);
+    x.mov_rm(1, 15, 0);   // rcx = shift amount
+    x.add_ri(15, 8);       // pop shift amount
+    x.mov_rm(0, 15, 0);   // rax = value
+    x.i(&[0x48, 0xD3, 0xE0]); // shl rax, cl
+    x.mov_mr(15, 0, 0);   // [r15] = result
+    x.back();
+
+    // SHR (0x0A) — value shift_amount -> result
+    x.patch_handler(0x0A);
+    x.mov_rm(1, 15, 0);   // rcx = shift amount
+    x.add_ri(15, 8);       // pop shift amount
+    x.mov_rm(0, 15, 0);   // rax = value
+    x.i(&[0x48, 0xD3, 0xF8]); // sar rax, cl (arithmetic shift right)
+    x.mov_mr(15, 0, 0);   // [r15] = result
+    x.back();
+
     // DUP (0x00)
     x.patch_handler(0x00);
     x.mov_rm(0, 15, 0);

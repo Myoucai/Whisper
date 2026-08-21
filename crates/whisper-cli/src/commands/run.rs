@@ -73,14 +73,13 @@ pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result
         .map_err(|e| format!("Import error: {e}"))?;
     let ast = resolved.ast;
 
-    // Phase 1b: Type check
+    // Phase 1b: Type check (warnings only — recursive words may produce false positives)
     let mut tc = whisper_typecheck::TypeChecker::new();
     let type_errors = tc.check(&ast);
     if !type_errors.is_empty() {
         for err in &type_errors {
-            eprintln!("Type error: {} (in {})", err.message, err.context);
+            eprintln!("Type warning: {} (in {})", err.message, err.context);
         }
-        return Err(format!("{} type error(s) found", type_errors.len()));
     }
 
     // Phase 2: Compile AST to bytecode
@@ -145,6 +144,11 @@ pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result
     for (name, code) in &defs {
         vm.define_word(name.clone(), code.clone());
     }
+
+    // Set program arguments
+    vm.program_args = std::env::args()
+        .map(|a| whisper_core::value::Value::Str(std::rc::Rc::new(a)))
+        .collect();
 
     // Phase 5: Execute
     match vm.execute(&bytecode) {

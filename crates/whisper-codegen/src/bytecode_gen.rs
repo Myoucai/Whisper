@@ -184,14 +184,16 @@ impl BytecodeGenerator {
         let then_len = then_code.len() as i32;
 
         if let Some(ref else_c) = else_code {
-            // If false, jump past then_branch AND the Jump opcode
-            // Offset = then_len + 1 (then_len opcodes + 1 Jump opcode)
+            // Layout: Cond(offset) THEN Jump(off) ELSE
+            // On FALSE: ip is at THEN. Jump by (then_len + 2) to skip THEN + Jump + reach ELSE
             self.emit(Opcode::Cond(then_len + 1));
             self.bytecode.extend(then_code);
             let jmp_off = else_c.len() as i32;
             self.emit(Opcode::Jump(jmp_off));
             self.bytecode.extend(else_c.clone());
         } else {
+            // Layout: Cond(offset) THEN
+            // On FALSE: fall through past THEN to end
             self.emit(Opcode::Cond(then_len));
             self.bytecode.extend(then_code);
         }
@@ -239,10 +241,18 @@ impl BytecodeGenerator {
             Operator::Not => Opcode::Not,
             Operator::Nth => Opcode::Nth,
             Operator::Append => Opcode::Append,
+            Operator::Prepend => Opcode::Prepend,
             Operator::Len => Opcode::Len,
             Operator::Map => Opcode::Map,
             Operator::Each => Opcode::Each,
             Operator::Fold => Opcode::Fold,
+            Operator::Filter => Opcode::Filter,
+            Operator::StrSplit => Opcode::StrSplit,
+            Operator::Ctos => Opcode::Ctos,
+            Operator::ListSlice => Opcode::ListSlice,
+            Operator::Shl => Opcode::Shl,
+            Operator::Shr => Opcode::Shr,
+            Operator::Args => Opcode::Args,
             Operator::StrLen => Opcode::StrLen,
             Operator::StrCat => Opcode::StrCat,
             Operator::StrSlice => Opcode::StrSlice,
@@ -263,6 +273,12 @@ impl BytecodeGenerator {
             Operator::BytesLen => Opcode::BytesLen,
             Operator::BytesWriteFile => Opcode::BytesWriteFile,
             Operator::Try => Opcode::Try,
+            Operator::MapNew => Opcode::MapNew,
+            Operator::MapGet => Opcode::MapGet,
+            Operator::MapSet => Opcode::MapSet,
+            Operator::MapDel => Opcode::MapDel,
+            Operator::MapKeys => Opcode::MapKeys,
+            Operator::MapHas => Opcode::MapHas,
             Operator::I64ToF64 => Opcode::I64ToF64,
             Operator::F64ToI64 => Opcode::F64ToI64,
             Operator::FSqrt => Opcode::FSqrt,
@@ -271,6 +287,25 @@ impl BytecodeGenerator {
             Operator::FTan => Opcode::FTan,
             Operator::JsonParse => Opcode::JsonParse,
             Operator::JsonStringify => Opcode::JsonStringify,
+            Operator::Now => Opcode::Now,
+            Operator::Sleep => Opcode::Sleep,
+            Operator::Random => Opcode::Random,
+            Operator::RandInt => Opcode::RandInt,
+            Operator::Floor => Opcode::Floor,
+            Operator::Ceil => Opcode::Ceil,
+            Operator::Round => Opcode::Round,
+            Operator::Log => Opcode::Log,
+            Operator::Exp => Opcode::Exp,
+            Operator::Atan2 => Opcode::Atan2,
+            Operator::BitAnd => Opcode::BitAnd,
+            Operator::BitOr => Opcode::BitOr,
+            Operator::BitXor => Opcode::BitXor,
+            Operator::BitNot => Opcode::BitNot,
+            Operator::Sort => Opcode::Sort,
+            Operator::Rev => Opcode::Rev,
+            Operator::Dedup => Opcode::Dedup,
+            Operator::Take => Opcode::Take,
+            Operator::DropN => Opcode::DropN,
             Operator::CondQ => Opcode::Cond(0), // placeholder
             Operator::CondArrow => Opcode::Cond(0),
             Operator::Hash => Opcode::Loop(0),
@@ -309,6 +344,11 @@ fn ast_node_to_value(
             let mut gen = BytecodeGenerator::new();
             gen.word_dict = word_dict.clone();
             let (code, _) = gen.compile(body);
+            whisper_core::value::Value::Ref(std::rc::Rc::from(code.into_boxed_slice()))
+        }
+        AstNode::WordRef(name) => {
+            // Word references in quotes must compile to Call opcodes
+            let code = vec![whisper_core::opcode::Opcode::Call(name.clone())];
             whisper_core::value::Value::Ref(std::rc::Rc::from(code.into_boxed_slice()))
         }
         AstNode::Op(Operator::Sub) => whisper_core::value::Value::I64(0),

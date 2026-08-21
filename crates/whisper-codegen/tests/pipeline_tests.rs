@@ -567,3 +567,164 @@ fn test_stdlib_io_println() {
     let result = vm.execute(&bc);
     assert!(result.is_ok());
 }
+
+// === String stdlib tests ===
+
+#[test]
+fn test_striter_basic() {
+    let mut vm = Vm::new();
+    // striter on "hi" should give (104, "i")
+    vm.data_stack.push(Value::Str(Rc::new("hi".into())));
+    let result = vm.execute(&[Opcode::StrIter]).unwrap();
+    // After striter, stack has: first_char rest_str
+    // execute() returns top of stack (rest_str = "i")
+    assert_eq!(result, Some(Value::Str(Rc::new("i".into()))), "rest of 'hi' = 'i'");
+    // Below should be 104 (h)
+    let ch = vm.data_stack.pop().unwrap();
+    assert_eq!(ch, Value::I64(104), "first char of 'hi' = 104 (h)");
+}
+
+#[test]
+fn test_upper_lambda() {
+    // Correct pattern: nested conditionals (| is conditional separator, NOT OR operator)
+    // _ 97 >= ?? _ 122 <= ?? convert | leave | leave ] ]
+    let result = eval("[97 65 32] { _ 97 >= ?? _ 122 <= ?? _ 32 - ` drop | ` drop | ` drop ] ] } @map").unwrap();
+    assert_eq!(result, Some(Value::List(Rc::new(vec![
+        Value::I64(65), Value::I64(65), Value::I64(32)
+    ]))), "upper [a,A,space] = [A,A,space]");
+}
+
+#[test]
+fn test_stdlib_str_first() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["str"]).unwrap();
+    let source = "\"hello\" first";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::Str(Rc::new("h".into()))), "first of 'hello' = 'h'");
+}
+
+#[test]
+fn test_stdlib_str_last() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["str"]).unwrap();
+    let source = "\"hello\" last";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::Str(Rc::new("o".into()))), "last of 'hello' = 'o'");
+}
+
+#[test]
+fn test_stdlib_str_rev() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["str"]).unwrap();
+    let source = "\"hi\" str-rev";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc);
+    assert!(result.is_ok(), "Error: {:?}", result);
+    assert_eq!(result.unwrap(), Some(Value::Str(Rc::new("ih".into()))), "str-rev of 'hi' = 'ih'");
+}
+
+#[test]
+fn test_stdlib_str_upper() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["str"]).unwrap();
+    let source = "\"hello\" upper";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::Str(Rc::new("HELLO".into()))), "upper of 'hello' = 'HELLO'");
+}
+
+#[test]
+fn test_stdlib_str_lower() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["str"]).unwrap();
+    let source = "\"HELLO\" lower";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::Str(Rc::new("hello".into()))), "lower of 'HELLO' = 'hello'");
+}
+
+#[test]
+fn test_stdlib_str_capitalize() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["str"]).unwrap();
+    let source = "\"hello\" capitalize";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::Str(Rc::new("Hello".into()))), "capitalize of 'hello' = 'Hello'");
+}
+
+#[test]
+fn test_stdlib_str_capitalize_nonletter() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["str"]).unwrap();
+    let source = "\"1abc\" capitalize";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::Str(Rc::new("1abc".into()))), "capitalize of '1abc' = '1abc' (no change)");
+}
+
+#[test]
+fn test_stdlib_str_upper_mixed() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["str"]).unwrap();
+    let source = "\"Hello World 123\" upper";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::Str(Rc::new("HELLO WORLD 123".into()))), "upper preserves non-lowercase chars");
+}
+
+#[test]
+fn test_stdlib_str_palindrome() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["str"]).unwrap();
+    let source = "\"racecar\" palindrome?";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::Bool(true)), "'racecar' is a palindrome");
+}
+
+#[test]
+fn test_stdlib_str_lines() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["str"]).unwrap();
+    let source = "\"hello\\nworld\" lines len";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::I64(2)), "lines splits on newlines");
+}
+
+#[test]
+fn test_stdlib_str_words() {
+    let mut vm = Vm::new();
+    load_stdlib(&mut vm, &["str"]).unwrap();
+    let source = "\"hello world\" words len";
+    let ast = Parser::parse_source(source).unwrap();
+    let mut gen = BytecodeGenerator::new();
+    let (bc, _) = gen.compile(&ast);
+    let result = vm.execute(&bc).unwrap();
+    assert_eq!(result, Some(Value::I64(2)), "words splits on spaces");
+}
+// force recompile
+// trigger recompile 1784087990

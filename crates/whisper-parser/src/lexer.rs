@@ -115,6 +115,9 @@ impl Lexer {
                 if self.peek() == Some('=') {
                     self.advance();
                     TokenKind::Le
+                } else if self.peek() == Some('<') {
+                    self.advance();
+                    TokenKind::Shl
                 } else {
                     TokenKind::Lt
                 }
@@ -124,6 +127,9 @@ impl Lexer {
                 if self.peek() == Some('=') {
                     self.advance();
                     TokenKind::Ge
+                } else if self.peek() == Some('>') {
+                    self.advance();
+                    TokenKind::Shr
                 } else {
                     TokenKind::Gt
                 }
@@ -380,8 +386,12 @@ impl Lexer {
             "import" => TokenKind::Import,
             "export" => TokenKind::Export,
             "append" => TokenKind::Append,
+            "prepend" => TokenKind::Prepend,
             "len" => TokenKind::Len,
             "drop" => TokenKind::Drop,
+            "dup" => TokenKind::Dup,
+            "swap" => TokenKind::Swap,
+            "over" => TokenKind::Pick(1),
             "mod" => TokenKind::Mod,
             "strlen" => TokenKind::StrLen,
             "strcat" => TokenKind::StrCat,
@@ -398,6 +408,18 @@ impl Lexer {
             "striter" => TokenKind::StrIter,
             "listfind" => TokenKind::ListFind,
             "strjoin" => TokenKind::StrJoin,
+            "strsplit" => TokenKind::StrSplit,
+            "ctos" => TokenKind::Ctos,
+            "chr" => TokenKind::Ctos,
+            "listslice" => TokenKind::ListSlice,
+            "list-slice" => TokenKind::ListSlice,
+            "args" => TokenKind::Args,
+            "map-new" => TokenKind::MapNew,
+            "map-get" => TokenKind::MapGet,
+            "map-set" => TokenKind::MapSet,
+            "map-del" => TokenKind::MapDel,
+            "map-keys" => TokenKind::MapKeys,
+            "map-has" => TokenKind::MapHas,
             "bytes-new" => TokenKind::BytesNew,
             "bytes-push" => TokenKind::BytesPush,
             "bytes-len" => TokenKind::BytesLen,
@@ -411,6 +433,25 @@ impl Lexer {
             "ftan" => TokenKind::FTan,
             "json-parse" => TokenKind::JsonParse,
             "json-stringify" => TokenKind::JsonStringify,
+            "now" => TokenKind::Now,
+            "sleep" => TokenKind::Sleep,
+            "random" => TokenKind::Random,
+            "randint" => TokenKind::RandInt,
+            "floor" => TokenKind::Floor,
+            "ceil" => TokenKind::Ceil,
+            "round" => TokenKind::Round,
+            "log" => TokenKind::Log,
+            "exp" => TokenKind::Exp,
+            "atan2" => TokenKind::Atan2,
+            "bitand" => TokenKind::BitAnd,
+            "bitor" => TokenKind::BitOr,
+            "bitxor" => TokenKind::BitXor,
+            "bitnot" => TokenKind::BitNot,
+            "sort" => TokenKind::Sort,
+            "rev" => TokenKind::Rev,
+            "dedup" => TokenKind::Dedup,
+            "take" => TokenKind::Take,
+            "drop-n" => TokenKind::DropN,
             _ => TokenKind::Word(name),
         }
     }
@@ -429,6 +470,7 @@ impl Lexer {
             "map" => TokenKind::AtMap,
             "each" => TokenKind::AtEach,
             "fold" => TokenKind::AtFold,
+            "filter" => TokenKind::AtFilter,
             "times" => TokenKind::AtTimes,
             _ => TokenKind::Word(format!("@{name}")),
         }

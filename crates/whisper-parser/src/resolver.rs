@@ -13,7 +13,7 @@
 
 use crate::ast::AstNode;
 use crate::Parser;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 /// Search paths for module resolution.
@@ -98,9 +98,18 @@ pub struct ResolvedModule {
 /// Walks the AST recursively, loading imported files and collecting
 /// their word definitions.  Import nodes are removed from the result.
 /// Cycles are detected and skipped.
+///
+/// **Export enforcement**: Only definitions marked with `export` in the
+/// imported module are included. Non-exported definitions are filtered out.
+/// If a module has no `export` statements, all definitions are included
+/// (backward compatibility).
+///
+/// **Conflict detection**: If two imported modules export the same word
+/// name, a warning is printed to stderr (compilation continues).
 pub fn resolve_imports(ast: Vec<AstNode>, source_dir: &Path) -> Result<ResolvedModule, String> {
     let mut visited: HashSet<PathBuf> = HashSet::new();
-    resolve_imports_inner(ast, source_dir, &mut visited)
+    let mut exported_names: HashMap<String, String> = HashMap::new();
+    resolve_imports_inner(ast, source_dir, &mut visited, &mut exported_names)
 }
 
 /// Internal recursive resolver with shared cycle-tracking set.
@@ -108,6 +117,7 @@ fn resolve_imports_inner(
     ast: Vec<AstNode>,
     source_dir: &Path,
     visited: &mut HashSet<PathBuf>,
+    exported_names: &mut HashMap<String, String>,
 ) -> Result<ResolvedModule, String> {
     let mut imported_defs: Vec<AstNode> = Vec::new();
     let mut loaded: Vec<PathBuf> = Vec::new();
@@ -138,8 +148,37 @@ fn resolve_imports_inner(
 
             // Recursively resolve imports within the module (shared visited set)
             let module_dir = resolved.parent().unwrap_or(source_dir);
-            let sub = resolve_imports_inner(module_ast, module_dir, visited)?;
-            imported_defs.extend(sub.ast);
+            let sub = resolve_imports_inner(module_ast, module_dir, visited, exported_names)?;
+
+            // Export enforcement: collect exported names from the module
+            let exported_set = collect_exports(&sub.ast);
+            let filtered_defs: Vec<AstNode> = sub
+                .ast
+                .into_iter()
+                .filter(|n| match n {
+                    AstNode::Def { name, .. } => {
+                        // If the module has exports, only include exported defs
+                        // If no exports, include all defs (backward compatibility)
+                        exported_set.is_empty() || exported_set.contains(name)
+                    }
+                    AstNode::Export(_) => false, // Strip export nodes from imports
+                    _ => true,
+                })
+                .collect();
+
+            // Conflict detection
+            for def_node in &filtered_defs {
+                if let AstNode::Def { name, .. } = def_node {
+                    if let Some(prev_module) = exported_names.get(name) {
+                        eprintln!(
+                            "Warning: word '{name}' exported by both '{prev_module}' and '{path}'"
+                        );
+                    }
+                    exported_names.insert(name.clone(), path.clone());
+                }
+            }
+
+            imported_defs.extend(filtered_defs);
             loaded.extend(sub.loaded);
             loaded.push(resolved);
         }
@@ -147,8 +186,6 @@ fn resolve_imports_inner(
 
     // Build result: imported defs first, then original nodes (minus imports)
     let mut result: Vec<AstNode> = imported_defs;
-    // Copy original AST, removing Import nodes (they've been resolved).
-    // Keep Export nodes as documentation.
     for node in ast {
         if !matches!(node, AstNode::Import(_)) {
             result.push(node);
@@ -159,6 +196,17 @@ fn resolve_imports_inner(
         ast: result,
         loaded,
     })
+}
+
+/// Collect the set of exported word names from an AST.
+fn collect_exports(ast: &[AstNode]) -> HashSet<String> {
+    let mut exports = HashSet::new();
+    for node in ast {
+        if let AstNode::Export(name) = node {
+            exports.insert(name.clone());
+        }
+    }
+    exports
 }
 
 #[cfg(test)]
@@ -262,8 +310,8 @@ mod tests {
             AstNode::Literal(whisper_core::value::Value::I64(5)),
         ];
         let result = resolve_imports(ast, &dir).unwrap();
-        // Should have helper def + export + the literal, no Import node
-        assert_eq!(result.ast.len(), 3, "got: {result:?}");
+        // Should have helper def + the literal, no Import or Export nodes
+        assert_eq!(result.ast.len(), 2, "got: {result:?}");
         assert!(!result.ast.iter().any(|n| matches!(n, AstNode::Import(_))));
         let _ = std::fs::remove_dir_all(&dir);
     }

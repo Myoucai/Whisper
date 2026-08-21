@@ -19,6 +19,7 @@ fn help() {
     println!("  whisper serve   <file.ws>   Start HTTP server");
     println!("  whisper bootstrap <file.ws> Self-hosting compiler pipeline");
     println!("  whisper lsp                 Start LSP language server");
+    println!("  whisper test   [path]       Run test files (*_test.ws)");
     println!();
     println!("OPTIONS:");
     println!("  --target wbin|native         Build target (default: wbin)");
@@ -61,6 +62,7 @@ fn main() {
         "serve" => cmd_serve(&args),
         "bootstrap" => cmd_bootstrap(&args),
         "lsp" => cmd_lsp(),
+        "test" => cmd_test(&args),
         _ => {
             eprintln!("Unknown command: {cmd}");
             help();
@@ -106,16 +108,19 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
 }
 
 fn cmd_build(args: &[String]) -> Result<(), String> {
+    let target = get_opt(args, "--target").unwrap_or_else(|| "wbin".into());
+    let output = get_opt(args, "-o");
+    // Find the file argument: skip flag values (--target X, -o X)
+    let output_val = output.as_deref();
     let file = args
         .iter()
         .skip(2)
-        .find(|a| !a.starts_with('-'))
+        .filter(|a| !a.starts_with('-'))
+        .filter(|a| Some(a.as_str()) != output_val) // exclude -o value
+        .find(|a| a.ends_with(".ws") || a.ends_with(".whisper"))
         .ok_or("Expected: whisper build <file.ws>")?;
-    let target = get_opt(args, "--target").unwrap_or_else(|| "wbin".into());
-    let output = get_opt(args, "-o").unwrap_or_else(|| {
-        let ext = if target == "native" || target == "elf" { "elf" } else { "wbin" };
-        file.replace(".ws", &format!(".{ext}"))
-    });
+    let ext = if target == "native" || target == "elf" { "elf" } else { "wbin" };
+    let output = output.unwrap_or_else(|| file.replace(".ws", &format!(".{ext}")));
     let source = std::fs::read_to_string(file).map_err(|e| format!("Cannot read '{file}': {e}"))?;
     let source_dir = std::path::Path::new(file)
         .parent()
@@ -227,4 +232,76 @@ fn cmd_search(args: &[String]) -> Result<(), String> {
 
 fn cmd_lsp() -> Result<(), String> {
     whisper_lsp::run_lsp_server().map_err(|e| format!("LSP server error: {e}"))
+}
+
+fn cmd_test(args: &[String]) -> Result<(), String> {
+    use std::path::Path;
+
+    let path = args.get(2).map(|s| s.as_str()).unwrap_or(".");
+    let test_files: Vec<std::path::PathBuf> = if path.ends_with(".ws") {
+        vec![std::path::PathBuf::from(path)]
+    } else {
+        // Find all *_test.ws files in the directory
+        let dir = Path::new(path);
+        if !dir.is_dir() {
+            return Err(format!("Not a directory: {path}"));
+        }
+        let mut files: Vec<_> = std::fs::read_dir(dir)
+            .map_err(|e| format!("Cannot read directory '{path}': {e}"))?
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| {
+                p.extension().map(|e| e == "ws").unwrap_or(false)
+                    && p.file_name()
+                        .map(|n| n.to_string_lossy().ends_with("_test.ws"))
+                        .unwrap_or(false)
+            })
+            .collect();
+        files.sort();
+        files
+    };
+
+    if test_files.is_empty() {
+        println!("No test files found in '{path}'");
+        return Ok(());
+    }
+
+    let config = commands::run::RunConfig {
+        allow_file_read: get_flag(args, "--allow-file-read"),
+        allow_file_write: get_flag(args, "--allow-file-write"),
+        allow_http: get_flag(args, "--allow-http"),
+        allow_env: get_flag(args, "--allow-env"),
+        allow_exec: get_flag(args, "--allow-exec"),
+        trace: false,
+    };
+
+    let mut passed = 0;
+    let mut failed = 0;
+
+    for file in &test_files {
+        let name = file.file_name().unwrap().to_string_lossy();
+        let source = std::fs::read_to_string(file)
+            .map_err(|e| format!("Cannot read '{}': {e}", file.display()))?;
+        let source_dir = file.parent().unwrap_or(Path::new("."));
+
+        print!("  {name} ... ");
+        match commands::run::run_source(&source, source_dir, &config) {
+            Ok(()) => {
+                println!("ok");
+                passed += 1;
+            }
+            Err(e) => {
+                println!("FAILED");
+                eprintln!("    {e}");
+                failed += 1;
+            }
+        }
+    }
+
+    println!();
+    println!("test result: {passed} passed, {failed} failed");
+    if failed > 0 {
+        std::process::exit(1);
+    }
+    Ok(())
 }

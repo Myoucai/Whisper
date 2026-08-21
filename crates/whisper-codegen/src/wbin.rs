@@ -150,6 +150,13 @@ impl WbinReader {
                 cursor.read_exact(&mut buf)?;
                 Ok(Opcode::Pick(buf[0]))
             }
+            0x05 => Ok(Opcode::Filter),
+            0x06 => Ok(Opcode::StrSplit),
+            0x07 => Ok(Opcode::Ctos),
+            0x08 => Ok(Opcode::ListSlice),
+            0x09 => Ok(Opcode::Shl),
+            0x0A => Ok(Opcode::Shr),
+            0x0B => Ok(Opcode::Args),
 
             // Arithmetic
             0x10 => Ok(Opcode::Add),
@@ -241,6 +248,13 @@ impl WbinReader {
             0xBF => Ok(Opcode::BytesLen),
             0xC0 => Ok(Opcode::BytesWriteFile),
             0xC1 => Ok(Opcode::Try),
+            0xC2 => Ok(Opcode::MapNew),
+            0xC3 => Ok(Opcode::MapGet),
+            0xC4 => Ok(Opcode::MapSet),
+            0xC5 => Ok(Opcode::MapDel),
+            0xC6 => Ok(Opcode::MapKeys),
+            0xC7 => Ok(Opcode::MapHas),
+            0xDE => Ok(Opcode::Prepend),
 
             // Float ops
             0xB0 => Ok(Opcode::I64ToF64),
@@ -251,6 +265,37 @@ impl WbinReader {
             0xB5 => Ok(Opcode::FTan),
             0xB6 => Ok(Opcode::JsonParse),
             0xB7 => Ok(Opcode::JsonStringify),
+
+            // Time
+            0xD0 => Ok(Opcode::Now),
+            0xD1 => Ok(Opcode::Sleep),
+
+            // Random
+            0xD2 => Ok(Opcode::Random),
+            0xD3 => Ok(Opcode::RandInt),
+
+            // Float math
+            0xD4 => Ok(Opcode::Floor),
+            0xD5 => Ok(Opcode::Ceil),
+            0xD6 => Ok(Opcode::Round),
+            0xD7 => Ok(Opcode::Log),
+            0xD8 => Ok(Opcode::Exp),
+            0xD9 => Ok(Opcode::Atan2),
+
+            // Bitwise
+            0xDA => Ok(Opcode::BitAnd),
+            0xDB => Ok(Opcode::BitOr),
+            0xDC => Ok(Opcode::BitXor),
+            0xDD => Ok(Opcode::BitNot),
+
+            // Sort
+            0xDF => Ok(Opcode::Sort),
+
+            // Rev / Dedup / Take / DropN
+            0xE0 => Ok(Opcode::Rev),
+            0xE1 => Ok(Opcode::Dedup),
+            0xE2 => Ok(Opcode::Take),
+            0xE3 => Ok(Opcode::DropN),
 
             // Control flow
             0x50 => {

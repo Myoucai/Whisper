@@ -15,17 +15,19 @@
 : second    { 1 @nth } ;
 : third     { 2 @nth } ;
 : last      { _ length 1 - @nth } ;
-: tail      { 1 ` length 1 - strslice } ;
-: init      { _ length 1 - 0 ` strslice } ;
+: tail      { _ 1 ` len 1 - list-slice } ;
+: init      { _ 0 ` len 1 - list-slice } ;
 : empty?    { length 0 = } ;
-: contains? { 0 ` { over over length < } { over over @nth over = ?? drop drop #t | 1 + ] } # drop drop #f } ;
+: contains? { #f ` { _ $2 = ?? drop #t | ] } @each } ;
 : all?      { { } @map 0 { & } @fold } ;
 : any?      { { } @map 0 { | } @fold } ;
 : rev       { [] { ` append } @fold } ;
-: sort      { _ length 1 <= ?? | _ 0 @nth over { _ over < } @filter sort ` over { _ over >= } @filter sort append ] } ;
-: take      { ` 0 ` strslice } ;
-: drop-n    { ` swap length ` - ` strslice } ;
-: dedup     { [] ` { length 0 > } { over over 0 @nth { over = } @filter length 0 = ?? over 0 @nth append | ] 1 strslice } # drop } ;
+: sort      { [] { insert-sorted } @fold } ;
+: insert-sorted { _ len 0 = ?? ` append | ` _ $2 >= ?? append | _ last ` init $3 insert-sorted ` append append ] ] } ;
+: take      { [] ` { _ 0 > } { ` _ over @ 0 @nth ` ` append ` 1 ` len 1 - list-slice ` 1 - } # drop drop rev } ;
+: drop-n    { _ 0 = ?? drop | ` _ len 0 = ?? drop | _ 1 ` len 1 - list-slice ` 1 - drop-n ] ] } ;
+: dedup     { [] { insert-dedup } @fold } ;
+: insert-dedup { _ len 0 = ?? ` append | ` _ last = ?? drop | ` ` init $2 insert-dedup ` last append append ] ] } ;
 : range     { [] ` { _ 0 > } { over over append ` 1 - ` } # drop } ;
 : range-to  { [] ` 1 ` { over over <= } { over over append 1 + } # drop drop } ;
 
@@ -53,8 +55,10 @@ export all?
 export any?
 export rev
 export sort
+export insert-sorted
 export take
 export drop-n
 export dedup
+export insert-dedup
 export range
 export range-to

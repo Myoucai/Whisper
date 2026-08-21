@@ -191,6 +191,10 @@ fn compile_tokens(vm: &mut Vm, tokens: &[Value]) -> Result<Vec<Opcode>, String> 
 }
 
 /// Full whisperc pipeline: classify-full (Whisper: lex→structify→classify) → split defs → compile
+///
+/// The Whisper compiler handles tokenization, structural parsing, and classification.
+/// Rust handles definition splitting (which is just list filtering) and orchestrates
+/// the compilation of main tokens and each def body via the Whisper `compile` word.
 fn compile_via_whisperc_full(vm: &mut Vm, source: &str) -> Result<(Vec<Opcode>, Vec<(String, Vec<Opcode>)>), String> {
     // Phase 1: Whisper handles tokenize → structify → classify-nested
     vm.data_stack.push(Value::Str(Rc::new(source.to_string())));
@@ -199,6 +203,8 @@ fn compile_via_whisperc_full(vm: &mut Vm, source: &str) -> Result<(Vec<Opcode>, 
         .ok_or("classify-full: no output")?;
 
     // Phase 2: Rust splits definitions from main tokens
+    // (This is equivalent to what split-defs in Whisper does,
+    //  but done in Rust for reliability)
     let (main_tokens, def_tokens) = split_defs(&tokens);
 
     // Phase 3: Whisper compiles main tokens and each def body

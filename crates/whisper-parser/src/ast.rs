@@ -83,6 +83,13 @@ pub enum Operator {
     Drop,
     Rot,
     Pick(u8),
+    Filter,
+    StrSplit,
+    Ctos,
+    ListSlice,
+    Shl,
+    Shr,
+    Args,
 
     // Arithmetic
     Add,
@@ -107,6 +114,7 @@ pub enum Operator {
     // List
     Nth,
     Append,
+    Prepend,
     Len,
     Map,
     Each,
@@ -134,6 +142,14 @@ pub enum Operator {
     BytesWriteFile,
     Try,
 
+    // Map
+    MapNew,
+    MapGet,
+    MapSet,
+    MapDel,
+    MapKeys,
+    MapHas,
+
     // Float
     I64ToF64,
     F64ToI64,
@@ -145,6 +161,37 @@ pub enum Operator {
     // JSON
     JsonParse,
     JsonStringify,
+
+    // Time
+    Now,
+    Sleep,
+
+    // Random
+    Random,
+    RandInt,
+
+    // Float math
+    Floor,
+    Ceil,
+    Round,
+    Log,
+    Exp,
+    Atan2,
+
+    // Bitwise
+    BitAnd,
+    BitOr,
+    BitXor,
+    BitNot,
+
+    // Sort
+    Sort,
+    Rev,
+    Dedup,
+
+    // List take/drop
+    Take,
+    DropN,
 
     // Control flow (runtime)
     CondQ,

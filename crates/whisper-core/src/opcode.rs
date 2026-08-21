@@ -31,6 +31,22 @@ pub enum Opcode {
     /// Pick nth element (0-based from top): ... a_n ... a_0 → ... a_n ... a_0 a_n
     Pick(u8),
 
+    // === Extended stack/list/string ops (0x05-0x0A) ===
+    /// Filter list by predicate: list {pred} -> filtered-list
+    Filter,
+    /// Split string by delimiter: str delimiter -> [substrings]
+    StrSplit,
+    /// Convert char code to single-char string: i64 -> str
+    Ctos,
+    /// Slice a list: list start len -> sub-list
+    ListSlice,
+    /// Left shift: i64 i64 -> i64
+    Shl,
+    /// Right shift: i64 i64 -> i64
+    Shr,
+    /// Push CLI arguments as a list of strings: → [str]
+    Args,
+
     // === Arithmetic (0x10-0x17) ===
     /// Addition: a b → (a+b)
     Add,
@@ -92,6 +108,8 @@ pub enum Opcode {
     Each,
     /// Fold over list: list init {fn} → result
     Fold,
+    /// Prepend element: elem list → new-list
+    Prepend,
 
     // === String operations (0x46-0x4E) ===
     /// String length: str → i64
@@ -137,6 +155,20 @@ pub enum Opcode {
     /// Try-catch: {body} → [#t result] | [#f "error"]
     Try,
 
+    // === Map operations (0xC2-0xC7) ===
+    /// Create empty map: → map
+    MapNew,
+    /// Get value from map: map key → value (or 0 if not found)
+    MapGet,
+    /// Set key-value in map: map key value → new-map
+    MapSet,
+    /// Delete key from map: map key → new-map
+    MapDel,
+    /// Get all keys: map → [str]
+    MapKeys,
+    /// Check if key exists: map key → bool
+    MapHas,
+
     // === Control flow (0x50-0x57) ===
     /// Conditional: if false, jump by offset
     Cond(i32),
@@ -179,6 +211,54 @@ pub enum Opcode {
     /// Serialize Whisper value to JSON string: value → str
     JsonStringify,
 
+    // === Time (0xD0-0xD1) ===
+    /// Get current unix timestamp: → i64
+    Now,
+    /// Sleep for milliseconds: i64 →
+    Sleep,
+
+    // === Random (0xD2-0xD3) ===
+    /// Random float 0.0-1.0: → f64
+    Random,
+    /// Random integer in range: i64 i64 → i64
+    RandInt,
+
+    // === Float math (0xD4-0xD9) ===
+    /// Floor: f64 → f64
+    Floor,
+    /// Ceil: f64 → f64
+    Ceil,
+    /// Round: f64 → f64
+    Round,
+    /// Natural log: f64 → f64
+    Log,
+    /// e^x: f64 → f64
+    Exp,
+    /// Arctangent of y/x: f64 f64 → f64
+    Atan2,
+
+    // === Bitwise (0xDA-0xDD) ===
+    /// Bitwise AND: i64 i64 → i64
+    BitAnd,
+    /// Bitwise OR: i64 i64 → i64
+    BitOr,
+    /// Bitwise XOR: i64 i64 → i64
+    BitXor,
+    /// Bitwise NOT: i64 → i64
+    BitNot,
+
+    // === Sort (0xDF) ===
+    /// Sort a list in ascending order: [T] → [T]
+    Sort,
+    /// Reverse a list: [T] → [T]
+    Rev,
+    /// Remove consecutive duplicates: [T] → [T]
+    Dedup,
+    /// Take first N elements: list n → sub-list
+    Take,
+    /// Drop first N elements: list n → sub-list
+    DropN,
+
     // === Confidence (0x80-0x83) ===
     /// Label following value with confidence
     ConfLabel(f64),
@@ -214,6 +294,13 @@ impl Opcode {
             Opcode::Drop => 0x02,
             Opcode::Rot => 0x03,
             Opcode::Pick(_) => 0x04,
+            Opcode::Filter => 0x05,
+            Opcode::StrSplit => 0x06,
+            Opcode::Ctos => 0x07,
+            Opcode::ListSlice => 0x08,
+            Opcode::Shl => 0x09,
+            Opcode::Shr => 0x0A,
+            Opcode::Args => 0x0B,
 
             // Arithmetic
             Opcode::Add => 0x10,
@@ -250,6 +337,7 @@ impl Opcode {
             Opcode::Map => 0x43,
             Opcode::Each => 0x44,
             Opcode::Fold => 0x45,
+            Opcode::Prepend => 0xDE,
 
             // String ops
             Opcode::StrLen => 0x46,
@@ -272,6 +360,14 @@ impl Opcode {
             Opcode::BytesLen => 0xBF,
             Opcode::BytesWriteFile => 0xC0,
             Opcode::Try => 0xC1,
+
+            // Map ops
+            Opcode::MapNew => 0xC2,
+            Opcode::MapGet => 0xC3,
+            Opcode::MapSet => 0xC4,
+            Opcode::MapDel => 0xC5,
+            Opcode::MapKeys => 0xC6,
+            Opcode::MapHas => 0xC7,
 
             // Control flow
             Opcode::Cond(_) => 0x50,
@@ -296,6 +392,33 @@ impl Opcode {
             Opcode::FTan => 0xB5,
             Opcode::JsonParse => 0xB6,
             Opcode::JsonStringify => 0xB7,
+
+            // Time
+            Opcode::Now => 0xD0,
+            Opcode::Sleep => 0xD1,
+
+            // Random
+            Opcode::Random => 0xD2,
+            Opcode::RandInt => 0xD3,
+
+            // Float math
+            Opcode::Floor => 0xD4,
+            Opcode::Ceil => 0xD5,
+            Opcode::Round => 0xD6,
+            Opcode::Log => 0xD7,
+            Opcode::Exp => 0xD8,
+            Opcode::Atan2 => 0xD9,
+
+            // Bitwise
+            Opcode::BitAnd => 0xDA,
+            Opcode::BitOr => 0xDB,
+            Opcode::BitXor => 0xDC,
+            Opcode::BitNot => 0xDD,
+            Opcode::Sort => 0xDF,
+            Opcode::Rev => 0xE0,
+            Opcode::Dedup => 0xE1,
+            Opcode::Take => 0xE2,
+            Opcode::DropN => 0xE3,
 
             // Confidence
             Opcode::ConfLabel(_) => 0x80,
@@ -341,6 +464,13 @@ impl Opcode {
             Opcode::Drop => "drop",
             Opcode::Rot => "rot",
             Opcode::Pick(_) => "pick",
+            Opcode::Filter => "filter",
+            Opcode::StrSplit => "strsplit",
+            Opcode::Ctos => "ctos",
+            Opcode::ListSlice => "listslice",
+            Opcode::Shl => "shl",
+            Opcode::Shr => "shr",
+            Opcode::Args => "args",
             Opcode::Add => "add",
             Opcode::Sub => "sub",
             Opcode::Mul => "mul",
@@ -367,6 +497,7 @@ impl Opcode {
             Opcode::Map => "map",
             Opcode::Each => "each",
             Opcode::Fold => "fold",
+            Opcode::Prepend => "prepend",
             Opcode::StrLen => "strlen",
             Opcode::StrCat => "strcat",
             Opcode::StrSlice => "strslice",
@@ -387,6 +518,12 @@ impl Opcode {
             Opcode::BytesLen => "bytes_len",
             Opcode::BytesWriteFile => "bytes_write",
             Opcode::Try => "try",
+            Opcode::MapNew => "map_new",
+            Opcode::MapGet => "map_get",
+            Opcode::MapSet => "map_set",
+            Opcode::MapDel => "map_del",
+            Opcode::MapKeys => "map_keys",
+            Opcode::MapHas => "map_has",
             Opcode::Cond(_) => "cond",
             Opcode::Jump(_) => "jump",
             Opcode::Loop(_) => "loop",
@@ -403,6 +540,25 @@ impl Opcode {
             Opcode::FTan => "ftan",
             Opcode::JsonParse => "json_parse",
             Opcode::JsonStringify => "json_stringify",
+            Opcode::Now => "now",
+            Opcode::Sleep => "sleep",
+            Opcode::Random => "random",
+            Opcode::RandInt => "randint",
+            Opcode::Floor => "floor",
+            Opcode::Ceil => "ceil",
+            Opcode::Round => "round",
+            Opcode::Log => "log",
+            Opcode::Exp => "exp",
+            Opcode::Atan2 => "atan2",
+            Opcode::BitAnd => "bitand",
+            Opcode::BitOr => "bitor",
+            Opcode::BitXor => "bitxor",
+            Opcode::BitNot => "bitnot",
+            Opcode::Sort => "sort",
+            Opcode::Rev => "rev",
+            Opcode::Dedup => "dedup",
+            Opcode::Take => "take",
+            Opcode::DropN => "drop-n",
             Opcode::ConfLabel(_) => "conf_label",
             Opcode::ProbChoice => "prob_choice",
             Opcode::OutputTop => "output_top",

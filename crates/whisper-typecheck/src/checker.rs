@@ -585,6 +585,75 @@ impl TypeChecker {
                 stack.push(Type::Str);
             }
 
+            // Time
+            Operator::Now => {
+                stack.push(Type::I64);
+            }
+            Operator::Sleep => {
+                self.expect(stack, &Type::I64, errors, ctx, "sleep");
+            }
+
+            // Random
+            Operator::Random => {
+                stack.push(Type::F64);
+            }
+            Operator::RandInt => {
+                self.expect(stack, &Type::I64, errors, ctx, "randint max");
+                self.expect(stack, &Type::I64, errors, ctx, "randint min");
+                stack.push(Type::I64);
+            }
+
+            // Float math
+            Operator::Floor | Operator::Ceil | Operator::Round | Operator::Log | Operator::Exp => {
+                self.expect(stack, &Type::F64, errors, ctx, "float math");
+                stack.push(Type::F64);
+            }
+            Operator::Atan2 => {
+                self.expect(stack, &Type::F64, errors, ctx, "atan2 x");
+                self.expect(stack, &Type::F64, errors, ctx, "atan2 y");
+                stack.push(Type::F64);
+            }
+
+            // Bitwise
+            Operator::BitAnd | Operator::BitOr | Operator::BitXor => {
+                self.expect(stack, &Type::I64, errors, ctx, "bitwise rhs");
+                self.expect(stack, &Type::I64, errors, ctx, "bitwise lhs");
+                stack.push(Type::I64);
+            }
+            Operator::BitNot => {
+                self.expect(stack, &Type::I64, errors, ctx, "bitnot");
+                stack.push(Type::I64);
+            }
+
+            // Sort
+            Operator::Sort => {
+                let t = self.inferer.fresh_var();
+                self.expect(stack, &Type::List(Box::new(t.clone())), errors, ctx, "sort");
+                stack.push(Type::List(Box::new(t)));
+            }
+            Operator::Rev => {
+                let t = self.inferer.fresh_var();
+                self.expect(stack, &Type::List(Box::new(t.clone())), errors, ctx, "rev");
+                stack.push(Type::List(Box::new(t)));
+            }
+            Operator::Dedup => {
+                let t = self.inferer.fresh_var();
+                self.expect(stack, &Type::List(Box::new(t.clone())), errors, ctx, "dedup");
+                stack.push(Type::List(Box::new(t)));
+            }
+            Operator::Take => {
+                self.expect(stack, &Type::I64, errors, ctx, "take n");
+                let t = self.inferer.fresh_var();
+                self.expect(stack, &Type::List(Box::new(t.clone())), errors, ctx, "take list");
+                stack.push(Type::List(Box::new(t)));
+            }
+            Operator::DropN => {
+                self.expect(stack, &Type::I64, errors, ctx, "drop-n n");
+                let t = self.inferer.fresh_var();
+                self.expect(stack, &Type::List(Box::new(t.clone())), errors, ctx, "drop-n list");
+                stack.push(Type::List(Box::new(t)));
+            }
+
             Operator::Nth => {
                 let any_list = Type::List(Box::new(self.inferer.fresh_var()));
                 self.expect(stack, &Type::I64, errors, ctx, "@nth index");
@@ -598,6 +667,12 @@ impl TypeChecker {
                 stack.pop(); // element — accept anything
                 self.expect(stack, &any_list, errors, ctx, "append list");
                 stack.push(list_ty);
+            }
+            Operator::Prepend => {
+                let t = self.inferer.fresh_var();
+                self.expect(stack, &Type::List(Box::new(t.clone())), errors, ctx, "prepend list");
+                self.expect(stack, &t, errors, ctx, "prepend elem");
+                stack.push(Type::List(Box::new(t)));
             }
             Operator::Map => {
                 let any_list = Type::List(Box::new(self.inferer.fresh_var()));
@@ -617,6 +692,36 @@ impl TypeChecker {
                 self.expect(stack, &any_list, errors, ctx, "@fold list");
                 stack.push(self.inferer.fresh_var());
             }
+            Operator::Filter => {
+                let any_list = Type::List(Box::new(self.inferer.fresh_var()));
+                self.expect_ref(stack, errors, ctx, "@filter quot");
+                self.expect(stack, &any_list, errors, ctx, "@filter list");
+                stack.push(Type::List(Box::new(self.inferer.fresh_var())));
+            }
+            Operator::StrSplit => {
+                self.expect(stack, &Type::Str, errors, ctx, "strsplit delimiter");
+                self.expect(stack, &Type::Str, errors, ctx, "strsplit input");
+                stack.push(Type::List(Box::new(Type::Str)));
+            }
+            Operator::Ctos => {
+                self.expect(stack, &Type::I64, errors, ctx, "ctos codepoint");
+                stack.push(Type::Str);
+            }
+            Operator::ListSlice => {
+                self.expect(stack, &Type::I64, errors, ctx, "listslice len");
+                self.expect(stack, &Type::I64, errors, ctx, "listslice start");
+                let any_list = Type::List(Box::new(self.inferer.fresh_var()));
+                self.expect(stack, &any_list, errors, ctx, "listslice list");
+                stack.push(Type::List(Box::new(self.inferer.fresh_var())));
+            }
+            Operator::Shl | Operator::Shr => {
+                self.expect(stack, &Type::I64, errors, ctx, "shift amount");
+                self.expect(stack, &Type::I64, errors, ctx, "shift value");
+                stack.push(Type::I64);
+            }
+            Operator::Args => {
+                stack.push(Type::List(Box::new(Type::Str)));
+            }
             Operator::AtTimes => {
                 self.expect_ref(stack, errors, ctx, "@times body");
                 self.expect(stack, &Type::I64, errors, ctx, "@times count");
@@ -635,6 +740,37 @@ impl TypeChecker {
             }
             Operator::OutputAll => {
                 stack.clear();
+            }
+
+            // Map operations
+            Operator::MapNew => {
+                stack.push(self.inferer.fresh_var());
+            }
+            Operator::MapGet => {
+                self.expect(stack, &Type::Str, errors, ctx, "map-get key");
+                stack.pop(); // pop the map
+                stack.push(self.inferer.fresh_var()); // value (any type)
+            }
+            Operator::MapSet => {
+                let v = self.inferer.fresh_var();
+                self.expect(stack, &v, errors, ctx, "map-set value");
+                self.expect(stack, &Type::Str, errors, ctx, "map-set key");
+                stack.pop(); // pop the map
+                stack.push(self.inferer.fresh_var()); // new map
+            }
+            Operator::MapDel => {
+                self.expect(stack, &Type::Str, errors, ctx, "map-del key");
+                stack.pop(); // pop the map
+                stack.push(self.inferer.fresh_var()); // new map
+            }
+            Operator::MapKeys => {
+                stack.pop(); // pop the map
+                stack.push(Type::List(Box::new(Type::Str)));
+            }
+            Operator::MapHas => {
+                self.expect(stack, &Type::Str, errors, ctx, "map-has key");
+                stack.pop(); // pop the map
+                stack.push(Type::Bool);
             }
 
             _ => {} // CapCall, CapExec, Cond, etc. unchecked

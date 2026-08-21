@@ -27,6 +27,26 @@
 : i2f       { i64tof64 } ;
 : between?  { rot drop _ over <= ` _ >= & } ;
 
+// Constants (push as float literals)
+: pi        { 3.141592653589793 } ;
+: e         { 2.718281828459045 } ;
+: tau       { 6.283185307179586 } ;
+: inf       { 1.0 0.0 / } ;
+
+// Float math wrappers
+: floor     { floor } ;
+: ceil      { ceil } ;
+: round     { round } ;
+: log       { log } ;
+: exp       { exp } ;
+: atan2     { atan2 } ;
+
+// Bitwise operations
+: bitand    { bitand } ;
+: bitor     { bitor } ;
+: bitxor    { bitxor } ;
+: bitnot    { bitnot } ;
+
 export sq
 export cube
 export double
@@ -54,3 +74,17 @@ export sqrt
 export f2i
 export i2f
 export between?
+export pi
+export e
+export tau
+export inf
+export floor
+export ceil
+export round
+export log
+export exp
+export atan2
+export bitand
+export bitor
+export bitxor
+export bitnot

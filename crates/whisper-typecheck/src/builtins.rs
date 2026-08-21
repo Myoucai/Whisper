@@ -47,7 +47,21 @@ pub fn get_builtin_signature(name: &str) -> Option<(Vec<Type>, Vec<Type>)> {
             vec![Type::List(Box::new(tv())), tv()],
             vec![Type::List(Box::new(tv()))],
         )),
+        "prepend" => Some((
+            vec![tv(), Type::List(Box::new(tv()))],
+            vec![Type::List(Box::new(tv()))],
+        )),
         "len" => Some((vec![Type::List(Box::new(tv()))], vec![i64.clone()])),
+        "@filter" => Some((
+            vec![Type::List(Box::new(tv())), Type::Ref(vec![tv()], vec![Type::Bool])],
+            vec![Type::List(Box::new(tv()))],
+        )),
+        "strsplit" => Some((vec![Type::Str, Type::Str], vec![Type::List(Box::new(Type::Str))])),
+        "ctos" => Some((vec![Type::I64], vec![Type::Str])),
+        "listslice" => Some((
+            vec![Type::List(Box::new(tv())), Type::I64, Type::I64],
+            vec![Type::List(Box::new(tv()))],
+        )),
 
         // String operations
         "strlen" => Some((vec![Type::Str], vec![Type::I64])),
@@ -79,6 +93,13 @@ pub fn get_builtin_signature(name: &str) -> Option<(Vec<Type>, Vec<Type>)> {
             vec![Type::Ref(vec![], vec![])],
             vec![Type::Bool, Type::TypeVar(0)],
         )),
+        "list-slice" => Some((
+            vec![Type::List(Box::new(tv())), Type::I64, Type::I64],
+            vec![Type::List(Box::new(tv()))],
+        )),
+        "<<" => Some((vec![Type::I64, Type::I64], vec![Type::I64])),
+        ">>" => Some((vec![Type::I64, Type::I64], vec![Type::I64])),
+        "args" => Some((vec![], vec![Type::List(Box::new(Type::Str))])),
 
         // Float operations
         "i64tof64" => Some((vec![Type::I64], vec![Type::F64])),
@@ -91,6 +112,55 @@ pub fn get_builtin_signature(name: &str) -> Option<(Vec<Type>, Vec<Type>)> {
         // JSON
         "json-parse" => Some((vec![Type::Str], vec![Type::TypeVar(0)])),
         "json-stringify" => Some((vec![Type::TypeVar(0)], vec![Type::Str])),
+
+        // Time
+        "now" => Some((vec![], vec![Type::I64])),
+        "sleep" => Some((vec![Type::I64], vec![])),
+
+        // Random
+        "random" => Some((vec![], vec![Type::F64])),
+        "randint" => Some((vec![Type::I64, Type::I64], vec![Type::I64])),
+
+        // Float math
+        "floor" => Some((vec![Type::F64], vec![Type::F64])),
+        "ceil" => Some((vec![Type::F64], vec![Type::F64])),
+        "round" => Some((vec![Type::F64], vec![Type::F64])),
+        "log" => Some((vec![Type::F64], vec![Type::F64])),
+        "exp" => Some((vec![Type::F64], vec![Type::F64])),
+        "atan2" => Some((vec![Type::F64, Type::F64], vec![Type::F64])),
+
+        // Bitwise
+        "bitand" => Some((vec![Type::I64, Type::I64], vec![Type::I64])),
+        "bitor" => Some((vec![Type::I64, Type::I64], vec![Type::I64])),
+        "bitxor" => Some((vec![Type::I64, Type::I64], vec![Type::I64])),
+        "bitnot" => Some((vec![Type::I64], vec![Type::I64])),
+
+        // Sort
+        "sort" => Some((vec![Type::List(Box::new(tv()))], vec![Type::List(Box::new(tv()))])),
+        "rev" => Some((vec![Type::List(Box::new(tv()))], vec![Type::List(Box::new(tv()))])),
+        "dedup" => Some((vec![Type::List(Box::new(tv()))], vec![Type::List(Box::new(tv()))])),
+        "take" => Some((
+            vec![Type::List(Box::new(tv())), Type::I64],
+            vec![Type::List(Box::new(tv()))],
+        )),
+        "drop-n" => Some((
+            vec![Type::List(Box::new(tv())), Type::I64],
+            vec![Type::List(Box::new(tv()))],
+        )),
+
+        // Map operations
+        "map-new" => Some((vec![], vec![Type::TypeVar(99)])),
+        "map-get" => Some((vec![Type::TypeVar(99), Type::Str], vec![Type::TypeVar(0)])),
+        "map-set" => Some((
+            vec![Type::TypeVar(99), Type::Str, Type::TypeVar(0)],
+            vec![Type::TypeVar(99)],
+        )),
+        "map-del" => Some((vec![Type::TypeVar(99), Type::Str], vec![Type::TypeVar(99)])),
+        "map-keys" => Some((
+            vec![Type::TypeVar(99)],
+            vec![Type::List(Box::new(Type::Str))],
+        )),
+        "map-has" => Some((vec![Type::TypeVar(99), Type::Str], vec![Type::Bool])),
 
         _ => None,
     }

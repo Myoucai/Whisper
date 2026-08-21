@@ -1,5 +1,6 @@
 /// Value type for the Whisper VM.
 /// All data on the stack is represented as a Value.
+use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::opcode::Opcode;
@@ -22,6 +23,8 @@ pub enum Value {
     Cap(u16, String),
     /// Signal with confidence tensor: (value, confidence 0.0-1.0)
     Signal(Box<Value>, f64),
+    /// String-keyed map (reference-counted for cheap clone)
+    Map(Rc<HashMap<String, Value>>),
 }
 
 impl Value {
@@ -36,6 +39,7 @@ impl Value {
             Value::Ref(_) => "ref",
             Value::Cap(_, _) => "cap",
             Value::Signal(v, _) => v.type_name(), // transparent for type checks
+            Value::Map(_) => "map",
         }
     }
 
@@ -100,6 +104,16 @@ impl std::fmt::Display for Value {
             Value::Ref(_) => write!(f, "{{...}}"),
             Value::Cap(id, desc) => write!(f, "@{id}({desc})"),
             Value::Signal(v, c) => write!(f, "{v}:{c}"),
+            Value::Map(m) => {
+                write!(f, "{{")?;
+                for (i, (k, v)) in m.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{k}: {v}")?;
+                }
+                write!(f, "}}")
+            }
         }
     }
 }

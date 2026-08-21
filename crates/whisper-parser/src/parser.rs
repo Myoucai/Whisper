@@ -443,6 +443,10 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::Append)))
             }
+            TokenKind::Prepend => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Prepend)))
+            }
             TokenKind::Len => {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::Len)))
@@ -458,6 +462,10 @@ impl Parser {
             TokenKind::AtFold => {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::Fold)))
+            }
+            TokenKind::AtFilter => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Filter)))
             }
             TokenKind::AtTimes => {
                 self.advance();
@@ -525,6 +533,30 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::StrJoin)))
             }
+            TokenKind::StrSplit => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::StrSplit)))
+            }
+            TokenKind::Ctos => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Ctos)))
+            }
+            TokenKind::ListSlice => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::ListSlice)))
+            }
+            TokenKind::Shl => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Shl)))
+            }
+            TokenKind::Shr => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Shr)))
+            }
+            TokenKind::Args => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Args)))
+            }
             TokenKind::BytesNew => {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::BytesNew)))
@@ -544,6 +576,32 @@ impl Parser {
             TokenKind::Try => {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::Try)))
+            }
+
+            // Map operations
+            TokenKind::MapNew => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::MapNew)))
+            }
+            TokenKind::MapGet => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::MapGet)))
+            }
+            TokenKind::MapSet => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::MapSet)))
+            }
+            TokenKind::MapDel => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::MapDel)))
+            }
+            TokenKind::MapKeys => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::MapKeys)))
+            }
+            TokenKind::MapHas => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::MapHas)))
             }
 
             // Float operations
@@ -580,6 +638,90 @@ impl Parser {
             TokenKind::JsonStringify => {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::JsonStringify)))
+            }
+
+            // Time
+            TokenKind::Now => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Now)))
+            }
+            TokenKind::Sleep => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Sleep)))
+            }
+
+            // Random
+            TokenKind::Random => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Random)))
+            }
+            TokenKind::RandInt => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::RandInt)))
+            }
+
+            // Float math
+            TokenKind::Floor => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Floor)))
+            }
+            TokenKind::Ceil => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Ceil)))
+            }
+            TokenKind::Round => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Round)))
+            }
+            TokenKind::Log => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Log)))
+            }
+            TokenKind::Exp => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Exp)))
+            }
+            TokenKind::Atan2 => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Atan2)))
+            }
+
+            // Bitwise
+            TokenKind::BitAnd => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::BitAnd)))
+            }
+            TokenKind::BitOr => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::BitOr)))
+            }
+            TokenKind::BitXor => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::BitXor)))
+            }
+            TokenKind::BitNot => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::BitNot)))
+            }
+            TokenKind::Sort => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Sort)))
+            }
+            TokenKind::Rev => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Rev)))
+            }
+            TokenKind::Dedup => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Dedup)))
+            }
+            TokenKind::Take => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Take)))
+            }
+            TokenKind::DropN => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::DropN)))
             }
 
             // Capability
@@ -760,6 +902,126 @@ impl Parser {
             TokenKind::JsonStringify => {
                 self.advance();
                 Ok("json-stringify".into())
+            }
+            TokenKind::StrSplit => {
+                self.advance();
+                Ok("strsplit".into())
+            }
+            TokenKind::Ctos => {
+                self.advance();
+                Ok("ctos".into())
+            }
+            TokenKind::Prepend => {
+                self.advance();
+                Ok("prepend".into())
+            }
+            TokenKind::ListSlice => {
+                self.advance();
+                Ok("list-slice".into())
+            }
+            TokenKind::Args => {
+                self.advance();
+                Ok("args".into())
+            }
+            TokenKind::MapNew => {
+                self.advance();
+                Ok("map-new".into())
+            }
+            TokenKind::MapGet => {
+                self.advance();
+                Ok("map-get".into())
+            }
+            TokenKind::MapSet => {
+                self.advance();
+                Ok("map-set".into())
+            }
+            TokenKind::MapDel => {
+                self.advance();
+                Ok("map-del".into())
+            }
+            TokenKind::MapKeys => {
+                self.advance();
+                Ok("map-keys".into())
+            }
+            TokenKind::MapHas => {
+                self.advance();
+                Ok("map-has".into())
+            }
+            TokenKind::Now => {
+                self.advance();
+                Ok("now".into())
+            }
+            TokenKind::Sleep => {
+                self.advance();
+                Ok("sleep".into())
+            }
+            TokenKind::Random => {
+                self.advance();
+                Ok("random".into())
+            }
+            TokenKind::RandInt => {
+                self.advance();
+                Ok("randint".into())
+            }
+            TokenKind::Floor => {
+                self.advance();
+                Ok("floor".into())
+            }
+            TokenKind::Ceil => {
+                self.advance();
+                Ok("ceil".into())
+            }
+            TokenKind::Round => {
+                self.advance();
+                Ok("round".into())
+            }
+            TokenKind::Log => {
+                self.advance();
+                Ok("log".into())
+            }
+            TokenKind::Exp => {
+                self.advance();
+                Ok("exp".into())
+            }
+            TokenKind::Atan2 => {
+                self.advance();
+                Ok("atan2".into())
+            }
+            TokenKind::BitAnd => {
+                self.advance();
+                Ok("bitand".into())
+            }
+            TokenKind::BitOr => {
+                self.advance();
+                Ok("bitor".into())
+            }
+            TokenKind::BitXor => {
+                self.advance();
+                Ok("bitxor".into())
+            }
+            TokenKind::BitNot => {
+                self.advance();
+                Ok("bitnot".into())
+            }
+            TokenKind::Sort => {
+                self.advance();
+                Ok("sort".into())
+            }
+            TokenKind::Rev => {
+                self.advance();
+                Ok("rev".into())
+            }
+            TokenKind::Dedup => {
+                self.advance();
+                Ok("dedup".into())
+            }
+            TokenKind::Take => {
+                self.advance();
+                Ok("take".into())
+            }
+            TokenKind::DropN => {
+                self.advance();
+                Ok("drop-n".into())
             }
             _ => Err(ParseError {
                 message: format!("Expected word, got {:?}", token.kind),

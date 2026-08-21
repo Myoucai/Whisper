@@ -499,3 +499,146 @@ fn wbin_roundtrip_program() {
     let r = vm.execute(&decoded).unwrap().unwrap();
     assert_eq!(r.unwrap_signal(), Value::I64(14));
 }
+
+// ── Phase 0 new opcodes ──────────────────────────────────────────────
+
+#[test]
+fn test_strsplit_basic() {
+    let source = r#""a-b-c" "-" strsplit len"#;
+    assert_run_i64(source, 3);
+}
+
+#[test]
+fn test_strsplit_words() {
+    let source = r#""hello world" " " strsplit len"#;
+    assert_run_i64(source, 2);
+}
+
+#[test]
+fn test_filter_basic() {
+    let source = "[1 2 3 4 5] { 3 > } @filter len";
+    assert_run_i64(source, 2); // [4, 5]
+}
+
+#[test]
+fn test_filter_empty_result() {
+    let source = "[1 2 3] { 10 > } @filter len";
+    assert_run_i64(source, 0);
+}
+
+#[test]
+fn test_list_slice_basic() {
+    let source = "[10 20 30 40 50] 1 3 list-slice len";
+    assert_run_i64(source, 3);
+}
+
+#[test]
+fn test_list_slice_first() {
+    let source = "[10 20 30] 0 2 list-slice 1 @nth";
+    assert_run_i64(source, 20);
+}
+
+#[test]
+fn test_ctos_basic() {
+    let source = "65 ctos"; // ASCII 'A'
+    assert_run_str(source, "A");
+}
+
+#[test]
+fn test_shl_basic() {
+    let source = "1 4 <<"; // 1 << 4 = 16
+    assert_run_i64(source, 16);
+}
+
+#[test]
+fn test_shr_basic() {
+    let source = "16 2 >>"; // 16 >> 2 = 4
+    assert_run_i64(source, 4);
+}
+
+#[test]
+fn test_shl_zero() {
+    let source = "42 0 <<";
+    assert_run_i64(source, 42);
+}
+
+// ── Phase 0 new opcodes ────────────────────────────────────────────
+
+#[test]
+fn filter_pipeline() {
+    // [3 1 4 1 5] { _ 2 > } @filter len -> 3
+    assert_run_i64("[3 1 4 1 5] { _ 2 > } @filter len", 3);
+}
+
+#[test]
+fn filter_keep_all() {
+    assert_run_i64("[1 2 3] { #t } @filter len", 3);
+}
+
+#[test]
+fn filter_keep_none() {
+    assert_run_i64("[1 2 3] { #f } @filter len", 0);
+}
+
+#[test]
+fn strsplit_pipeline() {
+    assert_run_i64("\"hello world\" \" \" strsplit len", 2);
+}
+
+#[test]
+fn strsplit_first_word() {
+    // Split and get first element
+    assert_run_str("\"hello world\" \" \" strsplit 0 @nth", "hello");
+}
+
+#[test]
+fn ctos_pipeline() {
+    assert_run_str("65 ctos", "A");
+}
+
+#[test]
+fn ctos_lowercase() {
+    assert_run_str("97 ctos", "a");
+}
+
+#[test]
+fn listslice_pipeline() {
+    assert_run_i64("[10 20 30 40 50] 1 3 listslice len", 3);
+}
+
+#[test]
+fn listslice_first_element() {
+    assert_run_i64("[10 20 30 40 50] 1 3 listslice 0 @nth", 20);
+}
+
+#[test]
+fn shl_pipeline() {
+    assert_run_i64("1 3 <<", 8);
+}
+
+#[test]
+fn shr_pipeline() {
+    assert_run_i64("8 2 >>", 2);
+}
+
+#[test]
+fn shl_larger() {
+    assert_run_i64("1 10 <<", 1024);
+}
+
+// ── wbin roundtrip for new opcodes ────────────────────────────────
+
+#[test]
+fn wbin_roundtrip_new_opcodes() {
+    use whisper_core::opcode::Opcode;
+    let ops = vec![
+        Opcode::PushI64(1),
+        Opcode::PushI64(3),
+        Opcode::Shl,
+        Opcode::PushI64(8),
+        Opcode::Eq,
+    ];
+    let data = whisper_codegen::wbin::WbinWriter::write(&ops);
+    let decoded = whisper_codegen::wbin::WbinReader::decode(&data).unwrap();
+    assert_eq!(ops, decoded);
+}
