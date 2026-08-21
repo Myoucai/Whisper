@@ -124,19 +124,20 @@ export ctos
 // Pass 1: Group paired delimiters {} and []
 // ══════════════════════════════════════════════════════════════════════
 
+: str-eq? { over str? ?? streq | drop drop #f ] } ;
 : group-paired-rec { [] swap gp-loop } ;
 
 : gp-loop {
     dup len 0 = ?? drop return ]
     dup 0 @nth
-    dup "{" streq ??
+    dup "{" str-eq? ??
         drop tok-advance
         collect-brace
         swap [5] swap append
         rot swap append swap
         gp-loop
     |
-    dup "[" streq ??
+    dup "[" str-eq? ??
         drop tok-advance
         collect-bracket
         swap [6] swap append
@@ -154,14 +155,14 @@ export ctos
 : cb-loop {
     dup len 0 = ?? return ]
     dup 0 @nth
-    dup "{" streq ??
+    dup "{" str-eq? ??
         drop tok-advance
         collect-brace
         swap [5] swap append
         rot swap append swap
         cb-loop
     |
-    dup "}" streq ??
+    dup "}" str-eq? ??
         drop tok-advance return
     |
         rot swap append swap
@@ -175,14 +176,14 @@ export ctos
 : cbr-loop {
     dup len 0 = ?? return ]
     dup 0 @nth
-    dup "[" streq ??
+    dup "[" str-eq? ??
         drop tok-advance
         collect-bracket
         swap [6] swap append
         rot swap append swap
         cbr-loop
     |
-    dup "]" streq ??
+    dup "]" str-eq? ??
         drop tok-advance return
     |
         rot swap append swap
@@ -468,7 +469,10 @@ export group-paired-rec
 // ── Recursive classification for structured token trees ─────────────
 
 : cl-quote {
-    dup 1 @nth classify-nested
+    // Inner tokens are raw (recognize skips structured tokens): run the
+    // full structify (brace grouping + cond/loop recognition) so ??|]
+    // inside quotes become Cond nodes instead of stray word calls.
+    dup 1 @nth structify classify-nested
     swap drop [5] swap append
 } ;
 : cl-list {
@@ -546,6 +550,7 @@ export classify-nested
 : op-bool  { tk-val [51] swap append 1 PushList } ;   // [[51, value]]
 : op-call  { tk-val [96] swap append 1 PushList } ;    // [[96, name]]
 : op-pick  { tk-val [4] swap append 1 PushList } ;     // [[4, N]]
+: op-hof   { dup tk-type swap tk-val compile 2 PushList 1 PushList } ; // [[op', inner_bc]]
 : op-op    { tk-val 1 PushList } ;                      // [[opcode]]
 
 // Quote: compile inner body, emit single [PushRef, inner_bc] instruction
@@ -623,6 +628,7 @@ export classify-nested
     dup 8 =   ?? drop op-loop  return ]
     dup 13 =  ?? drop op-bool  return ]
     dup 15 =  ?? drop op-pick  return ]
+    dup 249 >= over 254 <= & ?? drop op-hof return ]
     drop drop
     [] // unknown token → empty bytecode
 } ;
@@ -649,7 +655,49 @@ export classify-nested
     compile-loop
 } ;
 
-: compile { [] swap compile-loop } ;
+// ── Higher-order fusion: {quote} @map/@each/@fold/@times/@filter/try ──
+// A [5, inner] quote token followed by a consumer op fuses into ONE
+// instruction [op', inner-tokens] (op' 249-254); the C emitter wraps
+// the compiled body in a gcc nested function so quote-local labels
+// cannot collide with the enclosing function's labels.
+: is-quote-tok? {
+    dup list? ??
+        _ 0 @nth 5 = swap drop return ]
+    drop #f
+} ;
+: tok-head-quote? { dup 0 @nth is-quote-tok? } ;
+: consumer-op {
+    dup list? ??
+        _ 0 @nth 3 = ??
+            1 @nth
+            dup 67 = ?? drop 249 return ]
+            dup 68 = ?? drop 250 return ]
+            dup 69 = ?? drop 251 return ]
+            dup 83 = ?? drop 252 return ]
+            dup 5  = ?? drop 253 return ]
+            dup 193 = ?? drop 254 return ]
+            drop 0
+        | drop 0
+        ]
+    | drop 0
+    ]
+} ;
+: next-consumer-op { dup 1 @nth consumer-op } ;
+: fuse-hof {
+    dup len 1 < ?? return ]
+    tok-head-quote? ??
+        next-consumer-op dup 0 > ??
+            over 0 @nth 1 @nth
+            2 PushList
+            swap tok-advance tok-advance
+            fuse-hof prepend
+            return
+        | drop
+        ]
+    | ]
+    dup 0 @nth swap tok-advance fuse-hof prepend
+} ;
+: compile { fuse-hof [] swap compile-loop } ;
 
 export compile
 export compile-one
@@ -723,6 +771,7 @@ export split-defs
 
 : compile-full {
     classify-full               // tokenize → structify → classify
+    fuse-hof                    // fuse {quote}+consumer pairs (main AND def bodies)
     split-defs                  // → [main_bc, [[name, bc]...]]
 } ;
 
@@ -1003,6 +1052,12 @@ export classify-full
         dup 0 @nth
         dup 48 = ?? drop 1 @nth i64tostr "w_push((wval)(int64_t)" swap "L);\n" strcat strcat return ]
         dup 49 = ?? drop 1 @nth "{double _d=" swap "; w_push(*(wval*)&_d);}\n" strcat strcat return ]
+        dup 249 = ?? drop 1 @nth emit-func-body "{ auto void _qb(void) { " swap strcat " } wval *_l=(wval*)w_pop(); int64_t _n=w_list_len(_l); wval *_r=w_list_new(_n); for (int64_t _i=0;_i<_n;_i++){ w_push(_l[1+_i]); _qb(); _r[1+_i]=w_pop(); } w_push((wval)_r); }\n" strcat return ]
+        dup 250 = ?? drop 1 @nth emit-func-body "{ auto void _qb(void) { " swap strcat " } wval *_l=(wval*)w_pop(); int64_t _n=w_list_len(_l); for (int64_t _i=0;_i<_n;_i++){ int _s0=w_sp; w_push(_l[1+_i]); _qb(); if (w_sp>_s0) w_sp=_s0; } }\n" strcat return ]
+        dup 251 = ?? drop 1 @nth emit-func-body "{ auto void _qb(void) { " swap strcat " } wval _a=w_pop(); wval *_l=(wval*)w_pop(); int64_t _n=w_list_len(_l); for (int64_t _i=0;_i<_n;_i++){ w_push(_a); w_push(_l[1+_i]); _qb(); _a=w_pop(); } w_push(_a); }\n" strcat return ]
+        dup 252 = ?? drop 1 @nth emit-func-body "{ auto void _qb(void) { " swap strcat " } int64_t _n=(int64_t)w_pop(); for (int64_t _i=0;_i<_n;_i++){ _qb(); } }\n" strcat return ]
+        dup 253 = ?? drop 1 @nth emit-func-body "{ auto void _qb(void) { " swap strcat " } wval *_l=(wval*)w_pop(); int64_t _n=w_list_len(_l); wval *_r=w_list_new(0); for (int64_t _i=0;_i<_n;_i++){ w_push(_l[1+_i]); _qb(); if ((int64_t)w_pop()!=0) _r=w_list_append(_r,_l[1+_i]); } w_push((wval)_r); }\n" strcat return ]
+        dup 254 = ?? drop 1 @nth emit-func-body "{ auto void _qb(void) { " swap strcat " } _qb(); wval _r=w_pop(); w_push((wval)1); w_push(_r); }\n" strcat return ]
         dup 50 = ?? drop 1 @nth escape-c-str "w_push((wval)w_str_from_cstr(\"" swap "\"));\n" strcat strcat return ]
         dup 51 = ?? drop 1 @nth i64tostr "w_push((wval)" swap "L);\n" strcat strcat return ]
         dup 96 = ?? drop 1 @nth safe-c-name "W_" swap "();\n" strcat strcat return ]

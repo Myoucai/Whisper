@@ -8,8 +8,8 @@
 : sum       { 0 { + } @fold } ;
 : prod      { 1 { * } @fold } ;
 : product   { prod } ;
-: max-val   { _ 0 @nth ` 1 _ len 1 - list-slice { ` _ > ??drop | drop ` ] } @fold } ;
-: min-val   { _ 0 @nth ` 1 _ len 1 - list-slice { ` _ < ??drop | drop ` ] } @fold } ;
+: max-val   { _ 0 @nth ` 1 _ len 1 - list-slice { ` _ > ?? drop | drop ` ] } @fold } ;
+: min-val   { _ 0 @nth ` 1 _ len 1 - list-slice { ` _ < ?? drop | drop ` ] } @fold } ;
 : mean      { _ sum ` length / } ;
 : first     { 0 @nth } ;
 : second    { 1 @nth } ;
@@ -18,11 +18,11 @@
 : tail      { 1 drop-n } ;
 : init      { _ len 1 - take } ;
 : empty?    { len 0 = } ;
-: contains? { #f ` { $1 = ??drop #t | ] } @fold } ;
+: contains? { #f ` { $1 = ?? drop #t | ] } @fold } ;
 : all?      { #t ` { & } @fold } ;
 : any?      { #f ` { | } @fold } ;
 : range     { _ 0 > ?? _ 1 - range _ append | [] ] } ;
-: range-to  { ` 1 + > ??range _ append | drop ] } ;
+: range-to  { ` 1 + > ?? range _ append | drop ] } ;
 : filter    { @filter } ;
 export length
 export nth

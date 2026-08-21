@@ -164,3 +164,10 @@ pub fn build_c2(
     println!("Compiled native executable via self-hosted chain -> {output}");
     Ok(())
 }
+// force rebuild Fri Aug 21 15:39:03     2026
+// rebuild
+// rebuild
+// rb
+// rb2
+// rb3
+// rb4

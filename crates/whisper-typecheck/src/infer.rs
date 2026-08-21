@@ -59,8 +59,16 @@ impl TypeInferer {
         }
 
         match (&a, &b) {
-            // Type variable with anything
+            // Type variable with anything (with occurs-check: binding a
+            // variable to a type containing itself would make find() and
+            // resolve() recurse forever — reject instead).
             (Type::TypeVar(id), other) | (other, Type::TypeVar(id)) => {
+                if self.occurs(*id, other) {
+                    return Err(format!(
+                        "Infinite type: t{id} occurs in {} (recursive word signature?)",
+                        other.name()
+                    ));
+                }
                 self.unification.insert(*id, other.clone());
                 Ok(())
             }
@@ -96,30 +104,55 @@ impl TypeInferer {
     }
 
     /// Find the canonical representation of a type (Union-Find).
+    /// Guards against binding cycles (defensive; occurs-check should
+    /// prevent them from forming in the first place).
     pub fn find(&self, ty: Type) -> Type {
-        match &ty {
-            Type::TypeVar(id) => {
-                if let Some(resolved) = self.unification.get(id) {
-                    self.find(resolved.clone())
-                } else {
-                    ty
-                }
+        let mut current = ty;
+        let mut hops = 0usize;
+        loop {
+            match &current {
+                Type::TypeVar(id) => match self.unification.get(id) {
+                    Some(resolved) => {
+                        hops += 1;
+                        if hops > 10_000 {
+                            return current; // cycle guard — give up resolving
+                        }
+                        current = resolved.clone();
+                    }
+                    None => return current,
+                },
+                _ => return current,
             }
-            _ => ty,
         }
     }
 
     /// Resolve all type variables in a type to their unified concrete types.
     pub fn resolve(&self, ty: &Type) -> Type {
+        self.resolve_depth(ty, 0)
+    }
+
+    fn resolve_depth(&self, ty: &Type, depth: usize) -> Type {
+        if depth > 100 {
+            return Type::TypeVar(u64::MAX); // pathological nesting — bail out
+        }
         let resolved = self.find(ty.clone());
         match &resolved {
-            Type::List(inner) => Type::List(Box::new(self.resolve(inner))),
+            Type::List(inner) => Type::List(Box::new(self.resolve_depth(inner, depth + 1))),
             Type::Ref(inputs, outputs) => Type::Ref(
-                inputs.iter().map(|t| self.resolve(t)).collect(),
-                outputs.iter().map(|t| self.resolve(t)).collect(),
+                inputs
+                    .iter()
+                    .map(|t| self.resolve_depth(t, depth + 1))
+                    .collect(),
+                outputs
+                    .iter()
+                    .map(|t| self.resolve_depth(t, depth + 1))
+                    .collect(),
             ),
-            Type::Signal(inner) => Type::Signal(Box::new(self.resolve(inner))),
-            Type::Union(a, b) => Type::Union(Box::new(self.resolve(a)), Box::new(self.resolve(b))),
+            Type::Signal(inner) => Type::Signal(Box::new(self.resolve_depth(inner, depth + 1))),
+            Type::Union(a, b) => Type::Union(
+                Box::new(self.resolve_depth(a, depth + 1)),
+                Box::new(self.resolve_depth(b, depth + 1)),
+            ),
             other => other.clone(),
         }
     }
@@ -128,5 +161,30 @@ impl TypeInferer {
 impl Default for TypeInferer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl TypeInferer {
+    /// Does type variable `id` occur inside `ty`? Follows variable
+    /// bindings so mutually-recursive variables are detected too.
+    fn occurs(&self, id: u64, ty: &Type) -> bool {
+        match ty {
+            Type::TypeVar(other) => {
+                if *other == id {
+                    return true;
+                }
+                match self.unification.get(other) {
+                    Some(resolved) => self.occurs(id, resolved),
+                    None => false,
+                }
+            }
+            Type::List(inner) | Type::Signal(inner) => self.occurs(id, inner),
+            Type::Ref(inputs, outputs) => {
+                inputs.iter().any(|t| self.occurs(id, t))
+                    || outputs.iter().any(|t| self.occurs(id, t))
+            }
+            Type::Union(a, b) => self.occurs(id, a) || self.occurs(id, b),
+            _ => false,
+        }
     }
 }

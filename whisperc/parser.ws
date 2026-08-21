@@ -16,19 +16,20 @@
 // Pass 1: Group paired delimiters {} and []
 // ══════════════════════════════════════════════════════════════════════
 
+: str-eq? { over str? ?? streq | drop drop #f ] } ;
 : group-paired-rec { [] swap gp-loop } ;
 
 : gp-loop {
     dup len 0 = ?? drop return ]
     dup 0 @nth
-    dup "{" streq ??
+    dup "{" str-eq? ??
         drop tok-advance
         collect-brace
         swap [5] swap append
         rot swap append swap
         gp-loop
     |
-    dup "[" streq ??
+    dup "[" str-eq? ??
         drop tok-advance
         collect-bracket
         swap [6] swap append
@@ -46,14 +47,14 @@
 : cb-loop {
     dup len 0 = ?? drop return ]
     dup 0 @nth
-    dup "{" streq ??
+    dup "{" str-eq? ??
         drop tok-advance
         collect-brace
         swap [5] swap append
         rot swap append swap
         cb-loop
     |
-    dup "}" streq ??
+    dup "}" str-eq? ??
         drop tok-advance return
     |
         rot swap append swap
@@ -67,14 +68,14 @@
 : cbr-loop {
     dup len 0 = ?? drop return ]
     dup 0 @nth
-    dup "[" streq ??
+    dup "[" str-eq? ??
         drop tok-advance
         collect-bracket
         swap [6] swap append
         rot swap append swap
         cbr-loop
     |
-    dup "]" streq ??
+    dup "]" str-eq? ??
         drop tok-advance return
     |
         rot swap append swap
