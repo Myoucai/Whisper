@@ -1,5 +1,51 @@
 # Changelog
 
+## Unreleased (2026-08-21) — 修复与收敛
+
+### 修复（P0 级）
+- `whisper run` 在 HEAD 上完全不可用（`over` 关键字化与核心词表冲突）。
+  `TokenKind::keyword_name` 成为关键字↔def 名往返的单一事实源；`rot`/`return`/
+  `split-cond`/`list?`/`i64?`/`str?`/`bool?` 一并关键字化。
+- whisperc 管线恢复：6 月版 parser.ws 的 elif 链缺 `]`、main.ws 被掏空丢失
+  `compile`、PushList/字节映射缺失、op-quote 双发射——全部修复，31 个自举测试
+  由 11/31 → 31/31。
+- 优化器删除指令后不再产生错位跳转：每个 pass 携带新旧索引映射，
+  relocate 统一修正 Cond/Jump/Loop 偏移（此前任何带循环/分支的程序经
+  build 产出错位字节码）。
+- VM：`@map`/`@fold` 等高阶操作不再每元素深拷贝整栈（O(元素×栈深) → O(1)）；
+  引号嵌套 512 层上限防宿主栈溢出；StrSlice 拒绝非 UTF-8 边界（原为 panic）；
+  负数索引/长度显式报错；`[1 2] [1 2] =` 现在为 `#t`（结构化相等）。
+- 能力白名单：词法规范化路径后 `..` 穿越与前缀兄弟目录被拒绝（首个单测覆盖）。
+
+### 移除
+- ELF 直编后端（native_gen.rs ~3200 行，产物无法运行）及其前身 src/native/。
+- c-whisper / c-native 衍生目标、不可编译的 compiler.c、漂移的快照文件。
+  净删约 5700 行。`whisper build` 目标：`wbin` / `c` / `c2`。
+
+### 新增
+- **c2 目标**：`whisper build file.ws -t c2 -o prog` —— import 递归内联 →
+  自举编译器（compiler.all.ws）在 Rust VM 上运行生成 C → gcc 一键产出原生
+  可执行文件。stdlib/math（浮点/位运算）全量走通。
+- Rust parser 采纳种子条件语法：平铺切分 + 子区间递归，同时接受严格嵌套与
+  共享闭括号 elif 链（compiler.all.ws 首次可在 Rust parser 下完整解析）。
+- 浮点字面量进入自举链（classify→C 双字面量插值）；`<<`/`>>` 符号等价 shl/shr。
+- 自举链结构守卫：以 `{`/`[` 开头的程序不再令 classify 崩溃。
+- C 转译器（-t c）：quote 一等化为 C 函数指针，高阶操作接线 runtime.c，
+  TODO 项改为显式 `#error`；12 个端到端 gcc 测试。
+- CI：whisper-cli 集成测试不再被排除；新增 selfhost（种子编译 + 22 用例双模式
+  + 固定点字节级复验）与 c-backend 两个 job。
+- 固定点在上述改动后复验成立（gen2 == gen3）。
+
+### 已知限制（诚实口径）
+- 自举链（c2）尚不支持高阶函数（cgen 缺 quote 发射，输出 `// unknown`）；
+  Rust C 转译器（-t c）已支持。
+- C 运行时值无类型标签：浮点以位模式流转，`.` 打印为整数；混合类型算术
+  经显式 f-opcode（i64tof64/fsqrt/f64toi64）工作。
+- 两后端 `.` 的字符串格式不同（VM 带引号，C 链裸文本——自举链 driver 依赖之）。
+- 类型检查器仍为警告通道（放水项未修，见计划「明确不做」）。
+
+# Changelog
+
 ## v1.0.0 (2026-06-06) — First Stable Release
 
 ### Language Syntax (Frozen)

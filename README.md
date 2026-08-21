@@ -168,15 +168,20 @@ whisper bootstrap --hard hello.ws
 |------|------|------|------|
 | 字节码 | `whisper build file.ws` | `.wbin` | Rust VM |
 | C 源码 | `whisper build file.ws -t c -o prog.c` | C 源码 | gcc 编译为原生可执行文件 |
-| 自举 C 链 | `scripts/verify-fixedpoint.sh` | 独立编译器 + 固定点验证 | gcc |
+| **c2 自举链** | `whisper build file.ws -t c2 -o prog` | 原生可执行文件 | gcc |
+| 固定点复验 | `scripts/verify-fixedpoint.sh` | 自举链验证 | gcc |
 
 ```bash
-# 转译为 C 并编译为原生可执行文件
+# Rust C 转译后端（支持 @map/@fold 等高阶操作）
 whisper build hello.ws -t c -o hello.c && gcc -O2 -lm -o hello hello.c && ./hello
-# → "Hello, World!"
+
+# c2：import 自动内联 → 自举编译器（在 Rust VM 上运行）生成 C → gcc 一键到底
+whisper build hello.ws -t c2 -o hello && ./hello
 ```
 
-C 后端覆盖字符串/列表/Map/浮点等大部分 opcode；**自举 C 链**（`whisperc/`）从手写种子编译器出发，把用 Whisper 写的完整编译器编译成 C，固定点已达成并可字节级复验。
+- **`-t c`（Rust 转译器）**：覆盖字符串/列表/Map/浮点/高阶函数（`@map`/`@fold`/`@times` 等），12 个端到端 gcc 测试把关。
+- **`-t c2`（自举链）**：编译器完全由 Whisper 自身编写（`whisperc/compiler.all.ws`），在 Rust VM 上运行并生成 C；支持 import 内联（含 `std/*`）、浮点字面量、循环/条件/递归。已知限制：高阶函数（`@map` 等）尚待 cgen 支持；C 运行时值无类型标签，浮点算术仅经显式 f-opcode 流转。
+- 固定点（whisper2 编译自身输出逐字节一致）可随时用脚本复验，已纳入 CI。
 
 ## 功能特性
 
@@ -244,7 +249,7 @@ Whisper/
 
 ```bash
 cargo test --workspace
-# 357 tests: all passed (Rust 侧)
+# 381 tests: all passed (Rust 侧)
 bash whisper_test/run_core.sh <seed-bin> run|c   # 自举链 22 核心用例 x2 模式
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验
 ```
