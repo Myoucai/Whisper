@@ -176,11 +176,8 @@ fn fuzz_stack_underflow() {
         Opcode::Drop,
     ] {
         let mut vm = Vm::new();
-        assert!(
-            vm.execute(&[op.clone()]).is_err(),
-            "Op {:?} on empty stack should error",
-            op
-        );
+        let msg = format!("Op {:?} on empty stack should error", op);
+        assert!(vm.execute(&[op]).is_err(), "{}", msg);
     }
 }
 

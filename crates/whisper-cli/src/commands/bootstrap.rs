@@ -1314,7 +1314,7 @@ mod tests {
     /// Pipeline: Rust tokens → whisperc parser → whisperc compile
     #[test]
     fn test_full_pipeline_with_parser() {
-        let chunks = vec!["3", "4", "+"];
+        let chunks = ["3", "4", "+"];
         let tokens_rust: Vec<Value> =
             classify_chunks(&chunks.iter().map(|s| s.to_string()).collect::<Vec<_>>());
 

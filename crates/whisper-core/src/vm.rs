@@ -257,9 +257,15 @@ impl Vm {
                 self.data_stack.push(Value::List(Rc::new(parts)));
             }
             Opcode::Ctos => {
+                // Raw byte semantics (matches runtime.c's rt_ctos): the code
+                // is a byte, not a codepoint — %XX escapes must concatenate
+                // as bytes so multibyte UTF-8 survives url-decoding.
+                // from_utf8_unchecked: intermediate states may hold a partial
+                // UTF-8 sequence; the completed sequence is valid UTF-8.
                 let code = self.pop_i64()?;
-                let ch = std::char::from_u32(code as u32).unwrap_or('\u{FFFD}');
-                self.data_stack.push(Value::Str(Rc::new(ch.to_string())));
+                let byte = (code & 0xFF) as u8;
+                let s = unsafe { String::from_utf8_unchecked(vec![byte]) };
+                self.data_stack.push(Value::Str(Rc::new(s)));
             }
             Opcode::ListSlice => {
                 let len = self.pop_i64()?;
@@ -1665,11 +1671,7 @@ mod tests {
             .spawn(|| {
                 let mut code: Vec<Opcode> = vec![Opcode::PushI64(0)];
                 for _ in 0..3000 {
-                    code = vec![
-                        Opcode::PushI64(1),
-                        Opcode::PushRef(code.into()),
-                        Opcode::Times,
-                    ];
+                    code = vec![Opcode::PushI64(1), Opcode::PushRef(code), Opcode::Times];
                 }
                 let mut vm = Vm::new();
                 let err = vm.execute(&code).unwrap_err();

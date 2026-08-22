@@ -933,7 +933,7 @@ mod tests {
         assert!(errors.is_empty(), "Unexpected errors: {errors:?}");
         let sig = tc.word_sigs.get("sq").unwrap();
         assert!(
-            sig.outputs.len() >= 1,
+            !sig.outputs.is_empty(),
             "sq should produce at least 1 output, got {:?}",
             sig.outputs
         );

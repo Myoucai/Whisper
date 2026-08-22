@@ -484,7 +484,6 @@ fn capability_bound_executes() {
 
 // ── WASM compilation ──────────────────────────────────────────────────
 
-#[test]
 // ── .wbin roundtrip ──────────────────────────────────────────────────
 #[test]
 fn wbin_roundtrip_program() {

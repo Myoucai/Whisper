@@ -122,7 +122,7 @@ import "std/net"
         return
     ]
     drop drop drop drop
-    "method not allowed" "text/plain" "405 Method Not Allowed" respond-status
+    "method not allowed" respond-405
 } ;
 
 : handle {
@@ -136,22 +136,8 @@ import "std/net"
 } ;
 
 
-: serve {
-    _ accept
-    dup 0 >= ??
-        dup handle
-        close
-        serve
-    | drop
-        serve
-    ]
-} ;
 
 "WS_PORT" getenv
 dup strlen 0 = ?? drop "8097" | ]
 strtoi64
-listen
-dup 0 >= ??
-    serve
-| drop "listen failed" .
-]
+"handle" serve-concurrent

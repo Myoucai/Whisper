@@ -11,7 +11,6 @@ use std::io::Write;
 use std::process::Command;
 use whisper_codegen::bytecode_gen::BytecodeGenerator;
 use whisper_core::opcode::Opcode;
-use whisper_core::value::Value;
 use whisper_core::vm::Vm;
 use whisper_parser::Parser;
 

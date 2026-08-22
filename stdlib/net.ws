@@ -108,3 +108,16 @@ export url-decode
 } ;
 
 export respond-status
+
+// body → 405 response with Allow header (KV route methods)
+: respond-405 {
+    // body -> 405 response with Allow header
+    _ strlen i64tostr           // [body, len-str]
+    "HTTP/1.0 405 Method Not Allowed\r\nContent-Type: text/plain\r\nContent-Length: "
+    ` strcat
+    "\r\nAllow: GET, PUT, POST, DELETE" strcat
+    "\r\n\r\n" strcat
+    ` strcat
+} ;
+
+export respond-405

@@ -851,7 +851,6 @@ static LONG WINAPI _seh_handler(EXCEPTION_POINTERS *ep) {
                 w_sp, w_heap_pos, (size_t)(HEAP_SIZE/2),
                 w_heap_list_pos, (size_t)(HEAP_SIZE/2));
         fprintf(stderr, "Instruction at %p\n", ep->ContextRecord->Rip);
-        fflush(stderr);
         _exit(139);
     }
     return EXCEPTION_CONTINUE_SEARCH;
