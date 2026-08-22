@@ -734,6 +734,11 @@ fn c2_compiles_and_runs_via_self_hosted_chain() {
         .arg("-I")
         .arg(format!("{manifest}/../../whisperc"))
         .arg("-lm")
+        .args(if cfg!(windows) {
+            vec!["-lws2_32"]
+        } else {
+            vec![]
+        })
         .output()
         .expect("gcc failed to start");
     assert!(

@@ -896,7 +896,29 @@ static wval w_sock_accept(wval srv) {
 }
 
 // recv(conn) -> request string. HTTP-style: stop at header terminator, peer
-// close, 2s receive timeout, or 64KB cap. Empty string on close/error.
+// close, or 2s receive timeout. If the headers carry Content-Length, keep
+// reading until the body is complete (1MB cap). Empty string on close/error.
+static int w_hdr_content_length(const char *buf, size_t len) {
+    const char *needle = "content-length:";
+    size_t nlen = 15;
+    for (size_t i = 0; i + nlen < len; i++) {
+        size_t j = 0;
+        while (j < nlen) {
+            char a = buf[i + j];
+            if (a >= 'A' && a <= 'Z') a = (char)(a + 32);
+            if (a != needle[j]) break;
+            j++;
+        }
+        if (j == nlen) {
+            long v = strtol(buf + i + nlen, NULL, 10);
+            if (v < 0) v = 0;
+            if (v > 1048576) v = 1048576;
+            return (int)v;
+        }
+    }
+    return -1;
+}
+
 static wval w_sock_recv(wval h) {
     w_socket_t c = (w_socket_t)(int64_t)h;
 #ifdef _WIN32
@@ -909,7 +931,23 @@ static wval w_sock_recv(wval h) {
     size_t cap = 65536, len = 0;
     char *buf = (char *)w_alloc(cap);
     while (len < cap - 1) {
-        if (len >= 4 && memcmp(buf + len - 4, "\r\n\r\n", 4) == 0) break;
+        if (len >= 4 && memcmp(buf + len - 4, "\r\n\r\n", 4) == 0) {
+            int clen = w_hdr_content_length(buf, len);
+            if (clen <= 0) break;
+            size_t need = len + (size_t)clen + 1;
+            if (need > cap) {
+                cap = need;
+                char *nb = (char *)w_alloc(cap);
+                memcpy(nb, buf, len);
+                buf = nb;
+            }
+            while (len < need - 1) {
+                int n = (int)recv(c, buf + len, (int)(need - 1 - len), 0);
+                if (n <= 0) break;
+                len += (size_t)n;
+            }
+            break;
+        }
         int n = (int)recv(c, buf + len, (int)(cap - 1 - len), 0);
         if (n <= 0) break;
         len += (size_t)n;

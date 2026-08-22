@@ -402,10 +402,35 @@ impl Vm {
                         let _ = s.set_read_timeout(Some(std::time::Duration::from_secs(2)));
                         let mut chunk = [0u8; 4096];
                         loop {
-                            if buf.len() >= 65536 {
+                            if buf.len() >= 1_048_576 {
                                 break;
                             }
                             if buf.ends_with(b"\r\n\r\n") {
+                                // Read the Content-Length body if declared
+                                // (mirrors runtime.c's w_hdr_content_length).
+                                let headers = &buf[..buf.len()];
+                                let clen = headers
+                                    .windows(15)
+                                    .position(|w| w.eq_ignore_ascii_case(b"content-length:"))
+                                    .and_then(|i| {
+                                        let rest = &headers[i + 15..];
+                                        let end = rest
+                                            .iter()
+                                            .position(|b| !b.is_ascii_digit())
+                                            .unwrap_or(rest.len());
+                                        std::str::from_utf8(&rest[..end])
+                                            .ok()
+                                            .and_then(|n| n.parse::<usize>().ok())
+                                    })
+                                    .unwrap_or(0)
+                                    .min(1_048_576);
+                                let need = buf.len() + clen;
+                                while buf.len() < need {
+                                    match s.read(&mut chunk) {
+                                        Ok(0) | Err(_) => break,
+                                        Ok(n) => buf.extend_from_slice(&chunk[..n]),
+                                    }
+                                }
                                 break;
                             }
                             match s.read(&mut chunk) {
