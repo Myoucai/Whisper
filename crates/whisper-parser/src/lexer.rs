@@ -427,6 +427,8 @@ impl Lexer {
             "listslice" => TokenKind::ListSlice,
             "list-slice" => TokenKind::ListSlice,
             "args" => TokenKind::Args,
+            "shl" => TokenKind::Shl,
+            "shr" => TokenKind::Shr,
             "split-cond" => TokenKind::SplitCond,
             "list?" => TokenKind::ListCheck,
             "i64?" => TokenKind::I64Check,

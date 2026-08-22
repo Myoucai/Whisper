@@ -81,6 +81,8 @@ jobs:
         run: |
           cargo build -p whisper-cli
           bash scripts/stdlib-gate.sh
+      - name: Syntax freeze gate (dual-implementation conformance)
+        run: bash scripts/syntax-gate.sh
 
   lint:
     name: Lint
