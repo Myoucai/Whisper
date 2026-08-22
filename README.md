@@ -257,6 +257,13 @@ Whisper/
 └── .github/workflows/     # CI/CD
 ```
 
+## 用 Whisper 写的 Web 后端
+
+
+
+路由分发、JSON 响应、静态文件、`WS_PORT` 环境变量配置——全部由 Whisper 编写，
+自举编译器编译。FAIL: c2 build failed 在 CI 中验证。
+
 ## 测试
 
 ```bash

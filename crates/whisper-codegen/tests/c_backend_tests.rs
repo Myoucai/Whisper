@@ -93,6 +93,11 @@ fn compile_and_run_c(source: &str, tag: &str) -> String {
         .arg("-I")
         .arg(runtime_include_dir())
         .arg("-lm")
+        .args(if cfg!(windows) {
+            vec!["-lws2_32"]
+        } else {
+            vec![]
+        })
         .output()
         .expect("failed to invoke C compiler");
     assert!(

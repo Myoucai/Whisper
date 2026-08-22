@@ -85,6 +85,8 @@ jobs:
         run: bash scripts/syntax-gate.sh
       - name: Net gate (real HTTP server via self-hosted chain)
         run: bash scripts/net-gate.sh
+      - name: App gate (Whisper web backend: JSON/static/404 routes)
+        run: bash scripts/app-gate.sh
 
   lint:
     name: Lint
