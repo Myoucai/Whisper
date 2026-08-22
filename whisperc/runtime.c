@@ -17,6 +17,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <windows.h>
+#include <process.h>
 #else
 #include <sys/mman.h>
 #endif
@@ -30,15 +31,19 @@ typedef uint64_t wval;  // all values are 64-bit (i64, f64, pointer, bool)
 // ── Stack ───────────────────────────────────────────────────────────
 
 #define STACK_SIZE 65536
-static wval w_stack[STACK_SIZE];
-static int  w_sp = 0;
+// Thread-local interpreter state: worker threads (serve-concurrent)
+// each get a fresh stack; the heap stays per-thread too so arena
+// pointers never cross threads.
+#define W_TLS __thread
+static W_TLS wval *w_stack = NULL;   // allocated per thread
+static W_TLS int  w_sp = 0;
 static volatile int _dbg_max_sp = 0;
 static volatile int _dbg_call_depth = 0;
 
 // Function trace ring buffer
 #define TRACE_BUF 64
 static const char *_fn_trace[TRACE_BUF];
-static int _fn_trace_i = 0;
+static W_TLS int _fn_trace_i = 0;
 static void _trace_fn(const char *fn) { _fn_trace[_fn_trace_i & (TRACE_BUF-1)] = fn; _fn_trace_i++; }
 
 static inline void w_push(wval v) {
@@ -76,17 +81,21 @@ static void w_pick(void) { int64_t n = (int64_t)w_pop(); w_push(w_stack[w_sp - 1
 // of short strings as lists.
 
 #define HEAP_SIZE (4096LL * 1024 * 1024)  // 4 GB total, 2 GB per arena
-static char *w_heap = NULL;
-static size_t w_heap_pos = 0;       // string arena bump (up)
-static size_t w_heap_list_pos = 0;  // list arena bump (down)
+static W_TLS char *w_heap = NULL;
+static W_TLS size_t w_heap_pos = 0;       // string arena bump (up)
+static W_TLS size_t w_heap_list_pos = 0;  // list arena bump (down)
+// Worker threads use a smaller arena than the 4GB main heap; the
+// split layout (strings up / lists down) works at any size.
+static W_TLS long long w_heap_size = 0;
 
 static void w_heap_init(void) {
 #ifdef _WIN32
-    w_heap = (char *)VirtualAlloc(NULL, HEAP_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    if (w_heap == NULL) { fprintf(stderr, "VirtualAlloc failed for %lld bytes\n", (long long)HEAP_SIZE); exit(1); }
-    fprintf(stderr, "heap init: %lld bytes at %p\n", (long long)HEAP_SIZE, w_heap);
+    if (w_heap_size == 0) w_heap_size = HEAP_SIZE;
+    w_heap = (char *)VirtualAlloc(NULL, (SIZE_T)w_heap_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    if (w_heap == NULL) { fprintf(stderr, "VirtualAlloc failed for %lld bytes\n", w_heap_size); exit(1); }
 #else
-    w_heap = mmap(NULL, HEAP_SIZE, PROT_READ|PROT_WRITE,
+    if (w_heap_size == 0) w_heap_size = HEAP_SIZE;
+    w_heap = mmap(NULL, (size_t)w_heap_size, PROT_READ|PROT_WRITE,
                   MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
     if (w_heap == MAP_FAILED) { perror("mmap"); exit(1); }
 #endif
@@ -95,9 +104,9 @@ static void w_heap_init(void) {
 static void *w_alloc(size_t bytes) {
     // Align to 8 bytes
     bytes = (bytes + 7) & ~7;
-    if (w_heap_pos + bytes > (size_t)(HEAP_SIZE / 2)) {
+    if (w_heap_pos + bytes > (size_t)(w_heap_size / 2)) {
         fprintf(stderr, "whisper: string heap exhausted (pos=%zu, need=%zu, limit=%zu)\n",
-                w_heap_pos, bytes, (size_t)(HEAP_SIZE / 2));
+                w_heap_pos, bytes, (size_t)(w_heap_size / 2));
         exit(1);
     }
     void *p = w_heap + w_heap_pos;
@@ -107,13 +116,13 @@ static void *w_alloc(size_t bytes) {
 
 static void *w_alloc_list(size_t bytes) {
     bytes = (bytes + 7) & ~7;
-    if (w_heap_list_pos + bytes > (size_t)(HEAP_SIZE / 2)) {
+    if (w_heap_list_pos + bytes > (size_t)(w_heap_size / 2)) {
         fprintf(stderr, "whisper: list heap exhausted (pos=%zu, need=%zu, limit=%zu)\n",
-                w_heap_list_pos, bytes, (size_t)(HEAP_SIZE / 2));
+                w_heap_list_pos, bytes, (size_t)(w_heap_size / 2));
         exit(1);
     }
     w_heap_list_pos += bytes;
-    return w_heap + HEAP_SIZE - w_heap_list_pos;
+    return w_heap + w_heap_size - w_heap_list_pos;
 }
 
 // ── String operations ───────────────────────────────────────────────
@@ -241,8 +250,8 @@ static int64_t w_str_nth(const char *s, int64_t idx) {
 
 // Address-range type test: top half of the heap is the list arena.
 static int w_is_list_val(wval v) {
-    if (v < (wval)w_heap || v >= (wval)(w_heap + HEAP_SIZE)) return 0;
-    return v >= (wval)(w_heap + HEAP_SIZE / 2);
+    if (v < (wval)w_heap || v >= (wval)(w_heap + w_heap_size)) return 0;
+    return v >= (wval)(w_heap + w_heap_size / 2);
 }
 
 static inline wval *w_list_new(int64_t count) {
@@ -371,15 +380,15 @@ static wval *w_buf_push(wval *buf, wval elem) {
 
 // ── Type predicates (heap pointer heuristic) ───────────────────────
 static int wval_is_heap(wval v) {
-    return (v >= (wval)w_heap && v < (wval)(w_heap + HEAP_SIZE));
+    return (v >= (wval)w_heap && v < (wval)(w_heap + w_heap_size));
 }
 static int wval_is_str(wval v) {
     if (!wval_is_heap(v)) return 0;
-    return (v < (wval)(w_heap + HEAP_SIZE / 2));
+    return (v < (wval)(w_heap + w_heap_size / 2));
 }
 static int wval_is_list(wval v) {
     if (!wval_is_heap(v)) return 0;
-    return (v >= (wval)(w_heap + HEAP_SIZE / 2));
+    return (v >= (wval)(w_heap + w_heap_size / 2));
 }
 
 // Tag check for structured tokens: tag 5 = braces {}, tag 6 = brackets []
@@ -502,11 +511,11 @@ static char *w_strjoin(wval *list) {
 
 static int64_t w_listfind(wval *list, wval elem) {
     int64_t count = w_list_len(list);
-    int elem_is_str = w_is_list_val(elem) == 0 && elem >= (wval)w_heap && elem < (wval)(w_heap + HEAP_SIZE);
+    int elem_is_str = w_is_list_val(elem) == 0 && elem >= (wval)w_heap && elem < (wval)(w_heap + w_heap_size);
     for (int64_t i = 0; i < count; i++) {
         wval v = list[1 + i];
         if (v == elem) return i;
-        if (elem_is_str && v >= (wval)w_heap && v < (wval)(w_heap + HEAP_SIZE) &&
+        if (elem_is_str && v >= (wval)w_heap && v < (wval)(w_heap + w_heap_size) &&
             w_str_eq((const char *)v, (const char *)elem)) return i;
     }
     return -1;
@@ -531,7 +540,7 @@ static void w_print_val(wval v) {
 }
 
 static void w_dump_val(wval v) {
-    if (v >= (wval)w_heap && v < (wval)(w_heap + HEAP_SIZE)) {
+    if (v >= (wval)w_heap && v < (wval)(w_heap + w_heap_size)) {
         if (w_is_list_val(v)) {
             wval *l = (wval *)v;
             int64_t count = (int64_t)l[0];
@@ -675,7 +684,7 @@ static double w_fatan2(double y, double x) { return atan2(y, x); }
 
 // ── Random ──────────────────────────────────────────────────────────
 
-static uint64_t w_rng_state = 0;
+static W_TLS uint64_t w_rng_state = 0;
 
 static void w_random_seed(uint64_t seed) {
     w_rng_state = seed ? seed : 0xDEADBEEF;
@@ -744,11 +753,11 @@ static void w_list_(void) {
 }
 static void w_i64_(void) {
     wval v = w_pop();
-    w_push((wval)(v < (wval)w_heap || v >= (wval)(w_heap + HEAP_SIZE) ? 1L : 0L));
+    w_push((wval)(v < (wval)w_heap || v >= (wval)(w_heap + w_heap_size) ? 1L : 0L));
 }
 static void w_str_(void) {
     wval v = w_pop();
-    w_push((wval)((v >= (wval)w_heap && v < (wval)(w_heap + HEAP_SIZE) && !w_is_list_val(v)) ? 1L : 0L));
+    w_push((wval)((v >= (wval)w_heap && v < (wval)(w_heap + w_heap_size) && !w_is_list_val(v)) ? 1L : 0L));
 }
 static void w_bool_(void) {
     wval v = w_pop();
@@ -996,10 +1005,173 @@ static wval w_env_get(const char *name) {
     return (wval)w_str_new(v, (uint32_t)strlen(v));
 }
 
+// ── Shared KV store (v1.0.2 vocabulary) ──────────────────────────────
+// Process-global string→string map with a mutex; survives across the
+// worker threads spawned by serve-concurrent (arena strings are
+// per-thread, so values are copied into malloc'd storage).
+#define W_KV_MAX 1024
+static char *kv_keys[W_KV_MAX];
+static char *kv_vals[W_KV_MAX];
+static int kv_used = 0;
+#ifdef _WIN32
+static CRITICAL_SECTION w_kv_lock;
+static int w_kv_lock_init = 0;
+static void w_kv_lock_enter(void) {
+    if (!w_kv_lock_init) { InitializeCriticalSection(&w_kv_lock); w_kv_lock_init = 1; }
+    EnterCriticalSection(&w_kv_lock);
+}
+static void w_kv_lock_leave(void) { LeaveCriticalSection(&w_kv_lock); }
+#else
+#include <pthread.h>
+static pthread_mutex_t w_kv_lock = PTHREAD_MUTEX_INITIALIZER;
+static void w_kv_lock_enter(void) { pthread_mutex_lock(&w_kv_lock); }
+static void w_kv_lock_leave(void) { pthread_mutex_unlock(&w_kv_lock); }
+#endif
+
+static char *kv_dup(const char *s) {
+    // copy the runtime string layout (4-byte len prefix + data) so the
+    // stored copy stays a valid runtime string; kv_free releases the
+    // real malloc base (which sits 4 bytes before the data pointer).
+    uint32_t n = w_str_len(s);
+    uint32_t *p = (uint32_t *)malloc(4 + n);
+    *p = n;
+    memcpy(p + 1, s, n);
+    return (char *)(p + 1);
+}
+
+static void kv_free(char *s) {
+    free((uint32_t *)s - 1);
+}
+
+static void w_kv_set(const char *key, const char *val) {
+    w_kv_lock_enter();
+    for (int i = 0; i < kv_used; i++) {
+        if (w_str_eq(kv_keys[i], key)) {
+            kv_free(kv_vals[i]);
+            kv_vals[i] = kv_dup(val);
+            w_kv_lock_leave();
+            return;
+        }
+    }
+    if (kv_used < W_KV_MAX) {
+        kv_keys[kv_used] = kv_dup(key);
+        kv_vals[kv_used] = kv_dup(val);
+        kv_used++;
+    }
+    w_kv_lock_leave();
+}
+
+static wval w_kv_get(const char *key) {
+    w_kv_lock_enter();
+    for (int i = 0; i < kv_used; i++) {
+        if (w_str_eq(kv_keys[i], key)) {
+            wval r = (wval)w_str_new(kv_vals[i], w_str_len(kv_vals[i]));
+            w_kv_lock_leave();
+            return r;
+        }
+    }
+    w_kv_lock_leave();
+    return (wval)w_str_new("", 0); // missing -> empty string (VM parity)
+}
+
+static void w_kv_del(const char *key) {
+    w_kv_lock_enter();
+    for (int i = 0; i < kv_used; i++) {
+        if (w_str_eq(kv_keys[i], key)) {
+            kv_free(kv_keys[i]);
+            kv_free(kv_vals[i]);
+            for (int j = i; j < kv_used - 1; j++) {
+                kv_keys[j] = kv_keys[j + 1];
+                kv_vals[j] = kv_vals[j + 1];
+            }
+            kv_used--;
+            break;
+        }
+    }
+    w_kv_lock_leave();
+}
+
+static wval *w_kv_keys_list(void) {
+    w_kv_lock_enter();
+    wval *l = w_list_new(kv_used);
+    for (int i = 0; i < kv_used; i++)
+        l[1 + i] = (wval)w_str_new(kv_keys[i], w_str_len(kv_keys[i]));
+    w_kv_lock_leave();
+    return l;
+}
+
+// ── Concurrent serve (v1.0.2) ────────────────────────────────────────
+// serve-concurrent(port, handler): native accept loop; one thread per
+// connection. Each worker initializes its own thread-local stack and a
+// compact heap, pushes the conn handle, and calls the handler (quote
+// bodies are plain C functions). Never returns.
+#define W_THREAD_HEAP (64LL * 1024 * 1024)  // 64MB per worker
+
+typedef struct { w_socket_t conn; wfn handler; } w_job;
+
+static void w_worker_cleanup(void) {
+    if (w_stack) { free(w_stack); w_stack = NULL; }
+    w_sp = 0;
+    if (w_heap) {
+#ifdef _WIN32
+        VirtualFree(w_heap, 0, MEM_RELEASE);
+#else
+        munmap(w_heap, (size_t)w_heap_size);
+#endif
+        w_heap = NULL;
+    }
+    w_heap_pos = 0;
+    w_heap_list_pos = 0;
+    w_heap_size = 0;
+}
+
+#ifdef _WIN32
+static unsigned __stdcall w_worker_main(void *arg) {
+#else
+static void *w_worker_main(void *arg) {
+#endif
+    w_job *job = (w_job *)arg;
+    w_stack = (wval *)malloc(sizeof(wval) * STACK_SIZE);
+    if (w_stack == NULL) { free(job); return 0; }
+    w_sp = 0;
+    w_heap_size = W_THREAD_HEAP;
+    w_heap_init();
+    w_random_seed((uint64_t)(uintptr_t)job ^ (uint64_t)time(NULL));
+    w_push((wval)(int64_t)job->conn);
+    job->handler();
+    w_sock_close(job->conn);
+    w_worker_cleanup();
+    free(job);
+    return 0;
+}
+
+static void w_serve_concurrent(int64_t port, wfn handler) {
+    wval srv = w_sock_listen(port);
+    if ((int64_t)srv < 0) { fprintf(stderr, "serve-concurrent: listen failed\n"); exit(1); }
+    for (;;) {
+        w_socket_t c = accept((w_socket_t)(int64_t)srv, NULL, NULL);
+        if (c == W_BAD_SOCKET) continue;
+        w_job *job = (w_job *)malloc(sizeof(w_job));
+        job->conn = c;
+        job->handler = handler;
+#ifdef _WIN32
+        HANDLE t = (HANDLE)_beginthreadex(NULL, 0, w_worker_main, job, 0, NULL);
+        if (t) CloseHandle(t);
+#else
+        pthread_t t;
+        if (pthread_create(&t, NULL, w_worker_main, job) == 0) pthread_detach(t);
+#endif
+    }
+}
+
 static void w_init(int argc, char **argv) {
 #ifdef _WIN32
     SetUnhandledExceptionFilter(_seh_handler);
 #endif
+    if (w_stack == NULL) {
+        w_stack = (wval *)malloc(sizeof(wval) * STACK_SIZE);
+        if (w_stack == NULL) { fprintf(stderr, "stack alloc failed\n"); exit(1); }
+    }
     w_heap_init();
     w_net_init();
     w_argc = argc;

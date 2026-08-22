@@ -42,7 +42,7 @@ import "std/net"
     ]
 
     dup "/greet" streq ??
-        $1 req-path query-of "name" form-get
+        $1 req-path query-of "name" form-get url-decode
         ` drop ` drop
         dup strlen 0 > ??
             "{\"hello\":\"" ` strcat "\"}" strcat
@@ -78,17 +78,63 @@ import "std/net"
             return
         ]
         drop
-        "not found" "text/plain" respond-as
+        "not found" "text/plain" "404 Not Found" respond-status
         return
     ]
 
     drop drop
-    "not found" "text/plain" respond-as
+    "not found" "text/plain" "404 Not Found" respond-status
+} ;
+
+: route-kv {
+    // entry [req] -> exits [response]
+    _ req-path path-only         // [req path]
+    _ 4 9999 strslice            // [req path key]
+    $2 req-method                // [req path key meth]
+
+    dup "PUT" streq over "POST" streq | ??
+        drop
+        $2 req-body kv-set drop drop
+        "{\"ok\":true}" "application/json" respond-as
+        return
+    ]
+    dup "DELETE" streq ??
+        drop kv-del drop drop
+        "{\"deleted\":true}" "application/json" respond-as
+        return
+    ]
+    dup "GET" streq $3 "/kv" streq & ??
+        drop drop drop drop
+        kv-keys "" { ` " " strcat ` strcat } @fold
+        "text/plain" respond-as
+        return
+    ]
+    dup "GET" streq ??
+        drop
+        kv-get
+        swap drop swap drop
+        dup strlen 0 > ??
+            "text/plain" respond-as
+            return
+        ]
+        drop
+        "missing" "text/plain" "404 Not Found" respond-status
+        return
+    ]
+    drop drop drop drop
+    "method not allowed" "text/plain" "405 Method Not Allowed" respond-status
 } ;
 
 : handle {
-    _ recv route send drop
+    _ recv
+    dup req-path path-only
+    dup "/kv" strfind 0 >= ??
+        drop route-kv
+    | drop route
+    ]
+    send drop
 } ;
+
 
 : serve {
     _ accept

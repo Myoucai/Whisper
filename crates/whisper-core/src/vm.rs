@@ -66,6 +66,8 @@ pub struct Vm {
     /// (Listen/Accept/Recv/Send/CloseSock); handles are indices.
     net_listeners: Vec<std::net::TcpListener>,
     net_streams: Vec<std::net::TcpStream>,
+    /// Shared key-value store (KvSet/KvGet/KvDel/KvKeys).
+    kv: std::cell::RefCell<std::collections::HashMap<String, String>>,
 }
 
 fn generate_rng_seed() -> u64 {
@@ -98,6 +100,7 @@ impl Vm {
             program_args: Vec::new(),
             net_listeners: Vec::new(),
             net_streams: Vec::new(),
+            kv: std::cell::RefCell::new(std::collections::HashMap::new()),
         }
     }
 
@@ -122,6 +125,7 @@ impl Vm {
             program_args: Vec::new(),
             net_listeners: Vec::new(),
             net_streams: Vec::new(),
+            kv: std::cell::RefCell::new(std::collections::HashMap::new()),
         }
     }
 
@@ -482,6 +486,72 @@ impl Vm {
                 let name = self.pop_str()?;
                 let v = std::env::var(name.as_ref()).unwrap_or_default();
                 self.data_stack.push(Value::Str(Rc::new(v)));
+            }
+
+            // === Shared KV + concurrent serve (v1.0.2) ===
+            Opcode::KvSet => {
+                let val = self.pop_str()?;
+                let key = self.pop_str()?;
+                self.kv
+                    .borrow_mut()
+                    .insert(key.as_ref().to_string(), val.as_ref().to_string());
+            }
+            Opcode::KvGet => {
+                let key = self.pop_str()?;
+                let v = self
+                    .kv
+                    .borrow()
+                    .get(key.as_ref())
+                    .cloned()
+                    .unwrap_or_default();
+                self.data_stack.push(Value::Str(Rc::new(v)));
+            }
+            Opcode::KvDel => {
+                let key = self.pop_str()?;
+                self.kv.borrow_mut().remove(key.as_ref());
+            }
+            Opcode::KvKeys => {
+                let keys: Vec<Value> = self
+                    .kv
+                    .borrow()
+                    .keys()
+                    .map(|k| Value::Str(Rc::new(k.clone())))
+                    .collect();
+                self.data_stack.push(Value::List(Rc::new(keys)));
+            }
+            Opcode::ServeConcurrent => {
+                // The VM is single-threaded (Rc values): serve serially —
+                // name-based (C chain emits a w_find_word registry);
+                // handler receives the conn handle and owns its lifecycle.
+                let name = self.pop_str()?;
+                let port = self.pop_i64()?;
+                let listener = std::net::TcpListener::bind(("127.0.0.1", port as u16))
+                    .map_err(|e| VmError::IoError(e.to_string()))?;
+                self.net_listeners.push(listener);
+                let lidx = self.net_listeners.len() - 1;
+                let handler = self
+                    .word_dict
+                    .get(name.as_ref())
+                    .cloned()
+                    .ok_or_else(|| VmError::UndefinedWord(name.as_ref().to_string()))?;
+                let call = vec![Opcode::Call(name.as_ref().to_string())];
+                let _ = handler;
+                loop {
+                    let conn = self
+                        .net_listeners
+                        .get_mut(lidx)
+                        .and_then(|l| l.accept().ok())
+                        .map(|(s, _)| s);
+                    match conn {
+                        Some(s) => {
+                            self.net_streams.push(s);
+                            let cidx = self.net_streams.len() - 1;
+                            self.data_stack.push(Value::I64(cidx as i64));
+                            self.execute(&call)?;
+                        }
+                        None => break,
+                    }
+                }
             }
 
             // === Arithmetic ===

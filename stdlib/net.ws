@@ -58,3 +58,53 @@ export req-body
 export path-only
 export query-of
 export form-get
+
+// char → hex value | -1
+: hex-val {
+    dup 48 >= over 57 <= & ?? 48 - return ]
+    dup 65 >= over 70 <= & ?? 55 - return ]
+    dup 97 >= over 102 <= & ?? 87 - return ]
+    drop -1
+} ;
+
+// url-decode loop over char codes: list acc → acc'
+: udl {
+    over len 0 = ?? ` drop return ]
+    over 0 @nth dup 37 = ??
+        drop
+        over len 3 < ??
+            over 0 @nth ctos strcat
+            swap 1 drop-n swap udl
+        |
+            over 2 @nth hex-val
+            $2 1 @nth hex-val
+            16 * +
+            ctos strcat
+            swap 3 drop-n swap udl
+        ]
+    |
+        ctos strcat
+        swap 1 drop-n swap udl
+    ]
+} ;
+
+// "%41li%20ce" → "Ali ce"
+: url-decode { strchars "" udl } ;
+
+export hex-val
+export udl
+export url-decode
+
+// body ctype statusline → response with an arbitrary status
+: respond-status {
+    "HTTP/1.0 " ` strcat
+    "\r\nContent-Type: " strcat
+    $1 strcat
+    "\r\nContent-Length: " strcat
+    $2 strlen i64tostr strcat
+    "\r\n\r\n" strcat
+    $2 strcat
+    ` drop ` drop
+} ;
+
+export respond-status

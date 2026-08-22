@@ -600,6 +600,33 @@ fn transpile_opcodes(
                     "{{ const char *_d=(const char*)w_pop(); const char *_p=(const char*)w_pop(); w_push(w_write_file(_p,_d)); }}"
                 );
             }
+            Opcode::KvSet => {
+                let _ = writeln!(
+                    out,
+                    "{{ const char *_v=(const char*)w_pop(); const char *_k=(const char*)w_pop(); w_kv_set(_k,_v); }}"
+                );
+            }
+            Opcode::KvGet => {
+                let _ = writeln!(
+                    out,
+                    "{{ const char *_k=(const char*)w_pop(); w_push(w_kv_get(_k)); }}"
+                );
+            }
+            Opcode::KvDel => {
+                let _ = writeln!(
+                    out,
+                    "{{ const char *_k=(const char*)w_pop(); w_kv_del(_k); }}"
+                );
+            }
+            Opcode::KvKeys => {
+                let _ = writeln!(out, "w_push((wval)w_kv_keys_list());");
+            }
+            Opcode::ServeConcurrent => {
+                let _ = writeln!(
+                    out,
+                    "{{ wfn _f=(wfn)w_pop(); int64_t _p=(int64_t)w_pop(); w_serve_concurrent(_p,_f); }}"
+                );
+            }
             Opcode::EnvGet => {
                 let _ = writeln!(
                     out,

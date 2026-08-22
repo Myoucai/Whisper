@@ -648,6 +648,26 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::EnvGet)))
             }
+            TokenKind::KvSet => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::KvSet)))
+            }
+            TokenKind::KvGet => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::KvGet)))
+            }
+            TokenKind::KvDel => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::KvDel)))
+            }
+            TokenKind::KvKeys => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::KvKeys)))
+            }
+            TokenKind::ServeConcurrent => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::ServeConcurrent)))
+            }
             TokenKind::BytesNew => {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::BytesNew)))

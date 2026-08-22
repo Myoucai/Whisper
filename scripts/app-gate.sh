@@ -30,6 +30,13 @@ echo="$(curl -s --max-time 5 -d "payload-42" "http://127.0.0.1:$PORT/echo" 2>/de
 v1="$(curl -s --max-time 5 "http://127.0.0.1:$PORT/visits" 2>/dev/null)"
 v2="$(curl -s --max-time 5 "http://127.0.0.1:$PORT/visits" 2>/dev/null)"
 
+kvput="$(curl -s --max-time 5 -X PUT -d "kv-value" "http://127.0.0.1:$PORT/kv/greeting" 2>/dev/null)"
+kvget="$(curl -s --max-time 5 "http://127.0.0.1:$PORT/kv/greeting" 2>/dev/null)"
+kvmiss="$(curl -s --max-time 5 -o /dev/null -w "%{http_code}" "http://127.0.0.1:$PORT/kv/zzz" 2>/dev/null)"
+kv405="$(curl -s --max-time 5 -o /dev/null -w "%{http_code}" -X PATCH "http://127.0.0.1:$PORT/kv/x" 2>/dev/null)"
+kvdel="$(curl -s --max-time 5 -X DELETE "http://127.0.0.1:$PORT/kv/greeting" 2>/dev/null)"
+kv404="$(curl -s --max-time 5 -o /dev/null -w "%{http_code}" "http://127.0.0.1:$PORT/zzz" 2>/dev/null)"
+
 ok=1
 [ "$api" = '{"ok":true,"lang":"whisper","chain":"self-hosted"}' ] || ok=0
 [ -n "$idx" ] || ok=0
@@ -38,9 +45,15 @@ ok=1
 [ "$echo" = 'got: payload-42' ] || ok=0
 [ "$v1" = '{"visits":1}' ] || ok=0
 [ "$v2" = '{"visits":2}' ] || ok=0
+[ "$kvput" = '{"ok":true}' ] || ok=0
+[ "$kvget" = "kv-value" ] || ok=0
+[ "$kvmiss" = "404" ] || ok=0
+[ "$kv405" = "405" ] || ok=0
+[ "$kvdel" = '{"deleted":true}' ] || ok=0
+[ "$kv404" = "404" ] || ok=0
 
 if [ "$ok" = 1 ]; then
-    echo "=== app gate: PASS (routes: index/JSON/static/404/query/POST-body/persistence) ==="
+    echo "=== app gate: PASS (13 routes: index/JSON/static/query/POST-body/persistence/KV-CRUD/404/405) ==="
     exit 0
 else
     echo "=== app gate: FAIL ==="

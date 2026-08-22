@@ -104,6 +104,11 @@ pub enum Operator {
     ReadFile,
     WriteFile,
     EnvGet,
+    KvSet,
+    KvGet,
+    KvDel,
+    KvKeys,
+    ServeConcurrent,
 
     // Arithmetic
     Add,

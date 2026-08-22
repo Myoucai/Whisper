@@ -89,6 +89,11 @@ impl TokenKind {
             Self::ReadFile => "read-file",
             Self::WriteFile => "write-file",
             Self::EnvGet => "getenv",
+            Self::KvSet => "kv-set",
+            Self::KvGet => "kv-get",
+            Self::KvDel => "kv-del",
+            Self::KvKeys => "kv-keys",
+            Self::ServeConcurrent => "serve-concurrent",
             Self::MapNew => "map-new",
             Self::MapGet => "map-get",
             Self::MapSet => "map-set",
@@ -260,6 +265,11 @@ pub enum TokenKind {
     ReadFile,
     WriteFile,
     EnvGet,
+    KvSet,
+    KvGet,
+    KvDel,
+    KvKeys,
+    ServeConcurrent,
 
     // Float operations
     I64ToF64,

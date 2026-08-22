@@ -76,6 +76,19 @@ pub enum Opcode {
     /// name -> value | "" if unset
     EnvGet,
 
+    // === Shared KV + concurrent serve (v1.0.2 vocabulary) ===
+    /// key value -> (store; process-global, shared across threads)
+    KvSet,
+    /// key -> value | "" (missing yields empty string)
+    KvGet,
+    /// key -> (remove)
+    KvDel,
+    /// -> [keys]
+    KvKeys,
+    /// port {handler} -> (serve; never returns. VM: serial accept loop;
+    /// C chain: one thread per connection)
+    ServeConcurrent,
+
     // === Arithmetic (0x10-0x17) ===
     /// Addition: a b → (a+b)
     Add,
@@ -340,6 +353,11 @@ impl Opcode {
             Opcode::ReadFile => 242,
             Opcode::WriteFile => 243,
             Opcode::EnvGet => 244,
+            Opcode::KvSet => 245,
+            Opcode::KvGet => 246,
+            Opcode::KvDel => 247,
+            Opcode::KvKeys => 248,
+            Opcode::ServeConcurrent => 255,
             Opcode::ListCheck => 0xE4,
             Opcode::I64Check => 0xE5,
             Opcode::StrCheck => 0xE6,
@@ -527,6 +545,11 @@ impl Opcode {
             Opcode::ReadFile => "read-file",
             Opcode::WriteFile => "write-file",
             Opcode::EnvGet => "getenv",
+            Opcode::KvSet => "kv-set",
+            Opcode::KvGet => "kv-get",
+            Opcode::KvDel => "kv-del",
+            Opcode::KvKeys => "kv-keys",
+            Opcode::ServeConcurrent => "serve-concurrent",
             Opcode::Add => "add",
             Opcode::Sub => "sub",
             Opcode::Mul => "mul",
