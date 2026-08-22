@@ -62,6 +62,10 @@ pub struct Vm {
     byte_buffers: Vec<Vec<u8>>,
     /// CLI arguments set before execution (used by the Args opcode).
     pub program_args: Vec<Value>,
+    /// TCP listeners/streams behind the native IO handle opcodes
+    /// (Listen/Accept/Recv/Send/CloseSock); handles are indices.
+    net_listeners: Vec<std::net::TcpListener>,
+    net_streams: Vec<std::net::TcpStream>,
 }
 
 fn generate_rng_seed() -> u64 {
@@ -92,6 +96,8 @@ impl Vm {
             word_cache_pos: 0,
             byte_buffers: Vec::new(),
             program_args: Vec::new(),
+            net_listeners: Vec::new(),
+            net_streams: Vec::new(),
         }
     }
 
@@ -114,6 +120,8 @@ impl Vm {
             word_cache_pos: 0,
             byte_buffers: Vec::new(),
             program_args: Vec::new(),
+            net_listeners: Vec::new(),
+            net_streams: Vec::new(),
         }
     }
 
@@ -352,6 +360,103 @@ impl Vm {
                 })?;
                 let is_bool = matches!(v, Value::Bool(_));
                 self.data_stack.push(Value::Bool(is_bool));
+            }
+
+            // === Native IO (v1.0.1 vocabulary) — mirrors runtime.c ===
+            Opcode::Listen => {
+                let port = self.pop_i64()?;
+                let listener = std::net::TcpListener::bind(("127.0.0.1", port as u16));
+                match listener {
+                    Ok(l) => {
+                        self.net_listeners.push(l);
+                        self.data_stack
+                            .push(Value::I64((self.net_listeners.len() - 1) as i64));
+                    }
+                    Err(_) => self.data_stack.push(Value::I64(-1)),
+                }
+            }
+            Opcode::Accept => {
+                let idx = self.pop_i64()?;
+                let conn = self
+                    .net_listeners
+                    .get_mut(idx as usize)
+                    .and_then(|l| l.accept().ok())
+                    .map(|(s, _)| s);
+                match conn {
+                    Some(s) => {
+                        self.net_streams.push(s);
+                        self.data_stack
+                            .push(Value::I64((self.net_streams.len() - 1) as i64));
+                    }
+                    None => self.data_stack.push(Value::I64(-1)),
+                }
+            }
+            Opcode::Recv => {
+                let idx = self.pop_i64()?;
+                let mut buf = Vec::new();
+                let ok = self
+                    .net_streams
+                    .get_mut(idx as usize)
+                    .map(|s| {
+                        use std::io::Read;
+                        let _ = s.set_read_timeout(Some(std::time::Duration::from_secs(2)));
+                        let mut chunk = [0u8; 4096];
+                        loop {
+                            if buf.len() >= 65536 {
+                                break;
+                            }
+                            if buf.ends_with(b"\r\n\r\n") {
+                                break;
+                            }
+                            match s.read(&mut chunk) {
+                                Ok(0) | Err(_) => break,
+                                Ok(n) => buf.extend_from_slice(&chunk[..n]),
+                            }
+                        }
+                        true
+                    })
+                    .unwrap_or(false);
+                let _ = ok;
+                let s = String::from_utf8_lossy(&buf).to_string();
+                self.data_stack.push(Value::Str(Rc::new(s)));
+            }
+            Opcode::Send => {
+                let data = self.pop_str()?;
+                let idx = self.pop_i64()?;
+                let n = self
+                    .net_streams
+                    .get_mut(idx as usize)
+                    .and_then(|s| {
+                        use std::io::Write;
+                        s.write_all(data.as_bytes()).ok()?;
+                        Some(data.len() as i64)
+                    })
+                    .unwrap_or(-1);
+                self.data_stack.push(Value::I64(n));
+            }
+            Opcode::CloseSock => {
+                let idx = self.pop_i64()?;
+                if let Some(s) = self.net_streams.get_mut(idx as usize) {
+                    let _ = s.shutdown(std::net::Shutdown::Both);
+                }
+            }
+            Opcode::ReadFile => {
+                let path = self.pop_str()?;
+                let content = std::fs::read_to_string(path.as_ref()).unwrap_or_default();
+                self.data_stack.push(Value::Str(Rc::new(content)));
+            }
+            Opcode::WriteFile => {
+                let data = self.pop_str()?;
+                let path = self.pop_str()?;
+                let n = std::fs::write(path.as_ref(), data.as_bytes())
+                    .map(|_| data.len() as i64)
+                    .unwrap_or(-1);
+                self.data_stack.push(Value::I64(n));
+            }
+            Opcode::EnvGet => {
+                let name = self.pop_str()?;
+                let v = std::env::var(name.as_ref()).unwrap_or_default();
+                self.data_stack.push(Value::Str(Rc::new(v)));
             }
 
             // === Arithmetic ===

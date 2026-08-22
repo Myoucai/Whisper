@@ -299,6 +299,14 @@ impl WbinReader {
 
             // Seed-runtime natives
             0xF0 => Ok(Opcode::SplitCond),
+            236 => Ok(Opcode::Listen),
+            237 => Ok(Opcode::Accept),
+            238 => Ok(Opcode::Recv),
+            239 => Ok(Opcode::Send),
+            241 => Ok(Opcode::CloseSock),
+            242 => Ok(Opcode::ReadFile),
+            243 => Ok(Opcode::WriteFile),
+            244 => Ok(Opcode::EnvGet),
             0xE4 => Ok(Opcode::ListCheck),
             0xE5 => Ok(Opcode::I64Check),
             0xE6 => Ok(Opcode::StrCheck),

@@ -172,6 +172,11 @@ pub fn build_c2(
         .arg("-I")
         .arg(&whisperc_dir)
         .arg("-lm")
+        .args(if cfg!(windows) {
+            vec!["-lws2_32"]
+        } else {
+            vec![]
+        })
         .status()
         .map_err(|e| format!("failed to invoke {cc}: {e}"))?;
     if !status.success() {
@@ -183,3 +188,6 @@ pub fn build_c2(
     println!("Compiled native executable via self-hosted chain -> {output}");
     Ok(())
 }
+// rb
+// rb
+// rb

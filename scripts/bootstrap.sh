@@ -17,6 +17,7 @@ set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="${1:-$ROOT/target/bootstrap}"
 GCC="${GCC:-gcc}"
+EXTRA_LIBS="$(case $(uname) in MINGW*|MSYS*|CYGWIN*) echo -lws2_32;; esac)"
 mkdir -p "$OUT"
 trap 'rm -rf "$OUT/.tmp"' EXIT
 TMP="$OUT/.tmp"; mkdir -p "$TMP"
@@ -28,11 +29,11 @@ step "1/5 seed: gcc -> whisper0"
 
 step "2/5 whisper0 compiles the Whisper-written compiler -> whisper1"
 "$TMP/whisper0" -c < "$ROOT/whisperc/compiler.all.ws" > "$TMP/gen1.c" 2>/dev/null
-"$GCC" -O2 -fno-strict-aliasing -o "$TMP/whisper1" "$TMP/gen1.c" -I "$ROOT/whisperc" -lm
+"$GCC" -O2 -fno-strict-aliasing -o "$TMP/whisper1" "$TMP/gen1.c" -I "$ROOT/whisperc" -lm $EXTRA_LIBS
 
 step "3/5 whisper1 recompiles the compiler -> whisper2 (the toolchain)"
 "$TMP/whisper1" -c < "$ROOT/whisperc/compiler.all.ws" > "$TMP/gen2.c" 2>/dev/null
-"$GCC" -O2 -fno-strict-aliasing -o "$OUT/whisper2" "$TMP/gen2.c" -I "$ROOT/whisperc" -lm
+"$GCC" -O2 -fno-strict-aliasing -o "$OUT/whisper2" "$TMP/gen2.c" -I "$ROOT/whisperc" -lm $EXTRA_LIBS
 
 step "4/5 fixed-point check (whisper2 output must equal whisper1's)"
 "$OUT/whisper2" -c < "$ROOT/whisperc/compiler.all.ws" > "$TMP/gen3.c" 2>/dev/null
@@ -47,7 +48,7 @@ printf 'import "std/math"\n5 sq .\npi floor f64toi64 .\n' > "$TMP/smoke.ws"
 # import/export tokens, so plain concatenation is equivalent).
 { cat "$ROOT/stdlib/math.ws"; printf '5 sq .\npi floor f64toi64 .\n'; } > "$TMP/smoke-flat.ws"
 "$OUT/whisper2" -c < "$TMP/smoke-flat.ws" > "$TMP/smoke.c" 2>/dev/null
-"$GCC" -O2 -fno-strict-aliasing -w -o "$TMP/smoke" "$TMP/smoke.c" -I "$ROOT/whisperc" -lm
+"$GCC" -O2 -fno-strict-aliasing -w -o "$TMP/smoke" "$TMP/smoke.c" -I "$ROOT/whisperc" -lm $EXTRA_LIBS
 SMOKE_OUT=$("$TMP/smoke" 2>/dev/null | tr -d '\r')
 if [ "$SMOKE_OUT" != "$(printf '25\n3')" ]; then
     echo "[bootstrap] smoke FAILED: got [$SMOKE_OUT]" >&2

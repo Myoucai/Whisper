@@ -6,19 +6,20 @@
 # Usage: scripts/verify-fixedpoint.sh   (requires gcc)
 set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+EXTRA_LIBS="$(case $(uname) in MINGW*|MSYS*|CYGWIN*) echo -lws2_32;; esac)"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
 echo "[fixed-point] building seed compiler (whisperc/seed/compiler_seed.c)"
-gcc -O2 -o "$TMP/whisper0" "$ROOT/whisperc/seed/compiler_seed.c" -lm 2>/dev/null
+gcc -O2 -o "$TMP/whisper0" "$ROOT/whisperc/seed/compiler_seed.c" -lm $EXTRA_LIBS 2>/dev/null
 
 echo "[fixed-point] gen1.c = whisper0 compiling compiler.all.ws"
 "$TMP/whisper0" -c < "$ROOT/whisperc/compiler.all.ws" > "$TMP/gen1.c" 2>/dev/null
-gcc -O2 -fno-strict-aliasing -o "$TMP/whisper1" "$TMP/gen1.c" -I "$ROOT/whisperc" -lm 2>/dev/null
+gcc -O2 -fno-strict-aliasing -o "$TMP/whisper1" "$TMP/gen1.c" -I "$ROOT/whisperc" -lm $EXTRA_LIBS 2>/dev/null
 
 echo "[fixed-point] gen2.c = whisper1 compiling compiler.all.ws"
 "$TMP/whisper1" -c < "$ROOT/whisperc/compiler.all.ws" > "$TMP/gen2.c" 2>/dev/null
-gcc -O2 -fno-strict-aliasing -o "$TMP/whisper2" "$TMP/gen2.c" -I "$ROOT/whisperc" -lm 2>/dev/null
+gcc -O2 -fno-strict-aliasing -o "$TMP/whisper2" "$TMP/gen2.c" -I "$ROOT/whisperc" -lm $EXTRA_LIBS 2>/dev/null
 
 echo "[fixed-point] gen3.c = whisper2 compiling compiler.all.ws"
 "$TMP/whisper2" -c < "$ROOT/whisperc/compiler.all.ws" > "$TMP/gen3.c" 2>/dev/null

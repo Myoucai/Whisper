@@ -58,6 +58,24 @@ pub enum Opcode {
     /// Type predicate: value → bool (is this a bool?)  (seed opcode 231)
     BoolCheck,
 
+    // === Native IO (v1.0.1 vocabulary, opcodes 236-244) ===
+    /// port -> server handle | -1
+    Listen,
+    /// server handle -> conn handle | -1 (blocking)
+    Accept,
+    /// conn -> request str (HTTP-style read; "" on close)
+    Recv,
+    /// conn str -> bytes sent | -1
+    Send,
+    /// handle -> (close socket)
+    CloseSock,
+    /// path -> contents | "" on error
+    ReadFile,
+    /// path data -> bytes written | -1
+    WriteFile,
+    /// name -> value | "" if unset
+    EnvGet,
+
     // === Arithmetic (0x10-0x17) ===
     /// Addition: a b → (a+b)
     Add,
@@ -314,6 +332,14 @@ impl Opcode {
             Opcode::Args => 0x0B,
             // Seed-runtime natives (byte values mirror whisperc/runtime.c)
             Opcode::SplitCond => 0xF0,
+            Opcode::Listen => 236,
+            Opcode::Accept => 237,
+            Opcode::Recv => 238,
+            Opcode::Send => 239,
+            Opcode::CloseSock => 241,
+            Opcode::ReadFile => 242,
+            Opcode::WriteFile => 243,
+            Opcode::EnvGet => 244,
             Opcode::ListCheck => 0xE4,
             Opcode::I64Check => 0xE5,
             Opcode::StrCheck => 0xE6,
@@ -493,6 +519,14 @@ impl Opcode {
             Opcode::I64Check => "i64?",
             Opcode::StrCheck => "str?",
             Opcode::BoolCheck => "bool?",
+            Opcode::Listen => "listen",
+            Opcode::Accept => "accept",
+            Opcode::Recv => "recv",
+            Opcode::Send => "send",
+            Opcode::CloseSock => "close",
+            Opcode::ReadFile => "read-file",
+            Opcode::WriteFile => "write-file",
+            Opcode::EnvGet => "getenv",
             Opcode::Add => "add",
             Opcode::Sub => "sub",
             Opcode::Mul => "mul",

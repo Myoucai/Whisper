@@ -13,6 +13,9 @@
 #include <stdint.h>
 
 #ifdef _WIN32
+// winsock2.h must precede windows.h
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #else
 #include <sys/mman.h>
@@ -846,11 +849,121 @@ static LONG WINAPI _seh_handler(EXCEPTION_POINTERS *ep) {
 }
 #endif
 
+
+// ── Native IO: sockets, files, environment (v1.0.1 vocabulary) ──────
+#ifdef _WIN32
+typedef SOCKET w_socket_t;
+#define W_BAD_SOCKET INVALID_SOCKET
+#define w_closesock closesocket
+#else
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+typedef int w_socket_t;
+#define W_BAD_SOCKET (-1)
+#define w_closesock close
+#endif
+
+static void w_net_init(void) {
+#ifdef _WIN32
+    WSADATA d;
+    WSAStartup(MAKEWORD(2, 2), &d);
+#endif
+}
+
+// listen(port) -> server handle | -1
+static wval w_sock_listen(int64_t port) {
+    w_socket_t s = socket(AF_INET, SOCK_STREAM, 0);
+    if (s == W_BAD_SOCKET) return -1;
+    int opt = 1;
+    setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof(opt));
+    struct sockaddr_in a;
+    memset(&a, 0, sizeof(a));
+    a.sin_family = AF_INET;
+    a.sin_addr.s_addr = htonl(INADDR_ANY);
+    a.sin_port = htons((unsigned short)port);
+    if (bind(s, (struct sockaddr *)&a, sizeof(a)) != 0) { w_closesock(s); return -1; }
+    if (listen(s, 16) != 0) { w_closesock(s); return -1; }
+    return (wval)(int64_t)s;
+}
+
+// accept(server) -> conn handle | -1 (blocking)
+static wval w_sock_accept(wval srv) {
+    w_socket_t c = accept((w_socket_t)(int64_t)srv, NULL, NULL);
+    if (c == W_BAD_SOCKET) return -1;
+    return (wval)(int64_t)c;
+}
+
+// recv(conn) -> request string. HTTP-style: stop at header terminator, peer
+// close, 2s receive timeout, or 64KB cap. Empty string on close/error.
+static wval w_sock_recv(wval h) {
+    w_socket_t c = (w_socket_t)(int64_t)h;
+#ifdef _WIN32
+    DWORD ms = 2000;
+    setsockopt(c, SOL_SOCKET, SO_RCVTIMEO, (const char *)&ms, sizeof(ms));
+#else
+    struct timeval tv = {2, 0};
+    setsockopt(c, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof(tv));
+#endif
+    size_t cap = 65536, len = 0;
+    char *buf = (char *)w_alloc(cap);
+    while (len < cap - 1) {
+        if (len >= 4 && memcmp(buf + len - 4, "\r\n\r\n", 4) == 0) break;
+        int n = (int)recv(c, buf + len, (int)(cap - 1 - len), 0);
+        if (n <= 0) break;
+        len += (size_t)n;
+    }
+    return (wval)w_str_new(buf, (uint32_t)len);
+}
+
+// send(conn, data) -> bytes sent | -1
+static wval w_sock_send(wval h, const char *s) {
+    w_socket_t c = (w_socket_t)(int64_t)h;
+    int n = (int)send(c, s, w_str_len(s), 0);
+    return (wval)(int64_t)n;
+}
+
+static void w_sock_close(wval h) {
+    w_closesock((w_socket_t)(int64_t)h);
+}
+
+// read-file(path) -> contents | "" on error
+static wval w_read_file(const char *path) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return (wval)w_str_new("", 0);
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (sz < 0) { fclose(f); return (wval)w_str_new("", 0); }
+    char *buf = (char *)w_alloc((size_t)sz + 1);
+    size_t rd = fread(buf, 1, (size_t)sz, f);
+    fclose(f);
+    return (wval)w_str_new(buf, (uint32_t)rd);
+}
+
+// write-file(path, data) -> bytes written | -1
+static wval w_write_file(const char *path, const char *data) {
+    FILE *f = fopen(path, "wb");
+    if (!f) return -1;
+    size_t wr = fwrite(data, 1, w_str_len(data), f);
+    fclose(f);
+    return (wval)(int64_t)wr;
+}
+
+// getenv(name) -> value | "" if unset
+static wval w_env_get(const char *name) {
+    const char *v = getenv(name);
+    if (!v) return (wval)w_str_new("", 0);
+    return (wval)w_str_new(v, (uint32_t)strlen(v));
+}
+
 static void w_init(int argc, char **argv) {
 #ifdef _WIN32
     SetUnhandledExceptionFilter(_seh_handler);
 #endif
     w_heap_init();
+    w_net_init();
     w_argc = argc;
     w_argv = argv;
     w_random_seed((uint64_t)time(NULL) ^ 0x12345678);

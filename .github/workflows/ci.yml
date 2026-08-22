@@ -83,6 +83,8 @@ jobs:
           bash scripts/stdlib-gate.sh
       - name: Syntax freeze gate (dual-implementation conformance)
         run: bash scripts/syntax-gate.sh
+      - name: Net gate (real HTTP server via self-hosted chain)
+        run: bash scripts/net-gate.sh
 
   lint:
     name: Lint

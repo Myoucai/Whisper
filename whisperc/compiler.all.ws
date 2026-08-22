@@ -398,6 +398,8 @@ export group-paired-rec
     [9 "shl"] [10 "shr"] [9 "<<"] [10 ">>"]
     [223 "sort"] [224 "rev"] [225 "dedup"]
     [226 "take"] [227 "drop-n"]
+    [236 "listen"] [237 "accept"] [238 "recv"] [239 "send"]
+    [241 "close"] [242 "read-file"] [243 "write-file"] [244 "getenv"]
     [194 "map-new"] [195 "map-get"] [196 "map-set"]
     [197 "map-del"] [198 "map-keys"] [199 "map-has"]
     [208 "now"] [209 "sleep"] [210 "random"] [211 "randint"]
@@ -1020,6 +1022,22 @@ export classify-full
     dup 234 = ?? drop "{int64_t _n=(int64_t)w_pop();w_push((wval)w_buf_new(_n));}\n" return ]
     dup 235 = ?? drop "{wval _e=w_pop();wval*_b=(wval*)w_pop();w_push((wval)w_buf_push(_b,_e));}\n" return ]
     dup 240 = ?? drop "{int64_t _start=(int64_t)w_pop();wval*_toks=(wval*)w_pop();wval*_th=0,*_el=0;int _next=0;split_cond(_toks,(int)_start,&_th,&_el,&_next);wval*_r=w_list_new(3);_r[1]=(wval)_th;_r[2]=(wval)_el;_r[3]=(wval)(int64_t)_next;w_push((wval)_r);}\n" return ]
+    dup 236 = ?? drop "{ int64_t _p=(int64_t)w_pop(); w_push(w_sock_listen(_p)); }
+" return ]
+    dup 237 = ?? drop "{ wval _h=w_pop(); w_push(w_sock_accept(_h)); }
+" return ]
+    dup 238 = ?? drop "{ wval _c=w_pop(); w_push(w_sock_recv(_c)); }
+" return ]
+    dup 239 = ?? drop "{ const char *_s=(const char*)w_pop(); wval _c=w_pop(); w_push(w_sock_send(_c,_s)); }
+" return ]
+    dup 241 = ?? drop "{ wval _c=w_pop(); w_sock_close(_c); }
+" return ]
+    dup 242 = ?? drop "{ const char *_p=(const char*)w_pop(); w_push(w_read_file(_p)); }
+" return ]
+    dup 243 = ?? drop "{ const char *_d=(const char*)w_pop(); const char *_p=(const char*)w_pop(); w_push(w_write_file(_p,_d)); }
+" return ]
+    dup 244 = ?? drop "{ const char *_n=(const char*)w_pop(); w_push(w_env_get(_n)); }
+" return ]
     drop "// unknown bare opcode\n"
 } ;
 

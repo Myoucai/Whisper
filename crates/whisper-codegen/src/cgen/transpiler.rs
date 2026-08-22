@@ -567,6 +567,45 @@ fn transpile_opcodes(
             }
 
             // ── Seed-runtime natives ────────────────────────────
+            Opcode::Listen => {
+                let _ = writeln!(
+                    out,
+                    "{{ int64_t _p=(int64_t)w_pop(); w_push(w_sock_listen(_p)); }}"
+                );
+            }
+            Opcode::Accept => {
+                let _ = writeln!(out, "{{ wval _h=w_pop(); w_push(w_sock_accept(_h)); }}");
+            }
+            Opcode::Recv => {
+                let _ = writeln!(out, "{{ wval _c=w_pop(); w_push(w_sock_recv(_c)); }}");
+            }
+            Opcode::Send => {
+                let _ = writeln!(
+                    out,
+                    "{{ const char *_s=(const char*)w_pop(); wval _c=w_pop(); w_push(w_sock_send(_c,_s)); }}"
+                );
+            }
+            Opcode::CloseSock => {
+                let _ = writeln!(out, "{{ wval _c=w_pop(); w_sock_close(_c); }}");
+            }
+            Opcode::ReadFile => {
+                let _ = writeln!(
+                    out,
+                    "{{ const char *_p=(const char*)w_pop(); w_push(w_read_file(_p)); }}"
+                );
+            }
+            Opcode::WriteFile => {
+                let _ = writeln!(
+                    out,
+                    "{{ const char *_d=(const char*)w_pop(); const char *_p=(const char*)w_pop(); w_push(w_write_file(_p,_d)); }}"
+                );
+            }
+            Opcode::EnvGet => {
+                let _ = writeln!(
+                    out,
+                    "{{ const char *_n=(const char*)w_pop(); w_push(w_env_get(_n)); }}"
+                );
+            }
             Opcode::SplitCond => {
                 let _ = writeln!(out, "{pad}{{int64_t _start=(int64_t)w_pop();wval *_toks=(wval*)w_pop();wval *_th=0,*_el=0;int _next=0;split_cond(_toks,(int)_start,&_th,&_el,&_next);wval *_r=w_list_new(3);_r[1]=(wval)_th;_r[2]=(wval)_el;_r[3]=(wval)(int64_t)_next;w_push((wval)_r);}}");
             }

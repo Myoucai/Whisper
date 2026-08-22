@@ -616,6 +616,38 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::Return)))
             }
+            TokenKind::Listen => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Listen)))
+            }
+            TokenKind::Accept => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Accept)))
+            }
+            TokenKind::Recv => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Recv)))
+            }
+            TokenKind::Send => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Send)))
+            }
+            TokenKind::CloseSock => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::CloseSock)))
+            }
+            TokenKind::ReadFile => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::ReadFile)))
+            }
+            TokenKind::WriteFile => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::WriteFile)))
+            }
+            TokenKind::EnvGet => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::EnvGet)))
+            }
             TokenKind::BytesNew => {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::BytesNew)))

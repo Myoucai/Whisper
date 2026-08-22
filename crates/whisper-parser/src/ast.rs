@@ -96,6 +96,14 @@ pub enum Operator {
     StrCheck,
     BoolCheck,
     Return,
+    Listen,
+    Accept,
+    Recv,
+    Send,
+    CloseSock,
+    ReadFile,
+    WriteFile,
+    EnvGet,
 
     // Arithmetic
     Add,
