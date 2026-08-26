@@ -668,6 +668,26 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::ServeConcurrent)))
             }
+            TokenKind::ReadLine => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::ReadLine)))
+            }
+            TokenKind::StrUpper => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::StrUpper)))
+            }
+            TokenKind::StrLower => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::StrLower)))
+            }
+            TokenKind::StrStrip => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::StrStrip)))
+            }
+            TokenKind::Fmt => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Fmt)))
+            }
             TokenKind::BytesNew => {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::BytesNew)))

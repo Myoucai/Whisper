@@ -36,6 +36,12 @@ t list-range   'import "std/list" 5 range-to 2 @nth .' 3
 t list-maxval  'import "std/list" [3 1 4 1 5] max-val .' 5
 t list-rev     'import "std/list" [1 2 3] rev 0 @nth .' 3
 t list-sort    'import "std/list" [3 1 2] sort 0 @nth .' 1
+t p0-upper     '"Hello" str-upper .' HELLO
+t p0-lower     '"aBc" str-lower .' abc
+t p0-strip     '"  pad  " str-strip .' pad
+t p0-fmt       '"x={} y={}" 5 fmt 7 fmt .' 'x=5 y=7'
+t p0-fmt-str   '"n={}" "Li" fmt .' 'n=Li'
+t p0-fmt-mix   '"{} and {}" 3 fmt "x" fmt .' '3 and x'
 t str-len      'import "std/str" "hello" strlen .' 5
 t str-concat   'import "std/str" "hello" "world" strcat strlen .' 10
 t str-upper    'import "std/str" "hello" upper .' HELLO

@@ -575,6 +575,65 @@ static char *w_read_line(void) {
     return w_str_new(buf, len);
 }
 
+// ── P0 vocabulary (v1.0.3): ASCII case / trim / format ──────────────
+
+static wval w_str_case(wval s, int upper) {
+    const char *p = (const char *)s;
+    uint32_t n = w_str_len(p);
+    char *buf = (char *)malloc(n > 0 ? n : 1);
+    if (!buf) return (wval)w_str_new("", 0);
+    for (uint32_t i = 0; i < n; i++) {
+        unsigned char c = (unsigned char)p[i];
+        if (upper && c >= 'a' && c <= 'z') c -= 32;
+        else if (!upper && c >= 'A' && c <= 'Z') c += 32;
+        buf[i] = (char)c;
+    }
+    wval r = (wval)w_str_new(buf, n);
+    free(buf);
+    return r;
+}
+
+static wval w_str_strip(wval s) {
+    const char *p = (const char *)s;
+    uint32_t n = w_str_len(p), a = 0, b = n;
+    while (a < b && (p[a]==' '||p[a]=='\t'||p[a]=='\r'||p[a]=='\n')) a++;
+    while (b > a && (p[b-1]==' '||p[b-1]=='\t'||p[b-1]=='\r'||p[b-1]=='\n')) b--;
+    return (wval)w_str_new(p + a, b - a);
+}
+
+// fmt: replace the first {} in fstr with value rendered as text
+// (heap pointer => string; anything else => i64, mirroring w_dump_val)
+static wval w_fmt(wval f, wval v) {
+    const char *fs = (const char *)f;
+    uint32_t n = w_str_len(fs);
+    for (uint32_t i = 0; i + 1 < n; i++) {
+        if (fs[i] == '{' && fs[i+1] == '}') {
+            const char *vs;
+            char tmp[32];
+            uint32_t vn;
+            if (v >= (wval)w_heap && v < (wval)(w_heap + w_heap_size)) {
+                vs = (const char *)v;
+                vn = w_str_len(vs);
+            } else {
+                vs = tmp;
+                snprintf(tmp, sizeof(tmp), "%lld", (long long)(int64_t)v);
+                vn = (uint32_t)strlen(tmp);
+            }
+            // new = fs[:i] + vs + fs[i+2:]
+            uint32_t total = i + vn + (n - i - 2);
+            char *buf = (char *)malloc(total > 0 ? total : 1);
+            if (!buf) return (wval)w_str_new("", 0);
+            memcpy(buf, fs, i);
+            memcpy(buf + i, vs, vn);
+            memcpy(buf + i + vn, fs + i + 2, n - i - 2);
+            wval r = (wval)w_str_new(buf, total);
+            free(buf);
+            return r;
+        }
+    }
+    return (wval)w_str_new(fs, n); // no placeholder: unchanged
+}
+
 // OutputAll: print the whole stack as [v0 v1 ...]
 static void w_dump_val(wval v);
 

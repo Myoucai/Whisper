@@ -89,6 +89,18 @@ pub enum Opcode {
     /// C chain: one thread per connection)
     ServeConcurrent,
 
+    // === P0 vocabulary (v1.0.3) ===
+    /// -> str (one line from stdin, newline stripped; EOF yields "")
+    ReadLine,
+    /// str -> str (ASCII a-z to A-Z, other bytes untouched)
+    StrUpper,
+    /// str -> str (ASCII A-Z to a-z, other bytes untouched)
+    StrLower,
+    /// str -> str (trim ASCII whitespace at both ends)
+    StrStrip,
+    /// str value -> str (replace first {} with value as text)
+    Fmt,
+
     // === Arithmetic (0x10-0x17) ===
     /// Addition: a b → (a+b)
     Add,
@@ -358,6 +370,11 @@ impl Opcode {
             Opcode::KvDel => 247,
             Opcode::KvKeys => 248,
             Opcode::ServeConcurrent => 255,
+            Opcode::ReadLine => 249,
+            Opcode::StrUpper => 250,
+            Opcode::StrLower => 251,
+            Opcode::StrStrip => 252,
+            Opcode::Fmt => 253,
             Opcode::ListCheck => 0xE4,
             Opcode::I64Check => 0xE5,
             Opcode::StrCheck => 0xE6,
@@ -550,6 +567,11 @@ impl Opcode {
             Opcode::KvDel => "kv-del",
             Opcode::KvKeys => "kv-keys",
             Opcode::ServeConcurrent => "serve-concurrent",
+            Opcode::ReadLine => "read-line",
+            Opcode::StrUpper => "str-upper",
+            Opcode::StrLower => "str-lower",
+            Opcode::StrStrip => "str-strip",
+            Opcode::Fmt => "fmt",
             Opcode::Add => "add",
             Opcode::Sub => "sub",
             Opcode::Mul => "mul",

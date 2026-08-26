@@ -94,6 +94,11 @@ impl TokenKind {
             Self::KvDel => "kv-del",
             Self::KvKeys => "kv-keys",
             Self::ServeConcurrent => "serve-concurrent",
+            Self::ReadLine => "read-line",
+            Self::StrUpper => "str-upper",
+            Self::StrLower => "str-lower",
+            Self::StrStrip => "str-strip",
+            Self::Fmt => "fmt",
             Self::MapNew => "map-new",
             Self::MapGet => "map-get",
             Self::MapSet => "map-set",
@@ -270,6 +275,11 @@ pub enum TokenKind {
     KvDel,
     KvKeys,
     ServeConcurrent,
+    ReadLine,
+    StrUpper,
+    StrLower,
+    StrStrip,
+    Fmt,
 
     // Float operations
     I64ToF64,

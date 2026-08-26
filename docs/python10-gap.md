@@ -12,7 +12,7 @@
 | 能力 | Python 1.0 | Whisper 现状 | 判定 | 备注 |
 |------|-----------|--------------|------|------|
 | 整数/浮点 | int/long/float | i64 / f64 + 双向转换 | ✓ | complex 缺（低优先） |
-| 字符串 | 序列 + `%` 格式化 | 字节语义全套：strcat/slice/find/replace/split/join/chars/nth | ◐ | `%` 风格格式化缺 → 建议 `fmt` 词 |
+| 字符串 | 序列 + `%` 格式化 | 字节语义全套 + str-upper/lower/strip（v1.0.3）+ fmt | ✓ | v1.0.3 补齐 |
 | 列表 | 增删排序 | append/prepend/sort/rev/dedup/take/drop-n/slice/listfind + @map/@each/@fold/@filter | ✓ | 比 Py1.0 更强（高阶内置） |
 | 元组 | tuple | 无 | ◇ | 列表承担；不可变性靠惯例 |
 | 字典 | dict | Map（函数式）+ KV（进程级共享，互斥保护） | ✓ | 双层次设计优于单 dict |
@@ -32,7 +32,7 @@
 | string | split/join/strip/upper/lower | str.ws（find/replace/slice/to-int/from-int/…）+ 内建 strjoin/strsplit | ◐ | **upper/lower/strip 缺**（字节 vs 码点语义需先定） |
 | regex | 正则匹配 | 无 | ✗ | 最大缺口；建议先 `strfind`+`strreplace` 文档化，正则引擎列长期项 |
 | time | time/sleep/strftime | time.ws（now/sleep/sleep-secs） | ◐ | strftime/日期格式化缺 |
-| os | 文件/环境/进程 | read-file/write-file/getenv/exec(os.ws) | ◐ | **目录操作（listdir/mkdir）缺**；**stdin 缺**（read-line 词） |
+| os | 文件/环境/进程 | read-file/write-file/getenv/exec(os.ws) + read-line（v1.0.3） | ◐ | 目录操作（listdir/mkdir）缺；stdin 已补 ✓ |
 | socket | TCP 服务/客户端 | listen/accept/recv/send/close + serve-concurrent + http.ws（http-get/http-post 客户端） | ✓ | UDP 缺（低） |
 | marshal/pickle | 序列化 | json.ws（json-parse/json-stringify） | ✓ | JSON 替代足矣 |
 | struct | 二进制打包 | 无 | ✗ | 二进制协议处理；低-中优先 |
@@ -40,10 +40,10 @@
 
 ## 3. 建议补齐顺序
 
-**P0（一个词一个坑，收益/成本比最高）**
-1. `read-line`——stdin 读取；交互式脚本的前提
-2. `str-upper` / `str-lower` / `str-strip`——高频字符串操作（先定码点语义）
-3. `fmt`——`"{}+{}" a b fmt` 式格式化，替代 `%` 的生态位
+**P0（一个词一个坑，收益/成本比最高）——已于 v1.0.3 全部落地 ✓（字节 249-253）**
+1. `read-line`——stdin 读取 ✓
+2. `str-upper` / `str-lower` / `str-strip`——ASCII 语义、多字节 UTF-8 原样 ✓
+3. `fmt`——`"{}" value fmt` 单占位符替换、链式组合 ✓
 
 **P1（小词族）**
 4. 目录三件套：`listdir` / `mkdir` / `file-exists`
@@ -63,5 +63,5 @@
   在 tutorial 中写清楚"Python 的 X 在 Whisper 里如何写"
 
 **总评**：剔除设计性差异后，Whisper 对 Py1.0 可移植特性的覆盖约为
-**85%（核心+库合并加权）**；P0+P1 补齐后可达 ~95%，剩余为 regex/struct
-两个引擎级工程。
+**90%（核心+库合并加权，P0 已于 v1.0.3 落地）**；P1 补齐后可达 ~95%，
+剩余为 regex/struct 两个引擎级工程。

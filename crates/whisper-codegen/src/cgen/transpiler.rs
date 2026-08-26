@@ -627,6 +627,24 @@ fn transpile_opcodes(
                     "{{ wfn _f=(wfn)w_pop(); int64_t _p=(int64_t)w_pop(); w_serve_concurrent(_p,_f); }}"
                 );
             }
+            Opcode::ReadLine => {
+                let _ = writeln!(out, "{{ w_push((wval)w_read_line()); }}");
+            }
+            Opcode::StrUpper => {
+                let _ = writeln!(out, "{{ w_push((wval)w_str_case(w_pop(),1)); }}");
+            }
+            Opcode::StrLower => {
+                let _ = writeln!(out, "{{ w_push((wval)w_str_case(w_pop(),0)); }}");
+            }
+            Opcode::StrStrip => {
+                let _ = writeln!(out, "{{ w_push((wval)w_str_strip(w_pop())); }}");
+            }
+            Opcode::Fmt => {
+                let _ = writeln!(
+                    out,
+                    "{{ wval _v=w_pop(); wval _f=w_pop(); w_push((wval)w_fmt(_f,_v)); }}"
+                );
+            }
             Opcode::EnvGet => {
                 let _ = writeln!(
                     out,

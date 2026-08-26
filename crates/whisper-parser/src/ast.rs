@@ -109,6 +109,11 @@ pub enum Operator {
     KvDel,
     KvKeys,
     ServeConcurrent,
+    ReadLine,
+    StrUpper,
+    StrLower,
+    StrStrip,
+    Fmt,
 
     // Arithmetic
     Add,

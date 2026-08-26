@@ -525,6 +525,53 @@ impl Vm {
                     .collect();
                 self.data_stack.push(Value::List(Rc::new(keys)));
             }
+            Opcode::ReadLine => {
+                let mut line = String::new();
+                let n = std::io::stdin().read_line(&mut line).unwrap_or(0);
+                let s = if n == 0 {
+                    String::new()
+                } else {
+                    line.trim_end_matches(['\n', '\r']).to_string()
+                };
+                self.data_stack.push(Value::Str(Rc::new(s)));
+            }
+            Opcode::StrUpper => {
+                let s = self.pop_str()?;
+                let v: Vec<u8> = s.as_ref().bytes().map(|b| b.to_ascii_uppercase()).collect();
+                let out = String::from_utf8(v).unwrap_or_default();
+                self.data_stack.push(Value::Str(Rc::new(out)));
+            }
+            Opcode::StrLower => {
+                let s = self.pop_str()?;
+                let v: Vec<u8> = s.as_ref().bytes().map(|b| b.to_ascii_lowercase()).collect();
+                let out = String::from_utf8(v).unwrap_or_default();
+                self.data_stack.push(Value::Str(Rc::new(out)));
+            }
+            Opcode::StrStrip => {
+                let s = self.pop_str()?;
+                let v = s.as_ref().as_bytes();
+                let ws = |b: &u8| matches!(b, b' ' | b'\t' | b'\r' | b'\n');
+                let start = v.iter().position(|b| !ws(b)).unwrap_or(v.len());
+                let end = v.iter().rposition(|b| !ws(b)).map_or(start, |i| i + 1);
+                let out = String::from_utf8(v[start..end].to_vec()).unwrap_or_default();
+                self.data_stack.push(Value::Str(Rc::new(out)));
+            }
+            Opcode::Fmt => {
+                let value = self.data_stack.pop().ok_or(VmError::StackUnderflow {
+                    expected: 1,
+                    actual: self.data_stack.len(),
+                })?;
+                let fstr = self.pop_str()?;
+                let vs = match &value {
+                    Value::I64(n) => n.to_string(),
+                    Value::F64(f) => f.to_string(),
+                    Value::Bool(b) => (if *b { "#t" } else { "#f" }).to_string(),
+                    Value::Str(s) => s.as_ref().clone(),
+                    other => format!("{other:?}"),
+                };
+                let out = fstr.as_ref().replacen("{}", &vs, 1);
+                self.data_stack.push(Value::Str(Rc::new(out)));
+            }
             Opcode::ServeConcurrent => {
                 // The VM is single-threaded (Rc values): serve serially —
                 // name-based (C chain emits a w_find_word registry);

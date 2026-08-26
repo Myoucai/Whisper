@@ -402,6 +402,7 @@ export group-paired-rec
     [241 "close"] [242 "read-file"] [243 "write-file"] [244 "getenv"]
     [245 "kv-set"] [246 "kv-get"] [247 "kv-del"] [248 "kv-keys"]
     [255 "serve-concurrent"]
+    [249 "read-line"] [250 "str-upper"] [251 "str-lower"] [252 "str-strip"] [253 "fmt"]
     [194 "map-new"] [195 "map-get"] [196 "map-set"]
     [197 "map-del"] [198 "map-keys"] [199 "map-has"]
     [208 "now"] [209 "sleep"] [210 "random"] [211 "randint"]
@@ -1049,6 +1050,16 @@ export classify-full
     dup 248 = ?? drop "w_push((wval)w_kv_keys_list());
 " return ]
     dup 255 = ?? drop "{ const char *_n=(const char*)w_pop(); int64_t _p=(int64_t)w_pop(); w_serve_concurrent(_p, w_find_word(_n)); }
+" return ]
+    dup 249 = ?? drop "{ w_push((wval)w_read_line()); }
+" return ]
+    dup 250 = ?? drop "{ w_push((wval)w_str_case(w_pop(),1)); }
+" return ]
+    dup 251 = ?? drop "{ w_push((wval)w_str_case(w_pop(),0)); }
+" return ]
+    dup 252 = ?? drop "{ w_push((wval)w_str_strip(w_pop())); }
+" return ]
+    dup 253 = ?? drop "{ wval _v=w_pop(); wval _f=w_pop(); w_push((wval)w_fmt(_f,_v)); }
 " return ]
     drop "// unknown bare opcode\n"
 } ;
