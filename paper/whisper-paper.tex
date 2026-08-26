@@ -30,11 +30,15 @@ minimize token consumption while maintaining expressiveness and safety.
 \textbf{Whisper} employs single-character operators (\texttt{\_} for duplicate,
 \texttt{`} for swap, \texttt{@} for rotate), a compact conditional syntax
 (\texttt{?? ... | ... ]}), 22 core built-in words that eliminate import
-overhead, and a capability-based zero-trust security model. We fine-tune
-Qwen2.5-Coder-7B on 1,149 \textbf{Whisper} instruction-response pairs.
-On a 15-task benchmark, the model achieves 40.0\% exact-match accuracy
-and 93.3\% syntactic validity, with 83.3\% of executable generated programs
-producing correct output.
+overhead, and a capability-based zero-trust security model. We initially
+fine-tuned Qwen2.5-Coder-7B on 1,149 instruction-response pairs (15-task
+benchmark: 40.0\% exact match, 93.3\% syntactic validity). A post-syntax-freeze
+audit revealed only 58.5\% of that data executed on the frozen implementation;
+after repair, rewriting and expansion, we fine-tune Qwen3-Coder-30B-A3B (MoE,
+3.3B active parameters) on 2,057 fully execution-verified pairs and re-evaluate
+on 100 held-out stratified tasks under an execution-based standard, lifting
+execution pass rate from 44\% to \textbf{68\%} (71--72\% on the 92-task
+stable subset).
 A hand-written token-efficiency comparison across 25 tasks shows
 \textbf{Whisper} code consumes 24.0\% fewer tokens than equivalent Python,
 with \textbf{Whisper} more efficient on 17 of 25 tasks.

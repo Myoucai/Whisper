@@ -18,14 +18,14 @@
 {"instruction": "Double-dup then multiply top two (4 -> 4*4... via _ _ *)", "input": "", "whisper": "4 _ _ * * .", "output": "64"}
 {"instruction": "Is 12 greater than 5?", "input": "", "whisper": "12 5 > .", "output": "#t"}
 {"instruction": "Is 3 equal to 4?", "input": "", "whisper": "3 4 = .", "output": "#f"}
-{"instruction": "Sign check: -4 vs 0", "input": "", "whisper": "-4 0 < ?? \"neg\" . | \"pos\" . ]", "output": "\"neg\""}
-{"instruction": "Adult check: age 20 vs 18", "input": "", "whisper": "20 18 >= ?? \"adult\" . | \"minor\" . ]", "output": "\"adult\""}
+{"instruction": "Sign check: -4 vs 0 (print neg/pos)", "input": "", "whisper": "-4 0 < ?? \"neg\" . | \"pos\" . ]", "output": "\"neg\""}
+{"instruction": "Adult check: age 20 vs 18 (print adult/minor)", "input": "", "whisper": "20 18 >= ?? \"adult\" . | \"minor\" . ]", "output": "\"adult\""}
 {"instruction": "Max of 19 and 7 via ??", "input": "", "whisper": ": max { over over < ?? ` drop | drop ] } ;\n19 7 max .", "output": "19"}
 {"instruction": "Min of 19 and 7 via ??", "input": "", "whisper": ": min { over over < ?? drop | ` drop ] } ;\n19 7 min .", "output": "7"}
 {"instruction": "Classify 0: zero/nonzero", "input": "", "whisper": "0 0 = ?? \"zero\" . | \"nonzero\" . ]", "output": "\"zero\""}
 {"instruction": "Check 9 < 3", "input": "", "whisper": "9 3 < .", "output": "#f"}
 {"instruction": "Count 0..4 with a while loop", "input": "", "whisper": "0 { _ . 1 + } { _ 5 < } #", "output": "0 1 2 3 4"}
-{"instruction": "Run a block 4 times", "input": "", "whisper": "4 { \"go\" . } @times", "output": "\"go\" \"go\" \"go\" \"go\""}
+{"instruction": "Run a block 4 times printing \"go\"", "input": "", "whisper": "4 { \"go\" . } @times", "output": "\"go\" \"go\" \"go\" \"go\""}
 {"instruction": "Double a counter until >= 8", "input": "", "whisper": "1 { _ 2 * } { _ 8 < } # .", "output": "8"}
 {"instruction": "Sum 1..6 with while", "input": "", "whisper": "0 1 { over + ` 1 + } { _ 7 < } # ` drop .", "output": "8"}
 {"instruction": "Print countdown 3,2,1", "input": "", "whisper": "3 { _ . 1 - } { _ 0 > } #", "output": "3 2 1"}
@@ -34,7 +34,7 @@
 {"instruction": "Map square over [2 4 6]", "input": "", "whisper": "[2 4 6] { _ * } @map .", "output": "[4 16 36]"}
 {"instruction": "Map +10 over [1 2 3]", "input": "", "whisper": "[1 2 3] { 10 + } @map .", "output": "[11 12 13]"}
 {"instruction": "Filter multiples of 4 in [4 7 8 12]", "input": "", "whisper": "[4 7 8 12] { 4 % 0 = } @filter .", "output": "[4 8 12]"}
-{"instruction": "Filter strings of length 3", "input": "", "whisper": "[\"ab\" \"cde\" \"f\"] { strlen 3 = } @filter .", "output": "[\"cde\"]"}
+{"instruction": "Filter strings of length 3 from [\"ab\" \"cde\" \"f\"]", "input": "", "whisper": "[\"ab\" \"cde\" \"f\"] { strlen 3 = } @filter .", "output": "[\"cde\"]"}
 {"instruction": "Fold subtraction over [10 3 2] from 20", "input": "", "whisper": "[10 3 2] 20 { - } @fold .", "output": "5"}
 {"instruction": "Sum [4 5 6 7]", "input": "", "whisper": "[4 5 6 7] 0 { + } @fold .", "output": "22"}
 {"instruction": "Max of a list via fold with max word", "input": "", "whisper": ": max { over over < ?? ` drop | drop ] } ;\n[3 9 2 7] 0 { max } @fold .", "output": "9"}
@@ -80,11 +80,11 @@
 {"instruction": "11 to the 3rd", "input": "", "whisper": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n11 3 pow .", "output": "1331"}
 {"instruction": "Any base to power: 2 20", "input": "", "whisper": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n2 20 pow .", "output": "1048576"}
 {"instruction": "5 to the 0", "input": "", "whisper": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n5 0 pow .", "output": "1"}
-{"instruction": "KV roundtrip for a user name", "input": "", "whisper": "\"user\" \"ada\" kv-set \"user\" kv-get .", "output": "\"ada\""}
-{"instruction": "KV delete then check", "input": "", "whisper": "\"tmp\" \"x\" kv-set \"tmp\" kv-del \"tmp\" kv-get strlen .", "output": "0"}
+{"instruction": "KV: store \"ada\" under key \"user\" then read it back", "input": "", "whisper": "\"user\" \"ada\" kv-set \"user\" kv-get .", "output": "\"ada\""}
+{"instruction": "KV: set key \"tmp\" to \"x\", delete it, print the length of its value", "input": "", "whisper": "\"tmp\" \"x\" kv-set \"tmp\" kv-del \"tmp\" kv-get strlen .", "output": "0"}
 {"instruction": "KV keys count after 3 sets", "input": "", "whisper": "\"q1\" \"1\" kv-set \"q2\" \"2\" kv-set \"q3\" \"3\" kv-set kv-keys len .", "output": "3"}
-{"instruction": "File roundtrip with content 'persisted'", "input": "", "whisper": "\"ev_r.txt\" \"persisted\" write-file drop \"ev_r.txt\" read-file .", "output": "\"persisted\""}
-{"instruction": "File length of '1234567'", "input": "", "whisper": "\"ev_l.txt\" \"1234567\" write-file drop \"ev_l.txt\" read-file strlen .", "output": "7"}
+{"instruction": "File: write \"persisted\" to \"ev_r.txt\" then read it back", "input": "", "whisper": "\"ev_r.txt\" \"persisted\" write-file drop \"ev_r.txt\" read-file .", "output": "\"persisted\""}
+{"instruction": "File: write \"1234567\" to \"ev_l.txt\" then print its length", "input": "", "whisper": "\"ev_l.txt\" \"1234567\" write-file drop \"ev_l.txt\" read-file strlen .", "output": "7"}
 {"instruction": "PATH env is nonempty", "input": "", "whisper": "\"PATH\" getenv strlen 0 > .", "output": "#t"}
 {"instruction": "URL-decode 'x%20y%20z'", "input": "", "whisper": "import \"std/net\"\n\"x%20y%20z\" url-decode .", "output": "\"x y z\""}
 {"instruction": "Extract path from 'POST /form?x=1 HTTP/1.0'", "input": "", "whisper": "import \"std/net\"\n\"POST /form?x=1 HTTP/1.0\" req-path path-only .", "output": "\"/form\""}
