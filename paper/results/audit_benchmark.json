@@ -1,0 +1,240 @@
+{
+ "data": "../data/benchmark.jsonl",
+ "whisper_bin": "../../target/release/whisper.exe",
+ "total": 25,
+ "buckets": {
+  "OUTPUT_MISMATCH": 23,
+  "MISMATCH_DETAIL": 0,
+  "RUNTIME_ERROR": 2
+ },
+ "undefined_words": {
+  "prime?": 1
+ },
+ "failures": [
+  {
+   "idx": 0,
+   "instruction": "Print 'Hello, World!'",
+   "whisper": "\"Hello, World!\" .",
+   "expected_output": "",
+   "actual_output": "\"Hello, World!\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1,
+   "instruction": "Add 3 and 4",
+   "whisper": "3 4 + .",
+   "expected_output": "",
+   "actual_output": "7",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 2,
+   "instruction": "Square the number 5",
+   "whisper": "import std/math\n5 sq .",
+   "expected_output": "",
+   "actual_output": "25",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 3,
+   "instruction": "Absolute value of -7",
+   "whisper": "import std/math\n-7 abs .",
+   "expected_output": "",
+   "actual_output": "7",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 4,
+   "instruction": "Find the maximum of 3 and 7",
+   "whisper": "import std/math\n3 7 max .",
+   "expected_output": "",
+   "actual_output": "7",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 5,
+   "instruction": "Find the minimum of 3 and 7",
+   "whisper": "import std/math\n3 7 min .",
+   "expected_output": "",
+   "actual_output": "3",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 6,
+   "instruction": "Calculate the factorial of 5",
+   "whisper": "import std/math\n5 factorial .",
+   "expected_output": "",
+   "actual_output": "120",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 7,
+   "instruction": "Calculate fibonacci of 10",
+   "whisper": "import std/math\n10 fib .",
+   "expected_output": "",
+   "actual_output": "55",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 8,
+   "instruction": "Sum a list of numbers",
+   "whisper": "import std/list\n[1 2 3 4 5] sum .",
+   "expected_output": "",
+   "actual_output": "15",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 9,
+   "instruction": "Product of list elements",
+   "whisper": "import std/list\n[2 3 4 5] prod .",
+   "expected_output": "",
+   "actual_output": "120",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 10,
+   "instruction": "Square every number in a list",
+   "whisper": "import std/math\n[1 2 3 4 5] { sq } @map .",
+   "expected_output": "",
+   "actual_output": "[1 4 9 16 25]",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 11,
+   "instruction": "Get the length of a string",
+   "whisper": "\"Hello\" strlen .",
+   "expected_output": "",
+   "actual_output": "5",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 12,
+   "instruction": "Concatenate two strings",
+   "whisper": "\"Hello\" \"World\" strcat .",
+   "expected_output": "",
+   "actual_output": "\"HelloWorld\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 13,
+   "instruction": "Get the length of a list",
+   "whisper": "[10 20 30 40] len .",
+   "expected_output": "",
+   "actual_output": "4",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 14,
+   "instruction": "Check if a number is even",
+   "whisper": "import std/math\n8 even? .",
+   "expected_output": "",
+   "actual_output": "#t",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 15,
+   "instruction": "Compute 2 to the power of 10",
+   "whisper": "import std/math\n2 10 pow .",
+   "expected_output": "",
+   "actual_output": "1024",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 16,
+   "instruction": "Sum numbers from 1 to 10",
+   "whisper": "import std/list\n10 range-to sum .",
+   "expected_output": "",
+   "actual_output": "55",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 17,
+   "instruction": "Reverse a list",
+   "whisper": "import std/list\n[1 2 3 4 5] rev .",
+   "expected_output": "",
+   "actual_output": "[5 4 3 2 1]",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 18,
+   "instruction": "Check if a string contains a substring",
+   "whisper": "\"hello world\" \"lo\" strfind 0 >= .",
+   "expected_output": "",
+   "actual_output": "#t",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 19,
+   "instruction": "Get the last element of a list",
+   "whisper": "import std/list\n[10 20 30 40] last .",
+   "expected_output": "",
+   "actual_output": "40",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 20,
+   "instruction": "Reverse a string",
+   "whisper": "import std/str\n\"hello\" rev .",
+   "expected_output": "",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got str"
+  },
+  {
+   "idx": 21,
+   "instruction": "Count down from 5",
+   "whisper": "import std/list\n5 range rev { . } @each",
+   "expected_output": "",
+   "actual_output": "[[] [[]] [[] [[]]] [[] [[]] [[] [[]]]]]\n[[] [[]] [[] [[]]]]\n[[] [[]]]\n[[]]\n[]",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 22,
+   "instruction": "Negate a number",
+   "whisper": "import std/math\n42 neg .",
+   "expected_output": "",
+   "actual_output": "-42",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 23,
+   "instruction": "Check if 17 is prime",
+   "whisper": "import std/math\n17 prime? .",
+   "expected_output": "",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Undefined word: prime?"
+  },
+  {
+   "idx": 24,
+   "instruction": "Find GCD of 48 and 18",
+   "whisper": "import std/math\n: gcd { _ 0 = ?? drop | ` over % gcd ] } ;\n48 18 gcd .",
+   "expected_output": "",
+   "actual_output": "6",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  }
+ ]
+}

@@ -1,0 +1,50 @@
+{
+ "data": "../data/eval.jsonl",
+ "whisper_bin": "../../target/release/whisper.exe",
+ "total": 15,
+ "buckets": {
+  "PASS": 11,
+  "OUTPUT_MISMATCH": 1,
+  "MISMATCH_DETAIL": 0,
+  "RUNTIME_ERROR": 3
+ },
+ "undefined_words": {},
+ "failures": [
+  {
+   "idx": 3,
+   "instruction": "Calculate 2^16",
+   "whisper": ": pow { _ 0 = ?? drop 1 | _ 1 - _ _ ` pow * ] } ;\n2 16 pow .",
+   "expected_output": "65536",
+   "actual_output": "0",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 7,
+   "instruction": "Repeat a string n times",
+   "whisper": ": repeat { _ 0 = ?? drop drop \"\" | _ 1 - _ _ ` repeat strcat ] } ;\n\"abc\" 3 repeat .",
+   "expected_output": "abcabcabc",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected str, got i64"
+  },
+  {
+   "idx": 11,
+   "instruction": "Remove the first element from a list",
+   "whisper": "[1 2 3 4 5] _ len 1 - 1 strslice .",
+   "expected_output": "[2 3 4 5]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected str, got [T]"
+  },
+  {
+   "idx": 14,
+   "instruction": "Check if a number is prime",
+   "whisper": ": prime? { _ 2 < ?? drop #f | _ 2 = ?? drop #t | _ 2 % 0 = ?? drop #f | 3 { _ _ * _ _ ` >= } { _ _ _ ` % 0 = ?? drop drop #f | 2 + ] } # drop #t ] ] } ;\n17 prime? .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected bool, got ref"
+  }
+ ]
+}

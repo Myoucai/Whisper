@@ -1,0 +1,4320 @@
+{
+ "data": "../data/train.jsonl",
+ "whisper_bin": "../../target/release/whisper.exe",
+ "total": 1149,
+ "buckets": {
+  "PASS": 672,
+  "OUTPUT_MISMATCH": 257,
+  "MISMATCH_DETAIL": 0,
+  "SYNTAX_ERROR": 19,
+  "RUNTIME_ERROR": 184,
+  "TIMEOUT": 17
+ },
+ "undefined_words": {
+  "digit-sum": 1,
+  "str-rev": 2,
+  "http-get": 1,
+  "exec": 2,
+  "nip": 1,
+  "tuck": 1,
+  "x": 4,
+  "divisors": 1,
+  "range-asc": 1,
+  "cond": 1
+ },
+ "failures": [
+  {
+   "idx": 15,
+   "instruction": "Calculate what percentage a number is of 100",
+   "whisper": "75 100 / .",
+   "expected_output": "0.75",
+   "actual_output": "0",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 17,
+   "instruction": "Calculate 2 to the power of 10 using repeated multiplication",
+   "whisper": "2 _ * _ * _ * _ * _ * _ * _ * _ * _ * .",
+   "expected_output": "1024",
+   "actual_output": "0",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 28,
+   "instruction": "Calculate BMI given weight in kg and height in meters",
+   "whisper": "70 1.75 1.75 * / .",
+   "expected_output": "22.857",
+   "actual_output": "22.857142857142858",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 29,
+   "instruction": "Calculate simple interest on a principal",
+   "whisper": "1000 0.05 3 * * .",
+   "expected_output": "150",
+   "actual_output": "150.00000000000003",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 30,
+   "instruction": "Compute compound interest factor",
+   "whisper": "1.05 3 _ * * .",
+   "expected_output": "1.157625",
+   "actual_output": "9.450000000000001",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 37,
+   "instruction": "Compute bitwise AND of two numbers",
+   "whisper": "12 10 & .",
+   "expected_output": "8",
+   "actual_output": "#t",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 38,
+   "instruction": "Compute bitwise OR of two numbers",
+   "whisper": "12 10 | .",
+   "expected_output": "14",
+   "actual_output": "#t",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 39,
+   "instruction": "Compute bitwise XOR of two numbers",
+   "whisper": "12 10 ^ .",
+   "expected_output": "6",
+   "actual_output": "",
+   "status": "SYNTAX_ERROR",
+   "error": "Error: Parse error at 1:7: Unexpected character: '^'"
+  },
+  {
+   "idx": 43,
+   "instruction": "Compute the quadratic formula discriminant",
+   "whisper": "3 4 * 5 * 2 _ * - .",
+   "expected_output": "35",
+   "actual_output": "56",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 44,
+   "instruction": "Compute the discriminant b^2 - 4ac",
+   "whisper": "3 5 2 ` _ * ` 4 * 3 * 2 * - .",
+   "expected_output": "1",
+   "actual_output": "-23",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 46,
+   "instruction": "Calculate a * b + a * c (distributive property)",
+   "whisper": "2 3 4 _ over * ` * + .",
+   "expected_output": "14",
+   "actual_output": "67",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 53,
+   "instruction": "Calculate the volume of a sphere with radius r",
+   "whisper": "3 _ _ * * 3.14159 * 4 * 3 / .",
+   "expected_output": "113.097",
+   "actual_output": "113.09724",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 54,
+   "instruction": "Calculate gallons from liters",
+   "whisper": "5 0.264172 * .",
+   "expected_output": "1.32086",
+   "actual_output": "1.3208600000000001",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 56,
+   "instruction": "Calculate price after 15% discount and 8% tax",
+   "whisper": "50 0.85 * 1.08 * .",
+   "expected_output": "45.9",
+   "actual_output": "45.900000000000006",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 57,
+   "instruction": "Compute the compound amount after 3 years at 5%",
+   "whisper": "1000 1.05 3 _ * * * .",
+   "expected_output": "1157.625",
+   "actual_output": "9450.000000000002",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 59,
+   "instruction": "Calculate the harmonic mean of two numbers",
+   "whisper": "2 4 _ * _ 2 * swap + / .,",
+   "expected_output": "2.667",
+   "actual_output": "0",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 60,
+   "instruction": "Calculate the harmonic mean of a and b",
+   "whisper": "4 6 _ * 2 * ` + / .",
+   "expected_output": "4.8",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 65,
+   "instruction": "Divide 100 by 8",
+   "whisper": "100 8 / .",
+   "expected_output": "12.5",
+   "actual_output": "12",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 72,
+   "instruction": "What is 100 divided by 3 rounded down?",
+   "whisper": "100 3 / .",
+   "expected_output": "33.333",
+   "actual_output": "33",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 74,
+   "instruction": "What is 2 raised to the 8th power?",
+   "whisper": "2 _ * _ * _ * _ * _ * _ * _ * .",
+   "expected_output": "256",
+   "actual_output": "0",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 78,
+   "instruction": "Swap the top two stack values",
+   "whisper": "1 2 ` . .",
+   "expected_output": "2 1",
+   "actual_output": "1\n2",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 80,
+   "instruction": "Rotate the top three values on the stack",
+   "whisper": "1 2 3 @ . . .",
+   "expected_output": "2 3 1",
+   "actual_output": "1\n3\n2",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 82,
+   "instruction": "Copy the second value on the stack (over)",
+   "whisper": "1 2 _ ` drop . .",
+   "expected_output": "1 2",
+   "actual_output": "2\n1",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 83,
+   "instruction": "Swap then duplicate the top",
+   "whisper": "5 10 ` _ . . .",
+   "expected_output": "10 5 10",
+   "actual_output": "5\n5\n10",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 85,
+   "instruction": "Arrange stack: a b → a b a b",
+   "whisper": "1 2 _ ` over . . . .",
+   "expected_output": "1 2 1 2",
+   "actual_output": "2\n2\n2\n1",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 87,
+   "instruction": "Push a duplicate pair of the top two values",
+   "whisper": "5 6 _ ` . . . .",
+   "expected_output": "5 6 5 6",
+   "actual_output": "6\n6\n5",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 89,
+   "instruction": "Rotate top three in the opposite direction",
+   "whisper": "1 2 3 @ @ . . .",
+   "expected_output": "3 1 2",
+   "actual_output": "2\n1\n3",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 90,
+   "instruction": "Swap the top and third elements on the stack",
+   "whisper": "1 2 3 @ ` @ . . .",
+   "expected_output": "2 1 3",
+   "actual_output": "2\n3\n1",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 91,
+   "instruction": "Over: copy the second element and push on top",
+   "whisper": "3 4 over + . .",
+   "expected_output": "3 7",
+   "actual_output": "7\n3",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 94,
+   "instruction": "Duplicate top two, then add them",
+   "whisper": "3 4 _ ` + . .",
+   "expected_output": "3 7",
+   "actual_output": "8\n3",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 95,
+   "instruction": "Three-way swap using rot",
+   "whisper": "1 2 3 @ @ . . .",
+   "expected_output": "3 1 2",
+   "actual_output": "2\n1\n3",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 96,
+   "instruction": "Copy top two values using dup and swap",
+   "whisper": "5 10 _ ` over . . . .",
+   "expected_output": "5 10 5 10",
+   "actual_output": "10\n10\n10\n5",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 98,
+   "instruction": "Rot then drop the top",
+   "whisper": "1 2 3 @ drop . .",
+   "expected_output": "3 1",
+   "actual_output": "3\n2",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 99,
+   "instruction": "Swap then rotate all three",
+   "whisper": "1 2 3 ` @ . . .",
+   "expected_output": "3 1 2",
+   "actual_output": "1\n2\n3",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 100,
+   "instruction": "Over then multiply",
+   "whisper": "3 4 over * . .",
+   "expected_output": "3 12",
+   "actual_output": "12\n3",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 101,
+   "instruction": "Pick the second and third values from top",
+   "whisper": "10 20 30 $1 $2 . .",
+   "expected_output": "20 10",
+   "actual_output": "20\n20",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 105,
+   "instruction": "Swap then swap back",
+   "whisper": "1 2 ` ` . .",
+   "expected_output": "1 2",
+   "actual_output": "2\n1",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 106,
+   "instruction": "Stack manipulation: push 1 2 3, rot then swap",
+   "whisper": "1 2 3 @ ` . . .",
+   "expected_output": "3 2 1",
+   "actual_output": "3\n1\n2",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 109,
+   "instruction": "Duplicate and swap to create a b b a pattern",
+   "whisper": "1 2 _ ` ` . . . .",
+   "expected_output": "2 1 1 2",
+   "actual_output": "2\n2\n1",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 110,
+   "instruction": "Duplicate value and then swap with original",
+   "whisper": "1 2 _ ` ` . . .",
+   "expected_output": "1 2 2",
+   "actual_output": "2\n2\n1",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 111,
+   "instruction": "Use stack ops to compute (a+b)*(a-b)",
+   "whisper": "5 3 _ over + ` over - * .",
+   "expected_output": "16",
+   "actual_output": "-18",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 113,
+   "instruction": "Compute a^3 + a^2 using stack manipulation",
+   "whisper": "2 _ _ * ` * + .",
+   "expected_output": "12",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 150,
+   "instruction": "Verify a number satisfies a < b < c",
+   "whisper": "1 3 5 _ over > ` _ < & .",
+   "expected_output": "#t",
+   "actual_output": "#f",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 151,
+   "instruction": "Verify increasing order of three values",
+   "whisper": "1 3 5 _ _ over < ` ` > & .",
+   "expected_output": "t",
+   "actual_output": "#t",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 159,
+   "instruction": "Check if a number is even or odd",
+   "whisper": "7 2 % 0 = ?? \"even\" | \"odd\" ] .",
+   "expected_output": "odd",
+   "actual_output": "\"odd\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 160,
+   "instruction": "Grade classification based on score",
+   "whisper": "85 _ 90 >= ?? drop \"A\" | _ 80 >= ?? drop \"B\" | _ 70 >= ?? drop \"C\" | drop \"F\" ] ] ] .",
+   "expected_output": "B",
+   "actual_output": "\"B\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 161,
+   "instruction": "Find the minimum of two numbers",
+   "whisper": "3 7 _ over < ?? ] drop | drop ] .",
+   "expected_output": "3",
+   "actual_output": "",
+   "status": "SYNTAX_ERROR",
+   "error": "Error: Parse error at 1:31: Unexpected token: RBracket"
+  },
+  {
+   "idx": 162,
+   "instruction": "Find the maximum of two numbers",
+   "whisper": "3 7 _ over > ?? ] drop | drop ] .",
+   "expected_output": "7",
+   "actual_output": "",
+   "status": "SYNTAX_ERROR",
+   "error": "Error: Parse error at 1:31: Unexpected token: RBracket"
+  },
+  {
+   "idx": 163,
+   "instruction": "Clamp a value between 0 and 10",
+   "whisper": "15 0 10 _ > ?? drop drop 10 | _ 0 < ?? drop drop 0 ] ] .",
+   "expected_output": "10",
+   "actual_output": "0",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 164,
+   "instruction": "Return 'zero' or 'nonzero' based on value",
+   "whisper": "1 0 = ?? \"zero\" | \"nonzero\" ] .",
+   "expected_output": "nonzero",
+   "actual_output": "\"nonzero\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 166,
+   "instruction": "Guard clause: print value if in range, else complain",
+   "whisper": "5 _ 0 > ?? _ 100 < ?? _ . | drop \"too big\" . ] | drop \"negative\" . ] .",
+   "expected_output": "5",
+   "actual_output": "5\n5",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 167,
+   "instruction": "Branch on string equality",
+   "whisper": "42 42 = ?? \"same\" | \"different\" ] .",
+   "expected_output": "same",
+   "actual_output": "\"same\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 168,
+   "instruction": "Conditional swap: swap if first is greater",
+   "whisper": "1 2 _ over > ?? ` ] . .",
+   "expected_output": "1 2",
+   "actual_output": "2\n1",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 169,
+   "instruction": "Conditional with drop operation",
+   "whisper": "5 5 = ?? drop \"equal\" | \"not equal\" ] .",
+   "expected_output": "equal",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 170,
+   "instruction": "Multi-way branch with default case",
+   "whisper": "2 _ 1 = ?? \"one\" | _ 2 = ?? \"two\" | \"other\" ] ] .",
+   "expected_output": "two",
+   "actual_output": "\"two\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 172,
+   "instruction": "Check a value and print it if positive",
+   "whisper": "42 _ 0 > ?? . | drop \"negative\" . ] .",
+   "expected_output": "42",
+   "actual_output": "42",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 173,
+   "instruction": "Conditionally append to a list",
+   "whisper": "[1 2] 3 _ len 0 > ?? append | drop ] .",
+   "expected_output": "[1 2 3]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 174,
+   "instruction": "Safe division: check for zero divisor",
+   "whisper": "10 0 _ 0 = ?? drop drop \"undefined\" | / . ] .",
+   "expected_output": "undefined",
+   "actual_output": "\"undefined\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 175,
+   "instruction": "Convert boolean to string using conditional",
+   "whisper": "#t ?? \"true\" | \"false\" ] .",
+   "expected_output": "true",
+   "actual_output": "\"true\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 176,
+   "instruction": "Check if a list is empty",
+   "whisper": "[1 2] len 0 = ?? \"empty\" | \"not empty\" ] .",
+   "expected_output": "not empty",
+   "actual_output": "\"not empty\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 178,
+   "instruction": "Range check with guard clause output",
+   "whisper": "5 _ 0 >= ?? _ 10 <= ?? _ . | drop \"too high\" . ] | drop \"negative\" . ] .",
+   "expected_output": "5",
+   "actual_output": "5\n5",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 179,
+   "instruction": "Check string length and categorize",
+   "whisper": "\"hello\" _ strlen 5 = ?? \"five chars\" | \"other\" ] .",
+   "expected_output": "five chars",
+   "actual_output": "\"five chars\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 181,
+   "instruction": "Conditional with swap then drop pattern",
+   "whisper": "1 2 _ > ?? ` | drop ] . .",
+   "expected_output": "2",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 183,
+   "instruction": "Check if a number is divisible by both 3 and 5",
+   "whisper": "15 _ 3 % 0 = swap 5 % 0 = & ?? \"fizzbuzz\" | \"not\" ] .",
+   "expected_output": "fizzbuzz",
+   "actual_output": "\"fizzbuzz\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 184,
+   "instruction": "Leap year check",
+   "whisper": "2000 _ 4 % 0 = swap 100 % 0 != swap 400 % 0 = | & ?? \"leap\" | \"not\" ] .",
+   "expected_output": "leap",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 185,
+   "instruction": "Check if three numbers can form a triangle",
+   "whisper": "3 4 5 _ over + ` over > swap _ over + ` over > & swap _ over + ` over > & & ?? \"yes\" | \"no\" ] .",
+   "expected_output": "yes",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and bool"
+  },
+  {
+   "idx": 186,
+   "instruction": "Check if a+b > c (triangle inequality for one side)",
+   "whisper": "3 4 5 + > .",
+   "expected_output": "#t",
+   "actual_output": "#f",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 187,
+   "instruction": "Simple age category classifier",
+   "whisper": "25 _ 18 < ?? drop \"child\" | _ 65 < ?? drop \"adult\" | drop \"senior\" ] ] .",
+   "expected_output": "adult",
+   "actual_output": "\"adult\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 188,
+   "instruction": "Check password length",
+   "whisper": "\"abcdefgh\" strlen 8 >= ?? \"strong\" | \"weak\" ] .",
+   "expected_output": "strong",
+   "actual_output": "\"strong\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 189,
+   "instruction": "Return max of three values using nested conditionals",
+   "whisper": "5 10 3 _ over > ?? _ over > ?? ] ] | drop drop ] _ over > ?? ] drop | drop ] .",
+   "expected_output": "10",
+   "actual_output": "",
+   "status": "SYNTAX_ERROR",
+   "error": "Error: Parse error at 1:48: Unexpected token: RBracket"
+  },
+  {
+   "idx": 192,
+   "instruction": "Conditional: if empty string return default",
+   "whisper": "\"\" strlen 0 = ?? \"default\" | ] .",
+   "expected_output": "default",
+   "actual_output": "\"default\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 198,
+   "instruction": "Define a max function for two numbers",
+   "whisper": ": max { _ over > ?? ] drop | drop ] } ;\n3 7 max .",
+   "expected_output": "7",
+   "actual_output": "",
+   "status": "SYNTAX_ERROR",
+   "error": "Error: Parse error at 1:35: Unexpected token: RBracket"
+  },
+  {
+   "idx": 199,
+   "instruction": "Define a min function for two numbers",
+   "whisper": ": min { _ over < ?? ] drop | drop ] } ;\n3 7 min .",
+   "expected_output": "3",
+   "actual_output": "",
+   "status": "SYNTAX_ERROR",
+   "error": "Error: Parse error at 1:35: Unexpected token: RBracket"
+  },
+  {
+   "idx": 203,
+   "instruction": "Define a swap function",
+   "whisper": ": swp { ` } ;\n1 2 swp . .",
+   "expected_output": "2 1",
+   "actual_output": "1\n2",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 204,
+   "instruction": "Define an over (copy second) function",
+   "whisper": ": ovr { _ ` } ;\n1 2 ovr . . .",
+   "expected_output": "1 2 1",
+   "actual_output": "2\n2\n1",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 205,
+   "instruction": "Define a rot (rotate three) function",
+   "whisper": ": rot3 { @ } ;\n1 2 3 rot3 . . .",
+   "expected_output": "2 3 1",
+   "actual_output": "1\n3\n2",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 206,
+   "instruction": "Define dup2 to duplicate the top two values",
+   "whisper": ": dup2 { _ ` over } ;\n1 2 dup2 . . . .",
+   "expected_output": "1 2 1 2",
+   "actual_output": "2\n2\n2\n1",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 213,
+   "instruction": "Define a clamp function",
+   "whisper": ": clamp { _ over > ?? drop swap | _ over < ?? drop ] | ] ] } ;\n15 0 10 clamp .",
+   "expected_output": "10",
+   "actual_output": "",
+   "status": "SYNTAX_ERROR",
+   "error": "Error: Parse error at 1:58: Unexpected token: RBracket"
+  },
+  {
+   "idx": 215,
+   "instruction": "Define a recursive fibonacci function",
+   "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | drop ] } ;\n10 fib .",
+   "expected_output": "55",
+   "actual_output": "",
+   "status": "TIMEOUT",
+   "error": "timeout"
+  },
+  {
+   "idx": 216,
+   "instruction": "Define a recursive power function",
+   "whisper": ": pow { _ 0 = ?? drop 1 | _ 1 - ` _ ` pow * ] } ;\n2 10 pow .",
+   "expected_output": "1024",
+   "actual_output": "",
+   "status": "TIMEOUT",
+   "error": "timeout"
+  },
+  {
+   "idx": 217,
+   "instruction": "Define sum from 1 to n recursively",
+   "whisper": ": sum-n { _ 0 = ?? drop 0 | _ over 1 - sum-n + ] } ;\n10 sum-n .",
+   "expected_output": "55",
+   "actual_output": "30",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 222,
+   "instruction": "Define a greeting function",
+   "whisper": ": greet { \"Hello, \" swap strcat \"!\" strcat } ;\n\"World\" greet .",
+   "expected_output": "Hello, World!",
+   "actual_output": "\"Hello, World!\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 223,
+   "instruction": "Define a function to repeat a string n times",
+   "whisper": ": repeat { _ 0 = ?? drop drop \"\" | _ 1 - over ` repeat strcat ] } ;\n\"ab\" 3 repeat .",
+   "expected_output": "ababab",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected str, got i64"
+  },
+  {
+   "idx": 224,
+   "instruction": "Define iterative fibonacci with a loop",
+   "whisper": ": fib-iter { 0 1 rot { _ 0 > } { _ over + ` 1 - } # drop } ;\n10 fib-iter .",
+   "expected_output": "55",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and bool"
+  },
+  {
+   "idx": 225,
+   "instruction": "Define countdown from n",
+   "whisper": ": countdown { _ 0 > ?? _ . 1 - countdown | drop ] } ;\n5 countdown .",
+   "expected_output": "5 4 3 2 1",
+   "actual_output": "5\n4\n3\n2\n1",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 232,
+   "instruction": "Define a compound interest calculator",
+   "whisper": ": compound { swap 1 swap / 1 + swap _ * * } ;\n1000 0.05 3 compound .",
+   "expected_output": "1157.625",
+   "actual_output": "189",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 234,
+   "instruction": "Define a sphere volume function",
+   "whisper": ": sphere-vol { _ _ * * 3.14159 * 4 * 3 / } ;\n3 sphere-vol .",
+   "expected_output": "113.097",
+   "actual_output": "113.09724",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 235,
+   "instruction": "Define a BMI calculator",
+   "whisper": ": bmi { swap _ * / } ;\n70 1.75 bmi .",
+   "expected_output": "22.857",
+   "actual_output": "0.00035714285714285714",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 239,
+   "instruction": "Define a discount calculator",
+   "whisper": ": discount { swap 0.01 * swap - } ;\n100 20 discount .",
+   "expected_output": "80",
+   "actual_output": "-19",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 247,
+   "instruction": "Compute fibonacci of 8 recursively",
+   "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | drop ] } ;\n8 fib .",
+   "expected_output": "21",
+   "actual_output": "",
+   "status": "TIMEOUT",
+   "error": "timeout"
+  },
+  {
+   "idx": 248,
+   "instruction": "Compute 3 to the 4th power recursively",
+   "whisper": ": pow { _ 0 = ?? drop 1 | _ 1 - ` _ ` pow * ] } ;\n3 4 pow .",
+   "expected_output": "81",
+   "actual_output": "",
+   "status": "TIMEOUT",
+   "error": "timeout"
+  },
+  {
+   "idx": 249,
+   "instruction": "Sum integers from 1 to 100 recursively",
+   "whisper": ": sum-n { _ 0 = ?? drop 0 | _ over 1 - sum-n + ] } ;\n100 sum-n .",
+   "expected_output": "5050",
+   "actual_output": "2550",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 253,
+   "instruction": "Reverse the digits of 1234 recursively",
+   "whisper": ": rev { _ 10 < ?? | _ 10 % ` 10 / rev ` 10 * + ] } ;\n1234 rev .",
+   "expected_output": "4321",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 256,
+   "instruction": "Ackermann function for m=3, n=2",
+   "whisper": ": ack { _ 0 = ?? drop 1 + | over 0 = ?? drop drop 1 - | _ 1 - over ` 1 - ack ` ack ] ] } ;\n3 2 ack .",
+   "expected_output": "29",
+   "actual_output": "",
+   "status": "TIMEOUT",
+   "error": "timeout"
+  },
+  {
+   "idx": 257,
+   "instruction": "Count bits needed to represent 255 in binary",
+   "whisper": ": bits { _ 0 = ?? drop 1 | 2 / bits 1 + ] } ;\n255 bits .",
+   "expected_output": "8",
+   "actual_output": "9",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 258,
+   "instruction": "Reverse a string recursively",
+   "whisper": ": str-rev { _ strlen 0 = ?? drop \"\" | 1 strslice _ 0 strnth ctos str-rev strcat ] } ;\n\"hello\" str-rev .",
+   "expected_output": "olleh",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64, got str"
+  },
+  {
+   "idx": 259,
+   "instruction": "Sum elements of a list recursively",
+   "whisper": ": list-sum { _ len 0 = ?? drop 0 | _ 0 @nth over 1 strslice list-sum + ] } ;\n[1 2 3 4 5] list-sum .",
+   "expected_output": "15",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64, got [T]"
+  },
+  {
+   "idx": 260,
+   "instruction": "Fibonacci with accumulator (tail recursive)",
+   "whisper": ": fib-acc { _ 1 <= ?? drop | 1 - over + swap fib-acc ] } ;\n: fib { 0 1 rot fib-acc drop } ;\n10 fib .",
+   "expected_output": "55",
+   "actual_output": "0",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 261,
+   "instruction": "Compute exponential 2^8 recursively",
+   "whisper": ": exp { _ 0 = ?? drop 1 | 1 - over * swap exp ] } ;\n2 8 exp .",
+   "expected_output": "256",
+   "actual_output": "2980.9579870417283",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 262,
+   "instruction": "Triangular number T(10) recursively",
+   "whisper": ": tri { _ 0 = ?? drop 0 | _ over 1 - tri + ] } ;\n10 tri .",
+   "expected_output": "55",
+   "actual_output": "30",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 264,
+   "instruction": "Digital root of 999 recursively",
+   "whisper": ": dig-root { _ 10 < ?? | digit-sum dig-root ] } ;\n999 dig-root .",
+   "expected_output": "9",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Undefined word: digit-sum"
+  },
+  {
+   "idx": 266,
+   "instruction": "Catalan number C(5) recursively",
+   "whisper": ": catalan { _ 0 = ?? drop 1 | _ 1 - catalan ` _ 2 * 4 * 1 - * _ 2 + / ] } ;\n5 catalan .",
+   "expected_output": "42",
+   "actual_output": "0",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 267,
+   "instruction": "Binomial coefficient C(5,2) recursively",
+   "whisper": ": binom { _ 0 = ?? drop drop 1 | over over = ?? drop drop 1 | _ 1 - over ` 1 - binom ` over ` rot drop 1 - binom + ] ] } ;\n5 2 binom .",
+   "expected_output": "10",
+   "actual_output": "6",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 276,
+   "instruction": "Fold: find the maximum value in a list",
+   "whisper": "[3 1 4 1 5 9] 0 { _ over > ?? ] drop | drop ] } @fold .",
+   "expected_output": "9",
+   "actual_output": "",
+   "status": "SYNTAX_ERROR",
+   "error": "Error: Parse error at 1:45: Unexpected token: RBracket"
+  },
+  {
+   "idx": 278,
+   "instruction": "Times: repeat an action 3 times",
+   "whisper": "3 { . } @times",
+   "expected_output": "0 1 2",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 280,
+   "instruction": "Count how many even numbers are in a list",
+   "whisper": "[1 2 3 4 5 6] { _ 2 % 0 = } @map 0 { + } @fold .",
+   "expected_output": "3",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got i64 and bool"
+  },
+  {
+   "idx": 281,
+   "instruction": "Join a list of strings into one string",
+   "whisper": "[\"a\" \"b\" \"c\"] strjoin .",
+   "expected_output": "abc",
+   "actual_output": "\"abc\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 283,
+   "instruction": "Reverse a list using fold",
+   "whisper": "[1 2 3 4 5] [] { swap append } @fold .",
+   "expected_output": "[5 4 3 2 1]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 286,
+   "instruction": "Concatenate two lists",
+   "whisper": "[1 2] [3 4] append .",
+   "expected_output": "[1 2 3 4]",
+   "actual_output": "[1 2 [3 4]]",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 288,
+   "instruction": "Get the tail of a list (all but first)",
+   "whisper": "[10 20 30] 1 _ len 1 - strslice .",
+   "expected_output": "[20 30]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 289,
+   "instruction": "Find the minimum value in a list",
+   "whisper": "[3 1 4 1 5 9] 0 @nth swap { _ over < ?? swap | drop ] } @each drop .",
+   "expected_output": "1",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 290,
+   "instruction": "Flatten a nested list by folding with empty function",
+   "whisper": "[[1 2] [3 4]] { } @fold .",
+   "expected_output": "[1 2 3 4]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 291,
+   "instruction": "Convert a list of characters to a string",
+   "whisper": "[\"h\" \"e\" \"l\" \"l\" \"o\"] strjoin .",
+   "expected_output": "hello",
+   "actual_output": "\"hello\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 297,
+   "instruction": "Filter odd numbers from a list using map",
+   "whisper": "[1 2 3 4 5] { _ 2 % 1 = ?? _ | drop ] } @each",
+   "expected_output": "1 3 5",
+   "actual_output": "",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 303,
+   "instruction": "Concatenate two strings",
+   "whisper": "\"Hello\" \"World\" strcat .",
+   "expected_output": "HelloWorld",
+   "actual_output": "\"HelloWorld\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 306,
+   "instruction": "Extract a substring (first 5 characters)",
+   "whisper": "\"Hello World\" 0 5 strslice .",
+   "expected_output": "Hello",
+   "actual_output": "\"Hello\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 307,
+   "instruction": "Extract a substring starting at position 6",
+   "whisper": "\"Hello World\" 6 5 strslice .",
+   "expected_output": "World",
+   "actual_output": "\"World\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 310,
+   "instruction": "Replace a substring in a string",
+   "whisper": "\"Hello World\" \"World\" \"Whisper\" strreplace .",
+   "expected_output": "Hello Whisper",
+   "actual_output": "\"Hello Whisper\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 311,
+   "instruction": "Convert an integer to a string",
+   "whisper": "42 i64tostr .",
+   "expected_output": "42",
+   "actual_output": "\"42\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 315,
+   "instruction": "Convert a list of ASCII codes to a string",
+   "whisper": "[97 98 99] charsstr .",
+   "expected_output": "abc",
+   "actual_output": "\"abc\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 316,
+   "instruction": "Iterate over a string (get first char code and rest)",
+   "whisper": "\"Hello\" striter . .",
+   "expected_output": "72 \"ello\"",
+   "actual_output": "\"ello\"\n72",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 318,
+   "instruction": "Format a number and string together",
+   "whisper": "42 i64tostr \" is the answer\" strcat .",
+   "expected_output": "42 is the answer",
+   "actual_output": "\"42 is the answer\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 319,
+   "instruction": "Concatenate three strings together",
+   "whisper": "\"abc\" \"def\" strcat \"ghi\" strcat .",
+   "expected_output": "abcdefghi",
+   "actual_output": "\"abcdefghi\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 322,
+   "instruction": "Count occurrences of a character in a string",
+   "whisper": ": count-char { 0 swap { _ over = ?? 1 + | ] } @each swap drop } ;\n\"hello\" \"l\" count-char .",
+   "expected_output": "2",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got str"
+  },
+  {
+   "idx": 323,
+   "instruction": "Extract the last character of a string",
+   "whisper": "\"Hello\" _ strlen 1 - 1 strslice .",
+   "expected_output": "o",
+   "actual_output": "\"o\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 324,
+   "instruction": "Extract the first 3 characters of a string",
+   "whisper": "\"Whisper\" 0 3 strslice .",
+   "expected_output": "Whi",
+   "actual_output": "\"Whi\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 326,
+   "instruction": "Pad a number with leading text",
+   "whisper": "\"Number: \" 42 i64tostr strcat .",
+   "expected_output": "Number: 42",
+   "actual_output": "\"Number: 42\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 329,
+   "instruction": "Get the string representation of a boolean",
+   "whisper": "#t ?? \"true\" | \"false\" ] .",
+   "expected_output": "true",
+   "actual_output": "\"true\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 330,
+   "instruction": "Reverse a string using char list and fold",
+   "whisper": ": str-rev { strchars [] { swap append } @fold charsstr } ;\n\"hello\" str-rev .",
+   "expected_output": "olleh",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 331,
+   "instruction": "Check if a string is a palindrome",
+   "whisper": ": pal? { _ str-rev streq } ;\n\"racecar\" pal? .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Undefined word: str-rev"
+  },
+  {
+   "idx": 332,
+   "instruction": "Countdown from 5 using recursion with conditional",
+   "whisper": ": countdown { _ 0 > ?? _ . 1 - countdown | drop ] } ;\n5 countdown .",
+   "expected_output": "5 4 3 2 1",
+   "actual_output": "5\n4\n3\n2\n1",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 333,
+   "instruction": "Find the integer square root using a loop",
+   "whisper": ": find-sqrt { 0 { _ _ * over < } { 1 + } # . } ;\n25 find-sqrt .",
+   "expected_output": "5",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 334,
+   "instruction": "Sum from n down to 1 using a loop with accumulator",
+   "whisper": ": sum-while { 0 swap { _ 0 > } { over + swap 1 - swap } # drop } ;\n5 sum-while .",
+   "expected_output": "15",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 335,
+   "instruction": "Repeat a block 3 times using @times",
+   "whisper": "3 { _ . } @times",
+   "expected_output": "0 1 2",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 336,
+   "instruction": "Nested loops using @times",
+   "whisper": "3 { 3 { . } @times } @times",
+   "expected_output": "0 1 2 0 1 2 0 1 2",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 337,
+   "instruction": "Search for first element greater than 5 in a list",
+   "whisper": ": find-first { 0 { _ len < } { over over @nth _ 5 > ?? drop drop #t swap drop | drop 1 + ] } # drop } ;\n[1 3 5 7 9] find-first .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 338,
+   "instruction": "Accumulate until reaching a threshold",
+   "whisper": ": accum { 0 swap { _ 0 > } { over 100 >= ?? drop drop ] | over + swap 1 - swap ] } # drop } ;\n20 accum .",
+   "expected_output": "100",
+   "actual_output": "",
+   "status": "SYNTAX_ERROR",
+   "error": "Error: Parse error at 1:80: Unexpected token: RBracket"
+  },
+  {
+   "idx": 339,
+   "instruction": "Generate a descending sequence list",
+   "whisper": ": seq { [] swap { _ 0 > } { over over append swap 1 - swap } # drop } ;\n5 seq .",
+   "expected_output": "[5 4 3 2 1]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 340,
+   "instruction": "FizzBuzz from 1 to 15",
+   "whisper": ": fb { 1 swap { over over >= } { _ 15 % 0 = ?? \"FizzBuzz\" . drop | _ 3 % 0 = ?? \"Fizz\" . drop | _ 5 % 0 = ?? \"Buzz\" . drop | . ] ] ] 1 + } # drop drop } ;\n15 1 fb .",
+   "expected_output": "",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 341,
+   "instruction": "Count up from 0 to 4 using a loop",
+   "whisper": ": count-up { 0 swap { over over < } { over . 1 + } # drop drop } ;\n5 0 count-up .",
+   "expected_output": "0 1 2 3 4",
+   "actual_output": "0",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 342,
+   "instruction": "Loop with index over a list",
+   "whisper": ": indexed { 0 swap { len 0 > } { over 0 @nth over . . drop 1 strslice 1 + } # drop } ;\n[10 20 30] indexed .",
+   "expected_output": "0 10 1 20 2 30",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 343,
+   "instruction": "Iterate a list backwards",
+   "whisper": ": rev-iter { _ len 1 - { _ 0 >= } { over over @nth . 1 - } # drop drop } ;\n[10 20 30] rev-iter .",
+   "expected_output": "30 20 10",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64, got bool"
+  },
+  {
+   "idx": 344,
+   "instruction": "Collatz iteration using a while-like loop",
+   "whisper": ": collatz-iter { 0 swap { _ 1 > } { 1 + swap _ 2 % 0 = ?? 2 / | _ 3 * 1 + ] swap } # drop } ;\n6 collatz-iter .",
+   "expected_output": "9",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 345,
+   "instruction": "Loop collecting results into a list",
+   "whisper": ": collect { [] swap { _ 0 > } { over _ * append swap 1 - swap } # drop } ;\n5 collect .",
+   "expected_output": "[5 4 3 2 1]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got bool"
+  },
+  {
+   "idx": 346,
+   "instruction": "Loop with conditional body",
+   "whisper": ": process { { _ 0 > } { _ 2 % 0 = ?? _ . | drop ] 1 - } # drop } ;\n10 process .",
+   "expected_output": "10 8 6 4 2",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 347,
+   "instruction": "Repeat decrement until zero",
+   "whisper": ": dec-to-zero { { _ 0 > } { _ . 1 - } # drop } ;\n3 dec-to-zero .",
+   "expected_output": "3 2 1",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 348,
+   "instruction": "Sum values until threshold exceeded",
+   "whisper": ": sum-until { 0 swap { _ 0 > } { over 50 >= ?? drop drop ] | over + swap 1 - swap ] } # drop } ;\n20 sum-until .",
+   "expected_output": "50",
+   "actual_output": "",
+   "status": "SYNTAX_ERROR",
+   "error": "Error: Parse error at 1:83: Unexpected token: RBracket"
+  },
+  {
+   "idx": 349,
+   "instruction": "Iterative fibonacci with loop",
+   "whisper": ": fib-loop { 0 1 rot { _ 0 > } { _ over + ` 1 - } # drop } ;\n10 fib-loop .",
+   "expected_output": "55",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and bool"
+  },
+  {
+   "idx": 350,
+   "instruction": "Linear search with early exit",
+   "whisper": ": search { 0 { _ len < } { over over @nth _ 42 = ?? drop drop #t | 1 + ] } # drop } ;\n[10 20 30 42 50] search .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 351,
+   "instruction": "Generate descending range list",
+   "whisper": ": range-desc { [] swap { _ 0 > } { over over append swap 1 - swap } # drop } ;\n5 range-desc .",
+   "expected_output": "[5 4 3 2 1]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 352,
+   "instruction": "Sum even numbers up to n using a loop",
+   "whisper": ": sum-even { 0 swap { _ 0 > } { _ 2 % 0 = ?? over + swap 1 - swap | swap 1 - swap ] } # drop } ;\n10 sum-even .",
+   "expected_output": "30",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 353,
+   "instruction": "Count how many times we can divide by 2",
+   "whisper": ": div-count { 0 swap { _ 2 % 0 = } { 1 + swap 2 / swap } # drop } ;\n32 div-count .",
+   "expected_output": "5",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 354,
+   "instruction": "Generate a list from 1 to n using loop",
+   "whisper": ": range-asc { [] 1 rot { over over <= } { over over append 1 + } # drop drop } ;\n5 range-asc .",
+   "expected_output": "[1 2 3 4 5]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 355,
+   "instruction": "Find the first negative number in a list",
+   "whisper": ": find-neg { 0 { _ len < } { over over @nth _ 0 < ?? drop drop #t | 1 + ] } # drop } ;\n[3 1 -4 2] find-neg .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 356,
+   "instruction": "Loop printing hello 3 times",
+   "whisper": "3 { drop \"hello\" . } @times",
+   "expected_output": "hello hello hello",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 357,
+   "instruction": "Double a value n times in a loop",
+   "whisper": ": ndouble { { _ 0 > } { _ + 1 - } # } ;\n1 4 ndouble .",
+   "expected_output": "16",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and bool"
+  },
+  {
+   "idx": 358,
+   "instruction": "Print Hello, World!",
+   "whisper": "\"Hello, World!\" .",
+   "expected_output": "Hello, World!",
+   "actual_output": "\"Hello, World!\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 359,
+   "instruction": "Read a file and print its contents",
+   "whisper": "\"input.txt\" read-file .",
+   "expected_output": "<file contents>",
+   "actual_output": "\"\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 361,
+   "instruction": "Get an environment variable",
+   "whisper": "\"HOME\" getenv .",
+   "expected_output": "/home/user",
+   "actual_output": "\"C:\\Users\\Administrator\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 362,
+   "instruction": "Make an HTTP GET request",
+   "whisper": "\"https://api.example.com\" http-get .",
+   "expected_output": "<response>",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Undefined word: http-get"
+  },
+  {
+   "idx": 363,
+   "instruction": "Parse a JSON string",
+   "whisper": "{\"key\":\"val\"} json-parse .",
+   "expected_output": "[[\"key\" \"val\"]]",
+   "actual_output": "",
+   "status": "SYNTAX_ERROR",
+   "error": "Error: Parse error at 1:8: Expected word, got String(\"val\")"
+  },
+  {
+   "idx": 364,
+   "instruction": "Stringify a list to JSON",
+   "whisper": "[1 2 3] json-stringify .",
+   "expected_output": "[1,2,3]",
+   "actual_output": "\"[1,2,3]\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 365,
+   "instruction": "Read user input from stdin",
+   "whisper": ", .",
+   "expected_output": "<input>",
+   "actual_output": "\"\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 366,
+   "instruction": "Execute a shell command",
+   "whisper": "\"echo hello\" exec .",
+   "expected_output": "hello",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Undefined word: exec"
+  },
+  {
+   "idx": 368,
+   "instruction": "Calculate BMI from weight and height",
+   "whisper": ": bmi { _ * / } ;\n70 1.75 _ * bmi .",
+   "expected_output": "22.857",
+   "actual_output": "7.463556851311953",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 369,
+   "instruction": "Execute a Whisper expression from a string",
+   "whisper": "\"3 4 +\" exec .",
+   "expected_output": "7",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Undefined word: exec"
+  },
+  {
+   "idx": 370,
+   "instruction": "Log a message with a prefix",
+   "whisper": ": log { \"[LOG] \" swap strcat . } ;\n\"started\" log .",
+   "expected_output": "[LOG] started",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected f64, got str"
+  },
+  {
+   "idx": 371,
+   "instruction": "Read and parse a JSON config file",
+   "whisper": "\"config.json\" read-file json-parse .",
+   "expected_output": "<config>",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Program error: JSON parse: EOF while parsing a value at line 1 column 0"
+  },
+  {
+   "idx": 372,
+   "instruction": "Check app environment and print mode",
+   "whisper": "\"APP_ENV\" getenv \"prod\" streq ?? \"production\" | \"development\" ] .",
+   "expected_output": "development",
+   "actual_output": "\"development\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 373,
+   "instruction": "Check if a data file exists and has content",
+   "whisper": "\"data.txt\" read-file strlen 0 > ?? \"exists\" | \"missing\" ] .",
+   "expected_output": "exists",
+   "actual_output": "\"missing\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 374,
+   "instruction": "Create a string template for greeting",
+   "whisper": ": template { \"Hello, \" swap strcat \"!\" strcat } ;\n\"World\" template .",
+   "expected_output": "Hello, World!",
+   "actual_output": "\"Hello, World!\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 375,
+   "instruction": "Simple retry mechanism with counter",
+   "whisper": ": retry { 0 swap { over 3 < } { over \"attempt \" swap i64tostr strcat . 1 + } # drop drop } ;\n0 retry .",
+   "expected_output": "attempt 0 attempt 1 attempt 2",
+   "actual_output": "\"attempt 0\"",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 376,
+   "instruction": "Get the value for a key from a key-value list",
+   "whisper": "[\"key\" \"value\"] 1 @nth .",
+   "expected_output": "value",
+   "actual_output": "\"value\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 377,
+   "instruction": "Build a full name from first and last name",
+   "whisper": "\"John\" \" \" \"Doe\" strcat strcat .",
+   "expected_output": "John Doe",
+   "actual_output": "\"John Doe\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 378,
+   "instruction": "Check password strength simple",
+   "whisper": "\"abc123\" strlen 6 >= ?? \"ok\" | \"too short\" ] .",
+   "expected_output": "ok",
+   "actual_output": "\"ok\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 379,
+   "instruction": "Format a price with currency symbol",
+   "whisper": "\"$\" 99 i64tostr strcat .",
+   "expected_output": "$99",
+   "actual_output": "\"$99\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 381,
+   "instruction": "Simple temperature warning system",
+   "whisper": ": temp-warn { _ 30 > ?? \"hot\" | _ 15 < ?? \"cold\" | \"ok\" ] ] } ;\n28 temp-warn .",
+   "expected_output": "ok",
+   "actual_output": "\"ok\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 382,
+   "instruction": "Check if user is admin",
+   "whisper": "\"role\" \"admin\" streq ?? \"access granted\" | \"access denied\" ] .",
+   "expected_output": "access denied",
+   "actual_output": "\"access denied\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 383,
+   "instruction": "Read and uppercase first letter of a name",
+   "whisper": ": capitalize { 0 strnth 32 - ctos 1 strslice strcat } ;\n\"alice\" capitalize .",
+   "expected_output": "Alice",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64, got str"
+  },
+  {
+   "idx": 384,
+   "instruction": "Format a date string",
+   "whisper": "\"2024\" \"-\" \"01\" strcat strcat \"-\" \"15\" strcat strcat .",
+   "expected_output": "2024-01-15",
+   "actual_output": "\"2024-01-15\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 386,
+   "instruction": "Generate an error message",
+   "whisper": "\"Error: \" \"file not found\" strcat .",
+   "expected_output": "Error: file not found",
+   "actual_output": "\"Error: file not found\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 387,
+   "instruction": "Linear search for a value in a list",
+   "whisper": ": linear-search { 0 swap { over over len < } { over over @nth over = ?? drop drop #t | 1 + ] } # drop drop #f } ;\n[10 20 30] 20 linear-search .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 388,
+   "instruction": "Find the minimum value in a list algorithmically",
+   "whisper": ": find-min { _ 0 @nth swap 1 strslice { len 0 > } { over over 0 @nth < ?? drop | swap drop ] 1 strslice } # drop } ;\n[3 1 4 1 5 9] find-min .",
+   "expected_output": "1",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64, got [T]"
+  },
+  {
+   "idx": 389,
+   "instruction": "Find the maximum value in a list algorithmically",
+   "whisper": ": find-max { _ 0 @nth swap 1 strslice { len 0 > } { over over 0 @nth > ?? drop | swap drop ] 1 strslice } # drop } ;\n[3 1 4 1 5 9] find-max .",
+   "expected_output": "9",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64, got [T]"
+  },
+  {
+   "idx": 390,
+   "instruction": "Remove duplicates from a list",
+   "whisper": ": dedup { [] swap { len 0 > } { over over 0 @nth { over = } @filter len 0 = ?? over 0 @nth append ] 1 strslice } # drop } ;\n[1 2 3 2 1 4 5] dedup .",
+   "expected_output": "[1 2 3 4 5]",
+   "actual_output": "[1 2 3 2 1 4 5]",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 391,
+   "instruction": "Compute the dot product of two vectors",
+   "whisper": ": dot { 0 swap { len 0 > } { over 0 @nth over 0 @nth * + swap 1 strslice swap } # drop } ;\n[1 2 3] [4 5 6] dot .",
+   "expected_output": "32",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 392,
+   "instruction": "Caesar cipher encoding with shift 3",
+   "whisper": ": caesar { strchars { _ 97 - ` + 26 % 97 + } @map charsstr } ;\n\"abc\" 3 caesar .",
+   "expected_output": "def",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected str, got i64"
+  },
+  {
+   "idx": 393,
+   "instruction": "String reverse algorithm using fold",
+   "whisper": ": str-rev { strchars [] { swap append } @fold charsstr } ;\n\"hello\" str-rev .",
+   "expected_output": "olleh",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 394,
+   "instruction": "Check if a string is a palindrome",
+   "whisper": ": pal? { _ str-rev streq } ;\n\"racecar\" pal? .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Undefined word: str-rev"
+  },
+  {
+   "idx": 395,
+   "instruction": "Count occurrences of a target value in a list",
+   "whisper": ": count { 0 swap { len 0 > } { over 0 @nth over = ?? 1 + | ] 1 strslice } # drop } ;\n[1 2 3 2 1] 2 count .",
+   "expected_output": "2",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 396,
+   "instruction": "Merge two sorted lists",
+   "whisper": ": merge { [] swap { over len 0 > over len 0 > & } { over 0 @nth over 0 @nth < ?? over 0 @nth append swap 1 strslice swap | over 0 @nth append swap swap 1 strslice swap ] } # drop drop } ;\n[1 3 5] [2 4 6] merge .",
+   "expected_output": "[1 2 3 4 5 6]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got bool"
+  },
+  {
+   "idx": 397,
+   "instruction": "Quick sort algorithm",
+   "whisper": ": qsort { _ len 1 <= ?? ] _ 0 @nth over { _ over < } @filter qsort swap over { _ over >= } @filter qsort append } ;\n[3 1 4 1 5 9 2 6] qsort .",
+   "expected_output": "[1 1 2 3 4 5 6 9]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Index out of bounds: 0 (length 0)"
+  },
+  {
+   "idx": 398,
+   "instruction": "Sieve of Eratosthenes up to 10",
+   "whisper": ": sieve { _ 2 < ?? drop [] | [2] 3 _ { over over >= } { over over * over >= ?? drop | append ] 2 + } # drop drop } ;\n10 sieve .",
+   "expected_output": "[2 3 5 7]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected bool, got ref"
+  },
+  {
+   "idx": 399,
+   "instruction": "Pascal's triangle row 4",
+   "whisper": ": pascal { _ 0 = ?? drop [1] | _ 1 - pascal [1] swap { len 1 > } { over 0 @nth over 1 @nth + append 1 strslice } # 1 append ] } ;\n4 pascal .",
+   "expected_output": "[1 4 6 4 1]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected bool, got ref"
+  },
+  {
+   "idx": 400,
+   "instruction": "Binary search in a sorted list",
+   "whisper": ": bin-search { 0 over len 1 - { over over <= } { over over + 2 / over over @nth over = ?? drop drop drop #t | over over @nth over < ?? 1 + | 1 - ] ] } # drop drop drop #f } ;\n[1 3 5 7 9] 5 bin-search .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 401,
+   "instruction": "A* heuristic (Manhattan distance)",
+   "whisper": ": heuristic { _ over - abs ` over over - abs + } ;\n0 0 3 4 heuristic .",
+   "expected_output": "7",
+   "actual_output": "8",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 403,
+   "instruction": "Gray code of a number",
+   "whisper": ": gray { _ 1 rshift ^ } ;\n7 gray .",
+   "expected_output": "4",
+   "actual_output": "",
+   "status": "SYNTAX_ERROR",
+   "error": "Error: Parse error at 1:21: Unexpected character: '^'"
+  },
+  {
+   "idx": 404,
+   "instruction": "Compute the nth triangular number iteratively",
+   "whisper": ": tri-n { 0 swap { _ 0 > } { over + swap 1 - swap } # drop } ;\n10 tri-n .",
+   "expected_output": "55",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 405,
+   "instruction": "Check if a number is a perfect square",
+   "whisper": ": perfect-sq? { _ fsqrt _ _ * = } ;\n16 perfect-sq? .",
+   "expected_output": "#t",
+   "actual_output": "#f",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 406,
+   "instruction": "Integer logarithm base 2",
+   "whisper": ": ilog2 { 0 swap { _ 1 > } { 1 + swap 2 / swap } # drop } ;\n32 ilog2 .",
+   "expected_output": "5",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 407,
+   "instruction": "Euclidean distance between two 2D points",
+   "whisper": ": dist2d { _ over - _ * swap over - _ * + fsqrt } ;\n0 0 3 4 dist2d .",
+   "expected_output": "5",
+   "actual_output": "4",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 408,
+   "instruction": "Calculate factorial iteratively",
+   "whisper": ": fact-iter { 1 swap { _ 1 > } { _ * swap 1 - swap } # drop } ;\n5 fact-iter .",
+   "expected_output": "120",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and bool"
+  },
+  {
+   "idx": 410,
+   "instruction": "Conditional false branch with | separator",
+   "whisper": "3 5 > ?? \"yes\" | \"no\" ] .",
+   "expected_output": "no",
+   "actual_output": "\"no\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 414,
+   "instruction": "Loop using # not while",
+   "whisper": "5 { _ 0 > } { _ . 1 - } #",
+   "expected_output": "5 4 3 2 1",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 415,
+   "instruction": "Loop with { cond } { body } # pattern",
+   "whisper": "3 { _ 0 > } { 1 - } # .",
+   "expected_output": "0",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 418,
+   "instruction": "Repeat a block n times with @times",
+   "whisper": "3 { . } @times",
+   "expected_output": "0 1 2",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 420,
+   "instruction": "Create a code block (quotation) with { }",
+   "whisper": "{ 1 2 + } .",
+   "expected_output": "<block>",
+   "actual_output": "{...}",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 423,
+   "instruction": "Create a string literal with double quotes",
+   "whisper": "\"hello\" .",
+   "expected_output": "hello",
+   "actual_output": "\"hello\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 427,
+   "instruction": "Swap top two with ` (backtick)",
+   "whisper": "1 2 ` . .",
+   "expected_output": "2 1",
+   "actual_output": "1\n2",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 428,
+   "instruction": "Rotate top three with @",
+   "whisper": "1 2 3 @ . . .",
+   "expected_output": "2 3 1",
+   "actual_output": "1\n3\n2",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 439,
+   "instruction": "Fibonacci definition using Whisper syntax",
+   "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | drop ] } ;\n8 fib .",
+   "expected_output": "21",
+   "actual_output": "",
+   "status": "TIMEOUT",
+   "error": "timeout"
+  },
+  {
+   "idx": 442,
+   "instruction": "Simple hello world in proper Whisper",
+   "whisper": "\"Hello, Whisper!\" .",
+   "expected_output": "Hello, Whisper!",
+   "actual_output": "\"Hello, Whisper!\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 443,
+   "instruction": "Nested conditional pattern with ?? | ]",
+   "whisper": "10 _ 0 < ?? \"negative\" | _ 10 > ?? \"big\" | \"medium\" ] ] .",
+   "expected_output": "medium",
+   "actual_output": "\"medium\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 446,
+   "instruction": "Define count-if: count elements satisfying a predicate",
+   "whisper": ": count-if { 0 swap { 0 swap { _ 2 % 0 = ?? 1 + | ] } @each . } ;\n[1 2 3 4 5] { _ 2 % 0 = } count-if .",
+   "expected_output": "2",
+   "actual_output": "",
+   "status": "SYNTAX_ERROR",
+   "error": "Error: Parse error at 0:0: Reached end of file while looking for RBrace"
+  },
+  {
+   "idx": 450,
+   "instruction": "Define a function that conditionally filters a list",
+   "whisper": ": keep-positives { [] swap { len 0 > } { over 0 @nth _ 0 > ?? over 0 @nth append | drop ] 1 strslice } # drop } ;\n[-1 2 -3 4 -5] keep-positives .",
+   "expected_output": "[2 4]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Index out of bounds: 0 (length 0)"
+  },
+  {
+   "idx": 451,
+   "instruction": "Build a counter function using nested definition",
+   "whisper": ": make-counter { 0 swap { over drop 1 + } } ;\n0 make-counter .",
+   "expected_output": "<block>",
+   "actual_output": "{...}",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 452,
+   "instruction": "Map over a list then find max using fold",
+   "whisper": "[3 1 4 1 5 9] { _ * } @map 0 { _ over > ?? ] drop | drop ] } @fold .",
+   "expected_output": "81",
+   "actual_output": "",
+   "status": "SYNTAX_ERROR",
+   "error": "Error: Parse error at 1:58: Unexpected token: RBracket"
+  },
+  {
+   "idx": 454,
+   "instruction": "Compute the variance of a list step by step",
+   "whisper": ": mean { _ 0 { + } @fold ` len / } ;\n: variance { _ mean { _ over - _ * } @map mean } ;\n[2 4 6 8] variance .",
+   "expected_output": "5",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 455,
+   "instruction": "Filter then transform a list",
+   "whisper": "[1 2 3 4 5] { _ 2 % 0 = ?? _ 10 * | drop ] } @each",
+   "expected_output": "20 40",
+   "actual_output": "",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 457,
+   "instruction": "Define median of three numbers",
+   "whisper": ": median3 { _ over > ?? ` ] _ over < ?? ` ] drop } ;\n5 2 8 median3 .",
+   "expected_output": "5",
+   "actual_output": "2",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 458,
+   "instruction": "Print only even-indexed elements of a list",
+   "whisper": ": even-idx { 0 swap { len 0 > } { over 0 @nth . 1 strslice 1 + } # drop } ;\n[10 20 30 40] even-idx .",
+   "expected_output": "10 30",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 459,
+   "instruction": "Sum of first n natural numbers using loop",
+   "whisper": ": sum-to-n { 1 swap { over over <= } { over + swap 1 + swap } # drop drop } ;\n5 sum-to-n .",
+   "expected_output": "15",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 460,
+   "instruction": "Find all factors of a number",
+   "whisper": ": factors { [] 2 { over over * over >= } { over over % 0 = ?? over append | drop ] 1 + } # drop } ;\n12 factors .",
+   "expected_output": "[2 3 4 6]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got [T] and i64"
+  },
+  {
+   "idx": 461,
+   "instruction": "Concat all strings in a list with a separator",
+   "whisper": "[\"a\" \"b\" \"c\"] \"\" strjoin .",
+   "expected_output": "abc",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got str"
+  },
+  {
+   "idx": 462,
+   "instruction": "Define map-reduce pattern",
+   "whisper": ": map-reduce { swap { } @map } ;\n[1 2 3] { _ * } { + } 0 map-reduce .",
+   "expected_output": "14",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got ref"
+  },
+  {
+   "idx": 463,
+   "instruction": "Handle zero correctly in division",
+   "whisper": ": safe-div { _ 0 = ?? drop drop \"error\" | / . ] } ;\n10 0 safe-div .",
+   "expected_output": "error",
+   "actual_output": "\"error\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 465,
+   "instruction": "Handle the empty list case gracefully",
+   "whisper": "[] len 0 = ?? \"empty\" | \"has items\" ] .",
+   "expected_output": "empty",
+   "actual_output": "\"empty\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 466,
+   "instruction": "Return a default value when check fails",
+   "whisper": "\"maybe\" strlen 0 > ?? \"maybe\" | \"default\" ] .",
+   "expected_output": "maybe",
+   "actual_output": "\"maybe\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 469,
+   "instruction": "Check if a string contains only digits",
+   "whisper": "\"12345\" i64tostr .",
+   "expected_output": "12345",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64, got str"
+  },
+  {
+   "idx": 489,
+   "instruction": "Calculate half of 99",
+   "whisper": "99 2 / .",
+   "expected_output": "49.5",
+   "actual_output": "49",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 500,
+   "instruction": "What is 2 to the 5th power?",
+   "whisper": "2 _ * _ * _ * _ * .",
+   "expected_output": "32",
+   "actual_output": "65536",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 505,
+   "instruction": "What is the price after 10% tax on 200?",
+   "whisper": "200 1.1 * .",
+   "expected_output": "220",
+   "actual_output": "220.00000000000003",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 511,
+   "instruction": "Compute 5 plus 5 plus 5 plus 5 plus 5",
+   "whisper": "5 _ + _ + _ + _ + .",
+   "expected_output": "25",
+   "actual_output": "80",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 512,
+   "instruction": "Calculate (a+b)*(a-b) for a=7,b=3",
+   "whisper": "7 3 _ over + ` over - * .",
+   "expected_output": "40",
+   "actual_output": "-18",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 522,
+   "instruction": "Find 2^6 by repeated squaring",
+   "whisper": "2 _ * _ * _ * _ * _ * .",
+   "expected_output": "64",
+   "actual_output": "4294967296",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 530,
+   "instruction": "Sum of reciprocals: 1/2 + 1/3",
+   "whisper": "1 2 / 1 3 / + .",
+   "expected_output": "0.833",
+   "actual_output": "0",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 532,
+   "instruction": "What is the circumference of a circle with r=7?",
+   "whisper": "7 2 * 3.14159 * .",
+   "expected_output": "43.982",
+   "actual_output": "43.98226",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 533,
+   "instruction": "Compute the compound interest: P*(1+r)^t",
+   "whisper": "1000 1.05 3 _ * * * .",
+   "expected_output": "1157.625",
+   "actual_output": "9450.000000000002",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 535,
+   "instruction": "Swap the numbers 42 and 99",
+   "whisper": "42 99 ` . .",
+   "expected_output": "99 42",
+   "actual_output": "42\n99",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 537,
+   "instruction": "Rot three values: a=1, b=2, c=3",
+   "whisper": "1 2 3 @ . . .",
+   "expected_output": "2 3 1",
+   "actual_output": "1\n3\n2",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 541,
+   "instruction": "Nip: remove the second element",
+   "whisper": "1 2 nip .",
+   "expected_output": "2",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Undefined word: nip"
+  },
+  {
+   "idx": 542,
+   "instruction": "Tuck: duplicate the top under the second",
+   "whisper": "1 2 tuck . . .",
+   "expected_output": "2 1 2",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Undefined word: tuck"
+  },
+  {
+   "idx": 543,
+   "instruction": "Dup the top then swap",
+   "whisper": "5 10 _ ` . . .",
+   "expected_output": "5 10 5",
+   "actual_output": "10\n10\n5",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 544,
+   "instruction": "Rot then rot again",
+   "whisper": "1 2 3 @ @ . . .",
+   "expected_output": "3 1 2",
+   "actual_output": "2\n1\n3",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 548,
+   "instruction": "Swap twice returns to original order",
+   "whisper": "1 2 3 ` ` . . .",
+   "expected_output": "1 2 3",
+   "actual_output": "3\n2\n1",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 550,
+   "instruction": "Concatenate 'foo' and 'bar'",
+   "whisper": "\"foo\" \"bar\" strcat .",
+   "expected_output": "foobar",
+   "actual_output": "\"foobar\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 553,
+   "instruction": "Extract the first 3 characters of a string",
+   "whisper": "\"abcdef\" 0 3 strslice .",
+   "expected_output": "abc",
+   "actual_output": "\"abc\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 555,
+   "instruction": "Replace 'cat' with 'dog' in a string",
+   "whisper": "\"the cat sat\" \"cat\" \"dog\" strreplace .",
+   "expected_output": "the dog sat",
+   "actual_output": "\"the dog sat\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 556,
+   "instruction": "Convert the number 256 to a string",
+   "whisper": "256 i64tostr .",
+   "expected_output": "256",
+   "actual_output": "\"256\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 560,
+   "instruction": "Join character codes into a string",
+   "whisper": "[120 121 122] charsstr .",
+   "expected_output": "xyz",
+   "actual_output": "\"xyz\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 562,
+   "instruction": "Get the last 3 characters of a string",
+   "whisper": "\"hello world\" _ strlen 3 - 3 strslice .",
+   "expected_output": "rld",
+   "actual_output": "\"rld\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 563,
+   "instruction": "Build a greeting: 'Hi, ' + name",
+   "whisper": "\"Hi, \" \"Alice\" strcat .",
+   "expected_output": "Hi, Alice",
+   "actual_output": "\"Hi, Alice\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 565,
+   "instruction": "Convert a string to uppercase first letter",
+   "whisper": "\"whisper\" 0 strnth 32 - ctos 1 strslice strcat .",
+   "expected_output": "Whisper",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64, got str"
+  },
+  {
+   "idx": 567,
+   "instruction": "Generate a numbered label",
+   "whisper": "\"Item #\" 1 i64tostr strcat .",
+   "expected_output": "Item #1",
+   "actual_output": "\"Item #1\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 568,
+   "instruction": "Select the larger of two numbers: 42 and 17",
+   "whisper": "42 17 _ over > ?? ] drop | drop ] .",
+   "expected_output": "42",
+   "actual_output": "",
+   "status": "SYNTAX_ERROR",
+   "error": "Error: Parse error at 1:33: Unexpected token: RBracket"
+  },
+  {
+   "idx": 569,
+   "instruction": "Select the smaller of two numbers: 3 and 11",
+   "whisper": "3 11 _ over < ?? ] drop | drop ] .",
+   "expected_output": "3",
+   "actual_output": "",
+   "status": "SYNTAX_ERROR",
+   "error": "Error: Parse error at 1:32: Unexpected token: RBracket"
+  },
+  {
+   "idx": 570,
+   "instruction": "Return 'yes' if x>10, else 'no'",
+   "whisper": "15 _ 10 > ?? \"yes\" | \"no\" ] .",
+   "expected_output": "yes",
+   "actual_output": "\"yes\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 571,
+   "instruction": "Close the conditional block with ]",
+   "whisper": "1 1 = ?? \"equal\" | \"diff\" ] .",
+   "expected_output": "equal",
+   "actual_output": "\"equal\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 572,
+   "instruction": "Use nested ?? for 3-way classification",
+   "whisper": "75 _ 80 >= ?? \"A\" | _ 60 >= ?? \"B\" | \"C\" ] ] .",
+   "expected_output": "B",
+   "actual_output": "\"B\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 573,
+   "instruction": "Conditional branch: if true print the value",
+   "whisper": "42 _ 0 > ?? . | drop \"neg\" . ] .",
+   "expected_output": "42",
+   "actual_output": "42",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 575,
+   "instruction": "Check even odd with conditional",
+   "whisper": "14 2 % 0 = ?? \"even\" | \"odd\" ] .",
+   "expected_output": "even",
+   "actual_output": "\"even\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 576,
+   "instruction": "Safe division: avoid divide-by-zero",
+   "whisper": "10 2 _ 0 = ?? drop drop \"err\" | / . ] .",
+   "expected_output": "5",
+   "actual_output": "5",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 579,
+   "instruction": "Multi-way branch with default",
+   "whisper": "0 _ 0 > ?? \"pos\" | _ 0 < ?? \"neg\" | \"zero\" ] ] .",
+   "expected_output": "zero",
+   "actual_output": "\"zero\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 582,
+   "instruction": "Is the value exactly zero?",
+   "whisper": "0 0 = ?? \"zero\" | \"non-zero\" ] .",
+   "expected_output": "zero",
+   "actual_output": "\"zero\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 585,
+   "instruction": "Return boolean as string for display",
+   "whisper": "#f ?? \"true\" | \"false\" ] .",
+   "expected_output": "false",
+   "actual_output": "\"false\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 591,
+   "instruction": "Create a function that returns the larger of two values",
+   "whisper": ": max2 { _ over > ?? ] drop | drop ] } ;\n-1 5 max2 .",
+   "expected_output": "5",
+   "actual_output": "",
+   "status": "SYNTAX_ERROR",
+   "error": "Error: Parse error at 1:36: Unexpected token: RBracket"
+  },
+  {
+   "idx": 595,
+   "instruction": "Define a BMI calculation function",
+   "whisper": ": calc-bmi { swap _ * / } ;\n68 1.7 calc-bmi .",
+   "expected_output": "23.529",
+   "actual_output": "0.0003676470588235294",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 599,
+   "instruction": "Define a discount price calculator",
+   "whisper": ": after-discount { swap 0.01 * swap - } ;\n200 15 after-discount .",
+   "expected_output": "170",
+   "actual_output": "-13",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 608,
+   "instruction": "Fold: concatenate lists",
+   "whisper": "[[1] [2 3] [4]] [] { append } @fold .",
+   "expected_output": "[1 2 3 4]",
+   "actual_output": "[[1] [2 3] [4]]",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 609,
+   "instruction": "Each: print each string in a list",
+   "whisper": "[\"a\" \"b\" \"c\"] { . } @each",
+   "expected_output": "a b c",
+   "actual_output": "\"a\"\n\"b\"\n\"c\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 610,
+   "instruction": "Times: print numbers 0 through 4",
+   "whisper": "5 { . } @times",
+   "expected_output": "0 1 2 3 4",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 616,
+   "instruction": "Filter-like: keep values > 0",
+   "whisper": "[-1 2 -3 4] { _ 0 > ?? _ | drop ] } @each",
+   "expected_output": "2 4",
+   "actual_output": "",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 618,
+   "instruction": "Count the number of elements matching a condition",
+   "whisper": "[1 2 3 4 5] { _ 2 % 0 = } @map 0 { + } @fold .",
+   "expected_output": "2",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got i64 and bool"
+  },
+  {
+   "idx": 622,
+   "instruction": "Loop: count from 1 to 3",
+   "whisper": "1 { _ 4 < } { _ . 1 + } #",
+   "expected_output": "1 2 3",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 623,
+   "instruction": "While-style: decrement from 5 to 1",
+   "whisper": "5 { _ 0 > } { _ . 1 - } #",
+   "expected_output": "5 4 3 2 1",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 624,
+   "instruction": "Sum all numbers from 1 to n using a loop",
+   "whisper": ": sum-to { 0 swap { _ 0 > } { over + swap 1 - swap } # drop } ;\n4 sum-to .",
+   "expected_output": "10",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 625,
+   "instruction": "Print 'hello' 3 times using @times",
+   "whisper": "3 { drop \"hello\" . } @times",
+   "expected_output": "hello hello hello",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 626,
+   "instruction": "Loop over list elements with @each",
+   "whisper": "[\"x\" \"y\" \"z\"] { . } @each",
+   "expected_output": "x y z",
+   "actual_output": "\"x\"\n\"y\"\n\"z\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 627,
+   "instruction": "Nested @times to create a grid pattern",
+   "whisper": "2 { 2 { . } @times } @times",
+   "expected_output": "0 1 0 1",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 628,
+   "instruction": "Loop with early exit pattern",
+   "whisper": ": find-five { 1 { _ 10 <= } { _ 5 = ?? ] 1 + } # } ;\nfind-five .",
+   "expected_output": "5",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 629,
+   "instruction": "Accumulate products in a loop",
+   "whisper": ": product-loop { 1 swap { _ 1 > } { _ * swap 1 - swap } # drop } ;\n5 product-loop .",
+   "expected_output": "120",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and bool"
+  },
+  {
+   "idx": 630,
+   "instruction": "Loop to double a value n times",
+   "whisper": ": ndouble { { _ 0 > } { _ + 1 - } # } ;\n1 5 ndouble .",
+   "expected_output": "32",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and bool"
+  },
+  {
+   "idx": 631,
+   "instruction": "Generate a countdown list using a loop",
+   "whisper": ": range-dn { [] swap { _ 0 > } { over over append swap 1 - swap } # drop } ;\n3 range-dn .",
+   "expected_output": "[3 2 1]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 632,
+   "instruction": "Iterate and collect even numbers",
+   "whisper": ": collect-even { [] swap { _ 0 > } { _ 2 % 0 = ?? over over append | drop ] 1 - } # drop } ;\n10 collect-even .",
+   "expected_output": "[10 8 6 4 2]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 634,
+   "instruction": "Recursive fibonacci of 9",
+   "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | drop ] } ;\n9 fib .",
+   "expected_output": "34",
+   "actual_output": "",
+   "status": "TIMEOUT",
+   "error": "timeout"
+  },
+  {
+   "idx": 636,
+   "instruction": "Recursive sum from 1 to 20",
+   "whisper": ": sum1n { _ 0 = ?? drop 0 | _ over 1 - sum1n + ] } ;\n20 sum1n .",
+   "expected_output": "210",
+   "actual_output": "110",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 637,
+   "instruction": "Recursive power: 5^3",
+   "whisper": ": pow { _ 0 = ?? drop 1 | _ 1 - ` _ ` pow * ] } ;\n5 3 pow .",
+   "expected_output": "125",
+   "actual_output": "",
+   "status": "TIMEOUT",
+   "error": "timeout"
+  },
+  {
+   "idx": 639,
+   "instruction": "Recursive sum of digits of 1234",
+   "whisper": ": dsum { _ 0 = ?? drop 0 | _ 10 % over 10 / dsum + ] } ;\n1234 dsum .",
+   "expected_output": "10",
+   "actual_output": "16",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 641,
+   "instruction": "Recursive binary representation length of 128",
+   "whisper": ": blen { _ 0 = ?? drop 1 | 2 / blen 1 + ] } ;\n128 blen .",
+   "expected_output": "8",
+   "actual_output": "9",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 642,
+   "instruction": "Recursive reversal of digits: 5678",
+   "whisper": ": revn { _ 10 < ?? | _ 10 % ` 10 / revn ` 10 * + ] } ;\n5678 revn .",
+   "expected_output": "8765",
+   "actual_output": "215",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 643,
+   "instruction": "Fibonacci as tail-recursive with accumulator",
+   "whisper": ": fib-tr { 0 1 rot { _ 0 > } { _ over + ` 1 - } # drop } ;\n12 fib-tr .",
+   "expected_output": "144",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and bool"
+  },
+  {
+   "idx": 645,
+   "instruction": "Print a welcome message",
+   "whisper": "\"Welcome to Whisper!\" .",
+   "expected_output": "Welcome to Whisper!",
+   "actual_output": "\"Welcome to Whisper!\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 646,
+   "instruction": "Log an info message with a prefix",
+   "whisper": "\"[INFO] \" \"server started\" strcat .",
+   "expected_output": "[INFO] server started",
+   "actual_output": "\"[INFO] server started\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 647,
+   "instruction": "Format an error message with code",
+   "whisper": "\"Error \" 404 i64tostr strcat \": not found\" strcat .",
+   "expected_output": "Error 404: not found",
+   "actual_output": "\"Error 404: not found\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 648,
+   "instruction": "Create a simple HTTP response status line",
+   "whisper": "\"HTTP/1.1 \" 200 i64tostr strcat \" OK\" strcat .",
+   "expected_output": "HTTP/1.1 200 OK",
+   "actual_output": "\"HTTP/1.1 200 OK\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 649,
+   "instruction": "Check if a password meets minimum length",
+   "whisper": "\"pass123\" strlen 8 >= ?? \"valid\" | \"too short\" ] .",
+   "expected_output": "too short",
+   "actual_output": "\"too short\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 650,
+   "instruction": "Determine age category for a person",
+   "whisper": "16 _ 18 < ?? \"minor\" | \"adult\" ] .",
+   "expected_output": "minor",
+   "actual_output": "\"minor\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 651,
+   "instruction": "Return appropriate greeting by time of day",
+   "whisper": "14 _ 12 < ?? \"Good morning\" | _ 18 < ?? \"Good afternoon\" | \"Good evening\" ] ] .",
+   "expected_output": "Good afternoon",
+   "actual_output": "\"Good afternoon\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 653,
+   "instruction": "Get the file extension from a filename",
+   "whisper": "\"document.pdf\" \".\" strfind _ strlen ` - 1 - strslice .",
+   "expected_output": "pdf",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected str, got i64"
+  },
+  {
+   "idx": 654,
+   "instruction": "Build a URL from parts",
+   "whisper": "\"https://\" \"api.example.com\" strcat \"/v1/\" strcat \"users\" strcat .",
+   "expected_output": "https://api.example.com/v1/users",
+   "actual_output": "\"https://api.example.com/v1/users\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 655,
+   "instruction": "Simple temperature alert system",
+   "whisper": "35 _ 38 > ?? drop \"ALERT: extreme heat\" | _ 30 > ?? drop \"WARNING: hot\" | drop \"OK\" ] ] .",
+   "expected_output": "WARNING: hot",
+   "actual_output": "\"WARNING: hot\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 656,
+   "instruction": "Count words in a simple space-separated string",
+   "whisper": "\"hello world\" \" \" strfind .",
+   "expected_output": "-1",
+   "actual_output": "5",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 657,
+   "instruction": "Format a currency amount",
+   "whisper": "\"$\" 49.99 i64tostr strcat .",
+   "expected_output": "$49.99",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64, got f64"
+  },
+  {
+   "idx": 658,
+   "instruction": "Binary search in a sorted list [1,2,3,4,5,6,7,8,9,10] for 7",
+   "whisper": ": bsearch { 0 over len 1 - { over over <= } { over over + 2 / over over @nth over = ?? drop drop drop #t | over over @nth over < ?? 1 + | 1 - ] ] } # drop drop drop #f } ;\n[1 2 3 4 5 6 7 8 9 10] 7 bsearch .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 659,
+   "instruction": "Count vowels in a string",
+   "whisper": ": vowel-count { 0 swap strchars { _ 97 = swap 101 = | swap 105 = | swap 111 = | swap 117 = | ?? 1 + | drop ] ] ] ] ] } @each swap drop } ;",
+   "expected_output": "",
+   "actual_output": "",
+   "status": "SYNTAX_ERROR",
+   "error": "Error: Parse error at 1:110: Unexpected token: RBracket"
+  },
+  {
+   "idx": 660,
+   "instruction": "Check if a number is prime (optimistic)",
+   "whisper": ": is-prime? { _ 2 < ?? drop #f | _ 2 % 0 = ?? drop #f | 3 { _ _ * over >= } { _ over % 0 = ?? drop drop #f | 2 + ] } # drop #t ] ] } ;\n29 is-prime? .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected bool, got ref"
+  },
+  {
+   "idx": 661,
+   "instruction": "Generate the first n Fibonacci numbers",
+   "whisper": ": fibs { [] swap 0 1 rot { _ 0 > } { over over append ` over + ` swap 1 - swap } # drop drop drop } ;\n8 fibs .",
+   "expected_output": "[0 1 1 2 3 5 8 13]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 663,
+   "instruction": "Compute the power of a number using a loop",
+   "whisper": ": power { 1 rot { _ 0 > } { over * swap 1 - swap } # drop } ;\n2 16 power .",
+   "expected_output": "65536",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 666,
+   "instruction": "Write a Whisper conditional using ?? syntax",
+   "whisper": "x 0 > ?? \"positive\" | \"negative\" ] .",
+   "expected_output": "positive",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Undefined word: x"
+  },
+  {
+   "idx": 668,
+   "instruction": "Write a Whisper loop using {cond} {body} # pattern",
+   "whisper": "5 { _ 0 > } { _ . 1 - } #",
+   "expected_output": "5 4 3 2 1",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 672,
+   "instruction": "Use @ for rot in Whisper",
+   "whisper": "1 2 3 @ @ .",
+   "expected_output": "3 1 2",
+   "actual_output": "2",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 676,
+   "instruction": "Use @times to repeat in Whisper",
+   "whisper": "3 { \"hi\" . } @times",
+   "expected_output": "hi hi hi",
+   "actual_output": "\"hi\"\n\"hi\"\n\"hi\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 677,
+   "instruction": "Use @each to iterate in Whisper",
+   "whisper": "[\"a\" \"b\"] { . } @each",
+   "expected_output": "a b",
+   "actual_output": "\"a\"\n\"b\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 678,
+   "instruction": "Convert an integer to a string in Whisper",
+   "whisper": "42 i64tostr .",
+   "expected_output": "42",
+   "actual_output": "\"42\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 681,
+   "instruction": "Concatenate strings with strcat in Whisper",
+   "whisper": "\"a\" \"b\" strcat .",
+   "expected_output": "ab",
+   "actual_output": "\"ab\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 689,
+   "instruction": "Use nested conditionals with ] ] to close in Whisper",
+   "whisper": "x _ 0 > ?? \"pos\" | _ 0 < ?? \"neg\" | \"zero\" ] ] .",
+   "expected_output": "pos",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Undefined word: x"
+  },
+  {
+   "idx": 710,
+   "instruction": "Print the string 'done'",
+   "whisper": "\"done\" .",
+   "expected_output": "done",
+   "actual_output": "\"done\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 714,
+   "instruction": "Swap two values and print both",
+   "whisper": "1 2 ` . .",
+   "expected_output": "2 1",
+   "actual_output": "1\n2",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 716,
+   "instruction": "Push three values, rot, print",
+   "whisper": "1 2 3 @ . . .",
+   "expected_output": "2 3 1",
+   "actual_output": "1\n3\n2",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 723,
+   "instruction": "Print a string literal",
+   "whisper": "\"hello world\" .",
+   "expected_output": "hello world",
+   "actual_output": "\"hello world\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 726,
+   "instruction": "Use rot to reorder three values",
+   "whisper": "10 20 30 @ . . .",
+   "expected_output": "20 30 10",
+   "actual_output": "10\n30\n20",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 866,
+   "instruction": "What is 10 divided by 3?",
+   "whisper": "10 3 / .",
+   "expected_output": "3.3333333333333335",
+   "actual_output": "3",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 868,
+   "instruction": "What is 15 divided by 4?",
+   "whisper": "15 4 / .",
+   "expected_output": "3.75",
+   "actual_output": "3",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 870,
+   "instruction": "What is 20 divided by 6?",
+   "whisper": "20 6 / .",
+   "expected_output": "3.3333333333333335",
+   "actual_output": "3",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 872,
+   "instruction": "What is 25 divided by 7?",
+   "whisper": "25 7 / .",
+   "expected_output": "3.5714285714285716",
+   "actual_output": "3",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 874,
+   "instruction": "What is 30 divided by 8?",
+   "whisper": "30 8 / .",
+   "expected_output": "3.75",
+   "actual_output": "3",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 876,
+   "instruction": "What is 40 divided by 9?",
+   "whisper": "40 9 / .",
+   "expected_output": "4.444444444444445",
+   "actual_output": "4",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 878,
+   "instruction": "What is 50 divided by 12?",
+   "whisper": "50 12 / .",
+   "expected_output": "4.166666666666667",
+   "actual_output": "4",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 880,
+   "instruction": "What is 60 divided by 15?",
+   "whisper": "60 15 / .",
+   "expected_output": "4.0",
+   "actual_output": "4",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 882,
+   "instruction": "What is 100 divided by 25?",
+   "whisper": "100 25 / .",
+   "expected_output": "4.0",
+   "actual_output": "4",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 884,
+   "instruction": "What is 200 divided by 50?",
+   "whisper": "200 50 / .",
+   "expected_output": "4.0",
+   "actual_output": "4",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 886,
+   "instruction": "Calculate the factorial of 4 using a loop approach",
+   "whisper": ": fact-loop { 1 swap { _ 1 > } { _ * swap 1 - swap } # drop } ;\n4 fact-loop .",
+   "expected_output": "24",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and bool"
+  },
+  {
+   "idx": 887,
+   "instruction": "Calculate the factorial of 5 using a loop approach",
+   "whisper": ": fact-loop { 1 swap { _ 1 > } { _ * swap 1 - swap } # drop } ;\n5 fact-loop .",
+   "expected_output": "120",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and bool"
+  },
+  {
+   "idx": 888,
+   "instruction": "Calculate the factorial of 6 using a loop approach",
+   "whisper": ": fact-loop { 1 swap { _ 1 > } { _ * swap 1 - swap } # drop } ;\n6 fact-loop .",
+   "expected_output": "720",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and bool"
+  },
+  {
+   "idx": 889,
+   "instruction": "Calculate the factorial of 7 using a loop approach",
+   "whisper": ": fact-loop { 1 swap { _ 1 > } { _ * swap 1 - swap } # drop } ;\n7 fact-loop .",
+   "expected_output": "5040",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and bool"
+  },
+  {
+   "idx": 890,
+   "instruction": "Calculate the factorial of 8 using a loop approach",
+   "whisper": ": fact-loop { 1 swap { _ 1 > } { _ * swap 1 - swap } # drop } ;\n8 fact-loop .",
+   "expected_output": "40320",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and bool"
+  },
+  {
+   "idx": 891,
+   "instruction": "Calculate the factorial of 9 using a loop approach",
+   "whisper": ": fact-loop { 1 swap { _ 1 > } { _ * swap 1 - swap } # drop } ;\n9 fact-loop .",
+   "expected_output": "362880",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and bool"
+  },
+  {
+   "idx": 892,
+   "instruction": "Calculate the factorial of 10 using a loop approach",
+   "whisper": ": fact-loop { 1 swap { _ 1 > } { _ * swap 1 - swap } # drop } ;\n10 fact-loop .",
+   "expected_output": "3628800",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and bool"
+  },
+  {
+   "idx": 893,
+   "instruction": "Calculate the factorial of 11 using a loop approach",
+   "whisper": ": fact-loop { 1 swap { _ 1 > } { _ * swap 1 - swap } # drop } ;\n11 fact-loop .",
+   "expected_output": "39916800",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and bool"
+  },
+  {
+   "idx": 894,
+   "instruction": "Calculate the factorial of 12 using a loop approach",
+   "whisper": ": fact-loop { 1 swap { _ 1 > } { _ * swap 1 - swap } # drop } ;\n12 fact-loop .",
+   "expected_output": "479001600",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and bool"
+  },
+  {
+   "idx": 895,
+   "instruction": "Calculate the factorial of 13 using a loop approach",
+   "whisper": ": fact-loop { 1 swap { _ 1 > } { _ * swap 1 - swap } # drop } ;\n13 fact-loop .",
+   "expected_output": "6227020800",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and bool"
+  },
+  {
+   "idx": 896,
+   "instruction": "Price $50 with 10% discount",
+   "whisper": "50 90 * 100 / .",
+   "expected_output": "45.0",
+   "actual_output": "45",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 897,
+   "instruction": "Price $100 with 15% discount",
+   "whisper": "100 85 * 100 / .",
+   "expected_output": "85.0",
+   "actual_output": "85",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 898,
+   "instruction": "Price $200 with 20% discount",
+   "whisper": "200 80 * 100 / .",
+   "expected_output": "160.0",
+   "actual_output": "160",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 899,
+   "instruction": "Price $75 with 8% discount",
+   "whisper": "75 92 * 100 / .",
+   "expected_output": "69.0",
+   "actual_output": "69",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 900,
+   "instruction": "Price $120 with 5% discount",
+   "whisper": "120 95 * 100 / .",
+   "expected_output": "114.0",
+   "actual_output": "114",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 901,
+   "instruction": "Price $300 with 25% discount",
+   "whisper": "300 75 * 100 / .",
+   "expected_output": "225.0",
+   "actual_output": "225",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 902,
+   "instruction": "Price $80 with 12% discount",
+   "whisper": "80 88 * 100 / .",
+   "expected_output": "70.4",
+   "actual_output": "70",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 903,
+   "instruction": "Price $150 with 30% discount",
+   "whisper": "150 70 * 100 / .",
+   "expected_output": "105.0",
+   "actual_output": "105",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 904,
+   "instruction": "Price $60 with 10% discount",
+   "whisper": "60 90 * 100 / .",
+   "expected_output": "54.0",
+   "actual_output": "54",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 905,
+   "instruction": "Price $90 with 18% discount",
+   "whisper": "90 82 * 100 / .",
+   "expected_output": "73.8",
+   "actual_output": "73",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 906,
+   "instruction": "Total cost of $100 with 8% tax",
+   "whisper": "100 1.08 * .",
+   "expected_output": "108.0",
+   "actual_output": "108",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 909,
+   "instruction": "Total cost of $300 with 19% tax",
+   "whisper": "300 1.2 * .",
+   "expected_output": "360.0",
+   "actual_output": "360",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 913,
+   "instruction": "Push 5 and 6, then swap them",
+   "whisper": "5 6 ` . .",
+   "expected_output": "6 5",
+   "actual_output": "5\n6",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 915,
+   "instruction": "Push 10 and 11, then swap them",
+   "whisper": "10 11 ` . .",
+   "expected_output": "11 10",
+   "actual_output": "10\n11",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 917,
+   "instruction": "Push 15 and 16, then swap them",
+   "whisper": "15 16 ` . .",
+   "expected_output": "16 15",
+   "actual_output": "15\n16",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 919,
+   "instruction": "Push 20 and 21, then swap them",
+   "whisper": "20 21 ` . .",
+   "expected_output": "21 20",
+   "actual_output": "20\n21",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 921,
+   "instruction": "Push 25 and 26, then swap them",
+   "whisper": "25 26 ` . .",
+   "expected_output": "26 25",
+   "actual_output": "25\n26",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 923,
+   "instruction": "Push 30 and 31, then swap them",
+   "whisper": "30 31 ` . .",
+   "expected_output": "31 30",
+   "actual_output": "30\n31",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 925,
+   "instruction": "Push 42 and 43, then swap them",
+   "whisper": "42 43 ` . .",
+   "expected_output": "43 42",
+   "actual_output": "42\n43",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 927,
+   "instruction": "Push 50 and 51, then swap them",
+   "whisper": "50 51 ` . .",
+   "expected_output": "51 50",
+   "actual_output": "50\n51",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 929,
+   "instruction": "Push 99 and 100, then swap them",
+   "whisper": "99 100 ` . .",
+   "expected_output": "100 99",
+   "actual_output": "99\n100",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 931,
+   "instruction": "Push 100 and 101, then swap them",
+   "whisper": "100 101 ` . .",
+   "expected_output": "101 100",
+   "actual_output": "100\n101",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 932,
+   "instruction": "Rotate the three values 1 2 3",
+   "whisper": "1 2 3 @ . . .",
+   "expected_output": "2 3 1",
+   "actual_output": "1\n3\n2",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 933,
+   "instruction": "Rotate the three values 10 20 30",
+   "whisper": "10 20 30 @ . . .",
+   "expected_output": "20 30 10",
+   "actual_output": "10\n30\n20",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 934,
+   "instruction": "Rotate the three values 5 10 15",
+   "whisper": "5 10 15 @ . . .",
+   "expected_output": "10 15 5",
+   "actual_output": "5\n15\n10",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 935,
+   "instruction": "Rotate the three values 100 200 300",
+   "whisper": "100 200 300 @ . . .",
+   "expected_output": "200 300 100",
+   "actual_output": "100\n300\n200",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 936,
+   "instruction": "Rotate the three values 7 14 21",
+   "whisper": "7 14 21 @ . . .",
+   "expected_output": "14 21 7",
+   "actual_output": "7\n21\n14",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 942,
+   "instruction": "Print numbers 0 through 1 using @times",
+   "whisper": "2 { . } @times",
+   "expected_output": "0 1",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 943,
+   "instruction": "Print numbers 0 through 2 using @times",
+   "whisper": "3 { . } @times",
+   "expected_output": "0 1 2",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 944,
+   "instruction": "Print numbers 0 through 3 using @times",
+   "whisper": "4 { . } @times",
+   "expected_output": "0 1 2 3",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 945,
+   "instruction": "Print numbers 0 through 5 using @times",
+   "whisper": "6 { . } @times",
+   "expected_output": "0 1 2 3 4 5",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 946,
+   "instruction": "Print numbers 0 through 6 using @times",
+   "whisper": "7 { . } @times",
+   "expected_output": "0 1 2 3 4 5 6",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 947,
+   "instruction": "Print numbers 0 through 7 using @times",
+   "whisper": "8 { . } @times",
+   "expected_output": "0 1 2 3 4 5 6 7",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 948,
+   "instruction": "Print numbers 0 through 9 using @times",
+   "whisper": "10 { . } @times",
+   "expected_output": "0 1 2 3 4 5 6 7 8 9",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 949,
+   "instruction": "Count down from 3 using a loop",
+   "whisper": ": cd { { _ 0 > } { _ . 1 - } # drop } ;\n3 cd .",
+   "expected_output": "3 2 1",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 950,
+   "instruction": "Count down from 4 using a loop",
+   "whisper": ": cd { { _ 0 > } { _ . 1 - } # drop } ;\n4 cd .",
+   "expected_output": "4 3 2 1",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 951,
+   "instruction": "Count down from 5 using a loop",
+   "whisper": ": cd { { _ 0 > } { _ . 1 - } # drop } ;\n5 cd .",
+   "expected_output": "5 4 3 2 1",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 952,
+   "instruction": "Count down from 6 using a loop",
+   "whisper": ": cd { { _ 0 > } { _ . 1 - } # drop } ;\n6 cd .",
+   "expected_output": "6 5 4 3 2 1",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 953,
+   "instruction": "Count down from 8 using a loop",
+   "whisper": ": cd { { _ 0 > } { _ . 1 - } # drop } ;\n8 cd .",
+   "expected_output": "8 7 6 5 4 3 2 1",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 954,
+   "instruction": "Count down from 10 using a loop",
+   "whisper": ": cd { { _ 0 > } { _ . 1 - } # drop } ;\n10 cd .",
+   "expected_output": "10 9 8 7 6 5 4 3 2 1",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 955,
+   "instruction": "Count down from 12 using a loop",
+   "whisper": ": cd { { _ 0 > } { _ . 1 - } # drop } ;\n12 cd .",
+   "expected_output": "12 11 10 9 8 7 6 5 4 3 2 1",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 956,
+   "instruction": "Count down from 15 using a loop",
+   "whisper": ": cd { { _ 0 > } { _ . 1 - } # drop } ;\n15 cd .",
+   "expected_output": "15 14 13 12 11 10 9 8 7 6 5 4 3 2 1",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 957,
+   "instruction": "Print evens descending from 2",
+   "whisper": ": evens { { _ 0 > } { _ . 2 - } # drop } ;\n2 evens .",
+   "expected_output": "2",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 958,
+   "instruction": "Print evens descending from 4",
+   "whisper": ": evens { { _ 0 > } { _ . 2 - } # drop } ;\n4 evens .",
+   "expected_output": "4 2",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 959,
+   "instruction": "Print evens descending from 6",
+   "whisper": ": evens { { _ 0 > } { _ . 2 - } # drop } ;\n6 evens .",
+   "expected_output": "6 4 2",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 960,
+   "instruction": "Print evens descending from 8",
+   "whisper": ": evens { { _ 0 > } { _ . 2 - } # drop } ;\n8 evens .",
+   "expected_output": "8 6 4 2",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 961,
+   "instruction": "Print evens descending from 10",
+   "whisper": ": evens { { _ 0 > } { _ . 2 - } # drop } ;\n10 evens .",
+   "expected_output": "10 8 6 4 2",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 962,
+   "instruction": "Print evens descending from 12",
+   "whisper": ": evens { { _ 0 > } { _ . 2 - } # drop } ;\n12 evens .",
+   "expected_output": "12 10 8 6 4 2",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 963,
+   "instruction": "Print evens descending from 14",
+   "whisper": ": evens { { _ 0 > } { _ . 2 - } # drop } ;\n14 evens .",
+   "expected_output": "14 12 10 8 6 4 2",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 964,
+   "instruction": "Print evens descending from 16",
+   "whisper": ": evens { { _ 0 > } { _ . 2 - } # drop } ;\n16 evens .",
+   "expected_output": "16 14 12 10 8 6 4 2",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 965,
+   "instruction": "Print evens descending from 18",
+   "whisper": ": evens { { _ 0 > } { _ . 2 - } # drop } ;\n18 evens .",
+   "expected_output": "18 16 14 12 10 8 6 4 2",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 966,
+   "instruction": "Print evens descending from 20",
+   "whisper": ": evens { { _ 0 > } { _ . 2 - } # drop } ;\n20 evens .",
+   "expected_output": "20 18 16 14 12 10 8 6 4 2",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 967,
+   "instruction": "Sum all even numbers from 2 to 4 using a loop",
+   "whisper": ": sum-ev { 0 swap { _ 0 > } { _ 2 % 0 = ?? over + swap 1 - swap | swap 1 - swap ] } # drop } ;\n4 sum-ev .",
+   "expected_output": "6",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 968,
+   "instruction": "Sum all even numbers from 2 to 6 using a loop",
+   "whisper": ": sum-ev { 0 swap { _ 0 > } { _ 2 % 0 = ?? over + swap 1 - swap | swap 1 - swap ] } # drop } ;\n6 sum-ev .",
+   "expected_output": "12",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 969,
+   "instruction": "Sum all even numbers from 2 to 8 using a loop",
+   "whisper": ": sum-ev { 0 swap { _ 0 > } { _ 2 % 0 = ?? over + swap 1 - swap | swap 1 - swap ] } # drop } ;\n8 sum-ev .",
+   "expected_output": "20",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 970,
+   "instruction": "Sum all even numbers from 2 to 10 using a loop",
+   "whisper": ": sum-ev { 0 swap { _ 0 > } { _ 2 % 0 = ?? over + swap 1 - swap | swap 1 - swap ] } # drop } ;\n10 sum-ev .",
+   "expected_output": "30",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 971,
+   "instruction": "Sum all even numbers from 2 to 12 using a loop",
+   "whisper": ": sum-ev { 0 swap { _ 0 > } { _ 2 % 0 = ?? over + swap 1 - swap | swap 1 - swap ] } # drop } ;\n12 sum-ev .",
+   "expected_output": "42",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 980,
+   "instruction": "Compute fibonacci(5) recursively",
+   "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | drop ] } ;\n5 fib .",
+   "expected_output": "5",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 981,
+   "instruction": "Compute fibonacci(6) recursively",
+   "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | drop ] } ;\n6 fib .",
+   "expected_output": "8",
+   "actual_output": "",
+   "status": "TIMEOUT",
+   "error": "timeout"
+  },
+  {
+   "idx": 982,
+   "instruction": "Compute fibonacci(7) recursively",
+   "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | drop ] } ;\n7 fib .",
+   "expected_output": "13",
+   "actual_output": "",
+   "status": "TIMEOUT",
+   "error": "timeout"
+  },
+  {
+   "idx": 983,
+   "instruction": "Compute fibonacci(9) recursively",
+   "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | drop ] } ;\n9 fib .",
+   "expected_output": "34",
+   "actual_output": "",
+   "status": "TIMEOUT",
+   "error": "timeout"
+  },
+  {
+   "idx": 984,
+   "instruction": "Compute fibonacci(11) recursively",
+   "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | drop ] } ;\n11 fib .",
+   "expected_output": "89",
+   "actual_output": "",
+   "status": "TIMEOUT",
+   "error": "timeout"
+  },
+  {
+   "idx": 985,
+   "instruction": "Compute fibonacci(12) recursively",
+   "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | drop ] } ;\n12 fib .",
+   "expected_output": "144",
+   "actual_output": "",
+   "status": "TIMEOUT",
+   "error": "timeout"
+  },
+  {
+   "idx": 986,
+   "instruction": "Compute fibonacci(13) recursively",
+   "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | drop ] } ;\n13 fib .",
+   "expected_output": "233",
+   "actual_output": "",
+   "status": "TIMEOUT",
+   "error": "timeout"
+  },
+  {
+   "idx": 987,
+   "instruction": "Compute fibonacci(15) recursively",
+   "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | drop ] } ;\n15 fib .",
+   "expected_output": "610",
+   "actual_output": "",
+   "status": "TIMEOUT",
+   "error": "timeout"
+  },
+  {
+   "idx": 996,
+   "instruction": "Generate a greeting for a user",
+   "whisper": ": hello { \"Hello, \" swap strcat \"!\" strcat } ;\n\"John\" hello .",
+   "expected_output": "Hello, John!",
+   "actual_output": "\"Hello, John!\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 997,
+   "instruction": "Convert a score to a letter grade",
+   "whisper": ": grade { _ 90 >= ?? \"A\" | _ 80 >= ?? \"B\" | _ 70 >= ?? \"C\" | _ 60 >= ?? \"D\" | \"F\" ] ] ] ] } ;\n85 grade .",
+   "expected_output": "B",
+   "actual_output": "\"B\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 999,
+   "instruction": "Format a date as YYYY-MM-DD",
+   "whisper": "\"2025\" \"-\" strcat \"06\" strcat \"-\" strcat \"15\" strcat .",
+   "expected_output": "2025-06-15",
+   "actual_output": "\"2025-06-15\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1002,
+   "instruction": "Check if an input string is a valid number",
+   "whisper": ": is-num? { strtoi64 _ 0 = ?? drop #t | drop #f ] } ;\n\"123\" is-num? .",
+   "expected_output": "#t",
+   "actual_output": "#f",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1005,
+   "instruction": "Generate an invoice total with tax and shipping",
+   "whisper": ": total { 0.08 * + 5.99 + } ;\n100 total .",
+   "expected_output": "113.99",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 1006,
+   "instruction": "Build a CSV line from values",
+   "whisper": "\"name\" \",\" strcat \"age\" strcat \",\" strcat \"city\" strcat .",
+   "expected_output": "name,age,city",
+   "actual_output": "\"name,age,city\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1007,
+   "instruction": "Check strong password criteria",
+   "whisper": ": strong? { _ strlen 8 >= swap _ strlen 12 >= | } ;\n\"abc12345\" strong? .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected bool, got str"
+  },
+  {
+   "idx": 1009,
+   "instruction": "Normalize a value to percentage of max",
+   "whisper": ": pct-of { swap / 100 * } ;\n75 150 pct-of .",
+   "expected_output": "50",
+   "actual_output": "200",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1010,
+   "instruction": "Format a log entry",
+   "whisper": ": log { \"[\" swap strcat \"] \" strcat } ;\n\"ERROR\" \"disk full\" strcat log .",
+   "expected_output": "[ERROR] disk full",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected f64, got str"
+  },
+  {
+   "idx": 1011,
+   "instruction": "Check if 101 is prime by trial division",
+   "whisper": ": prime? { _ 2 < ?? drop #f | 2 { _ _ * over >= } { _ over % 0 = ?? drop drop #f | 1 + ] } # drop #t ] } ;\n101 prime? .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected bool, got ref"
+  },
+  {
+   "idx": 1012,
+   "instruction": "Find all divisors of 28",
+   "whisper": ": divisors { [] 1 swap { over over <= } { over over % 0 = ?? over append | drop ] 1 + } # drop drop } ;\n28 divisors .",
+   "expected_output": "[1 2 4 7 14 28]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected number, got [T]"
+  },
+  {
+   "idx": 1013,
+   "instruction": "Compute the LCM of 12 and 18",
+   "whisper": ": lcm { _ over ` gcd / * } ;\n12 18 lcm .",
+   "expected_output": "36",
+   "actual_output": "12",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1014,
+   "instruction": "Check perfect number (sum of divisors equals itself)",
+   "whisper": ": perfect? { _ divisors 0 { + } @fold _ = } ;\n6 perfect? .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Undefined word: divisors"
+  },
+  {
+   "idx": 1015,
+   "instruction": "Generate prime numbers up to 20",
+   "whisper": ": primes-to { [] 2 swap { over over <= } { _ prime? ?? over append | drop ] 1 + } # drop drop } ;\n20 primes-to .",
+   "expected_output": "[2 3 5 7 11 13 17 19]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected number, got [T]"
+  },
+  {
+   "idx": 1016,
+   "instruction": "Sum the first 100 natural numbers using fold",
+   "whisper": "100 1 - 1 + _ range-asc 0 { + } @fold .",
+   "expected_output": "5050",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Undefined word: range-asc"
+  },
+  {
+   "idx": 1017,
+   "instruction": "Calculate the standard deviation of [2,4,4,4,5,5,7,9]",
+   "whisper": ": stddev { _ mean { _ over - _ * } @map mean fsqrt } ;\n[2 4 4 4 5 5 7 9] stddev .",
+   "expected_output": "2",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 1018,
+   "instruction": "Find the longest string in a list",
+   "whisper": ": longest { \"\" swap { _ strlen over strlen > ?? swap | drop ] } @each drop } ;\n[\"a\" \"abc\" \"ab\" \"abcd\"] longest .",
+   "expected_output": "abcd",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 1019,
+   "instruction": "Check if a list is sorted in ascending order",
+   "whisper": ": sorted? { _ len 1 <= ?? drop #t | _ 0 @nth swap 1 strslice { len 0 > } { over 0 @nth over < ?? drop #f | swap drop ] 1 strslice } # drop #t ] } ;\n[1 3 5 7 9] sorted? .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64, got [T]"
+  },
+  {
+   "idx": 1021,
+   "instruction": "What is the correct way to write an if-else in Whisper? Use ?? | ]",
+   "whisper": "cond ?? true-branch | false-branch ]",
+   "expected_output": "",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Undefined word: cond"
+  },
+  {
+   "idx": 1024,
+   "instruction": "What symbol is used for swap in Whisper? Use ` (backtick)",
+   "whisper": "1 2 ` . .",
+   "expected_output": "2 1",
+   "actual_output": "1\n2",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1025,
+   "instruction": "What symbol is used for rotate in Whisper? Use @",
+   "whisper": "1 2 3 @ . . .",
+   "expected_output": "2 3 1",
+   "actual_output": "1\n3\n2",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1026,
+   "instruction": "How do you end a loop in Whisper? Use #",
+   "whisper": "3 { _ 0 > } { 1 - } # .",
+   "expected_output": "0",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 1027,
+   "instruction": "How do you close a conditional block in Whisper? Use ]",
+   "whisper": "#t ?? \"yes\" | \"no\" ] .",
+   "expected_output": "yes",
+   "actual_output": "\"yes\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1034,
+   "instruction": "How do you create a string in Whisper? Use double quotes",
+   "whisper": "\"hello\" .",
+   "expected_output": "hello",
+   "actual_output": "\"hello\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1039,
+   "instruction": "How do you concatenate strings in Whisper? Use strcat",
+   "whisper": "\"a\" \"b\" strcat .",
+   "expected_output": "ab",
+   "actual_output": "\"ab\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1040,
+   "instruction": "How do you write a nested conditional in Whisper? Use multiple ?? and ]",
+   "whisper": "x _ 0 > ?? \"pos\" | _ 0 < ?? \"neg\" | \"zero\" ] ] .",
+   "expected_output": "pos",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Undefined word: x"
+  },
+  {
+   "idx": 1041,
+   "instruction": "Divide 100 by 3 and print the result",
+   "whisper": "100 3 / .",
+   "expected_output": "33.333",
+   "actual_output": "33",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1043,
+   "instruction": "What is 1 divided by 4?",
+   "whisper": "1 4 / .",
+   "expected_output": "0.25",
+   "actual_output": "0",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1045,
+   "instruction": "Divide 256 by 8 then multiply by 3",
+   "whisper": "256 8 / 3 * .",
+   "expected_output": "32",
+   "actual_output": "96",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1046,
+   "instruction": "What is 1/2 + 1/3?",
+   "whisper": "1 2 / 1 3 / + .",
+   "expected_output": "0.833",
+   "actual_output": "0",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1047,
+   "instruction": "Compute 3 / 8 as a decimal",
+   "whisper": "3 8 / .",
+   "expected_output": "0.375",
+   "actual_output": "0",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1048,
+   "instruction": "What is 100 / 7?",
+   "whisper": "100 7 / .",
+   "expected_output": "14.286",
+   "actual_output": "14",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1049,
+   "instruction": "Divide a by b where a=22 and b=7",
+   "whisper": "22 7 / .",
+   "expected_output": "3.143",
+   "actual_output": "3",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1051,
+   "instruction": "What is 17 divided by 3 (integer portion)?",
+   "whisper": "17 3 / .",
+   "expected_output": "5.667",
+   "actual_output": "5",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1052,
+   "instruction": "Compute 42 / 5",
+   "whisper": "42 5 / .",
+   "expected_output": "8.4",
+   "actual_output": "8",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1053,
+   "instruction": "Calculate 2 to the power of 16",
+   "whisper": "2 _ * _ * _ * _ * _ * _ * _ * _ * _ * _ * _ * _ * _ * _ * _ * .",
+   "expected_output": "65536",
+   "actual_output": "0",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1054,
+   "instruction": "Compute 3^5 using a recursive power function",
+   "whisper": ": pow { _ 0 = ?? drop 1 | _ 1 - ` _ ` pow * ] } ;\n3 5 pow .",
+   "expected_output": "243",
+   "actual_output": "",
+   "status": "TIMEOUT",
+   "error": "timeout"
+  },
+  {
+   "idx": 1055,
+   "instruction": "Calculate 2^10 using the power function",
+   "whisper": ": pow { _ 0 = ?? drop 1 | _ 1 - ` _ ` pow * ] } ;\n2 10 pow .",
+   "expected_output": "1024",
+   "actual_output": "",
+   "status": "TIMEOUT",
+   "error": "timeout"
+  },
+  {
+   "idx": 1058,
+   "instruction": "Calculate the 5th power of 2: 2^5",
+   "whisper": "2 _ * _ * _ * _ * .",
+   "expected_output": "32",
+   "actual_output": "65536",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1059,
+   "instruction": "Search for number 50 in a list and return true if found",
+   "whisper": ": contains? { 0 swap { over over len < } { over over @nth over = ?? drop drop #t | 1 + ] } # drop drop #f } ;\n[10 20 30 40 50] 50 contains? .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 1060,
+   "instruction": "Find the index of value 3 in the list [1,2,3,4,5]",
+   "whisper": ": index-of { 0 swap { over over len < } { over over @nth over = ?? drop drop | 1 + ] } # drop drop -1 } ;\n[1 2 3 4 5] 3 index-of .",
+   "expected_output": "2",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 1061,
+   "instruction": "Check if all elements in a list are positive",
+   "whisper": ": all-pos? { { _ 0 > } @map 0 { & } @fold 1 = } ;\n[1 2 3 4] all-pos? .",
+   "expected_output": "#t",
+   "actual_output": "#f",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1063,
+   "instruction": "Binary search for 8 in [1,3,5,7,8,9,11]",
+   "whisper": ": bsearch { 0 over len 1 - { over over <= } { over over + 2 / over over @nth over = ?? drop drop drop #t | over over @nth over < ?? 1 + | 1 - ] ] } # drop drop drop #f } ;\n[1 3 5 7 8 9 11] 8 bsearch .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 1064,
+   "instruction": "Find the first even number in a list",
+   "whisper": ": find-even { 0 { _ len < } { over over @nth _ 2 % 0 = ?? drop drop #t | 1 + ] } # drop } ;\n[1 3 5 6 7] find-even .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 1065,
+   "instruction": "Calculate Euclidean distance between points (0,0) and (3,4)",
+   "whisper": ": dist { _ over - _ * swap over - _ * + fsqrt } ;\n0 0 3 4 dist .",
+   "expected_output": "5",
+   "actual_output": "4",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1067,
+   "instruction": "Find the Manhattan distance between (1,2) and (4,6)",
+   "whisper": ": manhattan { _ over - abs swap over - abs + } ;\n1 2 4 6 manhattan .",
+   "expected_output": "7",
+   "actual_output": "6",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1102,
+   "instruction": "Generate a range from 5 down to 1 using list stdlib",
+   "whisper": "import std/list\n5 range .",
+   "expected_output": "[5 4 3 2 1]",
+   "actual_output": "[[] [[]] [[] [[]]] [[] [[]] [[] [[]]]] [[] [[]] [[] [[]]] [[] [[]] [[] [[]]]]]]",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1105,
+   "instruction": "Check if list contains element using list stdlib",
+   "whisper": "import std/list\n[1 2 3] 2 contains? .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got bool"
+  },
+  {
+   "idx": 1112,
+   "instruction": "Reverse a string using str stdlib",
+   "whisper": "import std/str\n\"hello\" rev .",
+   "expected_output": "olleh",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got str"
+  },
+  {
+   "idx": 1113,
+   "instruction": "Capitalize a string using str stdlib",
+   "whisper": "import std/str\n\"hello\" capitalize .",
+   "expected_output": "Hello",
+   "actual_output": "\"Hello\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1114,
+   "instruction": "Repeat a string n times using str stdlib",
+   "whisper": "import std/str\n\"ab\" 3 repeat .",
+   "expected_output": "ababab",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected str, got i64"
+  },
+  {
+   "idx": 1116,
+   "instruction": "Check string starts with using str stdlib",
+   "whisper": "import std/str\n\"hello\" \"he\" starts-with? .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 1117,
+   "instruction": "Check string ends with using str stdlib",
+   "whisper": "import std/str\n\"hello\" \"lo\" ends-with? .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64, got str"
+  },
+  {
+   "idx": 1118,
+   "instruction": "Join strings using str stdlib",
+   "whisper": "import std/str\n[\"a\" \"b\" \"c\"] join .",
+   "expected_output": "abc",
+   "actual_output": "\"abc\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1120,
+   "instruction": "Import math and list to find the average of squares",
+   "whisper": "import std/math\nimport std/list\n[1 2 3] { sq } @map mean .",
+   "expected_output": "4.667",
+   "actual_output": "4",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1121,
+   "instruction": "Import str and list to reverse each string then join",
+   "whisper": "import std/str\nimport std/list\n[\"ab\" \"cd\"] { rev } @map \"\" join .",
+   "expected_output": "badc",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got str"
+  },
+  {
+   "idx": 1122,
+   "instruction": "Import math for even? check then sum evens using list",
+   "whisper": "import std/math\nimport std/list\n[1 2 3 4 5 6] { even? } @map 0 { + } @fold .",
+   "expected_output": "3",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got i64 and bool"
+  },
+  {
+   "idx": 1123,
+   "instruction": "Import math to negate and list to sum",
+   "whisper": "import std/math\nimport std/list\n[1 -2 3 -4] { neg } @map sum .",
+   "expected_output": "-2",
+   "actual_output": "2",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1125,
+   "instruction": "Convert this Python to Whisper: print(max(5, 10))",
+   "whisper": "5 10 _ over > ?? ] drop | drop ] .",
+   "expected_output": "10",
+   "actual_output": "",
+   "status": "SYNTAX_ERROR",
+   "error": "Error: Parse error at 1:32: Unexpected token: RBracket"
+  },
+  {
+   "idx": 1129,
+   "instruction": "Convert this to Whisper: if x > 0: print('positive') else: print('non-positive')",
+   "whisper": "x _ 0 > ?? \"positive\" . | \"non-positive\" . ]",
+   "expected_output": "positive",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Undefined word: x"
+  },
+  {
+   "idx": 1131,
+   "instruction": "Convert 'Hello' + ' ' + 'World' to Whisper",
+   "whisper": "\"Hello\" \" \" strcat \"World\" strcat .",
+   "expected_output": "Hello World",
+   "actual_output": "\"Hello World\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1134,
+   "instruction": "Translate: for i in range(5): print(i) to Whisper",
+   "whisper": "5 { . } @times",
+   "expected_output": "0 1 2 3 4",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Stack underflow: expected 1 values, got 0"
+  },
+  {
+   "idx": 1135,
+   "instruction": "Convert: ''.join(['a','b','c']) to Whisper",
+   "whisper": "[\"a\" \"b\" \"c\"] strjoin .",
+   "expected_output": "abc",
+   "actual_output": "\"abc\"",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1137,
+   "instruction": "Python: print(2**10) → Whisper using repeated multiplication",
+   "whisper": "2 _ * _ * _ * _ * _ * _ * _ * _ * _ * .",
+   "expected_output": "1024",
+   "actual_output": "0",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1138,
+   "instruction": "Write a for-loop equivalent in Whisper using #",
+   "whisper": "5 { _ 0 > } { _ . 1 - } #",
+   "expected_output": "5 4 3 2 1",
+   "actual_output": "#t",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected i64 or f64, got bool and i64"
+  },
+  {
+   "idx": 1140,
+   "instruction": "Create a function, call it, and use the result in a list",
+   "whisper": ": dbl { _ + } ;\n5 dbl [1 2] append .",
+   "expected_output": "[1 2 10]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 1143,
+   "instruction": "Use conditional inside a map",
+   "whisper": "[1 -2 3 -4] { _ 0 > ?? _ | drop ] } @each",
+   "expected_output": "1 3",
+   "actual_output": "",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1145,
+   "instruction": "Loop to build a list, then sum it",
+   "whisper": ": build-list { [] swap { _ 0 > } { over over append swap 1 - swap } # drop } ;\n: sum-list { 0 { + } @fold } ;\n5 build-list sum-list .",
+   "expected_output": "15",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 1146,
+   "instruction": "Define is-positive, then filter a list",
+   "whisper": ": pos? { _ 0 > } ;\n[-1 2 -3 4] { _ pos? ?? _ | drop ] } @each",
+   "expected_output": "2 4",
+   "actual_output": "",
+   "status": "OUTPUT_MISMATCH",
+   "error": null
+  },
+  {
+   "idx": 1147,
+   "instruction": "Conditionally transform a value and add to list",
+   "whisper": ": transform { _ 0 > ?? _ * | 0 ] } ;\n5 transform [1 2] append .",
+   "expected_output": "[1 2 25]",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got i64"
+  },
+  {
+   "idx": 1148,
+   "instruction": "Combine string operations: reverse and check palindrome",
+   "whisper": ": rev { strchars [] { swap append } @fold charsstr } ;\n: pal? { _ rev streq } ;\n\"aba\" pal? .",
+   "expected_output": "#t",
+   "actual_output": "",
+   "status": "RUNTIME_ERROR",
+   "error": "Error: Runtime error: Type mismatch: expected [T], got str"
+  }
+ ]
+}
