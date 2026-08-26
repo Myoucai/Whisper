@@ -46,3 +46,5 @@ whisperc/gen1.s
 whisperc/gen1.su
 whisper_test/tmp/
 adapters/
+!paper/results/logs/
+!paper/results/logs/**
