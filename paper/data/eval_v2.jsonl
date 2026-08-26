@@ -1,0 +1,100 @@
+{"instruction": "Add 17 and 25", "input": "", "whisper": "17 25 + .", "output": "42"}
+{"instruction": "Subtract 9 from 44", "input": "", "whisper": "44 9 - .", "output": "35"}
+{"instruction": "Multiply 7 by 8", "input": "", "whisper": "7 8 * .", "output": "56"}
+{"instruction": "Integer-divide 100 by 7", "input": "", "whisper": "100 7 / .", "output": "14"}
+{"instruction": "Remainder of 87 divided by 11", "input": "", "whisper": "87 11 % .", "output": "10"}
+{"instruction": "Sum 4 5 6 in one expression", "input": "", "whisper": "4 5 + 6 + .", "output": "15"}
+{"instruction": "Compute (2+3)*4", "input": "", "whisper": "2 3 + 4 * .", "output": "20"}
+{"instruction": "Compute 100 - 3*7", "input": "", "whisper": "100 3 7 * - .", "output": "79"}
+{"instruction": "Negate 42", "input": "", "whisper": "42 -1 * .", "output": "-42"}
+{"instruction": "Absolute value of -13", "input": "", "whisper": "-13 _ 0 < ?? -1 * | ] .", "output": "13"}
+{"instruction": "Square 9 using dup", "input": "", "whisper": "9 _ * .", "output": "81"}
+{"instruction": "Compute 2*11 with dup", "input": "", "whisper": "11 _ + .", "output": "22"}
+{"instruction": "Swap 6 and 7 then multiply", "input": "", "whisper": "6 7 ` * .", "output": "42"}
+{"instruction": "Over: copy second and add to top (3 8)", "input": "", "whisper": "3 8 over + .", "output": "11"}
+{"instruction": "Rot three values then drop two (4 5 6)", "input": "", "whisper": "4 5 6 @ drop drop .", "output": "5"}
+{"instruction": "Drop the top of 12 30", "input": "", "whisper": "12 30 drop .", "output": "12"}
+{"instruction": "Pick the third element (1 2 3 -> copy 1)", "input": "", "whisper": "1 2 3 $2 drop drop drop .", "output": "1"}
+{"instruction": "Double-dup then multiply top two (4 -> 4*4... via _ _ *)", "input": "", "whisper": "4 _ _ * * .", "output": "64"}
+{"instruction": "Is 12 greater than 5?", "input": "", "whisper": "12 5 > .", "output": "#t"}
+{"instruction": "Is 3 equal to 4?", "input": "", "whisper": "3 4 = .", "output": "#f"}
+{"instruction": "Sign check: -4 vs 0", "input": "", "whisper": "-4 0 < ?? \"neg\" . | \"pos\" . ]", "output": "\"neg\""}
+{"instruction": "Adult check: age 20 vs 18", "input": "", "whisper": "20 18 >= ?? \"adult\" . | \"minor\" . ]", "output": "\"adult\""}
+{"instruction": "Max of 19 and 7 via ??", "input": "", "whisper": ": max { over over < ?? ` drop | drop ] } ;\n19 7 max .", "output": "19"}
+{"instruction": "Min of 19 and 7 via ??", "input": "", "whisper": ": min { over over < ?? drop | ` drop ] } ;\n19 7 min .", "output": "7"}
+{"instruction": "Classify 0: zero/nonzero", "input": "", "whisper": "0 0 = ?? \"zero\" . | \"nonzero\" . ]", "output": "\"zero\""}
+{"instruction": "Check 9 < 3", "input": "", "whisper": "9 3 < .", "output": "#f"}
+{"instruction": "Count 0..4 with a while loop", "input": "", "whisper": "0 { _ . 1 + } { _ 5 < } #", "output": "0 1 2 3 4"}
+{"instruction": "Run a block 4 times", "input": "", "whisper": "4 { \"go\" . } @times", "output": "\"go\" \"go\" \"go\" \"go\""}
+{"instruction": "Double a counter until >= 8", "input": "", "whisper": "1 { _ 2 * } { _ 8 < } # .", "output": "8"}
+{"instruction": "Sum 1..6 with while", "input": "", "whisper": "0 1 { over + ` 1 + } { _ 7 < } # ` drop .", "output": "8"}
+{"instruction": "Print countdown 3,2,1", "input": "", "whisper": "3 { _ . 1 - } { _ 0 > } #", "output": "3 2 1"}
+{"instruction": "Sum five 2s via range and fold", "input": "", "whisper": "5 range-to { drop 2 } @map 0 { + } @fold .", "output": "10"}
+{"instruction": "Loop 3 times building a count", "input": "", "whisper": "0 3 { 1 + } @times .", "output": "3"}
+{"instruction": "Map square over [2 4 6]", "input": "", "whisper": "[2 4 6] { _ * } @map .", "output": "[4 16 36]"}
+{"instruction": "Map +10 over [1 2 3]", "input": "", "whisper": "[1 2 3] { 10 + } @map .", "output": "[11 12 13]"}
+{"instruction": "Filter multiples of 4 in [4 7 8 12]", "input": "", "whisper": "[4 7 8 12] { 4 % 0 = } @filter .", "output": "[4 8 12]"}
+{"instruction": "Filter strings of length 3", "input": "", "whisper": "[\"ab\" \"cde\" \"f\"] { strlen 3 = } @filter .", "output": "[\"cde\"]"}
+{"instruction": "Fold subtraction over [10 3 2] from 20", "input": "", "whisper": "[10 3 2] 20 { - } @fold .", "output": "5"}
+{"instruction": "Sum [4 5 6 7]", "input": "", "whisper": "[4 5 6 7] 0 { + } @fold .", "output": "22"}
+{"instruction": "Max of a list via fold with max word", "input": "", "whisper": ": max { over over < ?? ` drop | drop ] } ;\n[3 9 2 7] 0 { max } @fold .", "output": "9"}
+{"instruction": "Reverse [9 8 7 6]", "input": "", "whisper": "[9 8 7 6] rev .", "output": "[6 7 8 9]"}
+{"instruction": "Sort [6 2 9 1 5]", "input": "", "whisper": "[6 2 9 1 5] sort .", "output": "[1 2 5 6 9]"}
+{"instruction": "Take 3 of [a b c d e]", "input": "", "whisper": "[\"a\" \"b\" \"c\" \"d\" \"e\"] 3 take .", "output": "[\"a\" \"b\" \"c\"]"}
+{"instruction": "Drop 2 of [1 2 3 4 5]", "input": "", "whisper": "[1 2 3 4 5] 2 drop-n .", "output": "[3 4 5]"}
+{"instruction": "Slice [1..7] from 2 to 5", "input": "", "whisper": "7 range-to 2 5 list-slice .", "output": "[3 4 5 6 7]"}
+{"instruction": "Dedup [4 4 2 2 2 9]", "input": "", "whisper": "[4 4 2 2 2 9] dedup .", "output": "[4 2 9]"}
+{"instruction": "Nth element 1 of [30 40 50]", "input": "", "whisper": "[30 40 50] 1 @nth .", "output": "40"}
+{"instruction": "Length of 'whisper lang'", "input": "", "whisper": "\"whisper lang\" strlen .", "output": "12"}
+{"instruction": "Concat 'good' and 'bye'", "input": "", "whisper": "\"good\" \"bye\" strcat .", "output": "\"goodbye\""}
+{"instruction": "Slice 'abcdef' 2..5", "input": "", "whisper": "\"abcdef\" 2 5 strslice .", "output": "\"cdef\""}
+{"instruction": "Are 'one' and 'one' equal?", "input": "", "whisper": "\"one\" \"one\" streq .", "output": "#t"}
+{"instruction": "Find 'de' in 'abcdef'", "input": "", "whisper": "\"abcdef\" \"de\" strfind .", "output": "3"}
+{"instruction": "Replace 'cat' with 'dog' in 'cat and cat'", "input": "", "whisper": "\"cat and cat\" \"cat\" \"dog\" strreplace .", "output": "\"dog and dog\""}
+{"instruction": "Split 'x-y-z' on '-'", "input": "", "whisper": "\"x-y-z\" \"-\" strsplit .", "output": "[\"x\" \"y\" \"z\"]"}
+{"instruction": "Join [p q r] with '+'", "input": "", "whisper": "\"+\" [\"p\" \"q\" \"r\"] strjoin .", "output": "\"pqr\""}
+{"instruction": "Parse '777' as integer", "input": "", "whisper": "\"777\" strtoi64 .", "output": "777"}
+{"instruction": "Convert 365 to string length", "input": "", "whisper": "365 i64tostr strlen .", "output": "3"}
+{"instruction": "Char codes of 'hi'", "input": "", "whisper": "\"hi\" strchars .", "output": "[104 105]"}
+{"instruction": "Character at index 2 of 'xyz'", "input": "", "whisper": "\"xyz\" 2 strnth .", "output": "122"}
+{"instruction": "Contains 'an' in 'banana'?", "input": "", "whisper": "\"banana\" \"an\" strfind 0 >= .", "output": "#t"}
+{"instruction": "Char from code 122", "input": "", "whisper": "122 ctos .", "output": "\"z\""}
+{"instruction": "Float add 1.5 + 2.25", "input": "", "whisper": "1.5 2.25 + .", "output": "3.75"}
+{"instruction": "Float multiply 0.5 * 8.0", "input": "", "whisper": "0.5 8.0 * .", "output": "4"}
+{"instruction": "Float divide 7.0 / 2.0", "input": "", "whisper": "7.0 2.0 / .", "output": "3.5"}
+{"instruction": "Average of [1 2 3 4 5] as float", "input": "", "whisper": "5 range-to _ len ` 0.0 { + } @fold ` / .", "output": "3"}
+{"instruction": "Square root of 144.0", "input": "", "whisper": "144.0 fsqrt .", "output": "12"}
+{"instruction": "Floor of 3.9", "input": "", "whisper": "3.9 floor .", "output": "3"}
+{"instruction": "Compare floats 0.1+0.2 vs 0.3", "input": "", "whisper": "0.1 0.2 + 0.3 = .", "output": "#f"}
+{"instruction": "Bitwise AND 60 and 13", "input": "", "whisper": "60 13 bitand .", "output": "12"}
+{"instruction": "Bitwise OR 60 and 13", "input": "", "whisper": "60 13 bitor .", "output": "61"}
+{"instruction": "Bitwise XOR 60 and 13", "input": "", "whisper": "60 13 bitxor .", "output": "49"}
+{"instruction": "Shift 3 left 5", "input": "", "whisper": "3 5 shl .", "output": "96"}
+{"instruction": "Shift 200 right 3", "input": "", "whisper": "200 3 shr .", "output": "25"}
+{"instruction": "Bitwise NOT of 0", "input": "", "whisper": "0 bitnot .", "output": "-1"}
+{"instruction": "Fibonacci of 11", "input": "", "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n11 fib .", "output": "89"}
+{"instruction": "Fibonacci of 7", "input": "", "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n7 fib .", "output": "13"}
+{"instruction": "Factorial of 9", "input": "", "whisper": ": fact { _ 0 = ?? drop 1 | _ 1 - fact * ] } ;\n9 fact .", "output": "362880"}
+{"instruction": "Factorial of 4", "input": "", "whisper": ": fact { _ 0 = ?? drop 1 | _ 1 - fact * ] } ;\n4 fact .", "output": "24"}
+{"instruction": "3 to the 5th", "input": "", "whisper": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n3 5 pow .", "output": "243"}
+{"instruction": "11 to the 3rd", "input": "", "whisper": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n11 3 pow .", "output": "1331"}
+{"instruction": "Any base to power: 2 20", "input": "", "whisper": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n2 20 pow .", "output": "1048576"}
+{"instruction": "5 to the 0", "input": "", "whisper": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n5 0 pow .", "output": "1"}
+{"instruction": "KV roundtrip for a user name", "input": "", "whisper": "\"user\" \"ada\" kv-set \"user\" kv-get .", "output": "\"ada\""}
+{"instruction": "KV delete then check", "input": "", "whisper": "\"tmp\" \"x\" kv-set \"tmp\" kv-del \"tmp\" kv-get strlen .", "output": "0"}
+{"instruction": "KV keys count after 3 sets", "input": "", "whisper": "\"q1\" \"1\" kv-set \"q2\" \"2\" kv-set \"q3\" \"3\" kv-set kv-keys len .", "output": "3"}
+{"instruction": "File roundtrip with content 'persisted'", "input": "", "whisper": "\"ev_r.txt\" \"persisted\" write-file drop \"ev_r.txt\" read-file .", "output": "\"persisted\""}
+{"instruction": "File length of '1234567'", "input": "", "whisper": "\"ev_l.txt\" \"1234567\" write-file drop \"ev_l.txt\" read-file strlen .", "output": "7"}
+{"instruction": "PATH env is nonempty", "input": "", "whisper": "\"PATH\" getenv strlen 0 > .", "output": "#t"}
+{"instruction": "URL-decode 'x%20y%20z'", "input": "", "whisper": "import \"std/net\"\n\"x%20y%20z\" url-decode .", "output": "\"x y z\""}
+{"instruction": "Extract path from 'POST /form?x=1 HTTP/1.0'", "input": "", "whisper": "import \"std/net\"\n\"POST /form?x=1 HTTP/1.0\" req-path path-only .", "output": "\"/form\""}
+{"instruction": "Is 31 prime?", "input": "", "whisper": ": prime { _ 2 < ?? drop #f | _ 1 - range-to { 1 > } @filter ` { over ` % 0 = ?? drop 0 | 0 max ] } @fold 0 > ] } ;\n31 prime .", "output": "#t"}
+{"instruction": "Is 49 prime?", "input": "", "whisper": ": prime { _ 2 < ?? drop #f | _ 1 - range-to { 1 > } @filter ` { over ` % 0 = ?? drop 0 | 0 max ] } @fold 0 > ] } ;\n49 prime .", "output": "#f"}
+{"instruction": "Is 1996 a leap year?", "input": "", "whisper": ": leap { _ 4 % 0 = over 100 % 0 != @ 400 % 0 = ` | & } ;\n1996 leap .", "output": "#t"}
+{"instruction": "Is 2100 a leap year?", "input": "", "whisper": ": leap { _ 4 % 0 = over 100 % 0 != @ 400 % 0 = ` | & } ;\n2100 leap .", "output": "#f"}
+{"instruction": "Is 1 prime?", "input": "", "whisper": ": prime { _ 2 < ?? drop #f | _ 1 - range-to { 1 > } @filter ` { over ` % 0 = ?? drop 0 | 0 max ] } @fold 0 > ] } ;\n1 prime .", "output": "#f"}
+{"instruction": "Sum of squares of [1..4]", "input": "", "whisper": "4 range-to { _ * } @map 0 { + } @fold .", "output": "30"}
+{"instruction": "Count even numbers in [1..8]", "input": "", "whisper": "8 range-to { 2 % 0 = } @filter len .", "output": "4"}
+{"instruction": "Concatenate three strings", "input": "", "whisper": "\"x\" \"y\" strcat \"z\" strcat .", "output": "\"xyz\""}
+{"instruction": "Absolute value of -99", "input": "", "whisper": "-99 _ 0 < ?? -1 * | ] .", "output": "99"}
+{"instruction": "Modulo chain: (100 % 7) % 3", "input": "", "whisper": "100 7 % 3 % .", "output": "2"}

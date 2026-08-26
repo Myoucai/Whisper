@@ -137,3 +137,30 @@ model.save_pretrained('./whisper-qwen-7b-merged')
 AutoTokenizer.from_pretrained('./whisper-qwen-7b').save_pretrained('./whisper-qwen-7b-merged')
 "
 ```
+
+---
+
+## 重调 v4（2026-08 数据管线）
+
+本地已完成（无需 GPU）：
+- `train_v4.jsonl`（1052 条，100% 执行验证）：v2 修复 735 + 习语重写 273 + 新词汇 44
+  （新词汇含 v1.0.1 IO / v1.0.2 KV / url-decode / Forth 干扰项；socket 5 条为
+  模式验证，对应 app-gate 已端到端验证的 server.ws 模式）
+- `eval_v2.jsonl`（100 条，参数与训练集不相交，100% 执行验证）
+- 旧 `eval.jsonl`(15 条) 保留作回归基线
+
+AutoDL 步骤：
+```bash
+# 上传 paper/ 后
+cd ~/whisper-paper/scripts
+python finetune.py --data ../data/train_v4.jsonl --output ./whisper-qwen-7b-v4
+
+# 评测（执行对比，非文本匹配）：
+# 1) 新模型 x eval_v2（主指标：pass@1）
+# 2) 新模型 x 旧 eval.jsonl（回归：不得低于旧模型）
+python evaluate.py --model ./whisper-qwen-7b-v4 --data ../data/eval_v2.jsonl --output ../results/eval_v4_new.json
+python evaluate.py --model ./whisper-qwen-7b-v4 --data ../data/eval.jsonl --output ../results/eval_v4_regression.json
+```
+
+注意：evaluate.py 的对比用 `check_dataset_exec.py` 同款归一化
+（空白折叠），生成代码需 strip markdown 围栏（exp1 已有该逻辑）。

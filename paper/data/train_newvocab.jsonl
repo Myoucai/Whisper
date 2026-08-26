@@ -1,0 +1,44 @@
+{"instruction": "Store a value in the shared KV store", "input": "", "whisper": "\"greeting\" \"hello\" kv-set \"greeting\" kv-get .", "output": "\"hello\""}
+{"instruction": "Set and get a KV pair", "input": "", "whisper": "\"k1\" \"v1\" kv-set \"k1\" kv-get .", "output": "\"v1\""}
+{"instruction": "Overwrite an existing KV key", "input": "", "whisper": "\"k\" \"old\" kv-set \"k\" \"new\" kv-set \"k\" kv-get .", "output": "\"new\""}
+{"instruction": "Delete a key from the KV store", "input": "", "whisper": "\"k\" \"v\" kv-set \"k\" kv-del \"k\" kv-get strlen .", "output": "0"}
+{"instruction": "Getting a missing KV key returns an empty string", "input": "", "whisper": "\"nope\" kv-get strlen .", "output": "0"}
+{"instruction": "Count the keys in the KV store", "input": "", "whisper": "\"a\" \"1\" kv-set \"b\" \"2\" kv-set kv-keys len .", "output": "2"}
+{"instruction": "List all KV keys and count them", "input": "", "whisper": "\"x\" \"1\" kv-set \"y\" \"2\" kv-set \"z\" \"3\" kv-set kv-keys len .", "output": "3"}
+{"instruction": "Use KV as a visit counter", "input": "", "whisper": "\"n\" \"0\" kv-set \"n\" kv-get strtoi64 1 + i64tostr \"n\" ` kv-set \"n\" kv-get .", "output": "\"1\""}
+{"instruction": "Check whether a KV key exists", "input": "", "whisper": "\"k\" \"v\" kv-set \"k\" kv-get strlen 0 > .", "output": "#t"}
+{"instruction": "Delete a missing KV key is harmless", "input": "", "whisper": "\"ghost\" kv-del \"ok\" .", "output": "\"ok\""}
+{"instruction": "Write a file then read it back", "input": "", "whisper": "\"ft_a.txt\" \"whisper io\" write-file drop \"ft_a.txt\" read-file .", "output": "\"whisper io\""}
+{"instruction": "Write text to a file", "input": "", "whisper": "\"ft_b.txt\" \"data\" write-file drop \"ft_b.txt\" read-file .", "output": "\"data\""}
+{"instruction": "Reading a missing file returns an empty string", "input": "", "whisper": "\"ft_missing.txt\" read-file strlen .", "output": "0"}
+{"instruction": "Measure the length of a file's content", "input": "", "whisper": "\"ft_c.txt\" \"hello file\" write-file drop \"ft_c.txt\" read-file strlen .", "output": "10"}
+{"instruction": "Overwrite a file changes its content", "input": "", "whisper": "\"ft_d.txt\" \"one\" write-file drop \"ft_d.txt\" \"two\" write-file drop \"ft_d.txt\" read-file .", "output": "\"two\""}
+{"instruction": "Chain file write and string ops", "input": "", "whisper": "\"ft_e.txt\" \"abc\" write-file drop \"ft_e.txt\" read-file \"abc\" streq .", "output": "#t"}
+{"instruction": "Read an environment variable exists", "input": "", "whisper": "\"PATH\" getenv strlen 0 > .", "output": "#t"}
+{"instruction": "A missing environment variable yields an empty string", "input": "", "whisper": "\"WHISPER_NO_SUCH_VAR\" getenv strlen .", "output": "0"}
+{"instruction": "Read env and measure it", "input": "", "whisper": "\"PATH\" getenv strlen 0 >= .", "output": "#t"}
+{"instruction": "URL-decode a percent-encoded string", "input": "", "whisper": "import \"std/net\"\n\"Li%20Ming\" url-decode .", "output": "\"Li Ming\""}
+{"instruction": "Decode %XX escapes in a URL", "input": "", "whisper": "import \"std/net\"\n\"a%20b\" url-decode .", "output": "\"a b\""}
+{"instruction": "URL-decode leaves plain text unchanged", "input": "", "whisper": "import \"std/net\"\n\"plain\" url-decode .", "output": "\"plain\""}
+{"instruction": "Extract the query string of a request path", "input": "", "whisper": "import \"std/net\"\n\"/hi?x=1\" query-of .", "output": "\"x=1\""}
+{"instruction": "Get a form value from a urlencoded body", "input": "", "whisper": "import \"std/net\"\n\"name=Ali\" \"name\" form-get .", "output": "\"Ali\""}
+{"instruction": "Extract the request method", "input": "", "whisper": "import \"std/net\"\n\"GET /x HTTP/1.0\" req-method .", "output": "\"GET\""}
+{"instruction": "Extract the request path", "input": "", "whisper": "import \"std/net\"\n\"GET /kv/x HTTP/1.0\" req-path .", "output": "\"/kv/x\""}
+{"instruction": "Strip the query from a path", "input": "", "whisper": "import \"std/net\"\n\"/a/b?x=1\" path-only .", "output": "\"/a/b\""}
+{"instruction": "Swap two numbers and subtract (10 3 -> 3-10)", "input": "", "whisper": "10 3 ` - .", "output": "-7"}
+{"instruction": "Exchange the top two values then add", "input": "", "whisper": "1 2 ` + .", "output": "3"}
+{"instruction": "Duplicate the top value and multiply (square)", "input": "", "whisper": "5 _ * .", "output": "25"}
+{"instruction": "Duplicate the top of the stack", "input": "", "whisper": "7 _ + .", "output": "14"}
+{"instruction": "Copy the second value with over", "input": "", "whisper": "2 3 over * .", "output": "6"}
+{"instruction": "Rotate three values", "input": "", "whisper": "1 2 3 @ drop + .", "output": "5"}
+{"instruction": "Drop the top value", "input": "", "whisper": "1 2 drop .", "output": "1"}
+{"instruction": "Bitwise AND (not logical)", "input": "", "whisper": "12 10 bitand .", "output": "8"}
+{"instruction": "Logical AND of two booleans", "input": "", "whisper": "#t #f & .", "output": "#f"}
+{"instruction": "Logical OR of two booleans", "input": "", "whisper": "#t #f | .", "output": "#t"}
+{"instruction": "Conditional with ?? | ]", "input": "", "whisper": "5 3 > ?? \"yes\" . | \"no\" . ]", "output": "\"yes\""}
+{"instruction": "Even/odd check with a conditional", "input": "", "whisper": "4 2 % 0 = ?? \"even\" . | \"odd\" . ]", "output": "\"even\""}
+{"instruction": "Read one HTTP request from a connection", "input": "", "whisper": "_ recv req-path .", "output": "", "pattern_verified": true}
+{"instruction": "Send a response on a connection", "input": "", "whisper": "_ recv drop \"HTTP/1.0 200 OK\\r\\nContent-Length: 2\\r\\n\\r\\nhi\" send drop", "output": "", "pattern_verified": true}
+{"instruction": "Serve requests with a handler word", "input": "", "whisper": ": handle { _ recv drop \"HTTP/1.0 200 OK\\r\\n\\r\\n\" send drop } ;\n8080 \"handle\" serve-concurrent", "output": "", "pattern_verified": true}
+{"instruction": "Start a concurrent web server on a port", "input": "", "whisper": ": handle { _ recv req-path path-only . send drop } ;\n8080 \"handle\" serve-concurrent", "output": "", "pattern_verified": true}
+{"instruction": "Read a request's method and path", "input": "", "whisper": "_ recv dup req-method . req-path .", "output": "", "pattern_verified": true}

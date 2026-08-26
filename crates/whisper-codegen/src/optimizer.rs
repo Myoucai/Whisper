@@ -118,10 +118,7 @@ fn constant_folding(ops: &[Opcode]) -> (Vec<Opcode>, Vec<usize>) {
 
     while i < ops.len() {
         // never fold across or onto a jump target (loop/branch entry)
-        let window3_clear = i + 2 < ops.len()
-            && !targets[i]
-            && !targets[i + 1]
-            && !targets[i + 2];
+        let window3_clear = i + 2 < ops.len() && !targets[i] && !targets[i + 1] && !targets[i + 2];
         if window3_clear {
             // i64 binary ops
             if let (Opcode::PushI64(a), Opcode::PushI64(b), binop) =
@@ -287,43 +284,43 @@ fn peephole(ops: &[Opcode]) -> (Vec<Opcode>, Vec<usize>) {
             let clear = !targets[i] && !targets[i + 1];
             if clear {
                 match (&ops[i], &ops[i + 1]) {
-                // Dup + Drop → remove both
-                (Opcode::Dup, Opcode::Drop) => {
-                    i += 2;
-                    continue;
+                    // Dup + Drop → remove both
+                    (Opcode::Dup, Opcode::Drop) => {
+                        i += 2;
+                        continue;
+                    }
+                    // Swap + Swap → remove both
+                    (Opcode::Swap, Opcode::Swap) => {
+                        i += 2;
+                        continue;
+                    }
+                    // PushI64(0) + Add → no-op
+                    (Opcode::PushI64(0), Opcode::Add) => {
+                        i += 2;
+                        continue;
+                    }
+                    // PushI64(0) + Sub → no-op
+                    (Opcode::PushI64(0), Opcode::Sub) => {
+                        i += 2;
+                        continue;
+                    }
+                    // PushI64(1) + Mul → no-op
+                    (Opcode::PushI64(1), Opcode::Mul) => {
+                        i += 2;
+                        continue;
+                    }
+                    // Not + Not → remove double negation
+                    (Opcode::Not, Opcode::Not) => {
+                        i += 2;
+                        continue;
+                    }
+                    // PushBool(x) + Drop → no-op
+                    (Opcode::PushBool(_), Opcode::Drop) => {
+                        i += 2;
+                        continue;
+                    }
+                    _ => {}
                 }
-                // Swap + Swap → remove both
-                (Opcode::Swap, Opcode::Swap) => {
-                    i += 2;
-                    continue;
-                }
-                // PushI64(0) + Add → no-op
-                (Opcode::PushI64(0), Opcode::Add) => {
-                    i += 2;
-                    continue;
-                }
-                // PushI64(0) + Sub → no-op
-                (Opcode::PushI64(0), Opcode::Sub) => {
-                    i += 2;
-                    continue;
-                }
-                // PushI64(1) + Mul → no-op
-                (Opcode::PushI64(1), Opcode::Mul) => {
-                    i += 2;
-                    continue;
-                }
-                // Not + Not → remove double negation
-                (Opcode::Not, Opcode::Not) => {
-                    i += 2;
-                    continue;
-                }
-                // PushBool(x) + Drop → no-op
-                (Opcode::PushBool(_), Opcode::Drop) => {
-                    i += 2;
-                    continue;
-                }
-                _ => {}
-            }
             }
 
             // Dup + Dup → Dup + Pick(1) (save stack space)
@@ -425,11 +422,7 @@ fn dead_store_elimination(ops: &[Opcode]) -> (Vec<Opcode>, Vec<usize>) {
     let mut i = 0;
 
     while i < ops.len() {
-        if i + 1 < ops.len()
-            && ops[i + 1] == Opcode::Drop
-            && !targets[i]
-            && !targets[i + 1]
-        {
+        if i + 1 < ops.len() && ops[i + 1] == Opcode::Drop && !targets[i] && !targets[i + 1] {
             match &ops[i] {
                 Opcode::PushI64(_) | Opcode::PushF64(_) | Opcode::PushStr(_) => {
                     i += 2;
