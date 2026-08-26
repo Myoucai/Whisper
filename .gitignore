@@ -45,3 +45,4 @@ whisperc/gen*.c
 whisperc/gen1.s
 whisperc/gen1.su
 whisper_test/tmp/
+adapters/
