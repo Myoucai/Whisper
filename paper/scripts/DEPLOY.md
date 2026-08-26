@@ -164,3 +164,41 @@ python evaluate.py --model ./whisper-qwen-7b-v4 --data ../data/eval.jsonl --outp
 
 注意：evaluate.py 的对比用 `check_dataset_exec.py` 同款归一化
 （空白折叠），生成代码需 strip markdown 围栏（exp1 已有该逻辑）。
+
+---
+
+## 底座升级（2026-08）：Qwen2.5-Coder-7B → Qwen3-Coder-30B-A3B-Instruct
+
+为什么选它（"Coder Flash"）：
+- 编码特化的 MoE：30.5B 总参 / **3.3B 激活**——训练用全部容量，推理/拒识采样只花 3B 的速度
+- **Apache 2.0**（论文可用），256K 原生上下文
+- 4-bit NF4 QLoRA 约 17-18GB 权重，A6000 48GB 富余（默认已改 4bit + bsz2×accum8）
+- 无思考模式分支（instruct 变体），evaluate.py 已防御性剥离 `<think>`
+
+### 下载（AutoDL，二选一）
+```bash
+# 方式 A：hf-mirror（HF_ENDPOINT 已在脚本里设置）
+huggingface-cli download Qwen/Qwen3-Coder-30B-A3B-Instruct --local-dir ~/models/qwen3-coder-30b-a3b
+
+# 方式 B：ModelScope（国内更快，权重相同）
+pip install modelscope
+modelscope download --model Qwen/Qwen3-Coder-30B-A3B-Instruct --local_dir ~/models/qwen3-coder-30b-a3b
+```
+finetune.py / evaluate.py 均为 local_files_only=True，下载后：
+```bash
+python finetune.py --model ~/models/qwen3-coder-30b-a3b --data ../data/train_v4.jsonl --output ./whisper-qwen30b-v4
+```
+
+### 版本要求（MoE + 4bit）
+```bash
+pip install -U "transformers>=4.53" peft bitsandbytes accelerate trl
+```
+
+### 注意事项
+- LoRA target_modules 沿用 q/k/v/o/gate/up/down_proj —— 对 MoE 专家层同名生效；
+  不需要改（router `gate` 不会被 `gate_proj` 匹配到）
+- 若 bitsandbytes 对 MoE 4bit 报错（老版本），先 `pip install -U bitsandbytes`；
+  仍不行则退回 `--quant 8bit`（约 31GB，48GB 卡 bsz 1）
+- **换底座 = 换 tokenizer**：论文的 24% token 节省对比需用新 tokenizer 重测
+  （compare_tokens.py / realworld_token_compare.py），Step 4 一并做
+- 显存不够时梯度检查已默认开启；再不够加 `--batch-size 1 --grad-accum 16`

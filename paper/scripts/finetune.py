@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """
-Fine-tune Qwen-Coder-7B on Whisper code generation.
+Fine-tune Qwen3-Coder-30B-A3B-Instruct (MoE, "Coder Flash") on Whisper
+code generation. Also works with any Qwen2.5/Qwen3 dense base via --model.
 
 Optimized for: 48GB VRAM (RTX A6000 / RTX 6000 Ada / A40) on AutoDL.
+30B-A3B in 4-bit NF4 ≈ 17-18GB weights; only 3.3B params activate per
+token, so eval and rejection sampling are fast too.
 
 Usage:
     # AutoDL 一键环境
-    pip install transformers peft bitsandbytes datasets accelerate trl
+    pip install -U transformers peft bitsandbytes datasets accelerate trl
 
-    # 运行微调
-    python finetune.py --data ../data/train.jsonl --output ./whisper-qwen-7b
+    # 运行微调 (v4 数据)
+    python finetune.py --data ../data/train_v4.jsonl --output ./whisper-qwen30b-v4
 """
 
 import argparse
@@ -69,19 +72,22 @@ def load_dataset(path: str) -> Dataset:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Fine-tune Qwen-Coder-7B on Whisper")
-    parser.add_argument("--model", default="Qwen/Qwen2.5-Coder-7B-Instruct", help="Base model")
+    parser = argparse.ArgumentParser(description="Fine-tune Qwen3-Coder on Whisper")
+    parser.add_argument("--model", default="Qwen/Qwen3-Coder-30B-A3B-Instruct",
+                        help="Base model (MoE coder default; any Qwen works)")
     parser.add_argument("--data", default="../data/train.jsonl", help="Training JSONL")
-    parser.add_argument("--output", default="./whisper-qwen-7b", help="Output dir")
+    parser.add_argument("--output", default="./whisper-qwen30b-v4", help="Output dir")
     parser.add_argument("--epochs", type=int, default=5, help="Training epochs")
-    parser.add_argument("--batch-size", type=int, default=8, help="Per-device batch size")
-    parser.add_argument("--grad-accum", type=int, default=2, help="Gradient accumulation steps")
+    parser.add_argument("--batch-size", type=int, default=2,
+                        help="Per-device batch size (MoE 30B: keep 2)")
+    parser.add_argument("--grad-accum", type=int, default=8, help="Gradient accumulation steps")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
     parser.add_argument("--lora-r", type=int, default=128, help="LoRA rank")
     parser.add_argument("--lora-alpha", type=int, default=256, help="LoRA alpha")
     parser.add_argument("--max-seq-len", type=int, default=2048, help="Max sequence length")
-    parser.add_argument("--quant", default="8bit", choices=["4bit", "8bit", "none"],
-                        help="Quantization mode (8bit recommended for 48GB)")
+    parser.add_argument("--quant", default="4bit", choices=["4bit", "8bit", "none"],
+                        help="Quantization mode (4bit for 30B MoE on 48GB; "
+                             "8bit only for <=14B dense)")
     args = parser.parse_args()
 
     print(f"Model: {args.model}")

@@ -23,7 +23,7 @@ def main():
     # Train
     cmd = (
         f"python finetune.py"
-        f" --model Qwen/Qwen2.5-Coder-7B-Instruct"
+        f" --model Qwen/Qwen3-Coder-30B-A3B-Instruct"
         f" --data {data_path}"
         f" --output {output_dir}"
         f" --epochs 5 --batch-size 8 --grad-accum 2"

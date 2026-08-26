@@ -40,6 +40,11 @@ def generate_code(model, tokenizer, instruction: str, input_data: str = "", max_
         )
 
     generated = tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+    # Qwen3 hybrid-thinking bases may emit <think>...</think> before the
+    # answer; the coder-instruct variant normally does not, but strip
+    # defensively either way.
+    if "</think>" in generated:
+        generated = generated.split("</think>", 1)[1]
     return generated.strip()
 
 
