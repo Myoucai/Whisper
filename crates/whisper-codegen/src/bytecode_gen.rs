@@ -216,6 +216,16 @@ impl BytecodeGenerator {
         // Loop: if true, jump back to loop_start
         let offset = loop_start as i32 - cond_end as i32 - 1;
         self.emit(Opcode::Loop(offset));
+        // Backpatch leave: any Leave(0) emitted inside this body/cond
+        // region jumps past the Loop instruction. Inner loops' leaves
+        // already carry nonzero offsets (patched by their own
+        // compile_loop), so Leave(0) uniquely marks "mine".
+        let after_loop = self.bytecode.len();
+        for idx in loop_start..after_loop - 1 {
+            if let Opcode::Leave(0) = self.bytecode[idx] {
+                self.bytecode[idx] = Opcode::Leave((after_loop - idx - 1) as i32);
+            }
+        }
     }
 
     fn compile_operator(&mut self, op: Operator) {
@@ -277,6 +287,11 @@ impl BytecodeGenerator {
             Operator::StrLower => Opcode::StrLower,
             Operator::StrStrip => Opcode::StrStrip,
             Operator::Fmt => Opcode::Fmt,
+            Operator::ListDir => Opcode::ListDir,
+            Operator::Mkdir => Opcode::Mkdir,
+            Operator::FileExists => Opcode::FileExists,
+            Operator::StrfTime => Opcode::StrfTime,
+            Operator::Leave => Opcode::Leave(0),
             Operator::StrLen => Opcode::StrLen,
             Operator::StrCat => Opcode::StrCat,
             Operator::StrSlice => Opcode::StrSlice,

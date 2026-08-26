@@ -403,6 +403,7 @@ export group-paired-rec
     [245 "kv-set"] [246 "kv-get"] [247 "kv-del"] [248 "kv-keys"]
     [255 "serve-concurrent"]
     [249 "read-line"] [250 "str-upper"] [251 "str-lower"] [252 "str-strip"] [253 "fmt"]
+    [200 "listdir"] [201 "mkdir"] [202 "file-exists"] [203 "strftime"] [254 "leave"]
     [194 "map-new"] [195 "map-get"] [196 "map-set"]
     [197 "map-del"] [198 "map-keys"] [199 "map-has"]
     [208 "now"] [209 "sleep"] [210 "random"] [211 "randint"]
@@ -618,6 +619,39 @@ export classify-nested
     append                      // combined ++ [[82, -total]]
     // Stack: [token, cond_bc, result]
     swap drop swap drop
+    patch-leaves
+} ;
+
+// ── leave backpatch: rewrite [3 254] markers to [81 offset] jumps ──
+// Queue-style: [src dst] consumes one element per call. A leave seen
+// when dst has k elements sits at flat position k; total length is
+// len(src)+len(dst); jump target (past the trailing [82 off]) is
+// total, so offset = total - k - 1 = len(src) - 1.
+: pl-leave? {
+    // compiled IR: bare opcodes are plain i64 scalars (dup=0, .=144, ...)
+    // a leave marker is the scalar 254
+    dup i64? ?? _ 254 = ` drop | drop #f ]
+} ;
+
+: pl-head {
+    over len 0 = ?? return ]
+    $1 0 @nth pl-leave? ??
+        $1 len 1 - [81] ` append append
+    |
+        $1 0 @nth append
+    ]
+    swap 1 drop-n swap
+} ;
+
+: patch-leaves {
+    []
+    pl-until
+    ` drop
+} ;
+: pl-until {
+    over len 0 = ?? return ]
+    pl-head
+    pl-until
 } ;
 
 : compile-one {
@@ -1060,6 +1094,16 @@ export classify-full
     dup 252 = ?? drop "{ w_push((wval)w_str_strip(w_pop())); }
 " return ]
     dup 253 = ?? drop "{ wval _v=w_pop(); wval _f=w_pop(); w_push((wval)w_fmt(_f,_v)); }
+" return ]
+    dup 200 = ?? drop "{ w_push((wval)w_listdir(w_pop())); }
+" return ]
+    dup 201 = ?? drop "{ w_push((wval)w_mkdir(w_pop())); }
+" return ]
+    dup 202 = ?? drop "{ struct stat _st; w_push((wval)(stat((const char*)w_pop(),&_st)==0)); }
+" return ]
+    dup 203 = ?? drop "{ const char*_f=(const char*)w_pop(); int64_t _t=(int64_t)w_pop(); w_push((wval)w_strftime_utc(_t,_f)); }
+" return ]
+    dup 254 = ?? drop "
 " return ]
     drop "// unknown bare opcode\n"
 } ;

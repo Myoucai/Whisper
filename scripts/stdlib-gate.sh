@@ -36,6 +36,17 @@ t list-range   'import "std/list" 5 range-to 2 @nth .' 3
 t list-maxval  'import "std/list" [3 1 4 1 5] max-val .' 5
 t list-rev     'import "std/list" [1 2 3] rev 0 @nth .' 3
 t list-sort    'import "std/list" [3 1 2] sort 0 @nth .' 1
+t p1-mkdir     '"t_g1" mkdir . "t_g1" file-exists .' $'0
+1'
+t p1-strftime  '0 "%Y-%m-%d" strftime .' 1970-01-01
+t p1-strftime2 '1770000000 "%H:%M:%S" strftime .' 02:40:00
+t p1-listdir   '"." listdir len 0 > .' 1
+t p1-leave     '0 { _ 3 = ?? leave | ] _ . 1 + } { _ 5 < } # drop "end" .' $'0
+1
+2
+end'
+t p1-loop-plain '0 { _ . 1 + } { _ 2 < } #' $'0
+1'
 t p0-upper     '"Hello" str-upper .' HELLO
 t p0-lower     '"aBc" str-lower .' abc
 t p0-strip     '"  pad  " str-strip .' pad
@@ -56,3 +67,4 @@ t core-range   'import "std/list" 5 range-to len .' 5
 
 echo "=== stdlib gate: PASS=$pass FAIL=$fail ==="
 [ "$fail" -eq 0 ]
+rm -rf t_g1 t_zz

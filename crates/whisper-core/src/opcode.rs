@@ -101,6 +101,19 @@ pub enum Opcode {
     /// str value -> str (replace first {} with value as text)
     Fmt,
 
+    // === P1 vocabulary (v1.0.4) ===
+    /// path -> [names] (empty list on error)
+    ListDir,
+    /// path -> 0 | -1
+    Mkdir,
+    /// path -> #t | #f
+    FileExists,
+    /// ts fmt -> str (UTC; %Y %m %d %H %M %S)
+    StrfTime,
+    /// (inside {body} {cond} #) exit innermost loop; Leave(0) elsewhere
+    /// is a no-op fall-through
+    Leave(i32),
+
     // === Arithmetic (0x10-0x17) ===
     /// Addition: a b → (a+b)
     Add,
@@ -375,6 +388,11 @@ impl Opcode {
             Opcode::StrLower => 251,
             Opcode::StrStrip => 252,
             Opcode::Fmt => 253,
+            Opcode::ListDir => 200,
+            Opcode::Mkdir => 201,
+            Opcode::FileExists => 202,
+            Opcode::StrfTime => 203,
+            Opcode::Leave(_) => 254,
             Opcode::ListCheck => 0xE4,
             Opcode::I64Check => 0xE5,
             Opcode::StrCheck => 0xE6,
@@ -572,6 +590,11 @@ impl Opcode {
             Opcode::StrLower => "str-lower",
             Opcode::StrStrip => "str-strip",
             Opcode::Fmt => "fmt",
+            Opcode::ListDir => "listdir",
+            Opcode::Mkdir => "mkdir",
+            Opcode::FileExists => "file-exists",
+            Opcode::StrfTime => "strftime",
+            Opcode::Leave(_) => "leave",
             Opcode::Add => "add",
             Opcode::Sub => "sub",
             Opcode::Mul => "mul",

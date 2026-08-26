@@ -645,6 +645,27 @@ fn transpile_opcodes(
                     "{{ wval _v=w_pop(); wval _f=w_pop(); w_push((wval)w_fmt(_f,_v)); }}"
                 );
             }
+            Opcode::ListDir => {
+                let _ = writeln!(out, "{{ w_push((wval)w_listdir(w_pop())); }}");
+            }
+            Opcode::Mkdir => {
+                let _ = writeln!(out, "{{ w_push((wval)w_mkdir(w_pop())); }}");
+            }
+            Opcode::FileExists => {
+                let _ = writeln!(
+                    out,
+                    "{{ struct stat _st; w_push((wval)(stat((const char*)w_pop(),&_st)==0)); }}"
+                );
+            }
+            Opcode::StrfTime => {
+                let _ = writeln!(
+                    out,
+                    "{{ const char*_f=(const char*)w_pop(); int64_t _t=(int64_t)w_pop(); w_push((wval)w_strftime_utc(_t,_f)); }}"
+                );
+            }
+            Opcode::Leave(off) => {
+                let _ = writeln!(out, "goto L_{};", i + 1 + *off as usize);
+            }
             Opcode::EnvGet => {
                 let _ = writeln!(
                     out,

@@ -50,7 +50,7 @@ fn relocate(pre: &[Opcode], map: &[usize], mut post: Vec<Opcode>) -> Vec<Opcode>
     debug_assert_eq!(map.len(), pre.len() + 1);
     for (i, op) in pre.iter().enumerate() {
         let offset = match op {
-            Opcode::Cond(o) | Opcode::Jump(o) | Opcode::Loop(o) => *o,
+            Opcode::Cond(o) | Opcode::Jump(o) | Opcode::Loop(o) | Opcode::Leave(o) => *o,
             _ => continue,
         };
         let j = map[i];
@@ -70,7 +70,9 @@ fn relocate(pre: &[Opcode], map: &[usize], mut post: Vec<Opcode>) -> Vec<Opcode>
         let patched = match op {
             Opcode::Cond(_) => Opcode::Cond(new_offset as i32),
             Opcode::Jump(_) => Opcode::Jump(new_offset as i32),
-            _ => Opcode::Loop(new_offset as i32),
+            Opcode::Loop(_) => Opcode::Loop(new_offset as i32),
+            Opcode::Leave(_) => Opcode::Leave(new_offset as i32),
+            _ => unreachable!("relocate only patches jump-family ops"),
         };
         post[j] = patched;
     }
@@ -92,7 +94,7 @@ fn jump_targets(ops: &[Opcode]) -> Vec<bool> {
     let mut mask = vec![false; ops.len()];
     for (i, op) in ops.iter().enumerate() {
         let offset = match op {
-            Opcode::Cond(o) | Opcode::Jump(o) | Opcode::Loop(o) => *o as i64,
+            Opcode::Cond(o) | Opcode::Jump(o) | Opcode::Loop(o) | Opcode::Leave(o) => *o as i64,
             _ => continue,
         };
         let target = i as i64 + 1 + offset;

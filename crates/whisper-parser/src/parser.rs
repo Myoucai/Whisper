@@ -688,6 +688,26 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::Fmt)))
             }
+            TokenKind::ListDir => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::ListDir)))
+            }
+            TokenKind::Mkdir => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Mkdir)))
+            }
+            TokenKind::FileExists => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::FileExists)))
+            }
+            TokenKind::StrfTime => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::StrfTime)))
+            }
+            TokenKind::Leave => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Leave)))
+            }
             TokenKind::BytesNew => {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::BytesNew)))

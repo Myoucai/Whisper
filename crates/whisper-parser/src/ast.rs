@@ -114,6 +114,11 @@ pub enum Operator {
     StrLower,
     StrStrip,
     Fmt,
+    ListDir,
+    Mkdir,
+    FileExists,
+    StrfTime,
+    Leave,
 
     // Arithmetic
     Add,

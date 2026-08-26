@@ -525,6 +525,45 @@ impl Vm {
                     .collect();
                 self.data_stack.push(Value::List(Rc::new(keys)));
             }
+            Opcode::ListDir => {
+                let path = self.pop_str()?;
+                let mut names: Vec<Value> = Vec::new();
+                if let Ok(rd) = std::fs::read_dir(path.as_ref()) {
+                    for e in rd.flatten() {
+                        let n = e.file_name().to_string_lossy().to_string();
+                        names.push(Value::Str(Rc::new(n)));
+                    }
+                }
+                names.sort_by_key(|v| match v {
+                    Value::Str(s) => s.as_ref().clone(),
+                    other => format!("{other:?}"),
+                });
+                self.data_stack.push(Value::List(Rc::new(names)));
+            }
+            Opcode::Mkdir => {
+                let path = self.pop_str()?;
+                let r = std::fs::create_dir(path.as_ref())
+                    .map(|_| 0i64)
+                    .unwrap_or(-1);
+                self.data_stack.push(Value::I64(r));
+            }
+            Opcode::FileExists => {
+                let path = self.pop_str()?;
+                let r = std::fs::metadata(path.as_ref()).is_ok();
+                self.data_stack.push(Value::Bool(r));
+            }
+            Opcode::StrfTime => {
+                let fmt = self.pop_str()?;
+                let ts = self.pop_i64()?;
+                let out = crate::strftime::format_utc(ts, fmt.as_ref());
+                self.data_stack.push(Value::Str(Rc::new(out)));
+            }
+            Opcode::Leave(offset) => {
+                // same jump semantics as Jump; compile_loop backpatches
+                // the offset to the instruction after the Loop
+                let frame = self.call_stack.last_mut().unwrap();
+                frame.ip = (frame.ip as i64 + *offset as i64) as usize;
+            }
             Opcode::ReadLine => {
                 let mut line = String::new();
                 let n = std::io::stdin().read_line(&mut line).unwrap_or(0);

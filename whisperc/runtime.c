@@ -601,6 +601,113 @@ static wval w_str_strip(wval s) {
     return (wval)w_str_new(p + a, b - a);
 }
 
+// ── P1 vocabulary (v1.0.4): directory ops + UTC strftime ────────────
+
+#include <sys/stat.h>
+#ifdef _WIN32
+#include <direct.h>
+#include <dirent.h>
+#define w_mkdir_impl(p) _mkdir(p)
+#else
+#include <sys/stat.h>
+#include <dirent.h>
+#define w_mkdir_impl(p) mkdir(p, 0755)
+#endif
+
+static wval w_mkdir(wval path) {
+    return (wval)(int64_t)(w_mkdir_impl((const char *)path) == 0 ? 0 : -1);
+}
+
+// list of entry names, sorted bytewise; empty list on error
+static int w_cstr_cmp(const void *a, const void *b) {
+    return strcmp(*(const char **)a, *(const char **)b);
+}
+static wval w_listdir(wval path) {
+    const char *p = (const char *)path;
+    DIR *d = opendir(p);
+    if (!d) return (wval)w_list_new(0);
+    char **names = NULL;
+    int64_t n = 0, cap = 0;
+    struct dirent *e;
+    while ((e = readdir(d)) != NULL) {
+        if (n == cap) {
+            cap = cap ? cap * 2 : 16;
+            names = (char **)realloc(names, cap * sizeof(char *));
+            if (!names) { closedir(d); return (wval)w_list_new(0); }
+        }
+        // copy into the string arena so it outlives the DIR handle
+        uint32_t l = (uint32_t)strlen(e->d_name);
+        names[n] = (char *)w_str_new(e->d_name, l);
+        n++;
+    }
+    closedir(d);
+    if (n > 1) qsort(names, (size_t)n, sizeof(char *), w_cstr_cmp);
+    wval *lst = w_list_new(n);
+    for (int64_t i = 0; i < n; i++) lst[1 + i] = (wval)names[i];
+    free(names);
+    return (wval)lst;
+}
+
+// UTC formatting, subset %Y %m %d %H %M %S %% — mirrors the Rust
+// strftime::format_utc byte for byte (no platform strftime on purpose).
+static void w_civil_from_days(int64_t z, int64_t *y, int *mo, int *dd) {
+    z += 719468;
+    int64_t era = (z >= 0 ? z : z - 146096) / 146097;
+    uint64_t doe = (uint64_t)(z - era * 146097);
+    uint64_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    int64_t yy = (int64_t)yoe + era * 400;
+    uint64_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    uint64_t mp = (5 * doy + 2) / 153;
+    *dd = (int)(doy - (153 * mp + 2) / 5 + 1);
+    *mo = (int)(mp < 10 ? mp + 3 : mp - 9);
+    *y = (*mo <= 2) ? yy + 1 : yy;
+}
+static wval w_strftime_utc(int64_t ts, const char *fmt) {
+    int64_t days = ts / 86400;
+    int64_t secs = ts % 86400;
+    if (secs < 0) { secs += 86400; days -= 1; }
+    int64_t y; int mo, dd;
+    w_civil_from_days(days, &y, &mo, &dd);
+    char tmp[8];
+    const char *f = fmt;
+    uint32_t n = w_str_len(f);
+    // worst case growth: each %X becomes <= 2 digits replaced by <= 4
+    char *buf = (char *)malloc(n * 4 + 8);
+    if (!buf) return (wval)w_str_new("", 0);
+    uint32_t o = 0;
+    for (uint32_t i = 0; i < n; i++) {
+        if (f[i] == '%' && i + 1 < n) {
+            const char *rep = NULL;
+            int reqlen = 0;
+            switch (f[i + 1]) {
+            case 'Y': snprintf(tmp, sizeof(tmp), "%04lld", (long long)y);
+                      rep = tmp; reqlen = (int)strlen(tmp); break;
+            case 'm': snprintf(tmp, sizeof(tmp), "%02d", mo);
+                      rep = tmp; reqlen = 2; break;
+            case 'd': snprintf(tmp, sizeof(tmp), "%02d", dd);
+                      rep = tmp; reqlen = 2; break;
+            case 'H': snprintf(tmp, sizeof(tmp), "%02lld",
+                      (long long)(secs / 3600)); rep = tmp; reqlen = 2; break;
+            case 'M': snprintf(tmp, sizeof(tmp), "%02lld",
+                      (long long)((secs % 3600) / 60)); rep = tmp; reqlen = 2; break;
+            case 'S': snprintf(tmp, sizeof(tmp), "%02lld",
+                      (long long)(secs % 60)); rep = tmp; reqlen = 2; break;
+            case '%': rep = "%"; reqlen = 1; break;
+            }
+            if (rep) {
+                memcpy(buf + o, rep, (size_t)reqlen);
+                o += (uint32_t)reqlen;
+                i += 1;
+                continue;
+            }
+        }
+        buf[o++] = f[i];
+    }
+    wval r = (wval)w_str_new(buf, o);
+    free(buf);
+    return r;
+}
+
 // fmt: replace the first {} in fstr with value rendered as text
 // (heap pointer => string; anything else => i64, mirroring w_dump_val)
 static wval w_fmt(wval f, wval v) {

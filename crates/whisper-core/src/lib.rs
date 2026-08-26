@@ -3,6 +3,7 @@
 
 pub mod capability;
 pub mod opcode;
+pub mod strftime;
 pub mod value;
 pub mod vm;
 

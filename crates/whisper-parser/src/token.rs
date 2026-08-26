@@ -99,6 +99,11 @@ impl TokenKind {
             Self::StrLower => "str-lower",
             Self::StrStrip => "str-strip",
             Self::Fmt => "fmt",
+            Self::ListDir => "listdir",
+            Self::Mkdir => "mkdir",
+            Self::FileExists => "file-exists",
+            Self::StrfTime => "strftime",
+            Self::Leave => "leave",
             Self::MapNew => "map-new",
             Self::MapGet => "map-get",
             Self::MapSet => "map-set",
@@ -280,6 +285,11 @@ pub enum TokenKind {
     StrLower,
     StrStrip,
     Fmt,
+    ListDir,
+    Mkdir,
+    FileExists,
+    StrfTime,
+    Leave,
 
     // Float operations
     I64ToF64,
