@@ -113,6 +113,10 @@ pub enum Opcode {
     /// (inside {body} {cond} #) exit innermost loop; Leave(0) elsewhere
     /// is a no-op fall-through
     Leave(i32),
+    /// str pattern -> #t|#f (full-anchored regex subset)
+    StrMatch,
+    /// str pattern -> idx|-1 (first prefix match)
+    StrFindRe,
 
     // === Arithmetic (0x10-0x17) ===
     /// Addition: a b → (a+b)
@@ -393,6 +397,8 @@ impl Opcode {
             Opcode::FileExists => 202,
             Opcode::StrfTime => 203,
             Opcode::Leave(_) => 254,
+            Opcode::StrMatch => 233,
+            Opcode::StrFindRe => 204,
             Opcode::ListCheck => 0xE4,
             Opcode::I64Check => 0xE5,
             Opcode::StrCheck => 0xE6,
@@ -595,6 +601,8 @@ impl Opcode {
             Opcode::FileExists => "file-exists",
             Opcode::StrfTime => "strftime",
             Opcode::Leave(_) => "leave",
+            Opcode::StrMatch => "strmatch",
+            Opcode::StrFindRe => "strfind-re",
             Opcode::Add => "add",
             Opcode::Sub => "sub",
             Opcode::Mul => "mul",

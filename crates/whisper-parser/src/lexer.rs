@@ -452,6 +452,8 @@ impl Lexer {
             "file-exists" => TokenKind::FileExists,
             "strftime" => TokenKind::StrfTime,
             "leave" => TokenKind::Leave,
+            "strmatch" => TokenKind::StrMatch,
+            "strfind-re" => TokenKind::StrFindRe,
             "split-cond" => TokenKind::SplitCond,
             "list?" => TokenKind::ListCheck,
             "i64?" => TokenKind::I64Check,

@@ -104,6 +104,8 @@ impl TokenKind {
             Self::FileExists => "file-exists",
             Self::StrfTime => "strftime",
             Self::Leave => "leave",
+            Self::StrMatch => "strmatch",
+            Self::StrFindRe => "strfind-re",
             Self::MapNew => "map-new",
             Self::MapGet => "map-get",
             Self::MapSet => "map-set",
@@ -290,6 +292,8 @@ pub enum TokenKind {
     FileExists,
     StrfTime,
     Leave,
+    StrMatch,
+    StrFindRe,
 
     // Float operations
     I64ToF64,

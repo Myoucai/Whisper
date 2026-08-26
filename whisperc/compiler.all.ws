@@ -34,6 +34,18 @@
     | ]
     ]]]
 } ;
+// escape code -> replacement string; UNKNOWN escapes keep the
+// backslash (parity with the Rust lexer's pass-through rule, so
+// regex patterns like "\d+" survive the self-hosted chain)
+: esc-str {
+    dup 110 = ?? drop 10 ctos return ]
+    dup 116 = ?? drop 9 ctos return ]
+    dup 114 = ?? drop 13 ctos return ]
+    dup 48 = ?? drop 0 ctos return ]
+    dup 34 = ?? drop 34 ctos return ]
+    dup 92 = ?? drop 92 ctos return ]
+    92 ctos swap ctos strcat
+} ;
 
 // read-str-acc: acc s → acc' rest'
 : read-str-acc {
@@ -41,7 +53,7 @@
     |   _ 0 strnth 34 = ??
             striter ` drop
         |   _ 0 strnth 92 = ??
-                1 999999 strslice dup 0 strnth esc-char ctos
+                1 999999 strslice dup 0 strnth esc-str
                 @ ` strcat swap 1 999999 strslice read-str-acc
         |   _ 0 strnth ctos
             @ ` strcat
@@ -404,6 +416,7 @@ export group-paired-rec
     [255 "serve-concurrent"]
     [249 "read-line"] [250 "str-upper"] [251 "str-lower"] [252 "str-strip"] [253 "fmt"]
     [200 "listdir"] [201 "mkdir"] [202 "file-exists"] [203 "strftime"] [254 "leave"]
+    [233 "strmatch"] [204 "strfind-re"]
     [194 "map-new"] [195 "map-get"] [196 "map-set"]
     [197 "map-del"] [198 "map-keys"] [199 "map-has"]
     [208 "now"] [209 "sleep"] [210 "random"] [211 "randint"]
@@ -1104,6 +1117,9 @@ export classify-full
     dup 203 = ?? drop "{ const char*_f=(const char*)w_pop(); int64_t _t=(int64_t)w_pop(); w_push((wval)w_strftime_utc(_t,_f)); }
 " return ]
     dup 254 = ?? drop "
+" return ]    dup 233 = ?? drop "{ const char*_p=(const char*)w_pop(); const char*_s=(const char*)w_pop(); w_push((wval)w_strmatch((wval)_s,(wval)_p)); }
+" return ]
+    dup 204 = ?? drop "{ const char*_p=(const char*)w_pop(); const char*_s=(const char*)w_pop(); w_push((wval)w_strfind_re((wval)_s,(wval)_p)); }
 " return ]
     drop "// unknown bare opcode\n"
 } ;

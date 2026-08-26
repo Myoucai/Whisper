@@ -47,6 +47,16 @@ t p1-leave     '0 { _ 3 = ?? leave | ] _ . 1 + } { _ 5 < } # drop "end" .' $'0
 end'
 t p1-loop-plain '0 { _ . 1 + } { _ 2 < } #' $'0
 1'
+t p2-re-dot    '"hello" "h.llo" strmatch .' 1
+t p2-re-star   '"aaa" "a*" strmatch .' 1
+t p2-re-class  '"abc123def" "[a-z]+[0-9]+[a-z]+" strmatch .' 1
+t p2-re-neg    '"z" "[^a-y]" strmatch .' 1
+t p2-re-find   '"abc123" "\d+" strfind-re .' 3
+t p2-re-group  '"abab" "(ab)+" strmatch .' 1
+t p2-re-anchor '"hello" "^hello$" strmatch .' 1
+t p2-re-back   '"aaab" "a*ab" strmatch .' 1
+t p2-re-alt    '"foo" "foo|baz" strmatch .' 1
+t p2-re-no     '"hello" "hxllo" strmatch .' 0
 t p0-upper     '"Hello" str-upper .' HELLO
 t p0-lower     '"aBc" str-lower .' abc
 t p0-strip     '"  pad  " str-strip .' pad

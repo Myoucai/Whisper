@@ -525,6 +525,18 @@ impl Vm {
                     .collect();
                 self.data_stack.push(Value::List(Rc::new(keys)));
             }
+            Opcode::StrMatch => {
+                let pat = self.pop_str()?;
+                let s = self.pop_str()?;
+                let r = crate::rematch::str_match(s.as_bytes(), pat.as_bytes());
+                self.data_stack.push(Value::Bool(r));
+            }
+            Opcode::StrFindRe => {
+                let pat = self.pop_str()?;
+                let s = self.pop_str()?;
+                let r = crate::rematch::str_find(s.as_bytes(), pat.as_bytes());
+                self.data_stack.push(Value::I64(r));
+            }
             Opcode::ListDir => {
                 let path = self.pop_str()?;
                 let mut names: Vec<Value> = Vec::new();

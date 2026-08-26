@@ -602,6 +602,178 @@ static wval w_str_strip(wval s) {
 }
 
 // ── P1 vocabulary (v1.0.4): directory ops + UTC strftime ────────────
+// ── P2 vocabulary (v1.0.5): minimal backtracking regex ──────────────
+// Mirrors crates/whisper-core/src/rematch.rs byte for byte.
+
+static int w_re_class_match(const char *spec, uint32_t slen, uint8_t b) {
+    int neg = 0;
+    if (slen > 0 && spec[0] == '^') { neg = 1; spec++; slen--; }
+    uint32_t i = 0; int hit = 0;
+    while (i < slen) {
+        if (i + 2 < slen && spec[i + 1] == '-') {
+            if ((uint8_t)spec[i] <= b && b <= (uint8_t)spec[i + 2]) hit = 1;
+            i += 3;
+        } else {
+            if ((uint8_t)spec[i] == b) hit = 1;
+            i += 1;
+        }
+    }
+    return hit != neg;
+}
+
+static int w_re_esc_match(uint8_t e, uint8_t b) {
+    switch (e) {
+    case 'd': return b >= '0' && b <= '9';
+    case 'D': return !(b >= '0' && b <= '9');
+    case 'w': return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+                  || (b >= '0' && b <= '9') || b == '_';
+    case 'W': return !((b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+                  || (b >= '0' && b <= '9') || b == '_');
+    case 's': return b == ' ' || b == 9 || b == 13 || b == 10;
+    case 'S': return !(b == ' ' || b == 9 || b == 13 || b == 10);
+    default:  return e == b;
+    }
+}
+
+#define W_RE_MAXPAT 4096
+
+static void w_re_precompute(const char *p, uint32_t n, uint32_t *m) {
+    uint32_t stack[256]; int sp = 0; int in_class = 0;
+    for (uint32_t i = 0; i < n; i++) m[i] = 0;
+    for (uint32_t i = 0; i < n; i++) {
+        switch (p[i]) {
+        case '\\': i++; break;
+        case '[': if (!in_class) { in_class = 1; stack[sp++] = i; } break;
+        case ']': if (in_class) { in_class = 0; if (sp) m[stack[--sp]] = i; } break;
+        case '(': if (!in_class) stack[sp++] = i; break;
+        case ')': if (!in_class) { if (sp) m[stack[--sp]] = i; } break;
+        }
+    }
+}
+
+static int w_re_match_seq(const char *p, uint32_t start, uint32_t end,
+                          const char *t, uint32_t ti, uint32_t tlen,
+                          const uint32_t *m);
+
+static int w_re_match_at(const char *p, uint32_t pi, uint32_t pend,
+                         const char *t, uint32_t ti, uint32_t tlen,
+                         const uint32_t *m) {
+    int depth = 0, in_class = 0;
+    for (uint32_t i = pi; i < pend; i++) {
+        switch (p[i]) {
+        case '\\': i++; break;
+        case '[': in_class = 1; break;
+        case ']': in_class = 0; break;
+        case '(': if (!in_class) depth++; break;
+        case ')': if (!in_class) depth--; break;
+        case '|': if (!in_class && depth == 0) {
+            int e = w_re_match_seq(p, pi, i, t, ti, tlen, m);
+            if (e >= 0) return e;
+            return w_re_match_at(p, i + 1, pend, t, ti, tlen, m);
+        }
+        }
+    }
+    return w_re_match_seq(p, pi, pend, t, ti, tlen, m);
+}
+
+static void w_re_atom_bounds(const char *p, uint32_t start, const uint32_t *m,
+                             uint32_t *lo, uint32_t *hi, uint32_t *after) {
+    if (p[start] == '(' || p[start] == '[') {
+        *lo = start; *hi = m[start] + 1; *after = m[start] + 1;
+    } else if (p[start] == '\\') {
+        *lo = start; *hi = start + 2; *after = start + 2;
+    } else {
+        *lo = start; *hi = start + 1; *after = start + 1;
+    }
+}
+
+static int w_re_atom_once(const char *p, uint32_t lo, uint32_t hi,
+                          const char *t, uint32_t ti, uint32_t tlen,
+                          const uint32_t *m) {
+    if (lo >= hi) return (int)ti;
+    switch (p[lo]) {
+    case '.':
+        return ti < tlen ? (int)(ti + 1) : -1;
+    case '[':
+        if (ti < tlen && w_re_class_match(p + lo + 1, hi - 1 - (lo + 1),
+                                          (uint8_t)t[ti]))
+            return (int)(ti + 1);
+        return -1;
+    case '(':
+        if (hi - lo < 2) return (int)ti;
+        return w_re_match_at(p, lo + 1, hi - 1, t, ti, tlen, m);
+    case '^': return ti == 0 ? (int)ti : -1;
+    case '$': return ti == tlen ? (int)ti : -1;
+    case '\\':
+        if (ti < tlen && w_re_esc_match((uint8_t)p[lo + 1], (uint8_t)t[ti]))
+            return (int)(ti + 1);
+        return -1;
+    default:
+        if (ti < tlen && (uint8_t)t[ti] == (uint8_t)p[lo]) return (int)(ti + 1);
+        return -1;
+    }
+}
+
+static int w_re_match_seq(const char *p, uint32_t start, uint32_t end,
+                          const char *t, uint32_t ti, uint32_t tlen,
+                          const uint32_t *m) {
+    if (start == end) return (int)ti;
+    uint32_t a_lo, a_hi, after;
+    w_re_atom_bounds(p, start, m, &a_lo, &a_hi, &after);
+    int zero_width = p[a_lo] == '^' || p[a_lo] == '$'
+                     || (p[a_lo] == '(' && a_hi <= a_lo + 2);
+    uint32_t qmin = 1, qmax = 1, next = after;
+    if (!zero_width && next < end) {
+        switch (p[next]) {
+        case '*': qmin = 0; qmax = 0xFFFFFFFFu; next++; break;
+        case '+': qmin = 1; qmax = 0xFFFFFFFFu; next++; break;
+        case '?': qmin = 0; qmax = 1; next++; break;
+        }
+    }
+    static uint32_t ends[W_RE_MAXPAT + 1];
+    uint32_t nends = 1;
+    ends[0] = ti; uint32_t cur = ti;
+    for (;;) {
+        if (nends > qmax) break;
+        int n = w_re_atom_once(p, a_lo, a_hi, t, cur, tlen, m);
+        if (n < 0) break;
+        if (zero_width) { ends[nends++] = (uint32_t)n; break; }
+        if ((uint32_t)n > cur) { cur = (uint32_t)n; ends[nends++] = cur; }
+        else break;
+    }
+    if (nends < qmin + 1) return -1;
+    while (nends > qmin) {
+        nends--;
+        int r = w_re_match_seq(p, next, end, t, ends[nends], tlen, m);
+        if (r >= 0) return r;
+    }
+    return -1;
+}
+
+static wval w_strmatch(wval s, wval pat) {
+    const char *sv = (const char *)s, *pv = (const char *)pat;
+    uint32_t sl = w_str_len(sv), pl = w_str_len(pv);
+
+    static uint32_t m[W_RE_MAXPAT];
+    if (pl > W_RE_MAXPAT) return (wval)0L;
+    w_re_precompute(pv, pl, m);
+    int e = w_re_match_at(pv, 0, pl, sv, 0, sl, m);
+    return (wval)(int64_t)(e >= 0 && (uint32_t)e == sl ? 1 : 0);
+}
+
+static wval w_strfind_re(wval s, wval pat) {
+    const char *sv = (const char *)s, *pv = (const char *)pat;
+    uint32_t sl = w_str_len(sv), pl = w_str_len(pv);
+    static uint32_t m[W_RE_MAXPAT];
+    if (pl > W_RE_MAXPAT) return (wval)(int64_t)-1;
+    w_re_precompute(pv, pl, m);
+    for (uint32_t start = 0; start <= sl; start++) {
+        if (w_re_match_at(pv, 0, pl, sv, start, sl, m) >= 0)
+            return (wval)(int64_t)start;
+    }
+    return (wval)(int64_t)-1;
+}
+
 
 #include <sys/stat.h>
 #ifdef _WIN32

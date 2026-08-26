@@ -708,6 +708,14 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::Leave)))
             }
+            TokenKind::StrMatch => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::StrMatch)))
+            }
+            TokenKind::StrFindRe => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::StrFindRe)))
+            }
             TokenKind::BytesNew => {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::BytesNew)))

@@ -292,6 +292,8 @@ impl BytecodeGenerator {
             Operator::FileExists => Opcode::FileExists,
             Operator::StrfTime => Opcode::StrfTime,
             Operator::Leave => Opcode::Leave(0),
+            Operator::StrMatch => Opcode::StrMatch,
+            Operator::StrFindRe => Opcode::StrFindRe,
             Operator::StrLen => Opcode::StrLen,
             Operator::StrCat => Opcode::StrCat,
             Operator::StrSlice => Opcode::StrSlice,

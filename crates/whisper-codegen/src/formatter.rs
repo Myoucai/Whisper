@@ -239,6 +239,8 @@ fn fmt_op(op: Operator) -> String {
         Operator::FileExists => "file-exists".into(),
         Operator::StrfTime => "strftime".into(),
         Operator::Leave => "leave".into(),
+        Operator::StrMatch => "strmatch".into(),
+        Operator::StrFindRe => "strfind-re".into(),
         Operator::MapNew => "map-new".into(),
         Operator::MapGet => "map-get".into(),
         Operator::MapSet => "map-set".into(),

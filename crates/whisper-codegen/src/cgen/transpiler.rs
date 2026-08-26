@@ -627,6 +627,18 @@ fn transpile_opcodes(
                     "{{ wfn _f=(wfn)w_pop(); int64_t _p=(int64_t)w_pop(); w_serve_concurrent(_p,_f); }}"
                 );
             }
+            Opcode::StrMatch => {
+                let _ = writeln!(
+                    out,
+                    "{{ const char*_p=(const char*)w_pop(); const char*_s=(const char*)w_pop(); w_push((wval)w_strmatch((wval)_s,(wval)_p)); }}"
+                );
+            }
+            Opcode::StrFindRe => {
+                let _ = writeln!(
+                    out,
+                    "{{ const char*_p=(const char*)w_pop(); const char*_s=(const char*)w_pop(); w_push((wval)w_strfind_re((wval)_s,(wval)_p)); }}"
+                );
+            }
             Opcode::ReadLine => {
                 let _ = writeln!(out, "{{ w_push((wval)w_read_line()); }}");
             }

@@ -119,6 +119,8 @@ pub enum Operator {
     FileExists,
     StrfTime,
     Leave,
+    StrMatch,
+    StrFindRe,
 
     // Arithmetic
     Add,
