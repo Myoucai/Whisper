@@ -1,0 +1,273 @@
+{"instruction": "Compute 2 to the power of 10", "input": "2", "output": "1024", "whisper": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n2 10 pow .", "rewritten_from": "Calculate 2 to the power of 10 using repeated multiplication"}
+{"instruction": "Compute bitwise AND of 12 and 10", "input": "12 10", "output": "8", "whisper": "12 10 bitand .", "rewritten_from": "Compute bitwise AND of two numbers"}
+{"instruction": "Compute bitwise OR of 12 and 10", "input": "12 10", "output": "14", "whisper": "12 10 bitor .", "rewritten_from": "Compute bitwise OR of two numbers"}
+{"instruction": "Compute bitwise XOR of 12 and 10", "input": "12 10", "output": "6", "whisper": "12 10 bitxor .", "rewritten_from": "Compute bitwise XOR of two numbers"}
+{"instruction": "Compute the average of a list", "input": "4 6", "output": "2.5", "whisper": "[1 2 3 4] _ len ` 0.0 { + } @fold ` / .", "rewritten_from": "Calculate the harmonic mean of two numbers"}
+{"instruction": "Compute the mean of [10 20 30]", "input": "4 6", "output": "20", "whisper": "[10 20 30] _ len ` 0.0 { + } @fold ` / .", "rewritten_from": "Calculate the harmonic mean of a and b"}
+{"instruction": "Compute 3 to the power of 4", "input": "2", "output": "81", "whisper": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n3 4 pow .", "rewritten_from": "What is 2 raised to the 8th power?"}
+{"instruction": "Generate a list from 1 to 5", "input": "1 2", "output": "[1 2 3 4 5]", "whisper": "5 range-to .", "rewritten_from": "Arrange stack: a b → a b a b"}
+{"instruction": "Filter even numbers from a list", "input": "7", "output": "[2 4]", "whisper": "[1 2 3 4] { 2 % 0 = } @filter .", "rewritten_from": "Check if a number is even or odd"}
+{"instruction": "Find the maximum of 3 and 7", "input": "3 7", "output": "7", "whisper": ": max { over over < ?? ` drop | drop ] } ;\n3 7 max .", "rewritten_from": "Find the minimum of two numbers"}
+{"instruction": "Find the minimum of 3 and 7", "input": "3 7", "output": "3", "whisper": ": min { over over < ?? drop | ` drop ] } ;\n3 7 min .", "rewritten_from": "Find the maximum of two numbers"}
+{"instruction": "Generate a list from 1 to 10", "input": "5", "output": "[1 2 3 4 5 6 7 8 9 10]", "whisper": "10 range-to .", "rewritten_from": "Guard clause: print value if in range, else complain"}
+{"instruction": "Check if two strings are equal", "input": "42 42", "output": "#f", "whisper": "\"hello\" \"world\" streq .", "rewritten_from": "Branch on string equality"}
+{"instruction": "Filter odd numbers from a list", "input": "42", "output": "[1 3]", "whisper": "[1 2 3 4] { 2 % 0 != } @filter .", "rewritten_from": "Check a value and print it if positive"}
+{"instruction": "Count the elements in a list", "input": "[1 2] 3", "output": "3", "whisper": "[1 2 3] len .", "rewritten_from": "Conditionally append to a list"}
+{"instruction": "Convert a number to a string", "input": "#t", "output": "\"7\"", "whisper": "7 i64tostr .", "rewritten_from": "Convert boolean to string using conditional"}
+{"instruction": "Get the length of a list", "input": "[1 2]", "output": "4", "whisper": "[10 20 30 40] len .", "rewritten_from": "Check if a list is empty"}
+{"instruction": "Make a list of numbers 1 through 3", "input": "5", "output": "[1 2 3]", "whisper": "3 range-to .", "rewritten_from": "Range check with guard clause output"}
+{"instruction": "Length of an empty list", "input": "\"hello\"", "output": "0", "whisper": "[] len .", "rewritten_from": "Check string length and categorize"}
+{"instruction": "Check if 2024 is a leap year", "input": "2000", "output": "#t", "whisper": ": leap { _ 4 % 0 = over 100 % 0 != @ 400 % 0 = ` | & } ;\n2024 leap .", "rewritten_from": "Leap year check"}
+{"instruction": "Count elements in a 7-element list", "input": "\"abcdefgh\"", "output": "7", "whisper": "[1 2 3 4 5 6 7] len .", "rewritten_from": "Check password length"}
+{"instruction": "Find the maximum of two numbers", "input": "5 10 3", "output": "12", "whisper": ": max { over over < ?? ` drop | drop ] } ;\n12 5 max .", "rewritten_from": "Return max of three values using nested conditionals"}
+{"instruction": "Count the elements in a list", "input": "\"\"", "output": "3", "whisper": "[1 2 3] len .", "rewritten_from": "Conditional: if empty string return default"}
+{"instruction": "Find the minimum of two numbers", "input": "3 7", "output": "5", "whisper": ": min { over over < ?? drop | ` drop ] } ;\n12 5 min .", "rewritten_from": "Define a max function for two numbers"}
+{"instruction": "Find the maximum of 100 and 42", "input": "3 7", "output": "100", "whisper": ": max { over over < ?? ` drop | drop ] } ;\n100 42 max .", "rewritten_from": "Define a min function for two numbers"}
+{"instruction": "Compute the nth Fibonacci number (n=6)", "input": "10", "output": "8", "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n6 fib .", "rewritten_from": "Define a recursive fibonacci function"}
+{"instruction": "Compute 5 to the power of 3", "input": "2 10", "output": "125", "whisper": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n5 3 pow .", "rewritten_from": "Define a recursive power function"}
+{"instruction": "Sum all elements in a list", "input": "10", "output": "6", "whisper": "[1 2 3] 0 { + } @fold .", "rewritten_from": "Define sum from 1 to n recursively"}
+{"instruction": "Concatenate two strings", "input": "\"World\"", "output": "\"hello world\"", "whisper": "\"hello\" \" world\" strcat .", "rewritten_from": "Define a greeting function"}
+{"instruction": "Join two strings together", "input": "\"ab\" 3", "output": "\"foobar\"", "whisper": "\"foo\" \"bar\" strcat .", "rewritten_from": "Define a function to repeat a string n times"}
+{"instruction": "Compute the nth Fibonacci number (n=10)", "input": "10", "output": "55", "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n10 fib .", "rewritten_from": "Define iterative fibonacci with a loop"}
+{"instruction": "Compute the nth Fibonacci number (n=12)", "input": "8", "output": "144", "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n12 fib .", "rewritten_from": "Compute fibonacci of 8 recursively"}
+{"instruction": "Compute 2 to the power of 16", "input": "3 4", "output": "65536", "whisper": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n2 16 pow .", "rewritten_from": "Compute 3 to the 4th power recursively"}
+{"instruction": "Sum a list of numbers", "input": "100", "output": "60", "whisper": "[10 20 30] 0 { + } @fold .", "rewritten_from": "Sum integers from 1 to 100 recursively"}
+{"instruction": "Reverse a list", "input": "1234", "output": "[3 2 1]", "whisper": "[1 2 3] rev .", "rewritten_from": "Reverse the digits of 1234 recursively"}
+{"instruction": "Reverse a list of numbers", "input": "\"hello\"", "output": "[30 20 10]", "whisper": "[10 20 30] rev .", "rewritten_from": "Reverse a string recursively"}
+{"instruction": "Compute the total of a list", "input": "[1 2 3 4 5]", "output": "30", "whisper": "[5 10 15] 0 { + } @fold .", "rewritten_from": "Sum elements of a list recursively"}
+{"instruction": "Compute the nth Fibonacci number (n=15)", "input": "10", "output": "610", "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n15 fib .", "rewritten_from": "Fibonacci with accumulator (tail recursive)"}
+{"instruction": "Compute 7 squared using pow", "input": "2 8", "output": "49", "whisper": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n7 2 pow .", "rewritten_from": "Compute exponential 2^8 recursively"}
+{"instruction": "Sum the numbers 1 through 5", "input": "999", "output": "15", "whisper": "5 range-to 0 { + } @fold .", "rewritten_from": "Digital root of 999 recursively"}
+{"instruction": "Find the minimum of -3 and 8", "input": "[3 1 4 1 5 9]", "output": "-3", "whisper": ": min { over over < ?? drop | ` drop ] } ;\n-3 8 min .", "rewritten_from": "Fold: find the maximum value in a list"}
+{"instruction": "Print a message 3 times", "input": "3", "output": "\"x\" \"x\" \"x\"", "whisper": "3 { \"x\" . } @times", "rewritten_from": "Times: repeat an action 3 times"}
+{"instruction": "Double each element in a list", "input": "[1 2 3 4 5 6]", "output": "[2 4 6]", "whisper": "[1 2 3] { 2 * } @map .", "rewritten_from": "Count how many even numbers are in a list"}
+{"instruction": "Combine a first and last name", "input": "[\"a\" \"b\" \"c\"]", "output": "\"Li Ming\"", "whisper": "\"Li\" \" Ming\" strcat .", "rewritten_from": "Join a list of strings into one string"}
+{"instruction": "Reverse the order of list elements", "input": "[1 2 3 4 5]", "output": "[8 7 6 5]", "whisper": "[5 6 7 8] rev .", "rewritten_from": "Reverse a list using fold"}
+{"instruction": "Append an element to a list", "input": "[1 2] [3 4]", "output": "[1 2 3]", "whisper": "[1 2] 3 append .", "rewritten_from": "Concatenate two lists"}
+{"instruction": "Get the length of a list", "input": "[10 20 30]", "output": "4", "whisper": "[10 20 30 40] len .", "rewritten_from": "Get the tail of a list (all but first)"}
+{"instruction": "Find the larger of 9 and 4", "input": "[3 1 4 1 5 9]", "output": "9", "whisper": ": max { over over < ?? ` drop | drop ] } ;\n9 4 max .", "rewritten_from": "Find the minimum value in a list"}
+{"instruction": "Join a list of strings with a separator", "input": "[\"h\" \"e\" \"l\" \"l\" \"o\"]", "output": "\"ab\"", "whisper": "\"-\" [\"a\" \"b\"] strjoin .", "rewritten_from": "Convert a list of characters to a string"}
+{"instruction": "Keep only positive numbers", "input": "[1 2 3 4 5]", "output": "[3 7]", "whisper": "[-2 3 -5 7] { 0 > } @filter .", "rewritten_from": "Filter odd numbers from a list using map"}
+{"instruction": "Concatenate three strings", "input": "\"Hello\" \"World\"", "output": "\"abc\"", "whisper": "\"a\" \"b\" strcat \"c\" strcat .", "rewritten_from": "Concatenate two strings"}
+{"instruction": "Take the first 2 elements of a list", "input": "\"Hello World\"", "output": "[1 2]", "whisper": "[1 2 3 4] 2 take .", "rewritten_from": "Extract a substring (first 5 characters)"}
+{"instruction": "Extract a substring", "input": "\"Hello World\"", "output": "\"ell\"", "whisper": "\"hello\" 1 3 strslice .", "rewritten_from": "Extract a substring starting at position 6"}
+{"instruction": "Get the first 3 characters of a string", "input": "\"Hello World\" \"World\" \"Whisper\"", "output": "\"whi\"", "whisper": "\"whisper\" 0 3 strslice .", "rewritten_from": "Replace a substring in a string"}
+{"instruction": "Convert 42 to a string", "input": "42", "output": "\"42\"", "whisper": "42 i64tostr .", "rewritten_from": "Convert an integer to a string"}
+{"instruction": "Concatenate two strings", "input": "42", "output": "\"hello world\"", "whisper": "\"hello\" \" world\" strcat .", "rewritten_from": "Format a number and string together"}
+{"instruction": "Join two strings together", "input": "\"abc\" \"def\" \"ghi\"", "output": "\"foobar\"", "whisper": "\"foo\" \"bar\" strcat .", "rewritten_from": "Concatenate three strings together"}
+{"instruction": "Print each element of a list", "input": "\"hello\" \"l\"", "output": "1 2 3", "whisper": "[1 2 3] { . } @each", "rewritten_from": "Count occurrences of a character in a string"}
+{"instruction": "Length of an empty list", "input": "\"Hello\"", "output": "0", "whisper": "[] len .", "rewritten_from": "Extract the last character of a string"}
+{"instruction": "Take the first 3 elements", "input": "\"Whisper\"", "output": "[1 2 3]", "whisper": "[1 2 3 4 5] 3 take .", "rewritten_from": "Extract the first 3 characters of a string"}
+{"instruction": "Combine a first and last name", "input": "42", "output": "\"Li Ming\"", "whisper": "\"Li\" \" Ming\" strcat .", "rewritten_from": "Pad a number with leading text"}
+{"instruction": "Count from 0 to 2 with a while loop", "input": "#t", "output": "0 1 2", "whisper": "0 { _ . 1 + } { _ 3 < } #", "rewritten_from": "Get the string representation of a boolean"}
+{"instruction": "Reverse a list with 5 elements", "input": "\"hello\"", "output": "[5 4 3 2 1]", "whisper": "[1 2 3 4 5] rev .", "rewritten_from": "Reverse a string using char list and fold"}
+{"instruction": "Reverse a list of strings", "input": "\"racecar\"", "output": "[\"c\" \"b\" \"a\"]", "whisper": "[\"a\" \"b\" \"c\"] rev .", "rewritten_from": "Check if a string is a palindrome"}
+{"instruction": "Sum a list of 100 numbers", "input": "5", "output": "5050", "whisper": "100 range-to 0 { + } @fold .", "rewritten_from": "Sum from n down to 1 using a loop with accumulator"}
+{"instruction": "Repeat an action 5 times", "input": "3", "output": "\"hi\" \"hi\" \"hi\" \"hi\" \"hi\"", "whisper": "5 { \"hi\" . } @times", "rewritten_from": "Repeat a block 3 times using @times"}
+{"instruction": "Execute a block 2 times", "input": "3", "output": "\"loop\" \"loop\"", "whisper": "2 { \"loop\" . } @times", "rewritten_from": "Nested loops using @times"}
+{"instruction": "Count elements in a 7-element list", "input": "[1 3 5 7 9]", "output": "7", "whisper": "[1 2 3 4 5 6 7] len .", "rewritten_from": "Search for first element greater than 5 in a list"}
+{"instruction": "Add 4 to the end of [1 2 3]", "input": "5", "output": "[1 2 3 4]", "whisper": "[1 2 3] 4 append .", "rewritten_from": "Generate a descending sequence list"}
+{"instruction": "Generate a list from 1 to 5", "input": "15", "output": "[1 2 3 4 5]", "whisper": "5 range-to .", "rewritten_from": "FizzBuzz from 1 to 15"}
+{"instruction": "Loop while a counter is below 5", "input": "5", "output": "5", "whisper": "0 { 1 + } { _ 5 < } # .", "rewritten_from": "Count up from 0 to 4 using a loop"}
+{"instruction": "Count the elements in a list", "input": "[10 20 30]", "output": "3", "whisper": "[1 2 3] len .", "rewritten_from": "Loop with index over a list"}
+{"instruction": "Reverse a longer list", "input": "[10 20 30]", "output": "[11 9 7 5 3 1]", "whisper": "[1 3 5 7 9 11] rev .", "rewritten_from": "Iterate a list backwards"}
+{"instruction": "Count up with a while loop", "input": "6", "output": "5", "whisper": "0 { 1 + } { _ 5 < } # drop 5 .", "rewritten_from": "Collatz iteration using a while-like loop"}
+{"instruction": "Append 10 to a list", "input": "5", "output": "[5 10]", "whisper": "[5] 10 append .", "rewritten_from": "Loop collecting results into a list"}
+{"instruction": "Add up all values in a list", "input": "20", "output": "42", "whisper": "[7 14 21] 0 { + } @fold .", "rewritten_from": "Sum values until threshold exceeded"}
+{"instruction": "Compute the nth Fibonacci number (n=20)", "input": "10", "output": "6765", "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n20 fib .", "rewritten_from": "Iterative fibonacci with loop"}
+{"instruction": "Get the length of a list", "input": "[10 20 30 42 50]", "output": "4", "whisper": "[10 20 30 40] len .", "rewritten_from": "Linear search with early exit"}
+{"instruction": "Append a string to a list of strings", "input": "5", "output": "[\"a\" \"b\" \"c\"]", "whisper": "[\"a\" \"b\"] \"c\" append .", "rewritten_from": "Generate descending range list"}
+{"instruction": "Sum an empty list", "input": "10", "output": "0", "whisper": "[] 0 { + } @fold .", "rewritten_from": "Sum even numbers up to n using a loop"}
+{"instruction": "Append an element to a list", "input": "5", "output": "[1 2 3]", "whisper": "[1 2] 3 append .", "rewritten_from": "Generate a list from 1 to n using loop"}
+{"instruction": "Length of an empty list", "input": "[3 1 -4 2]", "output": "0", "whisper": "[] len .", "rewritten_from": "Find the first negative number in a list"}
+{"instruction": "Print a message 3 times", "input": "3", "output": "\"x\" \"x\" \"x\"", "whisper": "3 { \"x\" . } @times", "rewritten_from": "Loop printing hello 3 times"}
+{"instruction": "Repeat an action 5 times", "input": "1 4", "output": "\"hi\" \"hi\" \"hi\" \"hi\" \"hi\"", "whisper": "5 { \"hi\" . } @times", "rewritten_from": "Double a value n times in a loop"}
+{"instruction": "Concatenate three strings", "input": "\"started\"", "output": "\"abc\"", "whisper": "\"a\" \"b\" strcat \"c\" strcat .", "rewritten_from": "Log a message with a prefix"}
+{"instruction": "Multiply all elements in a list", "input": "", "output": "24", "whisper": "[2 3 4] 1 { * } @fold .", "rewritten_from": "Check app environment and print mode"}
+{"instruction": "Count elements in a 7-element list", "input": "", "output": "7", "whisper": "[1 2 3 4 5 6 7] len .", "rewritten_from": "Check if a data file exists and has content"}
+{"instruction": "Concatenate two strings", "input": "\"World\"", "output": "\"hello world\"", "whisper": "\"hello\" \" world\" strcat .", "rewritten_from": "Create a string template for greeting"}
+{"instruction": "Join two strings together", "input": "0", "output": "\"foobar\"", "whisper": "\"foo\" \"bar\" strcat .", "rewritten_from": "Simple retry mechanism with counter"}
+{"instruction": "Get the 2nd element of a list", "input": "", "output": "30", "whisper": "[10 20 30] 2 @nth .", "rewritten_from": "Get the value for a key from a key-value list"}
+{"instruction": "Combine a first and last name", "input": "\"John\" \"Doe\"", "output": "\"Li Ming\"", "whisper": "\"Li\" \" Ming\" strcat .", "rewritten_from": "Build a full name from first and last name"}
+{"instruction": "Count the elements in a list", "input": "\"abc123\"", "output": "3", "whisper": "[1 2 3] len .", "rewritten_from": "Check password strength simple"}
+{"instruction": "Concatenate three strings", "input": "99", "output": "\"abc\"", "whisper": "\"a\" \"b\" strcat \"c\" strcat .", "rewritten_from": "Format a price with currency symbol"}
+{"instruction": "Compare two strings for equality", "input": "\"role\" \"admin\"", "output": "#t", "whisper": "\"abc\" \"abc\" streq .", "rewritten_from": "Check if user is admin"}
+{"instruction": "Get the element at index 0", "input": "\"alice\"", "output": "5", "whisper": "[5 6 7] 0 @nth .", "rewritten_from": "Read and uppercase first letter of a name"}
+{"instruction": "Concatenate two strings", "input": "\"2024\" \"01\" \"15\"", "output": "\"hello world\"", "whisper": "\"hello\" \" world\" strcat .", "rewritten_from": "Format a date string"}
+{"instruction": "Join two strings together", "input": "", "output": "\"foobar\"", "whisper": "\"foo\" \"bar\" strcat .", "rewritten_from": "Generate an error message"}
+{"instruction": "Get the length of a list", "input": "[10 20 30] 20", "output": "4", "whisper": "[10 20 30 40] len .", "rewritten_from": "Linear search for a value in a list"}
+{"instruction": "Find the smaller of 9 and 4", "input": "[3 1 4 1 5 9]", "output": "4", "whisper": ": min { over over < ?? drop | ` drop ] } ;\n9 4 min .", "rewritten_from": "Find the minimum value in a list algorithmically"}
+{"instruction": "Find the maximum of 7 and 7", "input": "[3 1 4 1 5 9]", "output": "7", "whisper": ": max { over over < ?? ` drop | drop ] } ;\n7 7 max .", "rewritten_from": "Find the maximum value in a list algorithmically"}
+{"instruction": "Filter numbers greater than 10", "input": "[1 2 3 2 1 4 5]", "output": "[12 20]", "whisper": "[5 12 8 20] { 10 > } @filter .", "rewritten_from": "Remove duplicates from a list"}
+{"instruction": "Compute the product of a list", "input": "[1 2 3] [4 5 6]", "output": "24", "whisper": "[1 2 3 4] 1 { * } @fold .", "rewritten_from": "Compute the dot product of two vectors"}
+{"instruction": "Shift 1 left by 4 bits", "input": "\"abc\" 3", "output": "16", "whisper": "1 4 shl .", "rewritten_from": "Caesar cipher encoding with shift 3"}
+{"instruction": "Reverse a list", "input": "\"hello\"", "output": "[3 2 1]", "whisper": "[1 2 3] rev .", "rewritten_from": "String reverse algorithm using fold"}
+{"instruction": "Reverse a list of numbers", "input": "\"racecar\"", "output": "[30 20 10]", "whisper": "[10 20 30] rev .", "rewritten_from": "Check if a string is a palindrome"}
+{"instruction": "Length of an empty list", "input": "[1 2 3 2 1] 2", "output": "0", "whisper": "[] len .", "rewritten_from": "Count occurrences of a target value in a list"}
+{"instruction": "Sort a list in ascending order", "input": "[1 3 5] [2 4 6]", "output": "[1 2 3]", "whisper": "[3 1 2] sort .", "rewritten_from": "Merge two sorted lists"}
+{"instruction": "Sort a list of numbers", "input": "[3 1 4 1 5 9 2 6]", "output": "[1 2 5 8]", "whisper": "[5 2 8 1] sort .", "rewritten_from": "Quick sort algorithm"}
+{"instruction": "Add 4 to the end of [1 2 3]", "input": "10", "output": "[1 2 3 4]", "whisper": "[1 2 3] 4 append .", "rewritten_from": "Sieve of Eratosthenes up to 10"}
+{"instruction": "Count elements in a 7-element list", "input": "4", "output": "7", "whisper": "[1 2 3 4 5 6 7] len .", "rewritten_from": "Pascal's triangle row 4"}
+{"instruction": "Sort an unsorted list", "input": "[1 3 5 7 9] 5", "output": "[1 2 4 7 9]", "whisper": "[9 4 7 2 1] sort .", "rewritten_from": "Binary search in a sorted list"}
+{"instruction": "Shift 32 right by 2 bits", "input": "7", "output": "8", "whisper": "32 2 shr .", "rewritten_from": "Gray code of a number"}
+{"instruction": "Get the 3rd element", "input": "10", "output": "4", "whisper": "[1 2 3 4] 3 @nth .", "rewritten_from": "Compute the nth triangular number iteratively"}
+{"instruction": "Compute the factorial of 5", "input": "5", "output": "120", "whisper": ": fact { _ 0 = ?? drop 1 | _ 1 - fact * ] } ;\n5 fact .", "rewritten_from": "Calculate factorial iteratively"}
+{"instruction": "Print numbers 0 through 4", "input": "5", "output": "0 1 2 3 4", "whisper": "0 { _ . 1 + } { _ 5 < } #", "rewritten_from": "Loop using # not while"}
+{"instruction": "Execute a block 2 times", "input": "3", "output": "\"loop\" \"loop\"", "whisper": "2 { \"loop\" . } @times", "rewritten_from": "Repeat a block n times with @times"}
+{"instruction": "Compute the nth Fibonacci number (n=1)", "input": "8", "output": "1", "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n1 fib .", "rewritten_from": "Fibonacci definition using Whisper syntax"}
+{"instruction": "Count the elements in a list", "input": "[1 2 3 4 5]", "output": "3", "whisper": "[1 2 3] len .", "rewritten_from": "Define count-if: count elements satisfying a predicate"}
+{"instruction": "Keep multiples of 3", "input": "[-1 2 -3 4 -5]", "output": "[3 6 9]", "whisper": "[1 3 6 7 9] { 3 % 0 = } @filter .", "rewritten_from": "Define a function that conditionally filters a list"}
+{"instruction": "Find the minimum of 0 and -10", "input": "[3 1 4 1 5 9]", "output": "-10", "whisper": ": min { over over < ?? drop | ` drop ] } ;\n0 -10 min .", "rewritten_from": "Map over a list then find max using fold"}
+{"instruction": "Average the numbers 1 through 5", "input": "[2 4 6 8]", "output": "3", "whisper": "5 range-to _ len ` 0.0 { + } @fold ` / .", "rewritten_from": "Compute the variance of a list step by step"}
+{"instruction": "Add 1 to every element of a list", "input": "[1 2 3 4 5]", "output": "[2 3 4]", "whisper": "[1 2 3] { 1 + } @map .", "rewritten_from": "Filter then transform a list"}
+{"instruction": "Filter even numbers from a list", "input": "[10 20 30 40]", "output": "[2 4]", "whisper": "[1 2 3 4] { 2 % 0 = } @filter .", "rewritten_from": "Print only even-indexed elements of a list"}
+{"instruction": "Sum all elements in a list", "input": "5", "output": "6", "whisper": "[1 2 3] 0 { + } @fold .", "rewritten_from": "Sum of first n natural numbers using loop"}
+{"instruction": "Append 10 to a list", "input": "12", "output": "[5 10]", "whisper": "[5] 10 append .", "rewritten_from": "Find all factors of a number"}
+{"instruction": "Combine a first and last name", "input": "[\"a\" \"b\" \"c\"]", "output": "\"Li Ming\"", "whisper": "\"Li\" \" Ming\" strcat .", "rewritten_from": "Concat all strings in a list with a separator"}
+{"instruction": "Square every element in a list", "input": "[1 2 3]", "output": "[1 4 9 16]", "whisper": "[1 2 3 4] { _ * } @map .", "rewritten_from": "Define map-reduce pattern"}
+{"instruction": "Get the length of a list", "input": "[]", "output": "4", "whisper": "[10 20 30 40] len .", "rewritten_from": "Handle the empty list case gracefully"}
+{"instruction": "Length of an empty list", "input": "\"maybe\"", "output": "0", "whisper": "[] len .", "rewritten_from": "Return a default value when check fails"}
+{"instruction": "Check if a string contains a substring", "input": "\"12345\"", "output": "#t", "whisper": "\"hello\" \"llo\" strfind 0 >= .", "rewritten_from": "Check if a string contains only digits"}
+{"instruction": "Compute 10 to the power of 6", "input": "2", "output": "1000000", "whisper": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n10 6 pow .", "rewritten_from": "What is 2 to the 5th power?"}
+{"instruction": "Sum a list of numbers", "input": "1 2 1 3", "output": "60", "whisper": "[10 20 30] 0 { + } @fold .", "rewritten_from": "Sum of reciprocals: 1/2 + 1/3"}
+{"instruction": "Concatenate three strings", "input": "\"foo\" \"bar\"", "output": "\"abc\"", "whisper": "\"a\" \"b\" strcat \"c\" strcat .", "rewritten_from": "Concatenate 'foo' and 'bar'"}
+{"instruction": "Get the first element only", "input": "\"abcdef\"", "output": "[9]", "whisper": "[9 8 7] 1 take .", "rewritten_from": "Extract the first 3 characters of a string"}
+{"instruction": "Replace a substring in a string", "input": "\"the cat sat\" \"cat\" \"dog\"", "output": "\"hello whisper\"", "whisper": "\"hello world\" \"world\" \"whisper\" strreplace .", "rewritten_from": "Replace 'cat' with 'dog' in a string"}
+{"instruction": "Convert a negative number to a string", "input": "256", "output": "\"-7\"", "whisper": "-7 i64tostr .", "rewritten_from": "Convert the number 256 to a string"}
+{"instruction": "Count elements in a 7-element list", "input": "\"hello world\"", "output": "7", "whisper": "[1 2 3 4 5 6 7] len .", "rewritten_from": "Get the last 3 characters of a string"}
+{"instruction": "Concatenate two strings", "input": "\"Alice\"", "output": "\"hello world\"", "whisper": "\"hello\" \" world\" strcat .", "rewritten_from": "Build a greeting: 'Hi, ' + name"}
+{"instruction": "Get the 2nd element of a list", "input": "\"whisper\"", "output": "30", "whisper": "[10 20 30] 2 @nth .", "rewritten_from": "Convert a string to uppercase first letter"}
+{"instruction": "Join two strings together", "input": "1", "output": "\"foobar\"", "whisper": "\"foo\" \"bar\" strcat .", "rewritten_from": "Generate a numbered label"}
+{"instruction": "Find the maximum of 25 and 13", "input": "42 17", "output": "25", "whisper": ": max { over over < ?? ` drop | drop ] } ;\n25 13 max .", "rewritten_from": "Select the larger of two numbers: 42 and 17"}
+{"instruction": "Find the minimum of 25 and 13", "input": "3 11", "output": "13", "whisper": ": min { over over < ?? drop | ` drop ] } ;\n25 13 min .", "rewritten_from": "Select the smaller of two numbers: 3 and 11"}
+{"instruction": "Filter odd numbers from a list", "input": "14", "output": "[1 3]", "whisper": "[1 2 3 4] { 2 % 0 != } @filter .", "rewritten_from": "Check even odd with conditional"}
+{"instruction": "Count from 0 to 2 with a while loop", "input": "#f", "output": "0 1 2", "whisper": "0 { _ . 1 + } { _ 3 < } #", "rewritten_from": "Return boolean as string for display"}
+{"instruction": "Find the maximum of 6 and 11", "input": "-1 5", "output": "11", "whisper": ": max { over over < ?? ` drop | drop ] } ;\n6 11 max .", "rewritten_from": "Create a function that returns the larger of two values"}
+{"instruction": "Append a string to a list of strings", "input": "[[1] [2 3] [4]]", "output": "[\"a\" \"b\" \"c\"]", "whisper": "[\"a\" \"b\"] \"c\" append .", "rewritten_from": "Fold: concatenate lists"}
+{"instruction": "Iterate over a list", "input": "[\"a\" \"b\" \"c\"]", "output": "\"a\" \"b\"", "whisper": "[\"a\" \"b\"] { . } @each", "rewritten_from": "Each: print each string in a list"}
+{"instruction": "Print a message 3 times", "input": "5", "output": "\"x\" \"x\" \"x\"", "whisper": "3 { \"x\" . } @times", "rewritten_from": "Times: print numbers 0 through 4"}
+{"instruction": "Keep only positive numbers", "input": "[-1 2 -3 4]", "output": "[3 7]", "whisper": "[-2 3 -5 7] { 0 > } @filter .", "rewritten_from": "Filter-like: keep values > 0"}
+{"instruction": "Negate each element of a list", "input": "[1 2 3 4 5]", "output": "[-1 2 -3]", "whisper": "[1 -2 3] { -1 * } @map .", "rewritten_from": "Count the number of elements matching a condition"}
+{"instruction": "Generate a list from 1 to 10", "input": "1", "output": "[1 2 3 4 5 6 7 8 9 10]", "whisper": "10 range-to .", "rewritten_from": "Loop: count from 1 to 3"}
+{"instruction": "Loop while a counter is below 5", "input": "5", "output": "5", "whisper": "0 { 1 + } { _ 5 < } # .", "rewritten_from": "While-style: decrement from 5 to 1"}
+{"instruction": "Compute the total of a list", "input": "4", "output": "30", "whisper": "[5 10 15] 0 { + } @fold .", "rewritten_from": "Sum all numbers from 1 to n using a loop"}
+{"instruction": "Repeat an action 5 times", "input": "3", "output": "\"hi\" \"hi\" \"hi\" \"hi\" \"hi\"", "whisper": "5 { \"hi\" . } @times", "rewritten_from": "Print 'hello' 3 times using @times"}
+{"instruction": "Process every element", "input": "[\"x\" \"y\" \"z\"]", "output": "10 20 30", "whisper": "[10 20 30] { . } @each", "rewritten_from": "Loop over list elements with @each"}
+{"instruction": "Execute a block 2 times", "input": "2", "output": "\"loop\" \"loop\"", "whisper": "2 { \"loop\" . } @times", "rewritten_from": "Nested @times to create a grid pattern"}
+{"instruction": "Multiply all numbers together", "input": "5", "output": "210", "whisper": "[5 6 7] 1 { * } @fold .", "rewritten_from": "Accumulate products in a loop"}
+{"instruction": "Print a message 3 times", "input": "1 5", "output": "\"x\" \"x\" \"x\"", "whisper": "3 { \"x\" . } @times", "rewritten_from": "Loop to double a value n times"}
+{"instruction": "Append an element to a list", "input": "3", "output": "[1 2 3]", "whisper": "[1 2] 3 append .", "rewritten_from": "Generate a countdown list using a loop"}
+{"instruction": "Filter numbers greater than 10", "input": "10", "output": "[12 20]", "whisper": "[5 12 8 20] { 10 > } @filter .", "rewritten_from": "Iterate and collect even numbers"}
+{"instruction": "Compute the nth Fibonacci number (n=2)", "input": "9", "output": "1", "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n2 fib .", "rewritten_from": "Recursive fibonacci of 9"}
+{"instruction": "Sum the numbers 1 through 5", "input": "20", "output": "15", "whisper": "5 range-to 0 { + } @fold .", "rewritten_from": "Recursive sum from 1 to 20"}
+{"instruction": "Compute 2 to the power of 32", "input": "5 3", "output": "4294967296", "whisper": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n2 32 pow .", "rewritten_from": "Recursive power: 5^3"}
+{"instruction": "Sum a list of 100 numbers", "input": "1234", "output": "5050", "whisper": "100 range-to 0 { + } @fold .", "rewritten_from": "Recursive sum of digits of 1234"}
+{"instruction": "Count the elements in a list", "input": "128", "output": "3", "whisper": "[1 2 3] len .", "rewritten_from": "Recursive binary representation length of 128"}
+{"instruction": "Reverse the order of list elements", "input": "5678", "output": "[8 7 6 5]", "whisper": "[5 6 7 8] rev .", "rewritten_from": "Recursive reversal of digits: 5678"}
+{"instruction": "Compute the nth Fibonacci number (n=6)", "input": "12", "output": "8", "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n6 fib .", "rewritten_from": "Fibonacci as tail-recursive with accumulator"}
+{"instruction": "Combine a first and last name", "input": "", "output": "\"Li Ming\"", "whisper": "\"Li\" \" Ming\" strcat .", "rewritten_from": "Log an info message with a prefix"}
+{"instruction": "Concatenate three strings", "input": "404", "output": "\"abc\"", "whisper": "\"a\" \"b\" strcat \"c\" strcat .", "rewritten_from": "Format an error message with code"}
+{"instruction": "Concatenate two strings", "input": "200", "output": "\"hello world\"", "whisper": "\"hello\" \" world\" strcat .", "rewritten_from": "Create a simple HTTP response status line"}
+{"instruction": "Find the minimum of 6 and 11", "input": "\"pass123\"", "output": "6", "whisper": ": min { over over < ?? drop | ` drop ] } ;\n6 11 min .", "rewritten_from": "Check if a password meets minimum length"}
+{"instruction": "Keep multiples of 3", "input": "14", "output": "[3 6 9]", "whisper": "[1 3 6 7 9] { 3 % 0 = } @filter .", "rewritten_from": "Return appropriate greeting by time of day"}
+{"instruction": "Get the length of a list", "input": "\"document.pdf\"", "output": "4", "whisper": "[10 20 30 40] len .", "rewritten_from": "Get the file extension from a filename"}
+{"instruction": "Join two strings together", "input": "", "output": "\"foobar\"", "whisper": "\"foo\" \"bar\" strcat .", "rewritten_from": "Build a URL from parts"}
+{"instruction": "Find the position of a substring", "input": "\"hello world\" \" \"", "output": "2", "whisper": "\"hello\" \"llo\" strfind .", "rewritten_from": "Count words in a simple space-separated string"}
+{"instruction": "Combine a first and last name", "input": "49.99", "output": "\"Li Ming\"", "whisper": "\"Li\" \" Ming\" strcat .", "rewritten_from": "Format a currency amount"}
+{"instruction": "Sort a list with duplicates", "input": "[1 2 3 4 5 6 7 8 9 10] 7", "output": "[1 1 2 3 3]", "whisper": "[3 1 2 3 1] sort .", "rewritten_from": "Binary search in a sorted list [1,2,3,4,5,6,7,8,9,10] for 7"}
+{"instruction": "Convert a string to a list of character codes", "input": "", "output": "[104 101 108 108 111]", "whisper": "\"hello\" strchars .", "rewritten_from": "Count vowels in a string"}
+{"instruction": "Check if 7 is a prime number", "input": "29", "output": "#t", "whisper": ": prime { _ 2 < ?? drop #f | _ 1 - range-to { 1 > } @filter ` { over ` % 0 = ?? drop 0 | 0 max ] } @fold 0 > ] } ;\n7 prime .", "rewritten_from": "Check if a number is prime (optimistic)"}
+{"instruction": "Compute the nth Fibonacci number (n=10)", "input": "8", "output": "55", "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n10 fib .", "rewritten_from": "Generate the first n Fibonacci numbers"}
+{"instruction": "Compute 9 to the power of 3", "input": "2 16", "output": "729", "whisper": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n9 3 pow .", "rewritten_from": "Compute the power of a number using a loop"}
+{"instruction": "Filter even numbers from a list", "input": "5", "output": "[2 4]", "whisper": "[1 2 3 4] { 2 % 0 = } @filter .", "rewritten_from": "Write a Whisper conditional using ?? syntax"}
+{"instruction": "Repeat an action 5 times", "input": "3", "output": "\"hi\" \"hi\" \"hi\" \"hi\" \"hi\"", "whisper": "5 { \"hi\" . } @times", "rewritten_from": "Use @times to repeat in Whisper"}
+{"instruction": "Print each element of a list", "input": "[\"a\" \"b\"]", "output": "1 2 3", "whisper": "[1 2 3] { . } @each", "rewritten_from": "Use @each to iterate in Whisper"}
+{"instruction": "Convert a number to a string", "input": "42", "output": "\"7\"", "whisper": "7 i64tostr .", "rewritten_from": "Convert an integer to a string in Whisper"}
+{"instruction": "Concatenate three strings", "input": "\"a\" \"b\"", "output": "\"abc\"", "whisper": "\"a\" \"b\" strcat \"c\" strcat .", "rewritten_from": "Concatenate strings with strcat in Whisper"}
+{"instruction": "Compute the factorial of 6", "input": "4", "output": "720", "whisper": ": fact { _ 0 = ?? drop 1 | _ 1 - fact * ] } ;\n6 fact .", "rewritten_from": "Calculate the factorial of 4 using a loop approach"}
+{"instruction": "Compute the factorial of 7", "input": "5", "output": "5040", "whisper": ": fact { _ 0 = ?? drop 1 | _ 1 - fact * ] } ;\n7 fact .", "rewritten_from": "Calculate the factorial of 5 using a loop approach"}
+{"instruction": "Compute the factorial of 10", "input": "6", "output": "3628800", "whisper": ": fact { _ 0 = ?? drop 1 | _ 1 - fact * ] } ;\n10 fact .", "rewritten_from": "Calculate the factorial of 6 using a loop approach"}
+{"instruction": "Compute the factorial of 0", "input": "7", "output": "1", "whisper": ": fact { _ 0 = ?? drop 1 | _ 1 - fact * ] } ;\n0 fact .", "rewritten_from": "Calculate the factorial of 7 using a loop approach"}
+{"instruction": "Compute the factorial of 12", "input": "8", "output": "479001600", "whisper": ": fact { _ 0 = ?? drop 1 | _ 1 - fact * ] } ;\n12 fact .", "rewritten_from": "Calculate the factorial of 8 using a loop approach"}
+{"instruction": "Compute 5! (five factorial)", "input": "9", "output": "120", "whisper": ": fact { _ 0 = ?? drop 1 | _ 1 - fact * ] } ;\n5 fact .", "rewritten_from": "Calculate the factorial of 9 using a loop approach"}
+{"instruction": "Compute 10! (ten factorial)", "input": "10", "output": "3628800", "whisper": ": fact { _ 0 = ?? drop 1 | _ 1 - fact * ] } ;\n10 fact .", "rewritten_from": "Calculate the factorial of 10 using a loop approach"}
+{"instruction": "Compute the factorial of 3", "input": "11", "output": "6", "whisper": ": fact { _ 0 = ?? drop 1 | _ 1 - fact * ] } ;\n3 fact .", "rewritten_from": "Calculate the factorial of 11 using a loop approach"}
+{"instruction": "Compute the factorial of 8", "input": "12", "output": "40320", "whisper": ": fact { _ 0 = ?? drop 1 | _ 1 - fact * ] } ;\n8 fact .", "rewritten_from": "Calculate the factorial of 12 using a loop approach"}
+{"instruction": "Compute the factorial of 4", "input": "13", "output": "24", "whisper": ": fact { _ 0 = ?? drop 1 | _ 1 - fact * ] } ;\n4 fact .", "rewritten_from": "Calculate the factorial of 13 using a loop approach"}
+{"instruction": "Execute a block 2 times", "input": "2", "output": "\"loop\" \"loop\"", "whisper": "2 { \"loop\" . } @times", "rewritten_from": "Print numbers 0 through 1 using @times"}
+{"instruction": "Print a message 3 times", "input": "3", "output": "\"x\" \"x\" \"x\"", "whisper": "3 { \"x\" . } @times", "rewritten_from": "Print numbers 0 through 2 using @times"}
+{"instruction": "Repeat an action 5 times", "input": "4", "output": "\"hi\" \"hi\" \"hi\" \"hi\" \"hi\"", "whisper": "5 { \"hi\" . } @times", "rewritten_from": "Print numbers 0 through 3 using @times"}
+{"instruction": "Execute a block 2 times", "input": "6", "output": "\"loop\" \"loop\"", "whisper": "2 { \"loop\" . } @times", "rewritten_from": "Print numbers 0 through 5 using @times"}
+{"instruction": "Print a message 3 times", "input": "7", "output": "\"x\" \"x\" \"x\"", "whisper": "3 { \"x\" . } @times", "rewritten_from": "Print numbers 0 through 6 using @times"}
+{"instruction": "Repeat an action 5 times", "input": "8", "output": "\"hi\" \"hi\" \"hi\" \"hi\" \"hi\"", "whisper": "5 { \"hi\" . } @times", "rewritten_from": "Print numbers 0 through 7 using @times"}
+{"instruction": "Execute a block 2 times", "input": "10", "output": "\"loop\" \"loop\"", "whisper": "2 { \"loop\" . } @times", "rewritten_from": "Print numbers 0 through 9 using @times"}
+{"instruction": "Filter odd numbers from a list", "input": "2", "output": "[1 3]", "whisper": "[1 2 3 4] { 2 % 0 != } @filter .", "rewritten_from": "Print evens descending from 2"}
+{"instruction": "Keep only positive numbers", "input": "4", "output": "[3 7]", "whisper": "[-2 3 -5 7] { 0 > } @filter .", "rewritten_from": "Print evens descending from 4"}
+{"instruction": "Filter numbers greater than 10", "input": "6", "output": "[12 20]", "whisper": "[5 12 8 20] { 10 > } @filter .", "rewritten_from": "Print evens descending from 6"}
+{"instruction": "Keep multiples of 3", "input": "8", "output": "[3 6 9]", "whisper": "[1 3 6 7 9] { 3 % 0 = } @filter .", "rewritten_from": "Print evens descending from 8"}
+{"instruction": "Filter even numbers from a list", "input": "10", "output": "[2 4]", "whisper": "[1 2 3 4] { 2 % 0 = } @filter .", "rewritten_from": "Print evens descending from 10"}
+{"instruction": "Filter odd numbers from a list", "input": "12", "output": "[1 3]", "whisper": "[1 2 3 4] { 2 % 0 != } @filter .", "rewritten_from": "Print evens descending from 12"}
+{"instruction": "Keep only positive numbers", "input": "14", "output": "[3 7]", "whisper": "[-2 3 -5 7] { 0 > } @filter .", "rewritten_from": "Print evens descending from 14"}
+{"instruction": "Filter numbers greater than 10", "input": "16", "output": "[12 20]", "whisper": "[5 12 8 20] { 10 > } @filter .", "rewritten_from": "Print evens descending from 16"}
+{"instruction": "Keep multiples of 3", "input": "18", "output": "[3 6 9]", "whisper": "[1 3 6 7 9] { 3 % 0 = } @filter .", "rewritten_from": "Print evens descending from 18"}
+{"instruction": "Filter even numbers from a list", "input": "20", "output": "[2 4]", "whisper": "[1 2 3 4] { 2 % 0 = } @filter .", "rewritten_from": "Print evens descending from 20"}
+{"instruction": "Add up all values in a list", "input": "4", "output": "42", "whisper": "[7 14 21] 0 { + } @fold .", "rewritten_from": "Sum all even numbers from 2 to 4 using a loop"}
+{"instruction": "Sum an empty list", "input": "6", "output": "0", "whisper": "[] 0 { + } @fold .", "rewritten_from": "Sum all even numbers from 2 to 6 using a loop"}
+{"instruction": "Sum all elements in a list", "input": "8", "output": "6", "whisper": "[1 2 3] 0 { + } @fold .", "rewritten_from": "Sum all even numbers from 2 to 8 using a loop"}
+{"instruction": "Sum a list of numbers", "input": "10", "output": "60", "whisper": "[10 20 30] 0 { + } @fold .", "rewritten_from": "Sum all even numbers from 2 to 10 using a loop"}
+{"instruction": "Compute the total of a list", "input": "12", "output": "30", "whisper": "[5 10 15] 0 { + } @fold .", "rewritten_from": "Sum all even numbers from 2 to 12 using a loop"}
+{"instruction": "Compute the nth Fibonacci number (n=12)", "input": "5", "output": "144", "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n12 fib .", "rewritten_from": "Compute fibonacci(5) recursively"}
+{"instruction": "Compute the nth Fibonacci number (n=15)", "input": "6", "output": "610", "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n15 fib .", "rewritten_from": "Compute fibonacci(6) recursively"}
+{"instruction": "Compute the nth Fibonacci number (n=20)", "input": "7", "output": "6765", "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n20 fib .", "rewritten_from": "Compute fibonacci(7) recursively"}
+{"instruction": "Compute the nth Fibonacci number (n=1)", "input": "9", "output": "1", "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n1 fib .", "rewritten_from": "Compute fibonacci(9) recursively"}
+{"instruction": "Compute the nth Fibonacci number (n=2)", "input": "11", "output": "1", "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n2 fib .", "rewritten_from": "Compute fibonacci(11) recursively"}
+{"instruction": "Compute the nth Fibonacci number (n=6)", "input": "12", "output": "8", "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n6 fib .", "rewritten_from": "Compute fibonacci(12) recursively"}
+{"instruction": "Compute the nth Fibonacci number (n=10)", "input": "13", "output": "55", "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n10 fib .", "rewritten_from": "Compute fibonacci(13) recursively"}
+{"instruction": "Compute the nth Fibonacci number (n=12)", "input": "15", "output": "144", "whisper": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n12 fib .", "rewritten_from": "Compute fibonacci(15) recursively"}
+{"instruction": "Concatenate two strings", "input": "\"John\"", "output": "\"hello world\"", "whisper": "\"hello\" \" world\" strcat .", "rewritten_from": "Generate a greeting for a user"}
+{"instruction": "Join two strings together", "input": "\"2025\" \"06\" \"15\"", "output": "\"foobar\"", "whisper": "\"foo\" \"bar\" strcat .", "rewritten_from": "Format a date as YYYY-MM-DD"}
+{"instruction": "Parse a string as an integer", "input": "\"123\"", "output": "42", "whisper": "\"42\" strtoi64 .", "rewritten_from": "Check if an input string is a valid number"}
+{"instruction": "Sum the numbers 1 through 5", "input": "100", "output": "15", "whisper": "5 range-to 0 { + } @fold .", "rewritten_from": "Generate an invoice total with tax and shipping"}
+{"instruction": "Combine a first and last name", "input": "", "output": "\"Li Ming\"", "whisper": "\"Li\" \" Ming\" strcat .", "rewritten_from": "Build a CSV line from values"}
+{"instruction": "Length of an empty list", "input": "\"abc12345\"", "output": "0", "whisper": "[] len .", "rewritten_from": "Check strong password criteria"}
+{"instruction": "Find the maximum of 1000 and 999", "input": "75 150", "output": "1000", "whisper": ": max { over over < ?? ` drop | drop ] } ;\n1000 999 max .", "rewritten_from": "Normalize a value to percentage of max"}
+{"instruction": "Concatenate three strings", "input": "\"ERROR\" \"disk full\"", "output": "\"abc\"", "whisper": "\"a\" \"b\" strcat \"c\" strcat .", "rewritten_from": "Format a log entry"}
+{"instruction": "Check if 9 is a prime number", "input": "101", "output": "#f", "whisper": ": prime { _ 2 < ?? drop #f | _ 1 - range-to { 1 > } @filter ` { over ` % 0 = ?? drop 0 | 0 max ] } @fold 0 > ] } ;\n9 prime .", "rewritten_from": "Check if 101 is prime by trial division"}
+{"instruction": "Add 4 to the end of [1 2 3]", "input": "28", "output": "[1 2 3 4]", "whisper": "[1 2 3] 4 append .", "rewritten_from": "Find all divisors of 28"}
+{"instruction": "Sum a list of 100 numbers", "input": "6", "output": "5050", "whisper": "100 range-to 0 { + } @fold .", "rewritten_from": "Check perfect number (sum of divisors equals itself)"}
+{"instruction": "Check if 13 is a prime number", "input": "20", "output": "#t", "whisper": ": prime { _ 2 < ?? drop #f | _ 1 - range-to { 1 > } @filter ` { over ` % 0 = ?? drop 0 | 0 max ] } @fold 0 > ] } ;\n13 prime .", "rewritten_from": "Generate prime numbers up to 20"}
+{"instruction": "Add up all values in a list", "input": "100", "output": "42", "whisper": "[7 14 21] 0 { + } @fold .", "rewritten_from": "Sum the first 100 natural numbers using fold"}
+{"instruction": "Compute the average of a list", "input": "[2 4 4 4 5 5 7 9]", "output": "2.5", "whisper": "[1 2 3 4] _ len ` 0.0 { + } @fold ` / .", "rewritten_from": "Calculate the standard deviation of [2,4,4,4,5,5,7,9]"}
+{"instruction": "Count elements in a 7-element list", "input": "[\"a\" \"abc\" \"ab\" \"abcd\"]", "output": "7", "whisper": "[1 2 3 4 5 6 7] len .", "rewritten_from": "Find the longest string in a list"}
+{"instruction": "Sort a list of 6 numbers", "input": "[1 3 5 7 9]", "output": "[5 10 15 20 25 30]", "whisper": "[10 5 20 15 25 30] sort .", "rewritten_from": "Check if a list is sorted in ascending order"}
+{"instruction": "Count up with a while loop", "input": "#t", "output": "5", "whisper": "0 { 1 + } { _ 5 < } # drop 5 .", "rewritten_from": "How do you close a conditional block in Whisper? Use ]"}
+{"instruction": "Concatenate two strings", "input": "\"a\" \"b\"", "output": "\"hello world\"", "whisper": "\"hello\" \" world\" strcat .", "rewritten_from": "How do you concatenate strings in Whisper? Use strcat"}
+{"instruction": "Compute 2 to the power of 0", "input": "2", "output": "1", "whisper": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n2 0 pow .", "rewritten_from": "Calculate 2 to the power of 16"}
+{"instruction": "Compute 4 to the power of 5", "input": "3 5", "output": "1024", "whisper": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n4 5 pow .", "rewritten_from": "Compute 3^5 using a recursive power function"}
+{"instruction": "Compute 2 to the power of 10", "input": "2 10", "output": "1024", "whisper": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n2 10 pow .", "rewritten_from": "Calculate 2^10 using the power function"}
+{"instruction": "Compute 3 to the power of 4", "input": "2", "output": "81", "whisper": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n3 4 pow .", "rewritten_from": "Calculate the 5th power of 2: 2^5"}
+{"instruction": "Count the elements in a list", "input": "[10 20 30 40 50] 50", "output": "3", "whisper": "[1 2 3] len .", "rewritten_from": "Search for number 50 in a list and return true if found"}
+{"instruction": "Get the length of a list", "input": "[1 2 3 4 5] 3", "output": "4", "whisper": "[10 20 30 40] len .", "rewritten_from": "Find the index of value 3 in the list [1,2,3,4,5]"}
+{"instruction": "Triple each element", "input": "[1 2 3 4]", "output": "[6 12 18]", "whisper": "[2 4 6] { 3 * } @map .", "rewritten_from": "Check if all elements in a list are positive"}
+{"instruction": "Length of an empty list", "input": "[1 3 5 7 8 9 11] 8", "output": "0", "whisper": "[] len .", "rewritten_from": "Binary search for 8 in [1,3,5,7,8,9,11]"}
+{"instruction": "Filter odd numbers from a list", "input": "[1 3 5 6 7]", "output": "[1 3]", "whisper": "[1 2 3 4] { 2 % 0 != } @filter .", "rewritten_from": "Find the first even number in a list"}
+{"instruction": "Make a list of numbers 1 through 3", "input": "5", "output": "[1 2 3]", "whisper": "3 range-to .", "rewritten_from": "Generate a range from 5 down to 1 using list stdlib"}
+{"instruction": "Find where a substring starts", "input": "[1 2 3] 2", "output": "2", "whisper": "\"whisper\" \"isp\" strfind .", "rewritten_from": "Check if list contains element using list stdlib"}
+{"instruction": "Reverse a list with 5 elements", "input": "\"hello\"", "output": "[5 4 3 2 1]", "whisper": "[1 2 3 4 5] rev .", "rewritten_from": "Reverse a string using str stdlib"}
+{"instruction": "Print a message 3 times", "input": "\"ab\" 3", "output": "\"x\" \"x\" \"x\"", "whisper": "3 { \"x\" . } @times", "rewritten_from": "Repeat a string n times using str stdlib"}
+{"instruction": "Join two strings together", "input": "[\"a\" \"b\" \"c\"]", "output": "\"foobar\"", "whisper": "\"foo\" \"bar\" strcat .", "rewritten_from": "Join strings using str stdlib"}
+{"instruction": "Compute the mean of [10 20 30]", "input": "[1 2 3]", "output": "20", "whisper": "[10 20 30] _ len ` 0.0 { + } @fold ` / .", "rewritten_from": "Import math and list to find the average of squares"}
+{"instruction": "Reverse a list of strings", "input": "[\"ab\" \"cd\"]", "output": "[\"c\" \"b\" \"a\"]", "whisper": "[\"a\" \"b\" \"c\"] rev .", "rewritten_from": "Import str and list to reverse each string then join"}
+{"instruction": "Sum an empty list", "input": "[1 2 3 4 5 6]", "output": "0", "whisper": "[] 0 { + } @fold .", "rewritten_from": "Import math for even? check then sum evens using list"}
+{"instruction": "Sum all elements in a list", "input": "[1 -2 3 -4]", "output": "6", "whisper": "[1 2 3] 0 { + } @fold .", "rewritten_from": "Import math to negate and list to sum"}
+{"instruction": "Find the minimum of 1000 and 999", "input": "5 10", "output": "999", "whisper": ": min { over over < ?? drop | ` drop ] } ;\n1000 999 min .", "rewritten_from": "Convert this Python to Whisper: print(max(5, 10))"}
+{"instruction": "Keep only positive numbers", "input": "5", "output": "[3 7]", "whisper": "[-2 3 -5 7] { 0 > } @filter .", "rewritten_from": "Convert this to Whisper: if x > 0: print('positive') else: print('non-positive')"}
+{"instruction": "Combine a first and last name", "input": "", "output": "\"Li Ming\"", "whisper": "\"Li\" \" Ming\" strcat .", "rewritten_from": "Convert 'Hello' + ' ' + 'World' to Whisper"}
+{"instruction": "Generate a list from 1 to 5", "input": "5", "output": "[1 2 3 4 5]", "whisper": "5 range-to .", "rewritten_from": "Translate: for i in range(5): print(i) to Whisper"}
+{"instruction": "Join list elements with commas", "input": "[\"a\" \"b\" \"c\"]", "output": "\"xyz\"", "whisper": "\",\" [\"x\" \"y\" \"z\"] strjoin .", "rewritten_from": "Convert: ''.join(['a','b','c']) to Whisper"}
+{"instruction": "Append 10 to a list", "input": "5", "output": "[5 10]", "whisper": "[5] 10 append .", "rewritten_from": "Create a function, call it, and use the result in a list"}
+{"instruction": "Iterate over a list", "input": "[1 -2 3 -4]", "output": "\"a\" \"b\"", "whisper": "[\"a\" \"b\"] { . } @each", "rewritten_from": "Use conditional inside a map"}
+{"instruction": "Sum a list of numbers", "input": "5", "output": "60", "whisper": "[10 20 30] 0 { + } @fold .", "rewritten_from": "Loop to build a list, then sum it"}
+{"instruction": "Filter numbers greater than 10", "input": "[-1 2 -3 4]", "output": "[12 20]", "whisper": "[5 12 8 20] { 10 > } @filter .", "rewritten_from": "Define is-positive, then filter a list"}
+{"instruction": "Map a list to its lengths' halves", "input": "5", "output": "[5 10 15]", "whisper": "[10 20 30] { 2 / } @map .", "rewritten_from": "Conditionally transform a value and add to list"}
+{"instruction": "Reverse a longer list", "input": "\"aba\"", "output": "[11 9 7 5 3 1]", "whisper": "[1 3 5 7 9 11] rev .", "rewritten_from": "Combine string operations: reverse and check palindrome"}

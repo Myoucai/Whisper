@@ -83,6 +83,26 @@ fn new_map(in_len: usize) -> Vec<usize> {
     vec![DELETED; in_len + 1]
 }
 
+/// Boolean mask of jump-target indices. A window of instructions may only
+/// be collapsed (N→1 or N→0) when none of its indices is a jump target:
+/// landing on a folded constant re-executes the whole folded expression
+/// each iteration (`0 { 1 + } { _ 5 < } #` used to fold its body away and
+/// spin forever). Position-preserving rewrites (N→N) are always safe.
+fn jump_targets(ops: &[Opcode]) -> Vec<bool> {
+    let mut mask = vec![false; ops.len()];
+    for (i, op) in ops.iter().enumerate() {
+        let offset = match op {
+            Opcode::Cond(o) | Opcode::Jump(o) | Opcode::Loop(o) => *o as i64,
+            _ => continue,
+        };
+        let target = i as i64 + 1 + offset;
+        if target >= 0 && (target as usize) < mask.len() {
+            mask[target as usize] = true;
+        }
+    }
+    mask
+}
+
 // ── Constant folding ──────────────────────────────────────────────────
 
 /// Evaluate constant expressions at compile time.
@@ -93,10 +113,16 @@ fn new_map(in_len: usize) -> Vec<usize> {
 fn constant_folding(ops: &[Opcode]) -> (Vec<Opcode>, Vec<usize>) {
     let mut result = Vec::with_capacity(ops.len());
     let mut map = new_map(ops.len());
+    let targets = jump_targets(ops);
     let mut i = 0;
 
     while i < ops.len() {
-        if i + 2 < ops.len() {
+        // never fold across or onto a jump target (loop/branch entry)
+        let window3_clear = i + 2 < ops.len()
+            && !targets[i]
+            && !targets[i + 1]
+            && !targets[i + 2];
+        if window3_clear {
             // i64 binary ops
             if let (Opcode::PushI64(a), Opcode::PushI64(b), binop) =
                 (&ops[i], &ops[i + 1], &ops[i + 2])
@@ -134,7 +160,7 @@ fn constant_folding(ops: &[Opcode]) -> (Vec<Opcode>, Vec<usize>) {
         }
 
         // Single-arg folding: PushF64(x) FSqrt → PushF64(sqrt(x))
-        if i + 1 < ops.len() {
+        if i + 1 < ops.len() && !targets[i] && !targets[i + 1] {
             if let (Opcode::PushF64(x), Opcode::FSqrt) = (&ops[i], &ops[i + 1]) {
                 map[i] = result.len();
                 result.push(Opcode::PushF64(x.sqrt()));
@@ -242,11 +268,25 @@ fn fold_f64_binary(a: f64, b: f64, binop: &Opcode) -> Option<Opcode> {
 fn peephole(ops: &[Opcode]) -> (Vec<Opcode>, Vec<usize>) {
     let mut result = Vec::with_capacity(ops.len());
     let mut map = new_map(ops.len());
+    let targets = jump_targets(ops);
     let mut i = 0;
 
     while i < ops.len() {
         if i + 1 < ops.len() {
-            match (&ops[i], &ops[i + 1]) {
+            // Jump(0) → no-op (skip the Jump, keep the next op).
+            // Safe even when i+1 is a jump target: map[i+1] is set, so
+            // other jumps landing on the removed Jump walk to it.
+            if let Opcode::Jump(0) = ops[i] {
+                map[i + 1] = result.len();
+                result.push(ops[i + 1].clone());
+                i += 2;
+                continue;
+            }
+
+            // removals only when the window holds no jump target
+            let clear = !targets[i] && !targets[i + 1];
+            if clear {
+                match (&ops[i], &ops[i + 1]) {
                 // Dup + Drop → remove both
                 (Opcode::Dup, Opcode::Drop) => {
                     i += 2;
@@ -282,14 +322,8 @@ fn peephole(ops: &[Opcode]) -> (Vec<Opcode>, Vec<usize>) {
                     i += 2;
                     continue;
                 }
-                // Jump(0) → no-op (skip the Jump, keep the next op)
-                (Opcode::Jump(0), _) => {
-                    map[i + 1] = result.len();
-                    result.push(ops[i + 1].clone());
-                    i += 2;
-                    continue;
-                }
                 _ => {}
+            }
             }
 
             // Dup + Dup → Dup + Pick(1) (save stack space)
@@ -308,6 +342,9 @@ fn peephole(ops: &[Opcode]) -> (Vec<Opcode>, Vec<usize>) {
             && ops[i] == Opcode::Rot
             && ops[i + 1] == Opcode::Rot
             && ops[i + 2] == Opcode::Rot
+            && !targets[i]
+            && !targets[i + 1]
+            && !targets[i + 2]
         {
             i += 3;
             continue;
@@ -384,10 +421,15 @@ fn strength_reduction(ops: &[Opcode]) -> (Vec<Opcode>, Vec<usize>) {
 fn dead_store_elimination(ops: &[Opcode]) -> (Vec<Opcode>, Vec<usize>) {
     let mut result = Vec::with_capacity(ops.len());
     let mut map = new_map(ops.len());
+    let targets = jump_targets(ops);
     let mut i = 0;
 
     while i < ops.len() {
-        if i + 1 < ops.len() && ops[i + 1] == Opcode::Drop {
+        if i + 1 < ops.len()
+            && ops[i + 1] == Opcode::Drop
+            && !targets[i]
+            && !targets[i + 1]
+        {
             match &ops[i] {
                 Opcode::PushI64(_) | Opcode::PushF64(_) | Opcode::PushStr(_) => {
                     i += 2;
@@ -423,6 +465,51 @@ fn optimize_refs(ops: &[Opcode]) -> Vec<Opcode> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Regression: `0 { 1 + } { _ 5 < } #` compiled with the initial push
+    // adjacent to the loop body — constant folding used to merge
+    // Push(0)+Push(1)+Add across the loop entry, deleting the body and
+    // leaving an infinite loop. The fold must be refused because the
+    // body's first instruction is a Loop jump target.
+    #[test]
+    fn folding_does_not_cross_loop_entry() {
+        // idx: 0=Push(0) 1=Push(1) 2=Add 3=Dup 4=Push(5) 5=Lt 6=Loop(-6)
+        let ops = vec![
+            Opcode::PushI64(0),
+            Opcode::PushI64(1),
+            Opcode::Add,
+            Opcode::Dup,
+            Opcode::PushI64(5),
+            Opcode::Lt,
+            Opcode::Loop(-6),
+        ];
+        let opt = optimize(&ops);
+        // body survived: an Add is still present and executable
+        assert!(opt.contains(&Opcode::Add), "loop body folded away: {opt:?}");
+        // executing the optimized code must terminate and leave 5
+        let mut vm = whisper_core::vm::Vm::new();
+        let result = vm.execute(&opt).unwrap();
+        assert_eq!(result, Some(whisper_core::value::Value::I64(5)));
+    }
+
+    // Same guard for peephole removals: a Dup+Drop window straddling a
+    // loop entry must not be deleted.
+    #[test]
+    fn peephole_does_not_remove_jump_target() {
+        // loop entry at idx 1 (Dup) — target of Loop at idx 4
+        // body: Dup, Drop; cond: PushBool(false) → runs once, exits
+        let ops = vec![
+            Opcode::PushI64(7),
+            Opcode::Dup,
+            Opcode::Drop,
+            Opcode::PushBool(false),
+            Opcode::Loop(-4),
+        ];
+        let opt = optimize(&ops);
+        let mut vm = whisper_core::vm::Vm::new();
+        let result = vm.execute(&opt).unwrap();
+        assert_eq!(result, Some(whisper_core::value::Value::I64(7)));
+    }
 
     // Constant folding
     #[test]

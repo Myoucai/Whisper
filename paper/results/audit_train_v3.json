@@ -1,0 +1,10 @@
+{
+ "data": "../data/train_v3.jsonl",
+ "whisper_bin": "../../target/release/whisper.exe",
+ "total": 1008,
+ "buckets": {
+  "PASS": 1008
+ },
+ "undefined_words": {},
+ "failures": []
+}
