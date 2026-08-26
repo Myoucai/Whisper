@@ -603,6 +603,112 @@ static wval w_str_strip(wval s) {
 
 // ── P1 vocabulary (v1.0.4): directory ops + UTC strftime ────────────
 // ── P2 vocabulary (v1.0.5): minimal backtracking regex ──────────────
+// ── P2 vocabulary (v1.0.6): struct pack/unpack, little-endian ───────
+// Mirrors crates/whisper-core/src/structpack.rs byte for byte.
+
+static int w_sp_width(uint8_t c) {
+    switch (c) {
+    case 'i': case 'I': return 4;
+    case 'h': case 'H': return 2;
+    case 'b': case 'B': return 1;
+    case 'q': case 'Q': case 'd': return 8;
+    default: return -1; // 's' variable / unknown
+    }
+}
+
+// stack order at call: fmt on top, values under it
+static wval w_pack(wval fmt, wval values) {
+    const char *f = (const char *)fmt;
+    uint32_t fl = w_str_len(f);
+    if (fl > 0 && f[0] == '<') { f++; fl--; }
+    wval *vals = (wval *)values;
+    int64_t n = (int64_t)vals[0];
+    char *buf = (char *)malloc((size_t)(fl * 8 + 9 + n * 16));
+    if (!buf) return (wval)w_str_new("", 0);
+    uint32_t o = 0;
+    int64_t vi = 0, i = 0;
+    while (i < (int64_t)fl) {
+        uint8_t c = (uint8_t)f[i]; i++;
+        if (c == 's') {
+            if (vi >= n) { free(buf); return (wval)w_str_new("", 0); }
+            wval v = vals[1 + vi]; vi++;
+            if (!(v >= (wval)w_heap && v < (wval)(w_heap + w_heap_size))) {
+                free(buf); return (wval)w_str_new("", 0);
+            }
+            const char *s = (const char *)v;
+            uint32_t sl = w_str_len(s);
+            memcpy(buf + o, s, sl); o += sl;
+            buf[o++] = 0;
+            continue;
+        }
+        int wdt = w_sp_width(c);
+        if (wdt < 0 || vi >= n) { free(buf); return (wval)w_str_new("", 0); }
+        wval v = vals[1 + vi]; vi++;
+        uint64_t raw;
+        if (c == 'd') {
+            // f64 travels as its bit pattern in the C chain
+            if (v >= (wval)w_heap && v < (wval)(w_heap + w_heap_size)) {
+                free(buf); return (wval)w_str_new("", 0);
+            }
+            raw = (uint64_t)v;
+        } else {
+            if (v >= (wval)w_heap && v < (wval)(w_heap + w_heap_size)) {
+                free(buf); return (wval)w_str_new("", 0);
+            }
+            raw = (uint64_t)(int64_t)v;
+        }
+        for (int k = 0; k < wdt; k++) buf[o + k] = (char)((raw >> (8 * k)) & 0xFF);
+        o += (uint32_t)wdt;
+    }
+    if (vi != n) { free(buf); return (wval)w_str_new("", 0); }
+    wval r = (wval)w_str_new(buf, o);
+    free(buf);
+    return r;
+}
+
+static wval w_unpack(wval fmt, wval bytes) {
+    const char *f = (const char *)fmt;
+    const char *b = (const char *)bytes;
+    uint32_t fl = w_str_len(f), bl = w_str_len(b);
+    if (fl > 0 && f[0] == '<') { f++; fl--; }
+    wval *lst = w_list_new((int64_t)fl);
+    int64_t n = 0;
+    uint32_t pos = 0;
+    int64_t i = 0;
+    while (i < (int64_t)fl) {
+        uint8_t c = (uint8_t)f[i]; i++;
+        if (c == 's') {
+            uint32_t start = pos;
+            while (pos < bl && b[pos] != 0) pos++;
+            if (pos == bl) { return (wval)w_list_new(0); }
+            lst[1 + n] = (wval)w_str_new(b + start, pos - start); n++;
+            pos += 1;
+            continue;
+        }
+        int wdt = w_sp_width(c);
+        if (wdt < 0 || pos + wdt > bl) { return (wval)w_list_new(0); }
+        uint64_t raw = 0;
+        for (int k = 0; k < wdt; k++)
+            raw |= ((uint64_t)(uint8_t)b[pos + k]) << (8 * k);
+        pos += (uint32_t)wdt;
+        int64_t v;
+        if (c == 'i' || c == 'h' || c == 'b' || c == 'q') {
+            int sh = 64 - 8 * wdt;
+            v = ((int64_t)(raw << sh)) >> sh;
+        } else {
+            v = (int64_t)raw;
+        }
+        lst[1 + n] = (wval)v; n++;
+    }
+    // n == fl for fixed fields; rebuild if 's' shrank the count
+    if (n != (int64_t)fl) {
+        wval *l2 = w_list_new(n);
+        for (int64_t k = 0; k < n; k++) l2[1 + k] = lst[1 + k];
+        return (wval)l2;
+    }
+    return (wval)lst;
+}
+
 // Mirrors crates/whisper-core/src/rematch.rs byte for byte.
 
 static int w_re_class_match(const char *spec, uint32_t slen, uint8_t b) {

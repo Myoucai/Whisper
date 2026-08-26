@@ -57,6 +57,12 @@ t p2-re-anchor '"hello" "^hello$" strmatch .' 1
 t p2-re-back   '"aaab" "a*ab" strmatch .' 1
 t p2-re-alt    '"foo" "foo|baz" strmatch .' 1
 t p2-re-no     '"hello" "hxllo" strmatch .' 0
+t p2-sp-len     '[1 2] "<ih" pack strlen .' 6
+t p2-sp-rt      '[-2 300 -30000] "<bih" pack "<bih" unpack .' '[-2 300 -30000]'
+t p2-sp-sign    '[511] "<b" pack "<b" unpack .' '[-1]'
+t p2-sp-str     '[65 "ok"] "<bs" pack "<bs" unpack 1 @nth .' ok
+t p2-sp-trunc   '"ab" "<i" unpack .' '[]'
+t p2-sp-f64bits '[3.5] "<d" pack "<d" unpack 0 @nth .' 4615063718147915776
 t p0-upper     '"Hello" str-upper .' HELLO
 t p0-lower     '"aBc" str-lower .' abc
 t p0-strip     '"  pad  " str-strip .' pad

@@ -294,6 +294,8 @@ impl BytecodeGenerator {
             Operator::Leave => Opcode::Leave(0),
             Operator::StrMatch => Opcode::StrMatch,
             Operator::StrFindRe => Opcode::StrFindRe,
+            Operator::Pack => Opcode::Pack,
+            Operator::Unpack => Opcode::Unpack,
             Operator::StrLen => Opcode::StrLen,
             Operator::StrCat => Opcode::StrCat,
             Operator::StrSlice => Opcode::StrSlice,

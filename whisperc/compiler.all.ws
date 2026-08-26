@@ -417,6 +417,7 @@ export group-paired-rec
     [249 "read-line"] [250 "str-upper"] [251 "str-lower"] [252 "str-strip"] [253 "fmt"]
     [200 "listdir"] [201 "mkdir"] [202 "file-exists"] [203 "strftime"] [254 "leave"]
     [233 "strmatch"] [204 "strfind-re"]
+    [12 "pack"] [13 "unpack"]
     [194 "map-new"] [195 "map-get"] [196 "map-set"]
     [197 "map-del"] [198 "map-keys"] [199 "map-has"]
     [208 "now"] [209 "sleep"] [210 "random"] [211 "randint"]
@@ -1118,6 +1119,9 @@ export classify-full
 " return ]
     dup 254 = ?? drop "
 " return ]    dup 233 = ?? drop "{ const char*_p=(const char*)w_pop(); const char*_s=(const char*)w_pop(); w_push((wval)w_strmatch((wval)_s,(wval)_p)); }
+" return ]    dup 12 = ?? drop "{ const char*_f=(const char*)w_pop(); wval *_v=(wval*)w_pop(); w_push((wval)w_pack((wval)_f,(wval)_v)); }
+" return ]
+    dup 13 = ?? drop "{ const char*_f=(const char*)w_pop(); const char*_b=(const char*)w_pop(); w_push((wval)w_unpack((wval)_f,(wval)_b)); }
 " return ]
     dup 204 = ?? drop "{ const char*_p=(const char*)w_pop(); const char*_s=(const char*)w_pop(); w_push((wval)w_strfind_re((wval)_s,(wval)_p)); }
 " return ]

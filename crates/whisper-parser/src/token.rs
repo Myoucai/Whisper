@@ -106,6 +106,8 @@ impl TokenKind {
             Self::Leave => "leave",
             Self::StrMatch => "strmatch",
             Self::StrFindRe => "strfind-re",
+            Self::Pack => "pack",
+            Self::Unpack => "unpack",
             Self::MapNew => "map-new",
             Self::MapGet => "map-get",
             Self::MapSet => "map-set",
@@ -294,6 +296,8 @@ pub enum TokenKind {
     Leave,
     StrMatch,
     StrFindRe,
+    Pack,
+    Unpack,
 
     // Float operations
     I64ToF64,

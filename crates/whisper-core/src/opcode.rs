@@ -117,6 +117,10 @@ pub enum Opcode {
     StrMatch,
     /// str pattern -> idx|-1 (first prefix match)
     StrFindRe,
+    /// [values] fmt -> packed bytes | ""
+    Pack,
+    /// bytes fmt -> [values] | []
+    Unpack,
 
     // === Arithmetic (0x10-0x17) ===
     /// Addition: a b → (a+b)
@@ -399,6 +403,8 @@ impl Opcode {
             Opcode::Leave(_) => 254,
             Opcode::StrMatch => 233,
             Opcode::StrFindRe => 204,
+            Opcode::Pack => 12,
+            Opcode::Unpack => 13,
             Opcode::ListCheck => 0xE4,
             Opcode::I64Check => 0xE5,
             Opcode::StrCheck => 0xE6,
@@ -603,6 +609,8 @@ impl Opcode {
             Opcode::Leave(_) => "leave",
             Opcode::StrMatch => "strmatch",
             Opcode::StrFindRe => "strfind-re",
+            Opcode::Pack => "pack",
+            Opcode::Unpack => "unpack",
             Opcode::Add => "add",
             Opcode::Sub => "sub",
             Opcode::Mul => "mul",

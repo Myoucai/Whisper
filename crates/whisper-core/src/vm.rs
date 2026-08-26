@@ -525,6 +525,21 @@ impl Vm {
                     .collect();
                 self.data_stack.push(Value::List(Rc::new(keys)));
             }
+            Opcode::Pack => {
+                let fmt = self.pop_str()?;
+                let vals = self.pop_list()?;
+                let packed = crate::structpack::pack(&vals, fmt.as_bytes()).unwrap_or_default();
+                // bytes are a byte-semantic string
+                let s = unsafe { String::from_utf8_unchecked(packed) };
+                self.data_stack.push(Value::Str(std::rc::Rc::new(s)));
+            }
+            Opcode::Unpack => {
+                let fmt = self.pop_str()?;
+                let bytes = self.pop_str()?;
+                let vals =
+                    crate::structpack::unpack(bytes.as_bytes(), fmt.as_bytes()).unwrap_or_default();
+                self.data_stack.push(Value::List(std::rc::Rc::new(vals)));
+            }
             Opcode::StrMatch => {
                 let pat = self.pop_str()?;
                 let s = self.pop_str()?;

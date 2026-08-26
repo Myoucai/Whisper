@@ -121,6 +121,8 @@ pub enum Operator {
     Leave,
     StrMatch,
     StrFindRe,
+    Pack,
+    Unpack,
 
     // Arithmetic
     Add,

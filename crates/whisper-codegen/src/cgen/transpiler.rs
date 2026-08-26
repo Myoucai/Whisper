@@ -627,6 +627,12 @@ fn transpile_opcodes(
                     "{{ wfn _f=(wfn)w_pop(); int64_t _p=(int64_t)w_pop(); w_serve_concurrent(_p,_f); }}"
                 );
             }
+            Opcode::Pack => {
+                let _ = writeln!(out, "{{ w_push((wval)w_pack(w_pop(),w_pop())); }}");
+            }
+            Opcode::Unpack => {
+                let _ = writeln!(out, "{{ w_push((wval)w_unpack(w_pop(),w_pop())); }}");
+            }
             Opcode::StrMatch => {
                 let _ = writeln!(
                     out,

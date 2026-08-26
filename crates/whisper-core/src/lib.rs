@@ -5,6 +5,7 @@ pub mod capability;
 pub mod opcode;
 pub mod rematch;
 pub mod strftime;
+pub mod structpack;
 pub mod value;
 pub mod vm;
 
