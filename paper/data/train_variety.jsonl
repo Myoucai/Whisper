@@ -1,0 +1,900 @@
+{"instruction": "4 squared (use dup)", "input": "", "whisper": "4 _ * .", "output": "16", "variety": true}
+{"instruction": "Add 21 and 11", "input": "", "whisper": "21 11 + .", "output": "32", "variety": true}
+{"instruction": "Remainder of 4 divided by 25", "input": "", "whisper": "4 25 % .", "output": "4", "variety": true}
+{"instruction": "Swap 4 and 21 then subtract", "input": "", "whisper": "4 21 ` - .", "output": "17", "variety": true}
+{"instruction": "Run a block that prints 'ok', 3 times", "input": "", "whisper": "3 { \"ok\" . } @times", "output": "\"ok\" \"ok\" \"ok\"", "variety": true}
+{"instruction": "Remainder of 25 divided by 5", "input": "", "whisper": "25 5 % .", "output": "0", "variety": true}
+{"instruction": "Print the numbers 0 through 7-1 using #", "input": "", "whisper": "0 { _ . 1 + } { _ 7 < } #", "output": "0 1 2 3 4 5 6", "variety": true}
+{"instruction": "Compute 9+9 via dup", "input": "", "whisper": "9 _ + .", "output": "18", "variety": true}
+{"instruction": "Total of [8 21 25]", "input": "", "whisper": "[8 21 25] 0 { + } @fold .", "output": "54", "variety": true}
+{"instruction": "What is 5 times 17?", "input": "", "whisper": "5 17 * .", "output": "85", "variety": true}
+{"instruction": "Output 'win' on 6 lines", "input": "", "whisper": "6 { \"win\" . } @times", "output": "\"win\" \"win\" \"win\" \"win\" \"win\" \"win\"", "variety": true}
+{"instruction": "Compute 25 / 9", "input": "", "whisper": "25 9 / .", "output": "2", "variety": true}
+{"instruction": "abs(15)", "input": "", "whisper": "15 _ 0 < ?? -1 * | ] .", "output": "15", "variety": true}
+{"instruction": "Print the numbers 0 through 4-1 using #", "input": "", "whisper": "0 { _ . 1 + } { _ 4 < } #", "output": "0 1 2 3", "variety": true}
+{"instruction": "Sum of 25 and 84", "input": "", "whisper": "25 84 + .", "output": "109", "variety": true}
+{"instruction": "How long is 'late'?", "input": "", "whisper": "\"late\" strlen .", "output": "4", "variety": true}
+{"instruction": "Keep only even numbers from [5 12 21]", "input": "", "whisper": "[5 12 21] { 2 % 0 = } @filter .", "output": "[12]", "variety": true}
+{"instruction": "How long is 'echo'?", "input": "", "whisper": "\"echo\" strlen .", "output": "4", "variety": true}
+{"instruction": "Test if 71 is greater than 91; respond high or low", "input": "", "whisper": "71 91 > ?? \"high\" . | \"low\" . ]", "output": "\"low\"", "variety": true}
+{"instruction": "Reverse order of [1 6 18]", "input": "", "whisper": "[1 6 18] rev .", "output": "[18 6 1]", "variety": true}
+{"instruction": "Cube 91 using dup twice", "input": "", "whisper": "91 _ _ * * .", "output": "753571", "variety": true}
+{"instruction": "Stick 'hi' onto the end of 'right'", "input": "", "whisper": "\"right\" \"hi\" strcat .", "output": "\"righthi\"", "variety": true}
+{"instruction": "Make 71 non-negative", "input": "", "whisper": "71 _ 0 < ?? -1 * | ] .", "output": "71", "variety": true}
+{"instruction": "Make 28 non-negative", "input": "", "whisper": "28 _ 0 < ?? -1 * | ] .", "output": "28", "variety": true}
+{"instruction": "Run a block that prints 'dog', 4 times", "input": "", "whisper": "4 { \"dog\" . } @times", "output": "\"dog\" \"dog\" \"dog\" \"dog\"", "variety": true}
+{"instruction": "What is 5 plus 13?", "input": "", "whisper": "5 13 + .", "output": "18", "variety": true}
+{"instruction": "Join 'red' and 'delta'", "input": "", "whisper": "\"red\" \"delta\" strcat .", "output": "\"reddelta\"", "variety": true}
+{"instruction": "Swap 84 and 34 then subtract", "input": "", "whisper": "84 34 ` - .", "output": "-50", "variety": true}
+{"instruction": "abs(-11)", "input": "", "whisper": "-11 _ 0 < ?? -1 * | ] .", "output": "11", "variety": true}
+{"instruction": "Count characters in 'hi'", "input": "", "whisper": "\"hi\" strlen .", "output": "2", "variety": true}
+{"instruction": "Concatenate 'dog' 'jump'", "input": "", "whisper": "\"dog\" \"jump\" strcat .", "output": "\"dogjump\"", "variety": true}
+{"instruction": "Check whether 28 exceeds 8 (zero/nonzero)", "input": "", "whisper": "28 8 > ?? \"zero\" . | \"nonzero\" . ]", "output": "\"zero\"", "variety": true}
+{"instruction": "21 modulo 11", "input": "", "whisper": "21 11 % .", "output": "10", "variety": true}
+{"instruction": "How many items in [22 28 29]?", "input": "", "whisper": "[22 28 29] len .", "output": "3", "variety": true}
+{"instruction": "Compute 96 + 25", "input": "", "whisper": "96 25 + .", "output": "121", "variety": true}
+{"instruction": "For stack 5 31, use over then multiply", "input": "", "whisper": "5 31 over * .", "output": "155", "variety": true}
+{"instruction": "Length of 'slow'", "input": "", "whisper": "\"slow\" strlen .", "output": "4", "variety": true}
+{"instruction": "Double 34 by adding it to itself", "input": "", "whisper": "34 _ * .", "output": "1156", "variety": true}
+{"instruction": "Compute 2 / 23", "input": "", "whisper": "2 23 / .", "output": "0", "variety": true}
+{"instruction": "Compute 15 + 23", "input": "", "whisper": "15 23 + .", "output": "38", "variety": true}
+{"instruction": "Concatenate 'go' 'beta'", "input": "", "whisper": "\"go\" \"beta\" strcat .", "output": "\"gobeta\"", "variety": true}
+{"instruction": "Compute 96 - 45", "input": "", "whisper": "96 45 - .", "output": "51", "variety": true}
+{"instruction": "Copy the second value (31 4) and multiply", "input": "", "whisper": "31 4 over - .", "output": "-27", "variety": true}
+{"instruction": "Is 17 bigger than 28? Print win or lose", "input": "", "whisper": "17 28 > ?? \"win\" . | \"lose\" . ]", "output": "\"lose\"", "variety": true}
+{"instruction": "Add 9 and 96", "input": "", "whisper": "9 96 + .", "output": "105", "variety": true}
+{"instruction": "Compute 25 / 5", "input": "", "whisper": "25 5 / .", "output": "5", "variety": true}
+{"instruction": "Say 'right' exactly 4 times", "input": "", "whisper": "4 { \"right\" . } @times", "output": "\"right\" \"right\" \"right\" \"right\"", "variety": true}
+{"instruction": "Check whether 77 exceeds 13 (win/lose)", "input": "", "whisper": "77 13 > ?? \"win\" . | \"lose\" . ]", "output": "\"win\"", "variety": true}
+{"instruction": "Concatenate 'early' 'low'", "input": "", "whisper": "\"early\" \"low\" strcat .", "output": "\"earlylow\"", "variety": true}
+{"instruction": "Cube 6 using dup twice", "input": "", "whisper": "6 _ _ * * .", "output": "216", "variety": true}
+{"instruction": "Say 'beta' exactly 4 times", "input": "", "whisper": "4 { \"beta\" . } @times", "output": "\"beta\" \"beta\" \"beta\" \"beta\"", "variety": true}
+{"instruction": "Say 'king' exactly 3 times", "input": "", "whisper": "3 { \"king\" . } @times", "output": "\"king\" \"king\" \"king\"", "variety": true}
+{"instruction": "Integer-divide 17 by 12", "input": "", "whisper": "17 12 / .", "output": "1", "variety": true}
+{"instruction": "Print the numbers 0 through 3-1 using #", "input": "", "whisper": "0 { _ . 1 + } { _ 3 < } #", "output": "0 1 2", "variety": true}
+{"instruction": "84 vs 9 — print win when greater, lose otherwise", "input": "", "whisper": "84 9 > ?? \"win\" . | \"lose\" . ]", "output": "\"win\"", "variety": true}
+{"instruction": "What is 6 minus 3?", "input": "", "whisper": "6 3 - .", "output": "3", "variety": true}
+{"instruction": "How long is 'no'?", "input": "", "whisper": "\"no\" strlen .", "output": "2", "variety": true}
+{"instruction": "Calculate 11 + 15", "input": "", "whisper": "11 15 + .", "output": "26", "variety": true}
+{"instruction": "Length of 'blue'", "input": "", "whisper": "\"blue\" strlen .", "output": "4", "variety": true}
+{"instruction": "abs(-7)", "input": "", "whisper": "-7 _ 0 < ?? -1 * | ] .", "output": "7", "variety": true}
+{"instruction": "Duplicate the second element and multiply (8, 28)", "input": "", "whisper": "8 28 over + .", "output": "36", "variety": true}
+{"instruction": "Add 4 and 13", "input": "", "whisper": "4 13 + .", "output": "17", "variety": true}
+{"instruction": "Subtract 8 from 11", "input": "", "whisper": "11 8 - .", "output": "3", "variety": true}
+{"instruction": "Add up [10 17 28]", "input": "", "whisper": "[10 17 28] 0 { + } @fold .", "output": "55", "variety": true}
+{"instruction": "7 vs 4 — print win when greater, lose otherwise", "input": "", "whisper": "7 4 > ?? \"win\" . | \"lose\" . ]", "output": "\"win\"", "variety": true}
+{"instruction": "Total of [2 14 24]", "input": "", "whisper": "[2 14 24] 0 { + } @fold .", "output": "40", "variety": true}
+{"instruction": "For stack 13 23, use over then multiply", "input": "", "whisper": "13 23 over - .", "output": "10", "variety": true}
+{"instruction": "abs(11)", "input": "", "whisper": "11 _ 0 < ?? -1 * | ] .", "output": "11", "variety": true}
+{"instruction": "Compute 12 * 4", "input": "", "whisper": "12 4 * .", "output": "48", "variety": true}
+{"instruction": "Compute 6+6 via dup", "input": "", "whisper": "6 _ + .", "output": "12", "variety": true}
+{"instruction": "Stick 'cold' onto the end of 'old'", "input": "", "whisper": "\"old\" \"cold\" strcat .", "output": "\"oldcold\"", "variety": true}
+{"instruction": "Cube 84 using dup twice", "input": "", "whisper": "84 _ _ * * .", "output": "592704", "variety": true}
+{"instruction": "89 decreased by 6", "input": "", "whisper": "89 6 - .", "output": "83", "variety": true}
+{"instruction": "Map *2 over [2 13 19 21 29]", "input": "", "whisper": "[2 13 19 21 29] { 2 * } @map .", "output": "[4 26 38 42 58]", "variety": true}
+{"instruction": "Make 12 non-negative", "input": "", "whisper": "12 _ 0 < ?? -1 * | ] .", "output": "12", "variety": true}
+{"instruction": "Cube 68 using dup twice", "input": "", "whisper": "68 _ _ * * .", "output": "314432", "variety": true}
+{"instruction": "Remainder of 8 divided by 4", "input": "", "whisper": "8 4 % .", "output": "0", "variety": true}
+{"instruction": "Concatenate 'slow' 'delta'", "input": "", "whisper": "\"slow\" \"delta\" strcat .", "output": "\"slowdelta\"", "variety": true}
+{"instruction": "Compute 45*45 leaving one result", "input": "", "whisper": "45 _ _ drop * .", "output": "2025", "variety": true}
+{"instruction": "Compute 4 / 12", "input": "", "whisper": "4 12 / .", "output": "0", "variety": true}
+{"instruction": "Compute 9*9 leaving one result", "input": "", "whisper": "9 _ _ drop * .", "output": "81", "variety": true}
+{"instruction": "Sum all of [1 15 20 21 22]", "input": "", "whisper": "[1 15 20 21 22] 0 { + } @fold .", "output": "79", "variety": true}
+{"instruction": "What is 11 divided by 3 (integer)?", "input": "", "whisper": "11 3 / .", "output": "3", "variety": true}
+{"instruction": "Copy the second value (9 13) and multiply", "input": "", "whisper": "9 13 over - .", "output": "4", "variety": true}
+{"instruction": "68 decreased by 3", "input": "", "whisper": "68 3 - .", "output": "65", "variety": true}
+{"instruction": "Make -6 non-negative", "input": "", "whisper": "-6 _ 0 < ?? -1 * | ] .", "output": "6", "variety": true}
+{"instruction": "Odd numbers out of [6 11 13 14 15 19]: drop them ([6 11 13 14 15 19])", "input": "", "whisper": "[6 11 13 14 15 19] { 2 % 0 = } @filter .", "output": "[6 14]", "variety": true}
+{"instruction": "2 modulo 23", "input": "", "whisper": "2 23 % .", "output": "2", "variety": true}
+{"instruction": "How long is 'beta'?", "input": "", "whisper": "\"beta\" strlen .", "output": "4", "variety": true}
+{"instruction": "Compute 96+96 via dup", "input": "", "whisper": "96 _ + .", "output": "192", "variety": true}
+{"instruction": "Compute 52 - 2", "input": "", "whisper": "52 2 - .", "output": "50", "variety": true}
+{"instruction": "What is 17 % 23?", "input": "", "whisper": "17 23 % .", "output": "17", "variety": true}
+{"instruction": "over: 6 15 — multiply the copy by the top", "input": "", "whisper": "6 15 over * .", "output": "90", "variety": true}
+{"instruction": "Stick 'slow' onto the end of 'red'", "input": "", "whisper": "\"red\" \"slow\" strcat .", "output": "\"redslow\"", "variety": true}
+{"instruction": "Join 'hi' and 'red'", "input": "", "whisper": "\"hi\" \"red\" strcat .", "output": "\"hired\"", "variety": true}
+{"instruction": "Compute 15 / 3", "input": "", "whisper": "15 3 / .", "output": "5", "variety": true}
+{"instruction": "Filter [4 10 16 19 29] for even values", "input": "", "whisper": "[4 10 16 19 29] { 2 % 0 = } @filter .", "output": "[4 10 16]", "variety": true}
+{"instruction": "Compute 6*6 leaving one result", "input": "", "whisper": "6 _ _ drop * .", "output": "36", "variety": true}
+{"instruction": "Join 'late' and 'king'", "input": "", "whisper": "\"late\" \"king\" strcat .", "output": "\"lateking\"", "variety": true}
+{"instruction": "Count from 0 up to 6-1 (inclusive) with a while loop", "input": "", "whisper": "0 { _ . 1 + } { _ 6 < } #", "output": "0 1 2 3 4 5", "variety": true}
+{"instruction": "Absolute value of -3", "input": "", "whisper": "-3 _ 0 < ?? -1 * | ] .", "output": "3", "variety": true}
+{"instruction": "28 vs 31 — print even when greater, odd otherwise", "input": "", "whisper": "28 31 > ?? \"even\" . | \"odd\" . ]", "output": "\"odd\"", "variety": true}
+{"instruction": "over: 8 7 — multiply the copy by the top", "input": "", "whisper": "8 7 over * .", "output": "56", "variety": true}
+{"instruction": "Output 'low' on 6 lines", "input": "", "whisper": "6 { \"low\" . } @times", "output": "\"low\" \"low\" \"low\" \"low\" \"low\" \"low\"", "variety": true}
+{"instruction": "Output 'no' on 4 lines", "input": "", "whisper": "4 { \"no\" . } @times", "output": "\"no\" \"no\" \"no\" \"no\"", "variety": true}
+{"instruction": "What is 34 minus 4?", "input": "", "whisper": "34 4 - .", "output": "30", "variety": true}
+{"instruction": "What is 21 % 9?", "input": "", "whisper": "21 9 % .", "output": "3", "variety": true}
+{"instruction": "What is 6 % 3?", "input": "", "whisper": "6 3 % .", "output": "0", "variety": true}
+{"instruction": "For stack 15 25, use over then multiply", "input": "", "whisper": "15 25 over * .", "output": "375", "variety": true}
+{"instruction": "Absolute value of -9", "input": "", "whisper": "-9 _ 0 < ?? -1 * | ] .", "output": "9", "variety": true}
+{"instruction": "Check whether 68 exceeds 8 (pass/fail)", "input": "", "whisper": "68 8 > ?? \"pass\" . | \"fail\" . ]", "output": "\"pass\"", "variety": true}
+{"instruction": "Compute 84 - 23", "input": "", "whisper": "84 23 - .", "output": "61", "variety": true}
+{"instruction": "Copy the second value (12 15) and multiply", "input": "", "whisper": "12 15 over * .", "output": "180", "variety": true}
+{"instruction": "Make -5 non-negative", "input": "", "whisper": "-5 _ 0 < ?? -1 * | ] .", "output": "5", "variety": true}
+{"instruction": "Test if 11 is greater than 47; respond fast or slow", "input": "", "whisper": "11 47 > ?? \"fast\" . | \"slow\" . ]", "output": "\"slow\"", "variety": true}
+{"instruction": "Is 96 bigger than 2? Print zero or nonzero", "input": "", "whisper": "96 2 > ?? \"zero\" . | \"nonzero\" . ]", "output": "\"zero\"", "variety": true}
+{"instruction": "What is 23 divided by 11 (integer)?", "input": "", "whisper": "23 11 / .", "output": "2", "variety": true}
+{"instruction": "Swap 21 and 3 then subtract", "input": "", "whisper": "21 3 ` - .", "output": "-18", "variety": true}
+{"instruction": "Compute 13 + 17", "input": "", "whisper": "13 17 + .", "output": "30", "variety": true}
+{"instruction": "How long is 'jump'?", "input": "", "whisper": "\"jump\" strlen .", "output": "4", "variety": true}
+{"instruction": "over: 25 9 — multiply the copy by the top", "input": "", "whisper": "25 9 over * .", "output": "225", "variety": true}
+{"instruction": "Sum of 7 and 91", "input": "", "whisper": "7 91 + .", "output": "98", "variety": true}
+{"instruction": "What is 9 divided by 3 (integer)?", "input": "", "whisper": "9 3 / .", "output": "3", "variety": true}
+{"instruction": "Run a block that prints 'blue', 3 times", "input": "", "whisper": "3 { \"blue\" . } @times", "output": "\"blue\" \"blue\" \"blue\"", "variety": true}
+{"instruction": "Count characters in 'big'", "input": "", "whisper": "\"big\" strlen .", "output": "3", "variety": true}
+{"instruction": "Print the word 'win' 5 times", "input": "", "whisper": "5 { \"win\" . } @times", "output": "\"win\" \"win\" \"win\" \"win\" \"win\"", "variety": true}
+{"instruction": "Is 89 bigger than 3? Print open or shut", "input": "", "whisper": "89 3 > ?? \"open\" . | \"shut\" . ]", "output": "\"open\"", "variety": true}
+{"instruction": "Swap 91 and 5 then subtract", "input": "", "whisper": "91 5 ` - .", "output": "-86", "variety": true}
+{"instruction": "Repeat the string 'hi' 4 times", "input": "", "whisper": "4 { \"hi\" . } @times", "output": "\"hi\" \"hi\" \"hi\" \"hi\"", "variety": true}
+{"instruction": "Absolute value of 8", "input": "", "whisper": "8 _ 0 < ?? -1 * | ] .", "output": "8", "variety": true}
+{"instruction": "Integer-divide 25 by 2", "input": "", "whisper": "25 2 / .", "output": "12", "variety": true}
+{"instruction": "Compute 68+68 via dup", "input": "", "whisper": "68 _ + .", "output": "136", "variety": true}
+{"instruction": "Subtract 4 from 71", "input": "", "whisper": "71 4 - .", "output": "67", "variety": true}
+{"instruction": "Reverse 8 and 77, then compute a-b", "input": "", "whisper": "8 77 ` - .", "output": "69", "variety": true}
+{"instruction": "Subtract 5 from 84", "input": "", "whisper": "84 5 - .", "output": "79", "variety": true}
+{"instruction": "Absolute value of 7", "input": "", "whisper": "7 _ 0 < ?? -1 * | ] .", "output": "7", "variety": true}
+{"instruction": "Square 11 using dup", "input": "", "whisper": "11 _ * .", "output": "121", "variety": true}
+{"instruction": "Compute 31^2 with _", "input": "", "whisper": "31 _ * .", "output": "961", "variety": true}
+{"instruction": "Test if 56 is greater than 2; respond hot or cold", "input": "", "whisper": "56 2 > ?? \"hot\" . | \"cold\" . ]", "output": "\"hot\"", "variety": true}
+{"instruction": "13 decreased by 12", "input": "", "whisper": "13 12 - .", "output": "1", "variety": true}
+{"instruction": "Absolute value of 47", "input": "", "whisper": "47 _ 0 < ?? -1 * | ] .", "output": "47", "variety": true}
+{"instruction": "Square 45 using dup", "input": "", "whisper": "45 _ * .", "output": "2025", "variety": true}
+{"instruction": "Sum of 42 and 84", "input": "", "whisper": "42 84 + .", "output": "126", "variety": true}
+{"instruction": "Count elements in [14 16 26]", "input": "", "whisper": "[14 16 26] len .", "output": "3", "variety": true}
+{"instruction": "Integer-divide 6 by 11", "input": "", "whisper": "6 11 / .", "output": "0", "variety": true}
+{"instruction": "Join 'dog' and 'go'", "input": "", "whisper": "\"dog\" \"go\" strcat .", "output": "\"doggo\"", "variety": true}
+{"instruction": "Reverse 6 and 2, then compute a-b", "input": "", "whisper": "6 2 ` - .", "output": "-4", "variety": true}
+{"instruction": "Concatenate 'ok' 'low'", "input": "", "whisper": "\"ok\" \"low\" strcat .", "output": "\"oklow\"", "variety": true}
+{"instruction": "How long is 'go'?", "input": "", "whisper": "\"go\" strlen .", "output": "2", "variety": true}
+{"instruction": "Compute 4 * 25", "input": "", "whisper": "4 25 * .", "output": "100", "variety": true}
+{"instruction": "Swap 25 and 21 then subtract", "input": "", "whisper": "25 21 ` - .", "output": "-4", "variety": true}
+{"instruction": "Multiply 9 by 15", "input": "", "whisper": "9 15 * .", "output": "135", "variety": true}
+{"instruction": "Compute 91 - 77", "input": "", "whisper": "91 77 - .", "output": "14", "variety": true}
+{"instruction": "Stick 'echo' onto the end of 'left'", "input": "", "whisper": "\"left\" \"echo\" strcat .", "output": "\"leftecho\"", "variety": true}
+{"instruction": "Test if 5 is greater than 96; respond fast or slow", "input": "", "whisper": "5 96 > ?? \"fast\" . | \"slow\" . ]", "output": "\"slow\"", "variety": true}
+{"instruction": "Compute 8 * 25", "input": "", "whisper": "8 25 * .", "output": "200", "variety": true}
+{"instruction": "Sum of 6 and 13", "input": "", "whisper": "6 13 + .", "output": "19", "variety": true}
+{"instruction": "For stack 28 21, use over then multiply", "input": "", "whisper": "28 21 over * .", "output": "588", "variety": true}
+{"instruction": "17 modulo 7", "input": "", "whisper": "17 7 % .", "output": "3", "variety": true}
+{"instruction": "Copy the second value (4 28) and multiply", "input": "", "whisper": "4 28 over * .", "output": "112", "variety": true}
+{"instruction": "Absolute value of 77", "input": "", "whisper": "77 _ 0 < ?? -1 * | ] .", "output": "77", "variety": true}
+{"instruction": "Say 'up' exactly 2 times", "input": "", "whisper": "2 { \"up\" . } @times", "output": "\"up\" \"up\"", "variety": true}
+{"instruction": "Join 'echo' and 'cat'", "input": "", "whisper": "\"echo\" \"cat\" strcat .", "output": "\"echocat\"", "variety": true}
+{"instruction": "Calculate 9 + 8", "input": "", "whisper": "9 8 + .", "output": "17", "variety": true}
+{"instruction": "How long is 'low'?", "input": "", "whisper": "\"low\" strlen .", "output": "3", "variety": true}
+{"instruction": "Count characters in 'cold'", "input": "", "whisper": "\"cold\" strlen .", "output": "4", "variety": true}
+{"instruction": "Integer-divide 12 by 4", "input": "", "whisper": "12 4 / .", "output": "3", "variety": true}
+{"instruction": "Copy the second value (5 42) and multiply", "input": "", "whisper": "5 42 over * .", "output": "210", "variety": true}
+{"instruction": "Join 'echo' and 'hi'", "input": "", "whisper": "\"echo\" \"hi\" strcat .", "output": "\"echohi\"", "variety": true}
+{"instruction": "Multiply each item of [3 5 13 19 24] by 2", "input": "", "whisper": "[3 5 13 19 24] { 2 * } @map .", "output": "[6 10 26 38 48]", "variety": true}
+{"instruction": "Remainder of 5 divided by 17", "input": "", "whisper": "5 17 % .", "output": "5", "variety": true}
+{"instruction": "Multiply 13 by 25", "input": "", "whisper": "13 25 * .", "output": "325", "variety": true}
+{"instruction": "over: 17 28 — multiply the copy by the top", "input": "", "whisper": "17 28 over * .", "output": "476", "variety": true}
+{"instruction": "Swap 71 and 12 then subtract", "input": "", "whisper": "71 12 ` - .", "output": "-59", "variety": true}
+{"instruction": "Absolute value of 42", "input": "", "whisper": "42 _ 0 < ?? -1 * | ] .", "output": "42", "variety": true}
+{"instruction": "Copy the second value (21 7) and multiply", "input": "", "whisper": "21 7 over * .", "output": "147", "variety": true}
+{"instruction": "Duplicate the second element and multiply (13, 4)", "input": "", "whisper": "13 4 over + .", "output": "17", "variety": true}
+{"instruction": "Swap 77 and 21 then subtract", "input": "", "whisper": "77 21 ` - .", "output": "-56", "variety": true}
+{"instruction": "abs(2)", "input": "", "whisper": "2 _ 0 < ?? -1 * | ] .", "output": "2", "variety": true}
+{"instruction": "Check whether 45 exceeds 56 (on/off)", "input": "", "whisper": "45 56 > ?? \"on\" . | \"off\" . ]", "output": "\"off\"", "variety": true}
+{"instruction": "Check whether 21 exceeds 91 (on/off)", "input": "", "whisper": "21 91 > ?? \"on\" . | \"off\" . ]", "output": "\"off\"", "variety": true}
+{"instruction": "Swap 7 and 96 then subtract", "input": "", "whisper": "7 96 ` - .", "output": "89", "variety": true}
+{"instruction": "Reverse 11 and 12, then compute a-b", "input": "", "whisper": "11 12 ` - .", "output": "1", "variety": true}
+{"instruction": "Run a block that prints 'alpha', 3 times", "input": "", "whisper": "3 { \"alpha\" . } @times", "output": "\"alpha\" \"alpha\" \"alpha\"", "variety": true}
+{"instruction": "Integer-divide 13 by 3", "input": "", "whisper": "13 3 / .", "output": "4", "variety": true}
+{"instruction": "Length of 'new'", "input": "", "whisper": "\"new\" strlen .", "output": "3", "variety": true}
+{"instruction": "Exchange 56 77 and subtract top from second", "input": "", "whisper": "56 77 ` - .", "output": "21", "variety": true}
+{"instruction": "Subtract 42 from 45", "input": "", "whisper": "45 42 - .", "output": "3", "variety": true}
+{"instruction": "77 vs 28 — print pos when greater, neg otherwise", "input": "", "whisper": "77 28 > ?? \"pos\" . | \"neg\" . ]", "output": "\"pos\"", "variety": true}
+{"instruction": "Product of 6 and 13", "input": "", "whisper": "6 13 * .", "output": "78", "variety": true}
+{"instruction": "Cube 52 using dup twice", "input": "", "whisper": "52 _ _ * * .", "output": "140608", "variety": true}
+{"instruction": "Concatenate 'low' 'early'", "input": "", "whisper": "\"low\" \"early\" strcat .", "output": "\"lowearly\"", "variety": true}
+{"instruction": "over: 6 34 — multiply the copy by the top", "input": "", "whisper": "6 34 over * .", "output": "204", "variety": true}
+{"instruction": "Calculate 13 + 3", "input": "", "whisper": "13 3 + .", "output": "16", "variety": true}
+{"instruction": "Output 'up' on 3 lines", "input": "", "whisper": "3 { \"up\" . } @times", "output": "\"up\" \"up\" \"up\"", "variety": true}
+{"instruction": "Integer-divide 15 by 8", "input": "", "whisper": "15 8 / .", "output": "1", "variety": true}
+{"instruction": "Calculate 45 + 56", "input": "", "whisper": "45 56 + .", "output": "101", "variety": true}
+{"instruction": "Compute 91+91 via dup", "input": "", "whisper": "91 _ + .", "output": "182", "variety": true}
+{"instruction": "Count characters in 'right'", "input": "", "whisper": "\"right\" strlen .", "output": "5", "variety": true}
+{"instruction": "47 decreased by 9", "input": "", "whisper": "47 9 - .", "output": "38", "variety": true}
+{"instruction": "Stick 'alpha' onto the end of 'yes'", "input": "", "whisper": "\"yes\" \"alpha\" strcat .", "output": "\"yesalpha\"", "variety": true}
+{"instruction": "Calculate 84 + 2", "input": "", "whisper": "84 2 + .", "output": "86", "variety": true}
+{"instruction": "17 decreased by 7", "input": "", "whisper": "17 7 - .", "output": "10", "variety": true}
+{"instruction": "What is 84 minus 21?", "input": "", "whisper": "84 21 - .", "output": "63", "variety": true}
+{"instruction": "Calculate 47 + 21", "input": "", "whisper": "47 21 + .", "output": "68", "variety": true}
+{"instruction": "Double every element of [2 3 19 24 28 29]", "input": "", "whisper": "[2 3 19 24 28 29] { 2 * } @map .", "output": "[4 6 38 48 56 58]", "variety": true}
+{"instruction": "Run a block that prints 'echo', 2 times", "input": "", "whisper": "2 { \"echo\" . } @times", "output": "\"echo\" \"echo\"", "variety": true}
+{"instruction": "Test if 3 is greater than 91; respond win or lose", "input": "", "whisper": "3 91 > ?? \"win\" . | \"lose\" . ]", "output": "\"lose\"", "variety": true}
+{"instruction": "Compute 12 / 15", "input": "", "whisper": "12 15 / .", "output": "0", "variety": true}
+{"instruction": "For stack 2 7, use over then multiply", "input": "", "whisper": "2 7 over - .", "output": "5", "variety": true}
+{"instruction": "Exchange 25 47 and subtract top from second", "input": "", "whisper": "25 47 ` - .", "output": "22", "variety": true}
+{"instruction": "What is 3 times 15?", "input": "", "whisper": "3 15 * .", "output": "45", "variety": true}
+{"instruction": "Calculate 56 + 7", "input": "", "whisper": "56 7 + .", "output": "63", "variety": true}
+{"instruction": "What is 6 % 11?", "input": "", "whisper": "6 11 % .", "output": "6", "variety": true}
+{"instruction": "Compute 71 + 2", "input": "", "whisper": "71 2 + .", "output": "73", "variety": true}
+{"instruction": "Multiply 4 by 21", "input": "", "whisper": "4 21 * .", "output": "84", "variety": true}
+{"instruction": "Make 84 non-negative", "input": "", "whisper": "84 _ 0 < ?? -1 * | ] .", "output": "84", "variety": true}
+{"instruction": "21 modulo 13", "input": "", "whisper": "21 13 % .", "output": "8", "variety": true}
+{"instruction": "Duplicate the second element and multiply (12, 4)", "input": "", "whisper": "12 4 over - .", "output": "-8", "variety": true}
+{"instruction": "What is 63 minus 23?", "input": "", "whisper": "63 23 - .", "output": "40", "variety": true}
+{"instruction": "What is 17 % 4?", "input": "", "whisper": "17 4 % .", "output": "1", "variety": true}
+{"instruction": "34 decreased by 3", "input": "", "whisper": "34 3 - .", "output": "31", "variety": true}
+{"instruction": "Add 84 and 31", "input": "", "whisper": "84 31 + .", "output": "115", "variety": true}
+{"instruction": "Compute 56 + 5", "input": "", "whisper": "56 5 + .", "output": "61", "variety": true}
+{"instruction": "Length of 'yes'", "input": "", "whisper": "\"yes\" strlen .", "output": "3", "variety": true}
+{"instruction": "over: 34 21 — multiply the copy by the top", "input": "", "whisper": "34 21 over + .", "output": "55", "variety": true}
+{"instruction": "Exchange 15 4 and subtract top from second", "input": "", "whisper": "15 4 ` - .", "output": "-11", "variety": true}
+{"instruction": "Run a block that prints 'dog', 5 times", "input": "", "whisper": "5 { \"dog\" . } @times", "output": "\"dog\" \"dog\" \"dog\" \"dog\" \"dog\"", "variety": true}
+{"instruction": "Cube 25 using dup twice", "input": "", "whisper": "25 _ _ * * .", "output": "15625", "variety": true}
+{"instruction": "Double every element of [1 2 4 16 21 28]", "input": "", "whisper": "[1 2 4 16 21 28] { 2 * } @map .", "output": "[2 4 8 32 42 56]", "variety": true}
+{"instruction": "Duplicate the second element and multiply (15, 23)", "input": "", "whisper": "15 23 over - .", "output": "8", "variety": true}
+{"instruction": "Compute 7 + 42", "input": "", "whisper": "7 42 + .", "output": "49", "variety": true}
+{"instruction": "Add 8 and 42", "input": "", "whisper": "8 42 + .", "output": "50", "variety": true}
+{"instruction": "Compute 7 * 12", "input": "", "whisper": "7 12 * .", "output": "84", "variety": true}
+{"instruction": "23 modulo 8", "input": "", "whisper": "23 8 % .", "output": "7", "variety": true}
+{"instruction": "Length of 'hot'", "input": "", "whisper": "\"hot\" strlen .", "output": "3", "variety": true}
+{"instruction": "Compute 15 / 21", "input": "", "whisper": "15 21 / .", "output": "0", "variety": true}
+{"instruction": "Join 'blue' and 'early'", "input": "", "whisper": "\"blue\" \"early\" strcat .", "output": "\"blueearly\"", "variety": true}
+{"instruction": "Double every element of [2 4 24]", "input": "", "whisper": "[2 4 24] { 2 * } @map .", "output": "[4 8 48]", "variety": true}
+{"instruction": "42 decreased by 2", "input": "", "whisper": "42 2 - .", "output": "40", "variety": true}
+{"instruction": "Is 7 bigger than 11? Print on or off", "input": "", "whisper": "7 11 > ?? \"on\" . | \"off\" . ]", "output": "\"off\"", "variety": true}
+{"instruction": "15 modulo 25", "input": "", "whisper": "15 25 % .", "output": "15", "variety": true}
+{"instruction": "What is 11 times 12?", "input": "", "whisper": "11 12 * .", "output": "132", "variety": true}
+{"instruction": "What is 84 plus 96?", "input": "", "whisper": "84 96 + .", "output": "180", "variety": true}
+{"instruction": "Compute 9 * 17", "input": "", "whisper": "9 17 * .", "output": "153", "variety": true}
+{"instruction": "For stack 15 4, use over then multiply", "input": "", "whisper": "15 4 over + .", "output": "19", "variety": true}
+{"instruction": "Reverse 25 and 63, then compute a-b", "input": "", "whisper": "25 63 ` - .", "output": "38", "variety": true}
+{"instruction": "What is 63 minus 52?", "input": "", "whisper": "63 52 - .", "output": "11", "variety": true}
+{"instruction": "What is 15 % 11?", "input": "", "whisper": "15 11 % .", "output": "4", "variety": true}
+{"instruction": "Swap 84 and 42 then subtract", "input": "", "whisper": "84 42 ` - .", "output": "-42", "variety": true}
+{"instruction": "Integer-divide 15 by 13", "input": "", "whisper": "15 13 / .", "output": "1", "variety": true}
+{"instruction": "What is 68 minus 4?", "input": "", "whisper": "68 4 - .", "output": "64", "variety": true}
+{"instruction": "For stack 5 7, use over then multiply", "input": "", "whisper": "5 7 over * .", "output": "35", "variety": true}
+{"instruction": "Add 9 and 63", "input": "", "whisper": "9 63 + .", "output": "72", "variety": true}
+{"instruction": "Exchange 63 7 and subtract top from second", "input": "", "whisper": "63 7 ` - .", "output": "-56", "variety": true}
+{"instruction": "Duplicate the second element and multiply (7, 28)", "input": "", "whisper": "7 28 over * .", "output": "196", "variety": true}
+{"instruction": "abs(-15)", "input": "", "whisper": "-15 _ 0 < ?? -1 * | ] .", "output": "15", "variety": true}
+{"instruction": "5 modulo 7", "input": "", "whisper": "5 7 % .", "output": "5", "variety": true}
+{"instruction": "Subtract 42 from 56", "input": "", "whisper": "56 42 - .", "output": "14", "variety": true}
+{"instruction": "Test if 84 is greater than 34; respond on or off", "input": "", "whisper": "84 34 > ?? \"on\" . | \"off\" . ]", "output": "\"on\"", "variety": true}
+{"instruction": "Count characters in 'early'", "input": "", "whisper": "\"early\" strlen .", "output": "5", "variety": true}
+{"instruction": "Is 21 bigger than 23? Print zero or nonzero", "input": "", "whisper": "21 23 > ?? \"zero\" . | \"nonzero\" . ]", "output": "\"nonzero\"", "variety": true}
+{"instruction": "Compute 7 * 9", "input": "", "whisper": "7 9 * .", "output": "63", "variety": true}
+{"instruction": "Swap 9 and 17 then subtract", "input": "", "whisper": "9 17 ` - .", "output": "8", "variety": true}
+{"instruction": "Output 'down' on 3 lines", "input": "", "whisper": "3 { \"down\" . } @times", "output": "\"down\" \"down\" \"down\"", "variety": true}
+{"instruction": "What is 23 divided by 15 (integer)?", "input": "", "whisper": "23 15 / .", "output": "1", "variety": true}
+{"instruction": "Make 68 non-negative", "input": "", "whisper": "68 _ 0 < ?? -1 * | ] .", "output": "68", "variety": true}
+{"instruction": "Concatenate 'cold' 'gamma'", "input": "", "whisper": "\"cold\" \"gamma\" strcat .", "output": "\"coldgamma\"", "variety": true}
+{"instruction": "Repeat the string 'late' 4 times", "input": "", "whisper": "4 { \"late\" . } @times", "output": "\"late\" \"late\" \"late\" \"late\"", "variety": true}
+{"instruction": "56 decreased by 13", "input": "", "whisper": "56 13 - .", "output": "43", "variety": true}
+{"instruction": "What is 34 minus 25?", "input": "", "whisper": "34 25 - .", "output": "9", "variety": true}
+{"instruction": "Keep only even numbers from [8 19 21 23]", "input": "", "whisper": "[8 19 21 23] { 2 % 0 = } @filter .", "output": "[8]", "variety": true}
+{"instruction": "Reverse 25 and 34, then compute a-b", "input": "", "whisper": "25 34 ` - .", "output": "9", "variety": true}
+{"instruction": "Square 13 using dup", "input": "", "whisper": "13 _ * .", "output": "169", "variety": true}
+{"instruction": "Concatenate 'low' 'jump'", "input": "", "whisper": "\"low\" \"jump\" strcat .", "output": "\"lowjump\"", "variety": true}
+{"instruction": "Swap 45 and 4 then subtract", "input": "", "whisper": "45 4 ` - .", "output": "-41", "variety": true}
+{"instruction": "Absolute value of 4", "input": "", "whisper": "4 _ 0 < ?? -1 * | ] .", "output": "4", "variety": true}
+{"instruction": "Add 28 and 47", "input": "", "whisper": "28 47 + .", "output": "75", "variety": true}
+{"instruction": "What is 45 minus 13?", "input": "", "whisper": "45 13 - .", "output": "32", "variety": true}
+{"instruction": "What is 8 % 7?", "input": "", "whisper": "8 7 % .", "output": "1", "variety": true}
+{"instruction": "Compute 15 - 3", "input": "", "whisper": "15 3 - .", "output": "12", "variety": true}
+{"instruction": "over: 3 12 — multiply the copy by the top", "input": "", "whisper": "3 12 over - .", "output": "9", "variety": true}
+{"instruction": "Compare 77 and 31: answer zero if 77 > 31, else nonzero", "input": "", "whisper": "77 31 > ?? \"zero\" . | \"nonzero\" . ]", "output": "\"zero\"", "variety": true}
+{"instruction": "Subtract 2 from 71", "input": "", "whisper": "71 2 - .", "output": "69", "variety": true}
+{"instruction": "Length of 'left'", "input": "", "whisper": "\"left\" strlen .", "output": "4", "variety": true}
+{"instruction": "6 modulo 8", "input": "", "whisper": "6 8 % .", "output": "6", "variety": true}
+{"instruction": "Subtract 3 from 89", "input": "", "whisper": "89 3 - .", "output": "86", "variety": true}
+{"instruction": "Count characters in 'up'", "input": "", "whisper": "\"up\" strlen .", "output": "2", "variety": true}
+{"instruction": "Run a block that prints 'red', 6 times", "input": "", "whisper": "6 { \"red\" . } @times", "output": "\"red\" \"red\" \"red\" \"red\" \"red\" \"red\"", "variety": true}
+{"instruction": "68 vs 31 — print win when greater, lose otherwise", "input": "", "whisper": "68 31 > ?? \"win\" . | \"lose\" . ]", "output": "\"win\"", "variety": true}
+{"instruction": "5 modulo 12", "input": "", "whisper": "5 12 % .", "output": "5", "variety": true}
+{"instruction": "Concatenate 'hot' 'yes'", "input": "", "whisper": "\"hot\" \"yes\" strcat .", "output": "\"hotyes\"", "variety": true}
+{"instruction": "25 modulo 2", "input": "", "whisper": "25 2 % .", "output": "1", "variety": true}
+{"instruction": "Stick 'low' onto the end of 'sun'", "input": "", "whisper": "\"sun\" \"low\" strcat .", "output": "\"sunlow\"", "variety": true}
+{"instruction": "Add 31 and 45", "input": "", "whisper": "31 45 + .", "output": "76", "variety": true}
+{"instruction": "Absolute value of 52", "input": "", "whisper": "52 _ 0 < ?? -1 * | ] .", "output": "52", "variety": true}
+{"instruction": "Compare 71 and 5: answer even if 71 > 5, else odd", "input": "", "whisper": "71 5 > ?? \"even\" . | \"odd\" . ]", "output": "\"even\"", "variety": true}
+{"instruction": "Compute 31*31 leaving one result", "input": "", "whisper": "31 _ _ drop * .", "output": "961", "variety": true}
+{"instruction": "Reverse 42 and 31, then compute a-b", "input": "", "whisper": "42 31 ` - .", "output": "-11", "variety": true}
+{"instruction": "Check whether 52 exceeds 34 (fast/slow)", "input": "", "whisper": "52 34 > ?? \"fast\" . | \"slow\" . ]", "output": "\"fast\"", "variety": true}
+{"instruction": "Compute 91 - 34", "input": "", "whisper": "91 34 - .", "output": "57", "variety": true}
+{"instruction": "Product of 21 and 17", "input": "", "whisper": "21 17 * .", "output": "357", "variety": true}
+{"instruction": "Remainder of 3 divided by 5", "input": "", "whisper": "3 5 % .", "output": "3", "variety": true}
+{"instruction": "Is 84 bigger than 17? Print fast or slow", "input": "", "whisper": "84 17 > ?? \"fast\" . | \"slow\" . ]", "output": "\"fast\"", "variety": true}
+{"instruction": "Concatenate 'cold' 'alpha'", "input": "", "whisper": "\"cold\" \"alpha\" strcat .", "output": "\"coldalpha\"", "variety": true}
+{"instruction": "Total of [5 6 19 20 22]", "input": "", "whisper": "[5 6 19 20 22] 0 { + } @fold .", "output": "72", "variety": true}
+{"instruction": "Run a block that prints 'alpha', 6 times", "input": "", "whisper": "6 { \"alpha\" . } @times", "output": "\"alpha\" \"alpha\" \"alpha\" \"alpha\" \"alpha\" \"alpha\"", "variety": true}
+{"instruction": "For stack 11 28, use over then multiply", "input": "", "whisper": "11 28 over * .", "output": "308", "variety": true}
+{"instruction": "Keep only even numbers from [13 19 26]", "input": "", "whisper": "[13 19 26] { 2 % 0 = } @filter .", "output": "[26]", "variety": true}
+{"instruction": "Compute 4 / 7", "input": "", "whisper": "4 7 / .", "output": "0", "variety": true}
+{"instruction": "For stack 23 25, use over then multiply", "input": "", "whisper": "23 25 over * .", "output": "575", "variety": true}
+{"instruction": "Compute 13 / 5", "input": "", "whisper": "13 5 / .", "output": "2", "variety": true}
+{"instruction": "77 decreased by 7", "input": "", "whisper": "77 7 - .", "output": "70", "variety": true}
+{"instruction": "Reverse order of [1 11 16 26]", "input": "", "whisper": "[1 11 16 26] rev .", "output": "[26 16 11 1]", "variety": true}
+{"instruction": "Output 'old' on 6 lines", "input": "", "whisper": "6 { \"old\" . } @times", "output": "\"old\" \"old\" \"old\" \"old\" \"old\" \"old\"", "variety": true}
+{"instruction": "28 decreased by 21", "input": "", "whisper": "28 21 - .", "output": "7", "variety": true}
+{"instruction": "Compare 84 and 11: answer high if 84 > 11, else low", "input": "", "whisper": "84 11 > ?? \"high\" . | \"low\" . ]", "output": "\"high\"", "variety": true}
+{"instruction": "Copy the second value (8 6) and multiply", "input": "", "whisper": "8 6 over + .", "output": "14", "variety": true}
+{"instruction": "Add up [8 11 15 16 21 22]", "input": "", "whisper": "[8 11 15 16 21 22] 0 { + } @fold .", "output": "93", "variety": true}
+{"instruction": "What is 4 divided by 9 (integer)?", "input": "", "whisper": "4 9 / .", "output": "0", "variety": true}
+{"instruction": "What is 25 % 23?", "input": "", "whisper": "25 23 % .", "output": "2", "variety": true}
+{"instruction": "Compute 89*89 leaving one result", "input": "", "whisper": "89 _ _ drop * .", "output": "7921", "variety": true}
+{"instruction": "What is 23 % 12?", "input": "", "whisper": "23 12 % .", "output": "11", "variety": true}
+{"instruction": "Stick 'big' onto the end of 'alpha'", "input": "", "whisper": "\"alpha\" \"big\" strcat .", "output": "\"alphabig\"", "variety": true}
+{"instruction": "Compute 77 + 7", "input": "", "whisper": "77 7 + .", "output": "84", "variety": true}
+{"instruction": "What is 84 minus 47?", "input": "", "whisper": "84 47 - .", "output": "37", "variety": true}
+{"instruction": "Exchange 28 6 and subtract top from second", "input": "", "whisper": "28 6 ` - .", "output": "-22", "variety": true}
+{"instruction": "Run a block that prints 'delta', 6 times", "input": "", "whisper": "6 { \"delta\" . } @times", "output": "\"delta\" \"delta\" \"delta\" \"delta\" \"delta\" \"delta\"", "variety": true}
+{"instruction": "What is 4 minus 2?", "input": "", "whisper": "4 2 - .", "output": "2", "variety": true}
+{"instruction": "Compute 5^2 with _", "input": "", "whisper": "5 _ * .", "output": "25", "variety": true}
+{"instruction": "Subtract 9 from 11", "input": "", "whisper": "11 9 - .", "output": "2", "variety": true}
+{"instruction": "What is 52 minus 4?", "input": "", "whisper": "52 4 - .", "output": "48", "variety": true}
+{"instruction": "What is 5 divided by 6 (integer)?", "input": "", "whisper": "5 6 / .", "output": "0", "variety": true}
+{"instruction": "Join 'early' and 'red'", "input": "", "whisper": "\"early\" \"red\" strcat .", "output": "\"earlyred\"", "variety": true}
+{"instruction": "Stick 'old' onto the end of 'red'", "input": "", "whisper": "\"red\" \"old\" strcat .", "output": "\"redold\"", "variety": true}
+{"instruction": "Exchange 3 28 and subtract top from second", "input": "", "whisper": "3 28 ` - .", "output": "25", "variety": true}
+{"instruction": "Compute 84 - 42", "input": "", "whisper": "84 42 - .", "output": "42", "variety": true}
+{"instruction": "Swap 12 and 15 then subtract", "input": "", "whisper": "12 15 ` - .", "output": "3", "variety": true}
+{"instruction": "Run a block that prints 'blue', 6 times", "input": "", "whisper": "6 { \"blue\" . } @times", "output": "\"blue\" \"blue\" \"blue\" \"blue\" \"blue\" \"blue\"", "variety": true}
+{"instruction": "Is 15 bigger than 8? Print open or shut", "input": "", "whisper": "15 8 > ?? \"open\" . | \"shut\" . ]", "output": "\"open\"", "variety": true}
+{"instruction": "What is 23 % 9?", "input": "", "whisper": "23 9 % .", "output": "5", "variety": true}
+{"instruction": "Compare 15 and 17: answer zero if 15 > 17, else nonzero", "input": "", "whisper": "15 17 > ?? \"zero\" . | \"nonzero\" . ]", "output": "\"nonzero\"", "variety": true}
+{"instruction": "Remainder of 2 divided by 4", "input": "", "whisper": "2 4 % .", "output": "2", "variety": true}
+{"instruction": "15 modulo 2", "input": "", "whisper": "15 2 % .", "output": "1", "variety": true}
+{"instruction": "Is 42 bigger than 2? Print pos or neg", "input": "", "whisper": "42 2 > ?? \"pos\" . | \"neg\" . ]", "output": "\"pos\"", "variety": true}
+{"instruction": "Test if 23 is greater than 34; respond pos or neg", "input": "", "whisper": "23 34 > ?? \"pos\" . | \"neg\" . ]", "output": "\"neg\"", "variety": true}
+{"instruction": "Duplicate the second element and multiply (15, 12)", "input": "", "whisper": "15 12 over - .", "output": "-3", "variety": true}
+{"instruction": "Reverse 21 and 15, then compute a-b", "input": "", "whisper": "21 15 ` - .", "output": "-6", "variety": true}
+{"instruction": "Compute 25 * 4", "input": "", "whisper": "25 4 * .", "output": "100", "variety": true}
+{"instruction": "Cube 12 using dup twice", "input": "", "whisper": "12 _ _ * * .", "output": "1728", "variety": true}
+{"instruction": "Add 12 and 63", "input": "", "whisper": "12 63 + .", "output": "75", "variety": true}
+{"instruction": "Copy the second value (34 28) and multiply", "input": "", "whisper": "34 28 over * .", "output": "952", "variety": true}
+{"instruction": "Copy the second value (15 3) and multiply", "input": "", "whisper": "15 3 over * .", "output": "45", "variety": true}
+{"instruction": "Check whether 8 exceeds 15 (yes/no)", "input": "", "whisper": "8 15 > ?? \"yes\" . | \"no\" . ]", "output": "\"no\"", "variety": true}
+{"instruction": "Make -8 non-negative", "input": "", "whisper": "-8 _ 0 < ?? -1 * | ] .", "output": "8", "variety": true}
+{"instruction": "Exchange 63 84 and subtract top from second", "input": "", "whisper": "63 84 ` - .", "output": "21", "variety": true}
+{"instruction": "2 modulo 25", "input": "", "whisper": "2 25 % .", "output": "2", "variety": true}
+{"instruction": "Join 'gamma' and 'old'", "input": "", "whisper": "\"gamma\" \"old\" strcat .", "output": "\"gammaold\"", "variety": true}
+{"instruction": "Say 'win' exactly 4 times", "input": "", "whisper": "4 { \"win\" . } @times", "output": "\"win\" \"win\" \"win\" \"win\"", "variety": true}
+{"instruction": "Subtract 17 from 23", "input": "", "whisper": "23 17 - .", "output": "6", "variety": true}
+{"instruction": "Stick 'hot' onto the end of 'right'", "input": "", "whisper": "\"right\" \"hot\" strcat .", "output": "\"righthot\"", "variety": true}
+{"instruction": "Cube 96 using dup twice", "input": "", "whisper": "96 _ _ * * .", "output": "884736", "variety": true}
+{"instruction": "What is 12 % 23?", "input": "", "whisper": "12 23 % .", "output": "12", "variety": true}
+{"instruction": "Test if 63 is greater than 8; respond zero or nonzero", "input": "", "whisper": "63 8 > ?? \"zero\" . | \"nonzero\" . ]", "output": "\"zero\"", "variety": true}
+{"instruction": "Compare 34 and 23: answer zero if 34 > 23, else nonzero", "input": "", "whisper": "34 23 > ?? \"zero\" . | \"nonzero\" . ]", "output": "\"zero\"", "variety": true}
+{"instruction": "Copy the second value (31 28) and multiply", "input": "", "whisper": "31 28 over + .", "output": "59", "variety": true}
+{"instruction": "What is 63 plus 17?", "input": "", "whisper": "63 17 + .", "output": "80", "variety": true}
+{"instruction": "Stick 'alpha' onto the end of 'down'", "input": "", "whisper": "\"down\" \"alpha\" strcat .", "output": "\"downalpha\"", "variety": true}
+{"instruction": "Compute 8 / 13", "input": "", "whisper": "8 13 / .", "output": "0", "variety": true}
+{"instruction": "Multiply 8 by 3", "input": "", "whisper": "8 3 * .", "output": "24", "variety": true}
+{"instruction": "Check whether 45 exceeds 34 (fast/slow)", "input": "", "whisper": "45 34 > ?? \"fast\" . | \"slow\" . ]", "output": "\"fast\"", "variety": true}
+{"instruction": "21 decreased by 17", "input": "", "whisper": "21 17 - .", "output": "4", "variety": true}
+{"instruction": "3 modulo 11", "input": "", "whisper": "3 11 % .", "output": "3", "variety": true}
+{"instruction": "Exchange 4 25 and subtract top from second", "input": "", "whisper": "4 25 ` - .", "output": "21", "variety": true}
+{"instruction": "Swap 12 and 28 then subtract", "input": "", "whisper": "12 28 ` - .", "output": "16", "variety": true}
+{"instruction": "Compute 71 - 23", "input": "", "whisper": "71 23 - .", "output": "48", "variety": true}
+{"instruction": "Compute 9 / 7", "input": "", "whisper": "9 7 / .", "output": "1", "variety": true}
+{"instruction": "What is 8 divided by 17 (integer)?", "input": "", "whisper": "8 17 / .", "output": "0", "variety": true}
+{"instruction": "6 modulo 4", "input": "", "whisper": "6 4 % .", "output": "2", "variety": true}
+{"instruction": "How long is 'win'?", "input": "", "whisper": "\"win\" strlen .", "output": "3", "variety": true}
+{"instruction": "Swap 5 and 28 then subtract", "input": "", "whisper": "5 28 ` - .", "output": "23", "variety": true}
+{"instruction": "What is 31 plus 12?", "input": "", "whisper": "31 12 + .", "output": "43", "variety": true}
+{"instruction": "Swap 68 and 47 then subtract", "input": "", "whisper": "68 47 ` - .", "output": "-21", "variety": true}
+{"instruction": "Cube 2 using dup twice", "input": "", "whisper": "2 _ _ * * .", "output": "8", "variety": true}
+{"instruction": "Compute 13*13 leaving one result", "input": "", "whisper": "13 _ _ drop * .", "output": "169", "variety": true}
+{"instruction": "Output 'right' on 2 lines", "input": "", "whisper": "2 { \"right\" . } @times", "output": "\"right\" \"right\"", "variety": true}
+{"instruction": "Reverse 12 and 2, then compute a-b", "input": "", "whisper": "12 2 ` - .", "output": "-10", "variety": true}
+{"instruction": "Reverse 9 and 56, then compute a-b", "input": "", "whisper": "9 56 ` - .", "output": "47", "variety": true}
+{"instruction": "Cube 56 using dup twice", "input": "", "whisper": "56 _ _ * * .", "output": "175616", "variety": true}
+{"instruction": "Multiply 13 by 21", "input": "", "whisper": "13 21 * .", "output": "273", "variety": true}
+{"instruction": "Compute 4 / 6", "input": "", "whisper": "4 6 / .", "output": "0", "variety": true}
+{"instruction": "Compute 47*47 leaving one result", "input": "", "whisper": "47 _ _ drop * .", "output": "2209", "variety": true}
+{"instruction": "What is 7 minus 3?", "input": "", "whisper": "7 3 - .", "output": "4", "variety": true}
+{"instruction": "Check whether 12 exceeds 89 (pass/fail)", "input": "", "whisper": "12 89 > ?? \"pass\" . | \"fail\" . ]", "output": "\"fail\"", "variety": true}
+{"instruction": "Duplicate the second element and multiply (3, 6)", "input": "", "whisper": "3 6 over + .", "output": "9", "variety": true}
+{"instruction": "Join 'king' and 'old'", "input": "", "whisper": "\"king\" \"old\" strcat .", "output": "\"kingold\"", "variety": true}
+{"instruction": "Add up [13 19 22]", "input": "", "whisper": "[13 19 22] 0 { + } @fold .", "output": "54", "variety": true}
+{"instruction": "Compute 4 / 5", "input": "", "whisper": "4 5 / .", "output": "0", "variety": true}
+{"instruction": "Compute 13 - 2", "input": "", "whisper": "13 2 - .", "output": "11", "variety": true}
+{"instruction": "Count elements in [3 6 13 16 17 22]", "input": "", "whisper": "[3 6 13 16 17 22] len .", "output": "6", "variety": true}
+{"instruction": "Integer-divide 17 by 7", "input": "", "whisper": "17 7 / .", "output": "2", "variety": true}
+{"instruction": "Exchange 25 6 and subtract top from second", "input": "", "whisper": "25 6 ` - .", "output": "-19", "variety": true}
+{"instruction": "Integer-divide 6 by 2", "input": "", "whisper": "6 2 / .", "output": "3", "variety": true}
+{"instruction": "Subtract 12 from 21", "input": "", "whisper": "21 12 - .", "output": "9", "variety": true}
+{"instruction": "Total of [10 13 19 22 25 27]", "input": "", "whisper": "[10 13 19 22 25 27] 0 { + } @fold .", "output": "116", "variety": true}
+{"instruction": "Join 'slow' and 'sun'", "input": "", "whisper": "\"slow\" \"sun\" strcat .", "output": "\"slowsun\"", "variety": true}
+{"instruction": "Swap 31 and 34 then subtract", "input": "", "whisper": "31 34 ` - .", "output": "3", "variety": true}
+{"instruction": "Compute 7 / 17", "input": "", "whisper": "7 17 / .", "output": "0", "variety": true}
+{"instruction": "Say 'early' exactly 3 times", "input": "", "whisper": "3 { \"early\" . } @times", "output": "\"early\" \"early\" \"early\"", "variety": true}
+{"instruction": "Sum of 47 and 6", "input": "", "whisper": "47 6 + .", "output": "53", "variety": true}
+{"instruction": "Exchange 13 7 and subtract top from second", "input": "", "whisper": "13 7 ` - .", "output": "-6", "variety": true}
+{"instruction": "Concatenate 'cold' 'sun'", "input": "", "whisper": "\"cold\" \"sun\" strcat .", "output": "\"coldsun\"", "variety": true}
+{"instruction": "Stick 'fast' onto the end of 'yes'", "input": "", "whisper": "\"yes\" \"fast\" strcat .", "output": "\"yesfast\"", "variety": true}
+{"instruction": "Join 'fox' and 'sky'", "input": "", "whisper": "\"fox\" \"sky\" strcat .", "output": "\"foxsky\"", "variety": true}
+{"instruction": "Join 'left' and 'low'", "input": "", "whisper": "\"left\" \"low\" strcat .", "output": "\"leftlow\"", "variety": true}
+{"instruction": "What is 2 % 9?", "input": "", "whisper": "2 9 % .", "output": "2", "variety": true}
+{"instruction": "What is 13 % 11?", "input": "", "whisper": "13 11 % .", "output": "2", "variety": true}
+{"instruction": "Remainder of 8 divided by 25", "input": "", "whisper": "8 25 % .", "output": "8", "variety": true}
+{"instruction": "over: 6 21 — multiply the copy by the top", "input": "", "whisper": "6 21 over + .", "output": "27", "variety": true}
+{"instruction": "Test if 47 is greater than 25; respond pass or fail", "input": "", "whisper": "47 25 > ?? \"pass\" . | \"fail\" . ]", "output": "\"pass\"", "variety": true}
+{"instruction": "Say 'new' exactly 3 times", "input": "", "whisper": "3 { \"new\" . } @times", "output": "\"new\" \"new\" \"new\"", "variety": true}
+{"instruction": "What is 11 times 9?", "input": "", "whisper": "11 9 * .", "output": "99", "variety": true}
+{"instruction": "What is 45 minus 8?", "input": "", "whisper": "45 8 - .", "output": "37", "variety": true}
+{"instruction": "Add 45 and 12", "input": "", "whisper": "45 12 + .", "output": "57", "variety": true}
+{"instruction": "Remainder of 11 divided by 3", "input": "", "whisper": "11 3 % .", "output": "2", "variety": true}
+{"instruction": "Print the word 'sun' 6 times", "input": "", "whisper": "6 { \"sun\" . } @times", "output": "\"sun\" \"sun\" \"sun\" \"sun\" \"sun\" \"sun\"", "variety": true}
+{"instruction": "Product of 15 and 17", "input": "", "whisper": "15 17 * .", "output": "255", "variety": true}
+{"instruction": "Exchange 45 2 and subtract top from second", "input": "", "whisper": "45 2 ` - .", "output": "-43", "variety": true}
+{"instruction": "Output 'beta' on 6 lines", "input": "", "whisper": "6 { \"beta\" . } @times", "output": "\"beta\" \"beta\" \"beta\" \"beta\" \"beta\" \"beta\"", "variety": true}
+{"instruction": "What is 25 minus 2?", "input": "", "whisper": "25 2 - .", "output": "23", "variety": true}
+{"instruction": "Reverse order of [5 16 25]", "input": "", "whisper": "[5 16 25] rev .", "output": "[25 16 5]", "variety": true}
+{"instruction": "Duplicate the second element and multiply (2, 8)", "input": "", "whisper": "2 8 over - .", "output": "6", "variety": true}
+{"instruction": "Integer-divide 25 by 6", "input": "", "whisper": "25 6 / .", "output": "4", "variety": true}
+{"instruction": "What is 25 divided by 21 (integer)?", "input": "", "whisper": "25 21 / .", "output": "1", "variety": true}
+{"instruction": "Say 'blue' exactly 5 times", "input": "", "whisper": "5 { \"blue\" . } @times", "output": "\"blue\" \"blue\" \"blue\" \"blue\" \"blue\"", "variety": true}
+{"instruction": "Cube 42 using dup twice", "input": "", "whisper": "42 _ _ * * .", "output": "74088", "variety": true}
+{"instruction": "Compute 56+56 via dup", "input": "", "whisper": "56 _ + .", "output": "112", "variety": true}
+{"instruction": "Odd numbers out of [14 16 24]: drop them ([14 16 24])", "input": "", "whisper": "[14 16 24] { 2 % 0 = } @filter .", "output": "[14 16 24]", "variety": true}
+{"instruction": "What is 4 divided by 17 (integer)?", "input": "", "whisper": "4 17 / .", "output": "0", "variety": true}
+{"instruction": "Make 21 non-negative", "input": "", "whisper": "21 _ 0 < ?? -1 * | ] .", "output": "21", "variety": true}
+{"instruction": "Compute 91 - 63", "input": "", "whisper": "91 63 - .", "output": "28", "variety": true}
+{"instruction": "What is 13 times 17?", "input": "", "whisper": "13 17 * .", "output": "221", "variety": true}
+{"instruction": "Remainder of 3 divided by 4", "input": "", "whisper": "3 4 % .", "output": "3", "variety": true}
+{"instruction": "Join 'alpha' and 'left'", "input": "", "whisper": "\"alpha\" \"left\" strcat .", "output": "\"alphaleft\"", "variety": true}
+{"instruction": "Length of the list [2 3 16 20]", "input": "", "whisper": "[2 3 16 20] len .", "output": "4", "variety": true}
+{"instruction": "Product of 15 and 7", "input": "", "whisper": "15 7 * .", "output": "105", "variety": true}
+{"instruction": "What is 12 times 8?", "input": "", "whisper": "12 8 * .", "output": "96", "variety": true}
+{"instruction": "7 modulo 5", "input": "", "whisper": "7 5 % .", "output": "2", "variety": true}
+{"instruction": "What is 8 minus 5?", "input": "", "whisper": "8 5 - .", "output": "3", "variety": true}
+{"instruction": "Integer-divide 11 by 15", "input": "", "whisper": "11 15 / .", "output": "0", "variety": true}
+{"instruction": "Output 'king' on 5 lines", "input": "", "whisper": "5 { \"king\" . } @times", "output": "\"king\" \"king\" \"king\" \"king\" \"king\"", "variety": true}
+{"instruction": "Is 34 bigger than 47? Print adult or minor", "input": "", "whisper": "34 47 > ?? \"adult\" . | \"minor\" . ]", "output": "\"minor\"", "variety": true}
+{"instruction": "Swap 25 and 96 then subtract", "input": "", "whisper": "25 96 ` - .", "output": "71", "variety": true}
+{"instruction": "Compute 84+84 via dup", "input": "", "whisper": "84 _ + .", "output": "168", "variety": true}
+{"instruction": "What is 12 times 23?", "input": "", "whisper": "12 23 * .", "output": "276", "variety": true}
+{"instruction": "What is 8 plus 21?", "input": "", "whisper": "8 21 + .", "output": "29", "variety": true}
+{"instruction": "Cube 15 using dup twice", "input": "", "whisper": "15 _ _ * * .", "output": "3375", "variety": true}
+{"instruction": "Compute 12*12 leaving one result", "input": "", "whisper": "12 _ _ drop * .", "output": "144", "variety": true}
+{"instruction": "Compute 17 / 15", "input": "", "whisper": "17 15 / .", "output": "1", "variety": true}
+{"instruction": "Output 'gamma' on 5 lines", "input": "", "whisper": "5 { \"gamma\" . } @times", "output": "\"gamma\" \"gamma\" \"gamma\" \"gamma\" \"gamma\"", "variety": true}
+{"instruction": "Add up [1 5 13 15 18 25]", "input": "", "whisper": "[1 5 13 15 18 25] 0 { + } @fold .", "output": "77", "variety": true}
+{"instruction": "What is 13 divided by 7 (integer)?", "input": "", "whisper": "13 7 / .", "output": "1", "variety": true}
+{"instruction": "Is 21 bigger than 4? Print win or lose", "input": "", "whisper": "21 4 > ?? \"win\" . | \"lose\" . ]", "output": "\"win\"", "variety": true}
+{"instruction": "Reverse 63 and 31, then compute a-b", "input": "", "whisper": "63 31 ` - .", "output": "-32", "variety": true}
+{"instruction": "Absolute value of 63", "input": "", "whisper": "63 _ 0 < ?? -1 * | ] .", "output": "63", "variety": true}
+{"instruction": "over: 31 13 — multiply the copy by the top", "input": "", "whisper": "31 13 over * .", "output": "403", "variety": true}
+{"instruction": "Length of the list [1 8 12 13 28]", "input": "", "whisper": "[1 8 12 13 28] len .", "output": "5", "variety": true}
+{"instruction": "Compute 15^2 with _", "input": "", "whisper": "15 _ * .", "output": "225", "variety": true}
+{"instruction": "Duplicate the second element and multiply (12, 23)", "input": "", "whisper": "12 23 over * .", "output": "276", "variety": true}
+{"instruction": "Say 'cat' exactly 3 times", "input": "", "whisper": "3 { \"cat\" . } @times", "output": "\"cat\" \"cat\" \"cat\"", "variety": true}
+{"instruction": "Run a block that prints 'gamma', 4 times", "input": "", "whisper": "4 { \"gamma\" . } @times", "output": "\"gamma\" \"gamma\" \"gamma\" \"gamma\"", "variety": true}
+{"instruction": "Compute 11 + 63", "input": "", "whisper": "11 63 + .", "output": "74", "variety": true}
+{"instruction": "Multiply each item of [10 16 21 24 27] by 2", "input": "", "whisper": "[10 16 21 24 27] { 2 * } @map .", "output": "[20 32 42 48 54]", "variety": true}
+{"instruction": "Concatenate 'go' 'new'", "input": "", "whisper": "\"go\" \"new\" strcat .", "output": "\"gonew\"", "variety": true}
+{"instruction": "Is 25 bigger than 6? Print pass or fail", "input": "", "whisper": "25 6 > ?? \"pass\" . | \"fail\" . ]", "output": "\"pass\"", "variety": true}
+{"instruction": "Repeat the string 'late' 3 times", "input": "", "whisper": "3 { \"late\" . } @times", "output": "\"late\" \"late\" \"late\"", "variety": true}
+{"instruction": "Remainder of 8 divided by 6", "input": "", "whisper": "8 6 % .", "output": "2", "variety": true}
+{"instruction": "Multiply 7 by 4", "input": "", "whisper": "7 4 * .", "output": "28", "variety": true}
+{"instruction": "Multiply each item of [8 13 20 21 26 27] by 2", "input": "", "whisper": "[8 13 20 21 26 27] { 2 * } @map .", "output": "[16 26 40 42 52 54]", "variety": true}
+{"instruction": "over: 21 3 — multiply the copy by the top", "input": "", "whisper": "21 3 over + .", "output": "24", "variety": true}
+{"instruction": "Test if 15 is greater than 23; respond pass or fail", "input": "", "whisper": "15 23 > ?? \"pass\" . | \"fail\" . ]", "output": "\"fail\"", "variety": true}
+{"instruction": "Join 'old' and 'down'", "input": "", "whisper": "\"old\" \"down\" strcat .", "output": "\"olddown\"", "variety": true}
+{"instruction": "Output 'sky' on 3 lines", "input": "", "whisper": "3 { \"sky\" . } @times", "output": "\"sky\" \"sky\" \"sky\"", "variety": true}
+{"instruction": "Odd numbers out of [4 7 14]: drop them ([4 7 14])", "input": "", "whisper": "[4 7 14] { 2 % 0 = } @filter .", "output": "[4 14]", "variety": true}
+{"instruction": "Remainder of 11 divided by 13", "input": "", "whisper": "11 13 % .", "output": "11", "variety": true}
+{"instruction": "Square 84 using dup", "input": "", "whisper": "84 _ * .", "output": "7056", "variety": true}
+{"instruction": "Compute 47 - 21", "input": "", "whisper": "47 21 - .", "output": "26", "variety": true}
+{"instruction": "8 vs 56 — print hot when greater, cold otherwise", "input": "", "whisper": "8 56 > ?? \"hot\" . | \"cold\" . ]", "output": "\"cold\"", "variety": true}
+{"instruction": "Swap 71 and 91 then subtract", "input": "", "whisper": "71 91 ` - .", "output": "20", "variety": true}
+{"instruction": "Subtract 3 from 8", "input": "", "whisper": "8 3 - .", "output": "5", "variety": true}
+{"instruction": "Remainder of 23 divided by 5", "input": "", "whisper": "23 5 % .", "output": "3", "variety": true}
+{"instruction": "What is 13 divided by 23 (integer)?", "input": "", "whisper": "13 23 / .", "output": "0", "variety": true}
+{"instruction": "Exchange 17 12 and subtract top from second", "input": "", "whisper": "17 12 ` - .", "output": "-5", "variety": true}
+{"instruction": "For stack 12 9, use over then multiply", "input": "", "whisper": "12 9 over + .", "output": "21", "variety": true}
+{"instruction": "Output 'up' on 4 lines", "input": "", "whisper": "4 { \"up\" . } @times", "output": "\"up\" \"up\" \"up\" \"up\"", "variety": true}
+{"instruction": "Exchange 42 5 and subtract top from second", "input": "", "whisper": "42 5 ` - .", "output": "-37", "variety": true}
+{"instruction": "Output 'sun' on 2 lines", "input": "", "whisper": "2 { \"sun\" . } @times", "output": "\"sun\" \"sun\"", "variety": true}
+{"instruction": "Length of 'sun'", "input": "", "whisper": "\"sun\" strlen .", "output": "3", "variety": true}
+{"instruction": "Join 'beta' and 'gamma'", "input": "", "whisper": "\"beta\" \"gamma\" strcat .", "output": "\"betagamma\"", "variety": true}
+{"instruction": "Calculate 23 + 91", "input": "", "whisper": "23 91 + .", "output": "114", "variety": true}
+{"instruction": "Compute 7 * 21", "input": "", "whisper": "7 21 * .", "output": "147", "variety": true}
+{"instruction": "Compute 77 - 11", "input": "", "whisper": "77 11 - .", "output": "66", "variety": true}
+{"instruction": "Check whether 42 exceeds 13 (open/shut)", "input": "", "whisper": "42 13 > ?? \"open\" . | \"shut\" . ]", "output": "\"open\"", "variety": true}
+{"instruction": "Add 47 and 3", "input": "", "whisper": "47 3 + .", "output": "50", "variety": true}
+{"instruction": "Calculate 63 + 12", "input": "", "whisper": "63 12 + .", "output": "75", "variety": true}
+{"instruction": "Remainder of 12 divided by 8", "input": "", "whisper": "12 8 % .", "output": "4", "variety": true}
+{"instruction": "Compute 31+31 via dup", "input": "", "whisper": "31 _ + .", "output": "62", "variety": true}
+{"instruction": "25 modulo 21", "input": "", "whisper": "25 21 % .", "output": "4", "variety": true}
+{"instruction": "Print the word 'big' 3 times", "input": "", "whisper": "3 { \"big\" . } @times", "output": "\"big\" \"big\" \"big\"", "variety": true}
+{"instruction": "Compute 4+4 via dup", "input": "", "whisper": "4 _ + .", "output": "8", "variety": true}
+{"instruction": "Length of 'dog'", "input": "", "whisper": "\"dog\" strlen .", "output": "3", "variety": true}
+{"instruction": "abs(23)", "input": "", "whisper": "23 _ 0 < ?? -1 * | ] .", "output": "23", "variety": true}
+{"instruction": "Filter [2 6 8 16 18 26] for even values", "input": "", "whisper": "[2 6 8 16 18 26] { 2 % 0 = } @filter .", "output": "[2 6 8 16 18 26]", "variety": true}
+{"instruction": "Swap 56 and 11 then subtract", "input": "", "whisper": "56 11 ` - .", "output": "-45", "variety": true}
+{"instruction": "What is 13 times 2?", "input": "", "whisper": "13 2 * .", "output": "26", "variety": true}
+{"instruction": "15 decreased by 11", "input": "", "whisper": "15 11 - .", "output": "4", "variety": true}
+{"instruction": "Compare 8 and 3: answer high if 8 > 3, else low", "input": "", "whisper": "8 3 > ?? \"high\" . | \"low\" . ]", "output": "\"high\"", "variety": true}
+{"instruction": "Check whether 25 exceeds 68 (even/odd)", "input": "", "whisper": "25 68 > ?? \"even\" . | \"odd\" . ]", "output": "\"odd\"", "variety": true}
+{"instruction": "Filter [16 18 24 25 26] for even values", "input": "", "whisper": "[16 18 24 25 26] { 2 % 0 = } @filter .", "output": "[16 18 24 26]", "variety": true}
+{"instruction": "Compute 5 / 21", "input": "", "whisper": "5 21 / .", "output": "0", "variety": true}
+{"instruction": "Sum of 4 and 91", "input": "", "whisper": "4 91 + .", "output": "95", "variety": true}
+{"instruction": "Reverse order of [8 10 15 26 29]", "input": "", "whisper": "[8 10 15 26 29] rev .", "output": "[29 26 15 10 8]", "variety": true}
+{"instruction": "Compute 89 + 42", "input": "", "whisper": "89 42 + .", "output": "131", "variety": true}
+{"instruction": "Make 17 non-negative", "input": "", "whisper": "17 _ 0 < ?? -1 * | ] .", "output": "17", "variety": true}
+{"instruction": "Duplicate the second element and multiply (11, 4)", "input": "", "whisper": "11 4 over - .", "output": "-7", "variety": true}
+{"instruction": "over: 28 23 — multiply the copy by the top", "input": "", "whisper": "28 23 over * .", "output": "644", "variety": true}
+{"instruction": "Compute 3 / 11", "input": "", "whisper": "3 11 / .", "output": "0", "variety": true}
+{"instruction": "Absolute value of 89", "input": "", "whisper": "89 _ 0 < ?? -1 * | ] .", "output": "89", "variety": true}
+{"instruction": "How long is 'ok'?", "input": "", "whisper": "\"ok\" strlen .", "output": "2", "variety": true}
+{"instruction": "For stack 23 12, use over then multiply", "input": "", "whisper": "23 12 over * .", "output": "276", "variety": true}
+{"instruction": "Is 12 bigger than 63? Print pass or fail", "input": "", "whisper": "12 63 > ?? \"pass\" . | \"fail\" . ]", "output": "\"fail\"", "variety": true}
+{"instruction": "Integer-divide 9 by 6", "input": "", "whisper": "9 6 / .", "output": "1", "variety": true}
+{"instruction": "Concatenate 'dog' 'no'", "input": "", "whisper": "\"dog\" \"no\" strcat .", "output": "\"dogno\"", "variety": true}
+{"instruction": "Integer-divide 2 by 5", "input": "", "whisper": "2 5 / .", "output": "0", "variety": true}
+{"instruction": "Multiply each item of [8 11 14 17 28] by 2", "input": "", "whisper": "[8 11 14 17 28] { 2 * } @map .", "output": "[16 22 28 34 56]", "variety": true}
+{"instruction": "Filter [6 8 9 13 18] for even values", "input": "", "whisper": "[6 8 9 13 18] { 2 % 0 = } @filter .", "output": "[6 8 18]", "variety": true}
+{"instruction": "Compare 52 and 3: answer adult if 52 > 3, else minor", "input": "", "whisper": "52 3 > ?? \"adult\" . | \"minor\" . ]", "output": "\"adult\"", "variety": true}
+{"instruction": "Sum of 9 and 15", "input": "", "whisper": "9 15 + .", "output": "24", "variety": true}
+{"instruction": "Is 47 bigger than 21? Print win or lose", "input": "", "whisper": "47 21 > ?? \"win\" . | \"lose\" . ]", "output": "\"win\"", "variety": true}
+{"instruction": "Square 7 using dup", "input": "", "whisper": "7 _ * .", "output": "49", "variety": true}
+{"instruction": "Reverse 56 and 5, then compute a-b", "input": "", "whisper": "56 5 ` - .", "output": "-51", "variety": true}
+{"instruction": "What is 11 times 2?", "input": "", "whisper": "11 2 * .", "output": "22", "variety": true}
+{"instruction": "Remainder of 13 divided by 8", "input": "", "whisper": "13 8 % .", "output": "5", "variety": true}
+{"instruction": "What is 9 % 2?", "input": "", "whisper": "9 2 % .", "output": "1", "variety": true}
+{"instruction": "Repeat the string 'no' 2 times", "input": "", "whisper": "2 { \"no\" . } @times", "output": "\"no\" \"no\"", "variety": true}
+{"instruction": "Odd numbers out of [4 10 14 23 26]: drop them ([4 10 14 23 26])", "input": "", "whisper": "[4 10 14 23 26] { 2 % 0 = } @filter .", "output": "[4 10 14 26]", "variety": true}
+{"instruction": "Is 12 bigger than 8? Print open or shut", "input": "", "whisper": "12 8 > ?? \"open\" . | \"shut\" . ]", "output": "\"open\"", "variety": true}
+{"instruction": "Check whether 13 exceeds 6 (win/lose)", "input": "", "whisper": "13 6 > ?? \"win\" . | \"lose\" . ]", "output": "\"win\"", "variety": true}
+{"instruction": "Check whether 71 exceeds 23 (even/odd)", "input": "", "whisper": "71 23 > ?? \"even\" . | \"odd\" . ]", "output": "\"even\"", "variety": true}
+{"instruction": "Run a block that prints 'late', 5 times", "input": "", "whisper": "5 { \"late\" . } @times", "output": "\"late\" \"late\" \"late\" \"late\" \"late\"", "variety": true}
+{"instruction": "6 decreased by 4", "input": "", "whisper": "6 4 - .", "output": "2", "variety": true}
+{"instruction": "Subtract 34 from 63", "input": "", "whisper": "63 34 - .", "output": "29", "variety": true}
+{"instruction": "What is 6 divided by 21 (integer)?", "input": "", "whisper": "6 21 / .", "output": "0", "variety": true}
+{"instruction": "Reverse 8 and 15, then compute a-b", "input": "", "whisper": "8 15 ` - .", "output": "7", "variety": true}
+{"instruction": "Say 'beta' exactly 2 times", "input": "", "whisper": "2 { \"beta\" . } @times", "output": "\"beta\" \"beta\"", "variety": true}
+{"instruction": "Swap 96 and 2 then subtract", "input": "", "whisper": "96 2 ` - .", "output": "-94", "variety": true}
+{"instruction": "Output 'cold' on 4 lines", "input": "", "whisper": "4 { \"cold\" . } @times", "output": "\"cold\" \"cold\" \"cold\" \"cold\"", "variety": true}
+{"instruction": "Remainder of 13 divided by 2", "input": "", "whisper": "13 2 % .", "output": "1", "variety": true}
+{"instruction": "Multiply 4 by 11", "input": "", "whisper": "4 11 * .", "output": "44", "variety": true}
+{"instruction": "Join 'no' and 'down'", "input": "", "whisper": "\"no\" \"down\" strcat .", "output": "\"nodown\"", "variety": true}
+{"instruction": "Multiply each item of [14 17 21 22 24 27] by 2", "input": "", "whisper": "[14 17 21 22 24 27] { 2 * } @map .", "output": "[28 34 42 44 48 54]", "variety": true}
+{"instruction": "Join 'dog' and 'down'", "input": "", "whisper": "\"dog\" \"down\" strcat .", "output": "\"dogdown\"", "variety": true}
+{"instruction": "What is 7 divided by 3 (integer)?", "input": "", "whisper": "7 3 / .", "output": "2", "variety": true}
+{"instruction": "Remainder of 3 divided by 9", "input": "", "whisper": "3 9 % .", "output": "3", "variety": true}
+{"instruction": "Integer-divide 23 by 9", "input": "", "whisper": "23 9 / .", "output": "2", "variety": true}
+{"instruction": "Integer-divide 4 by 21", "input": "", "whisper": "4 21 / .", "output": "0", "variety": true}
+{"instruction": "over: 25 15 — multiply the copy by the top", "input": "", "whisper": "25 15 over + .", "output": "40", "variety": true}
+{"instruction": "Print the word 'gamma' 3 times", "input": "", "whisper": "3 { \"gamma\" . } @times", "output": "\"gamma\" \"gamma\" \"gamma\"", "variety": true}
+{"instruction": "Remainder of 13 divided by 12", "input": "", "whisper": "13 12 % .", "output": "1", "variety": true}
+{"instruction": "Length of the list [1 10 12 18 21 23]", "input": "", "whisper": "[1 10 12 18 21 23] len .", "output": "6", "variety": true}
+{"instruction": "What is 56 plus 6?", "input": "", "whisper": "56 6 + .", "output": "62", "variety": true}
+{"instruction": "Is 28 bigger than 21? Print open or shut", "input": "", "whisper": "28 21 > ?? \"open\" . | \"shut\" . ]", "output": "\"open\"", "variety": true}
+{"instruction": "Multiply 5 by 15", "input": "", "whisper": "5 15 * .", "output": "75", "variety": true}
+{"instruction": "Exchange 77 34 and subtract top from second", "input": "", "whisper": "77 34 ` - .", "output": "-43", "variety": true}
+{"instruction": "Map *2 over [3 8 9 12 14 26]", "input": "", "whisper": "[3 8 9 12 14 26] { 2 * } @map .", "output": "[6 16 18 24 28 52]", "variety": true}
+{"instruction": "Compare 63 and 71: answer high if 63 > 71, else low", "input": "", "whisper": "63 71 > ?? \"high\" . | \"low\" . ]", "output": "\"low\"", "variety": true}
+{"instruction": "Repeat the string 'sky' 5 times", "input": "", "whisper": "5 { \"sky\" . } @times", "output": "\"sky\" \"sky\" \"sky\" \"sky\" \"sky\"", "variety": true}
+{"instruction": "Compute 6 * 4", "input": "", "whisper": "6 4 * .", "output": "24", "variety": true}
+{"instruction": "Run a block that prints 'alpha', 5 times", "input": "", "whisper": "5 { \"alpha\" . } @times", "output": "\"alpha\" \"alpha\" \"alpha\" \"alpha\" \"alpha\"", "variety": true}
+{"instruction": "Swap 89 and 7 then subtract", "input": "", "whisper": "89 7 ` - .", "output": "-82", "variety": true}
+{"instruction": "Say 'king' exactly 2 times", "input": "", "whisper": "2 { \"king\" . } @times", "output": "\"king\" \"king\"", "variety": true}
+{"instruction": "Concatenate 'king' 'late'", "input": "", "whisper": "\"king\" \"late\" strcat .", "output": "\"kinglate\"", "variety": true}
+{"instruction": "Odd numbers out of [6 11 16 21 27]: drop them ([6 11 16 21 27])", "input": "", "whisper": "[6 11 16 21 27] { 2 % 0 = } @filter .", "output": "[6 16]", "variety": true}
+{"instruction": "Add 17 and 15", "input": "", "whisper": "17 15 + .", "output": "32", "variety": true}
+{"instruction": "Compare 71 and 77: answer hot if 71 > 77, else cold", "input": "", "whisper": "71 77 > ?? \"hot\" . | \"cold\" . ]", "output": "\"cold\"", "variety": true}
+{"instruction": "Test if 7 is greater than 42; respond even or odd", "input": "", "whisper": "7 42 > ?? \"even\" . | \"odd\" . ]", "output": "\"odd\"", "variety": true}
+{"instruction": "Remainder of 5 divided by 3", "input": "", "whisper": "5 3 % .", "output": "2", "variety": true}
+{"instruction": "What is 5 divided by 8 (integer)?", "input": "", "whisper": "5 8 / .", "output": "0", "variety": true}
+{"instruction": "Repeat the string 'old' 4 times", "input": "", "whisper": "4 { \"old\" . } @times", "output": "\"old\" \"old\" \"old\" \"old\"", "variety": true}
+{"instruction": "Compute 77+77 via dup", "input": "", "whisper": "77 _ + .", "output": "154", "variety": true}
+{"instruction": "Join 'old' and 'beta'", "input": "", "whisper": "\"old\" \"beta\" strcat .", "output": "\"oldbeta\"", "variety": true}
+{"instruction": "Exchange 89 3 and subtract top from second", "input": "", "whisper": "89 3 ` - .", "output": "-86", "variety": true}
+{"instruction": "Compute 52*52 leaving one result", "input": "", "whisper": "52 _ _ drop * .", "output": "2704", "variety": true}
+{"instruction": "Length of the list [10 18 22 27]", "input": "", "whisper": "[10 18 22 27] len .", "output": "4", "variety": true}
+{"instruction": "What is 17 divided by 5 (integer)?", "input": "", "whisper": "17 5 / .", "output": "3", "variety": true}
+{"instruction": "Say 'sky' exactly 4 times", "input": "", "whisper": "4 { \"sky\" . } @times", "output": "\"sky\" \"sky\" \"sky\" \"sky\"", "variety": true}
+{"instruction": "Concatenate 'down' 'early'", "input": "", "whisper": "\"down\" \"early\" strcat .", "output": "\"downearly\"", "variety": true}
+{"instruction": "Stick 'echo' onto the end of 'new'", "input": "", "whisper": "\"new\" \"echo\" strcat .", "output": "\"newecho\"", "variety": true}
+{"instruction": "Duplicate the second element and multiply (25, 23)", "input": "", "whisper": "25 23 over - .", "output": "-2", "variety": true}
+{"instruction": "What is 12 % 2?", "input": "", "whisper": "12 2 % .", "output": "0", "variety": true}
+{"instruction": "Say 'low' exactly 5 times", "input": "", "whisper": "5 { \"low\" . } @times", "output": "\"low\" \"low\" \"low\" \"low\" \"low\"", "variety": true}
+{"instruction": "71 vs 77 — print even when greater, odd otherwise", "input": "", "whisper": "71 77 > ?? \"even\" . | \"odd\" . ]", "output": "\"odd\"", "variety": true}
+{"instruction": "Length of 'sky'", "input": "", "whisper": "\"sky\" strlen .", "output": "3", "variety": true}
+{"instruction": "What is 25 % 15?", "input": "", "whisper": "25 15 % .", "output": "10", "variety": true}
+{"instruction": "Check whether 34 exceeds 7 (on/off)", "input": "", "whisper": "34 7 > ?? \"on\" . | \"off\" . ]", "output": "\"on\"", "variety": true}
+{"instruction": "Compute 4 + 15", "input": "", "whisper": "4 15 + .", "output": "19", "variety": true}
+{"instruction": "Duplicate the second element and multiply (25, 15)", "input": "", "whisper": "25 15 over * .", "output": "375", "variety": true}
+{"instruction": "Exchange 63 17 and subtract top from second", "input": "", "whisper": "63 17 ` - .", "output": "-46", "variety": true}
+{"instruction": "Compute 5 / 25", "input": "", "whisper": "5 25 / .", "output": "0", "variety": true}
+{"instruction": "Compute 3+3 via dup", "input": "", "whisper": "3 _ + .", "output": "6", "variety": true}
+{"instruction": "Concatenate 'king' 'low'", "input": "", "whisper": "\"king\" \"low\" strcat .", "output": "\"kinglow\"", "variety": true}
+{"instruction": "Double every element of [5 21 25]", "input": "", "whisper": "[5 21 25] { 2 * } @map .", "output": "[10 42 50]", "variety": true}
+{"instruction": "Length of 'fox'", "input": "", "whisper": "\"fox\" strlen .", "output": "3", "variety": true}
+{"instruction": "Filter [1 8 16 27 28] for even values", "input": "", "whisper": "[1 8 16 27 28] { 2 % 0 = } @filter .", "output": "[8 16 28]", "variety": true}
+{"instruction": "What is 3 times 2?", "input": "", "whisper": "3 2 * .", "output": "6", "variety": true}
+{"instruction": "Multiply 2 by 7", "input": "", "whisper": "2 7 * .", "output": "14", "variety": true}
+{"instruction": "Swap 6 and 45 then subtract", "input": "", "whisper": "6 45 ` - .", "output": "39", "variety": true}
+{"instruction": "What is 25 times 13?", "input": "", "whisper": "25 13 * .", "output": "325", "variety": true}
+{"instruction": "What is 13 % 23?", "input": "", "whisper": "13 23 % .", "output": "13", "variety": true}
+{"instruction": "Product of 11 and 13", "input": "", "whisper": "11 13 * .", "output": "143", "variety": true}
+{"instruction": "What is 91 minus 3?", "input": "", "whisper": "91 3 - .", "output": "88", "variety": true}
+{"instruction": "Compute 7 / 21", "input": "", "whisper": "7 21 / .", "output": "0", "variety": true}
+{"instruction": "Run a block that prints 'echo', 4 times", "input": "", "whisper": "4 { \"echo\" . } @times", "output": "\"echo\" \"echo\" \"echo\" \"echo\"", "variety": true}
+{"instruction": "Integer-divide 23 by 2", "input": "", "whisper": "23 2 / .", "output": "11", "variety": true}
+{"instruction": "What is 8 times 2?", "input": "", "whisper": "8 2 * .", "output": "16", "variety": true}
+{"instruction": "Compute 21 / 2", "input": "", "whisper": "21 2 / .", "output": "10", "variety": true}
+{"instruction": "Reverse order of [1 7 14 23]", "input": "", "whisper": "[1 7 14 23] rev .", "output": "[23 14 7 1]", "variety": true}
+{"instruction": "Swap 31 and 25 then subtract", "input": "", "whisper": "31 25 ` - .", "output": "-6", "variety": true}
+{"instruction": "Compute 11 * 15", "input": "", "whisper": "11 15 * .", "output": "165", "variety": true}
+{"instruction": "Add 89 and 28", "input": "", "whisper": "89 28 + .", "output": "117", "variety": true}
+{"instruction": "For stack 4 9, use over then multiply", "input": "", "whisper": "4 9 over * .", "output": "36", "variety": true}
+{"instruction": "Product of 11 and 25", "input": "", "whisper": "11 25 * .", "output": "275", "variety": true}
+{"instruction": "Subtract 15 from 17", "input": "", "whisper": "17 15 - .", "output": "2", "variety": true}
+{"instruction": "Compute 15*15 leaving one result", "input": "", "whisper": "15 _ _ drop * .", "output": "225", "variety": true}
+{"instruction": "Swap 6 and 3 then subtract", "input": "", "whisper": "6 3 ` - .", "output": "-3", "variety": true}
+{"instruction": "Compute 25 * 8", "input": "", "whisper": "25 8 * .", "output": "200", "variety": true}
+{"instruction": "For stack 23 2, use over then multiply", "input": "", "whisper": "23 2 over + .", "output": "25", "variety": true}
+{"instruction": "What is 91 minus 12?", "input": "", "whisper": "91 12 - .", "output": "79", "variety": true}
+{"instruction": "What is 91 plus 31?", "input": "", "whisper": "91 31 + .", "output": "122", "variety": true}
+{"instruction": "What is 21 times 3?", "input": "", "whisper": "21 3 * .", "output": "63", "variety": true}
+{"instruction": "Product of 25 and 9", "input": "", "whisper": "25 9 * .", "output": "225", "variety": true}
+{"instruction": "What is 7 divided by 2 (integer)?", "input": "", "whisper": "7 2 / .", "output": "3", "variety": true}
+{"instruction": "Compute 2 / 4", "input": "", "whisper": "2 4 / .", "output": "0", "variety": true}
+{"instruction": "Test if 84 is greater than 6; respond pass or fail", "input": "", "whisper": "84 6 > ?? \"pass\" . | \"fail\" . ]", "output": "\"pass\"", "variety": true}
+{"instruction": "Swap 89 and 25 then subtract", "input": "", "whisper": "89 25 ` - .", "output": "-64", "variety": true}
+{"instruction": "Copy the second value (2 7) and multiply", "input": "", "whisper": "2 7 over + .", "output": "9", "variety": true}
+{"instruction": "Length of the list [14 24 27]", "input": "", "whisper": "[14 24 27] len .", "output": "3", "variety": true}
+{"instruction": "Product of 25 and 21", "input": "", "whisper": "25 21 * .", "output": "525", "variety": true}
+{"instruction": "over: 21 17 — multiply the copy by the top", "input": "", "whisper": "21 17 over + .", "output": "38", "variety": true}
+{"instruction": "Compute 45 - 5", "input": "", "whisper": "45 5 - .", "output": "40", "variety": true}
+{"instruction": "Repeat the string 'sun' 5 times", "input": "", "whisper": "5 { \"sun\" . } @times", "output": "\"sun\" \"sun\" \"sun\" \"sun\" \"sun\"", "variety": true}
+{"instruction": "Compute 13 / 15", "input": "", "whisper": "13 15 / .", "output": "0", "variety": true}
+{"instruction": "Product of 9 and 7", "input": "", "whisper": "9 7 * .", "output": "63", "variety": true}
+{"instruction": "What is 13 plus 96?", "input": "", "whisper": "13 96 + .", "output": "109", "variety": true}
+{"instruction": "Swap 4 and 96 then subtract", "input": "", "whisper": "4 96 ` - .", "output": "92", "variety": true}
+{"instruction": "Add 31 and 15", "input": "", "whisper": "31 15 + .", "output": "46", "variety": true}
+{"instruction": "Subtract 6 from 91", "input": "", "whisper": "91 6 - .", "output": "85", "variety": true}
+{"instruction": "Calculate 52 + 28", "input": "", "whisper": "52 28 + .", "output": "80", "variety": true}
+{"instruction": "Double every element of [1 13 15 20]", "input": "", "whisper": "[1 13 15 20] { 2 * } @map .", "output": "[2 26 30 40]", "variety": true}
+{"instruction": "abs(25)", "input": "", "whisper": "25 _ 0 < ?? -1 * | ] .", "output": "25", "variety": true}
+{"instruction": "Exchange 23 45 and subtract top from second", "input": "", "whisper": "23 45 ` - .", "output": "22", "variety": true}
+{"instruction": "Compute 7 / 15", "input": "", "whisper": "7 15 / .", "output": "0", "variety": true}
+{"instruction": "What is 15 divided by 4 (integer)?", "input": "", "whisper": "15 4 / .", "output": "3", "variety": true}
+{"instruction": "Remainder of 8 divided by 11", "input": "", "whisper": "8 11 % .", "output": "8", "variety": true}
+{"instruction": "9 modulo 4", "input": "", "whisper": "9 4 % .", "output": "1", "variety": true}
+{"instruction": "Subtract 4 from 17", "input": "", "whisper": "17 4 - .", "output": "13", "variety": true}
+{"instruction": "Integer-divide 2 by 21", "input": "", "whisper": "2 21 / .", "output": "0", "variety": true}
+{"instruction": "Concatenate 'up' 'king'", "input": "", "whisper": "\"up\" \"king\" strcat .", "output": "\"upking\"", "variety": true}
+{"instruction": "Map *2 over [7 8 17 27]", "input": "", "whisper": "[7 8 17 27] { 2 * } @map .", "output": "[14 16 34 54]", "variety": true}
+{"instruction": "Duplicate the second element and multiply (28, 9)", "input": "", "whisper": "28 9 over - .", "output": "-19", "variety": true}
+{"instruction": "Test if 17 is greater than 63; respond adult or minor", "input": "", "whisper": "17 63 > ?? \"adult\" . | \"minor\" . ]", "output": "\"minor\"", "variety": true}
+{"instruction": "Reverse the list [3 11 12 20 26 28]", "input": "", "whisper": "[3 11 12 20 26 28] rev .", "output": "[28 26 20 12 11 3]", "variety": true}
+{"instruction": "Check whether 6 exceeds 84 (on/off)", "input": "", "whisper": "6 84 > ?? \"on\" . | \"off\" . ]", "output": "\"off\"", "variety": true}
+{"instruction": "Join 'go' and 'big'", "input": "", "whisper": "\"go\" \"big\" strcat .", "output": "\"gobig\"", "variety": true}
+{"instruction": "Run a block that prints 'no', 5 times", "input": "", "whisper": "5 { \"no\" . } @times", "output": "\"no\" \"no\" \"no\" \"no\" \"no\"", "variety": true}
+{"instruction": "What is 2 times 3?", "input": "", "whisper": "2 3 * .", "output": "6", "variety": true}
+{"instruction": "Calculate 84 + 15", "input": "", "whisper": "84 15 + .", "output": "99", "variety": true}
+{"instruction": "Compare 45 and 84: answer even if 45 > 84, else odd", "input": "", "whisper": "45 84 > ?? \"even\" . | \"odd\" . ]", "output": "\"odd\"", "variety": true}
+{"instruction": "Reverse 7 and 15, then compute a-b", "input": "", "whisper": "7 15 ` - .", "output": "8", "variety": true}
+{"instruction": "Duplicate the second element and multiply (4, 13)", "input": "", "whisper": "4 13 over * .", "output": "52", "variety": true}
+{"instruction": "Product of 12 and 7", "input": "", "whisper": "12 7 * .", "output": "84", "variety": true}
+{"instruction": "Cube 5 using dup twice", "input": "", "whisper": "5 _ _ * * .", "output": "125", "variety": true}
+{"instruction": "Repeat the string 'jump' 2 times", "input": "", "whisper": "2 { \"jump\" . } @times", "output": "\"jump\" \"jump\"", "variety": true}
+{"instruction": "Exchange 96 4 and subtract top from second", "input": "", "whisper": "96 4 ` - .", "output": "-92", "variety": true}
+{"instruction": "What is 96 plus 47?", "input": "", "whisper": "96 47 + .", "output": "143", "variety": true}
+{"instruction": "What is 4 plus 42?", "input": "", "whisper": "4 42 + .", "output": "46", "variety": true}
+{"instruction": "Stick 'slow' onto the end of 'dog'", "input": "", "whisper": "\"dog\" \"slow\" strcat .", "output": "\"dogslow\"", "variety": true}
+{"instruction": "Compute 42+42 via dup", "input": "", "whisper": "42 _ + .", "output": "84", "variety": true}
+{"instruction": "Swap 45 and 6 then subtract", "input": "", "whisper": "45 6 ` - .", "output": "-39", "variety": true}
+{"instruction": "Check whether 6 exceeds 2 (open/shut)", "input": "", "whisper": "6 2 > ?? \"open\" . | \"shut\" . ]", "output": "\"open\"", "variety": true}
+{"instruction": "Count characters in 'down'", "input": "", "whisper": "\"down\" strlen .", "output": "4", "variety": true}
+{"instruction": "What is 23 divided by 13 (integer)?", "input": "", "whisper": "23 13 / .", "output": "1", "variety": true}
+{"instruction": "Cube 8 using dup twice", "input": "", "whisper": "8 _ _ * * .", "output": "512", "variety": true}
+{"instruction": "Is 71 bigger than 17? Print adult or minor", "input": "", "whisper": "71 17 > ?? \"adult\" . | \"minor\" . ]", "output": "\"adult\"", "variety": true}
+{"instruction": "Compute 4 * 9", "input": "", "whisper": "4 9 * .", "output": "36", "variety": true}
+{"instruction": "Say 'cat' exactly 2 times", "input": "", "whisper": "2 { \"cat\" . } @times", "output": "\"cat\" \"cat\"", "variety": true}
+{"instruction": "Compute 6 / 7", "input": "", "whisper": "6 7 / .", "output": "0", "variety": true}
+{"instruction": "Join 'delta' and 'hot'", "input": "", "whisper": "\"delta\" \"hot\" strcat .", "output": "\"deltahot\"", "variety": true}
+{"instruction": "Compare 7 and 96: answer win if 7 > 96, else lose", "input": "", "whisper": "7 96 > ?? \"win\" . | \"lose\" . ]", "output": "\"lose\"", "variety": true}
+{"instruction": "Swap 25 and 42 then subtract", "input": "", "whisper": "25 42 ` - .", "output": "17", "variety": true}
+{"instruction": "Say 'new' exactly 2 times", "input": "", "whisper": "2 { \"new\" . } @times", "output": "\"new\" \"new\"", "variety": true}
+{"instruction": "Compare 17 and 23: answer pos if 17 > 23, else neg", "input": "", "whisper": "17 23 > ?? \"pos\" . | \"neg\" . ]", "output": "\"neg\"", "variety": true}
+{"instruction": "Remainder of 7 divided by 2", "input": "", "whisper": "7 2 % .", "output": "1", "variety": true}
+{"instruction": "Swap 6 and 47 then subtract", "input": "", "whisper": "6 47 ` - .", "output": "41", "variety": true}
+{"instruction": "Compute 9 - 7", "input": "", "whisper": "9 7 - .", "output": "2", "variety": true}
+{"instruction": "Length of 'delta'", "input": "", "whisper": "\"delta\" strlen .", "output": "5", "variety": true}
+{"instruction": "Make 5 non-negative", "input": "", "whisper": "5 _ 0 < ?? -1 * | ] .", "output": "5", "variety": true}
+{"instruction": "Is 12 bigger than 52? Print high or low", "input": "", "whisper": "12 52 > ?? \"high\" . | \"low\" . ]", "output": "\"low\"", "variety": true}
+{"instruction": "Reverse the list [3 6 7 24]", "input": "", "whisper": "[3 6 7 24] rev .", "output": "[24 7 6 3]", "variety": true}
+{"instruction": "Sum of 6 and 25", "input": "", "whisper": "6 25 + .", "output": "31", "variety": true}
+{"instruction": "Turn [3 9 13 21] around", "input": "", "whisper": "[3 9 13 21] rev .", "output": "[21 13 9 3]", "variety": true}
+{"instruction": "Repeat the string 'cold' 2 times", "input": "", "whisper": "2 { \"cold\" . } @times", "output": "\"cold\" \"cold\"", "variety": true}
+{"instruction": "Sum of 47 and 42", "input": "", "whisper": "47 42 + .", "output": "89", "variety": true}
+{"instruction": "Copy the second value (15 42) and multiply", "input": "", "whisper": "15 42 over * .", "output": "630", "variety": true}
+{"instruction": "For stack 8 13, use over then multiply", "input": "", "whisper": "8 13 over + .", "output": "21", "variety": true}
+{"instruction": "What is 2 plus 77?", "input": "", "whisper": "2 77 + .", "output": "79", "variety": true}
+{"instruction": "What is 4 % 9?", "input": "", "whisper": "4 9 % .", "output": "4", "variety": true}
+{"instruction": "Compute 3 * 8", "input": "", "whisper": "3 8 * .", "output": "24", "variety": true}
+{"instruction": "96 decreased by 31", "input": "", "whisper": "96 31 - .", "output": "65", "variety": true}
+{"instruction": "Cube 77 using dup twice", "input": "", "whisper": "77 _ _ * * .", "output": "456533", "variety": true}
+{"instruction": "Test if 52 is greater than 12; respond on or off", "input": "", "whisper": "52 12 > ?? \"on\" . | \"off\" . ]", "output": "\"on\"", "variety": true}
+{"instruction": "Integer-divide 23 by 25", "input": "", "whisper": "23 25 / .", "output": "0", "variety": true}
+{"instruction": "Reverse order of [8 9 17 23 25]", "input": "", "whisper": "[8 9 17 23 25] rev .", "output": "[25 23 17 9 8]", "variety": true}
+{"instruction": "Subtract 4 from 25", "input": "", "whisper": "25 4 - .", "output": "21", "variety": true}
+{"instruction": "Map *2 over [1 6 7 14 22 24]", "input": "", "whisper": "[1 6 7 14 22 24] { 2 * } @map .", "output": "[2 12 14 28 44 48]", "variety": true}
+{"instruction": "Multiply each item of [6 16 17 21 24 26] by 2", "input": "", "whisper": "[6 16 17 21 24 26] { 2 * } @map .", "output": "[12 32 34 42 48 52]", "variety": true}
+{"instruction": "Calculate 8 + 17", "input": "", "whisper": "8 17 + .", "output": "25", "variety": true}
+{"instruction": "Check whether 15 exceeds 52 (adult/minor)", "input": "", "whisper": "15 52 > ?? \"adult\" . | \"minor\" . ]", "output": "\"minor\"", "variety": true}
+{"instruction": "Integer-divide 8 by 11", "input": "", "whisper": "8 11 / .", "output": "0", "variety": true}
+{"instruction": "Say 'slow' exactly 2 times", "input": "", "whisper": "2 { \"slow\" . } @times", "output": "\"slow\" \"slow\"", "variety": true}
+{"instruction": "Join 'hot' and 'king'", "input": "", "whisper": "\"hot\" \"king\" strcat .", "output": "\"hotking\"", "variety": true}
+{"instruction": "Integer-divide 21 by 17", "input": "", "whisper": "21 17 / .", "output": "1", "variety": true}
+{"instruction": "Compute 9 + 23", "input": "", "whisper": "9 23 + .", "output": "32", "variety": true}
+{"instruction": "What is 5 times 11?", "input": "", "whisper": "5 11 * .", "output": "55", "variety": true}
+{"instruction": "Compute 13 / 2", "input": "", "whisper": "13 2 / .", "output": "6", "variety": true}
+{"instruction": "What is 15 % 23?", "input": "", "whisper": "15 23 % .", "output": "15", "variety": true}
+{"instruction": "Reverse 47 and 56, then compute a-b", "input": "", "whisper": "47 56 ` - .", "output": "9", "variety": true}
+{"instruction": "Absolute value of -4", "input": "", "whisper": "-4 _ 0 < ?? -1 * | ] .", "output": "4", "variety": true}
+{"instruction": "What is 91 minus 28?", "input": "", "whisper": "91 28 - .", "output": "63", "variety": true}
+{"instruction": "23 vs 4 — print even when greater, odd otherwise", "input": "", "whisper": "23 4 > ?? \"even\" . | \"odd\" . ]", "output": "\"even\"", "variety": true}
+{"instruction": "Compute 11 * 8", "input": "", "whisper": "11 8 * .", "output": "88", "variety": true}
+{"instruction": "Add up [9 16 19 29]", "input": "", "whisper": "[9 16 19 29] 0 { + } @fold .", "output": "73", "variety": true}
+{"instruction": "Reverse 28 and 63, then compute a-b", "input": "", "whisper": "28 63 ` - .", "output": "35", "variety": true}
+{"instruction": "Exchange 34 91 and subtract top from second", "input": "", "whisper": "34 91 ` - .", "output": "57", "variety": true}
+{"instruction": "Exchange 71 34 and subtract top from second", "input": "", "whisper": "71 34 ` - .", "output": "-37", "variety": true}
+{"instruction": "Compute 21 / 12", "input": "", "whisper": "21 12 / .", "output": "1", "variety": true}
+{"instruction": "Compute 4 / 23", "input": "", "whisper": "4 23 / .", "output": "0", "variety": true}
+{"instruction": "Copy the second value (34 12) and multiply", "input": "", "whisper": "34 12 over - .", "output": "-22", "variety": true}
+{"instruction": "For stack 5 15, use over then multiply", "input": "", "whisper": "5 15 over * .", "output": "75", "variety": true}
+{"instruction": "What is 91 minus 25?", "input": "", "whisper": "91 25 - .", "output": "66", "variety": true}
+{"instruction": "For stack 3 17, use over then multiply", "input": "", "whisper": "3 17 over + .", "output": "20", "variety": true}
+{"instruction": "Swap 5 and 6 then subtract", "input": "", "whisper": "5 6 ` - .", "output": "1", "variety": true}
+{"instruction": "Print the word 'left' 6 times", "input": "", "whisper": "6 { \"left\" . } @times", "output": "\"left\" \"left\" \"left\" \"left\" \"left\" \"left\"", "variety": true}
+{"instruction": "Length of 'gamma'", "input": "", "whisper": "\"gamma\" strlen .", "output": "5", "variety": true}
+{"instruction": "Stick 'hi' onto the end of 'alpha'", "input": "", "whisper": "\"alpha\" \"hi\" strcat .", "output": "\"alphahi\"", "variety": true}
+{"instruction": "Sum of 71 and 45", "input": "", "whisper": "71 45 + .", "output": "116", "variety": true}
+{"instruction": "Reverse 89 and 23, then compute a-b", "input": "", "whisper": "89 23 ` - .", "output": "-66", "variety": true}
+{"instruction": "abs(34)", "input": "", "whisper": "34 _ 0 < ?? -1 * | ] .", "output": "34", "variety": true}
+{"instruction": "Square 68 using dup", "input": "", "whisper": "68 _ * .", "output": "4624", "variety": true}
+{"instruction": "Double every element of [2 15 25]", "input": "", "whisper": "[2 15 25] { 2 * } @map .", "output": "[4 30 50]", "variety": true}
+{"instruction": "Compute 71^2 with _", "input": "", "whisper": "71 _ * .", "output": "5041", "variety": true}
+{"instruction": "Repeat the string 'old' 2 times", "input": "", "whisper": "2 { \"old\" . } @times", "output": "\"old\" \"old\"", "variety": true}
+{"instruction": "How long is 'king'?", "input": "", "whisper": "\"king\" strlen .", "output": "4", "variety": true}
+{"instruction": "Compute 23+23 via dup", "input": "", "whisper": "23 _ + .", "output": "46", "variety": true}
+{"instruction": "Stick 'low' onto the end of 'fast'", "input": "", "whisper": "\"fast\" \"low\" strcat .", "output": "\"fastlow\"", "variety": true}
+{"instruction": "Absolute value of 3", "input": "", "whisper": "3 _ 0 < ?? -1 * | ] .", "output": "3", "variety": true}
+{"instruction": "Output 'cold' on 6 lines", "input": "", "whisper": "6 { \"cold\" . } @times", "output": "\"cold\" \"cold\" \"cold\" \"cold\" \"cold\" \"cold\"", "variety": true}
+{"instruction": "Sum all of [10 12 23 24 27 29]", "input": "", "whisper": "[10 12 23 24 27 29] 0 { + } @fold .", "output": "125", "variety": true}
+{"instruction": "Reverse 45 and 47, then compute a-b", "input": "", "whisper": "45 47 ` - .", "output": "2", "variety": true}
+{"instruction": "Reverse the list [8 10 26]", "input": "", "whisper": "[8 10 26] rev .", "output": "[26 10 8]", "variety": true}
+{"instruction": "What is 63 minus 13?", "input": "", "whisper": "63 13 - .", "output": "50", "variety": true}
+{"instruction": "Cube 28 using dup twice", "input": "", "whisper": "28 _ _ * * .", "output": "21952", "variety": true}
+{"instruction": "Swap 11 and 68 then subtract", "input": "", "whisper": "11 68 ` - .", "output": "57", "variety": true}
+{"instruction": "Filter [10 13 23] for even values", "input": "", "whisper": "[10 13 23] { 2 % 0 = } @filter .", "output": "[10]", "variety": true}
+{"instruction": "What is 21 minus 8?", "input": "", "whisper": "21 8 - .", "output": "13", "variety": true}
+{"instruction": "13 modulo 6", "input": "", "whisper": "13 6 % .", "output": "1", "variety": true}
+{"instruction": "over: 28 3 — multiply the copy by the top", "input": "", "whisper": "28 3 over + .", "output": "31", "variety": true}
+{"instruction": "Calculate 31 + 68", "input": "", "whisper": "31 68 + .", "output": "99", "variety": true}
+{"instruction": "Calculate 17 + 91", "input": "", "whisper": "17 91 + .", "output": "108", "variety": true}
+{"instruction": "Swap 89 and 34 then subtract", "input": "", "whisper": "89 34 ` - .", "output": "-55", "variety": true}
+{"instruction": "Check whether 4 exceeds 9 (open/shut)", "input": "", "whisper": "4 9 > ?? \"open\" . | \"shut\" . ]", "output": "\"shut\"", "variety": true}
+{"instruction": "For stack 25 3, use over then multiply", "input": "", "whisper": "25 3 over * .", "output": "75", "variety": true}
+{"instruction": "Multiply 3 by 23", "input": "", "whisper": "3 23 * .", "output": "69", "variety": true}
+{"instruction": "Reverse the list [12 14 29]", "input": "", "whisper": "[12 14 29] rev .", "output": "[29 14 12]", "variety": true}
+{"instruction": "For stack 6 28, use over then multiply", "input": "", "whisper": "6 28 over - .", "output": "22", "variety": true}
+{"instruction": "Compute 2 / 7", "input": "", "whisper": "2 7 / .", "output": "0", "variety": true}
+{"instruction": "Add up [1 6 7 19 20 27]", "input": "", "whisper": "[1 6 7 19 20 27] 0 { + } @fold .", "output": "80", "variety": true}
+{"instruction": "Reverse 45 and 96, then compute a-b", "input": "", "whisper": "45 96 ` - .", "output": "51", "variety": true}
+{"instruction": "What is 12 % 3?", "input": "", "whisper": "12 3 % .", "output": "0", "variety": true}
+{"instruction": "Compute 7*7 leaving one result", "input": "", "whisper": "7 _ _ drop * .", "output": "49", "variety": true}
+{"instruction": "Concatenate 'sky' 'no'", "input": "", "whisper": "\"sky\" \"no\" strcat .", "output": "\"skyno\"", "variety": true}
+{"instruction": "Is 28 bigger than 77? Print adult or minor", "input": "", "whisper": "28 77 > ?? \"adult\" . | \"minor\" . ]", "output": "\"minor\"", "variety": true}
+{"instruction": "Remainder of 3 divided by 17", "input": "", "whisper": "3 17 % .", "output": "3", "variety": true}
+{"instruction": "Is 31 bigger than 6? Print win or lose", "input": "", "whisper": "31 6 > ?? \"win\" . | \"lose\" . ]", "output": "\"win\"", "variety": true}
+{"instruction": "Reverse the list [12 15 29]", "input": "", "whisper": "[12 15 29] rev .", "output": "[29 15 12]", "variety": true}
+{"instruction": "over: 42 8 — multiply the copy by the top", "input": "", "whisper": "42 8 over * .", "output": "336", "variety": true}
+{"instruction": "Double 52 by adding it to itself", "input": "", "whisper": "52 _ * .", "output": "2704", "variety": true}
+{"instruction": "What is 8 divided by 6 (integer)?", "input": "", "whisper": "8 6 / .", "output": "1", "variety": true}
+{"instruction": "Filter [4 12 17 18 19] for even values", "input": "", "whisper": "[4 12 17 18 19] { 2 % 0 = } @filter .", "output": "[4 12 18]", "variety": true}
+{"instruction": "Compute 68 + 47", "input": "", "whisper": "68 47 + .", "output": "115", "variety": true}
+{"instruction": "Output 'right' on 3 lines", "input": "", "whisper": "3 { \"right\" . } @times", "output": "\"right\" \"right\" \"right\"", "variety": true}
+{"instruction": "Copy the second value (9 6) and multiply", "input": "", "whisper": "9 6 over * .", "output": "54", "variety": true}
+{"instruction": "Swap 91 and 6 then subtract", "input": "", "whisper": "91 6 ` - .", "output": "-85", "variety": true}
+{"instruction": "Compute 11 + 31", "input": "", "whisper": "11 31 + .", "output": "42", "variety": true}
+{"instruction": "Duplicate the second element and multiply (6, 8)", "input": "", "whisper": "6 8 over + .", "output": "14", "variety": true}
+{"instruction": "Keep only even numbers from [1 10 12 15 23 24]", "input": "", "whisper": "[1 10 12 15 23 24] { 2 % 0 = } @filter .", "output": "[10 12 24]", "variety": true}
+{"instruction": "Compute 31 + 7", "input": "", "whisper": "31 7 + .", "output": "38", "variety": true}
+{"instruction": "over: 5 28 — multiply the copy by the top", "input": "", "whisper": "5 28 over + .", "output": "33", "variety": true}
+{"instruction": "Copy the second value (12 5) and multiply", "input": "", "whisper": "12 5 over - .", "output": "-7", "variety": true}
+{"instruction": "Exchange 28 23 and subtract top from second", "input": "", "whisper": "28 23 ` - .", "output": "-5", "variety": true}
+{"instruction": "Length of 'red'", "input": "", "whisper": "\"red\" strlen .", "output": "3", "variety": true}
+{"instruction": "Compute 96*96 leaving one result", "input": "", "whisper": "96 _ _ drop * .", "output": "9216", "variety": true}
+{"instruction": "Compute 52+52 via dup", "input": "", "whisper": "52 _ + .", "output": "104", "variety": true}
+{"instruction": "Run a block that prints 'early', 4 times", "input": "", "whisper": "4 { \"early\" . } @times", "output": "\"early\" \"early\" \"early\" \"early\"", "variety": true}
+{"instruction": "Test if 6 is greater than 21; respond yes or no", "input": "", "whisper": "6 21 > ?? \"yes\" . | \"no\" . ]", "output": "\"no\"", "variety": true}
+{"instruction": "77 decreased by 31", "input": "", "whisper": "77 31 - .", "output": "46", "variety": true}
+{"instruction": "Integer-divide 6 by 9", "input": "", "whisper": "6 9 / .", "output": "0", "variety": true}
+{"instruction": "Test if 5 is greater than 63; respond adult or minor", "input": "", "whisper": "5 63 > ?? \"adult\" . | \"minor\" . ]", "output": "\"minor\"", "variety": true}
+{"instruction": "What is 15 times 13?", "input": "", "whisper": "15 13 * .", "output": "195", "variety": true}
+{"instruction": "Is 28 bigger than 21? Print fast or slow", "input": "", "whisper": "28 21 > ?? \"fast\" . | \"slow\" . ]", "output": "\"fast\"", "variety": true}
+{"instruction": "Compare 63 and 34: answer on if 63 > 34, else off", "input": "", "whisper": "63 34 > ?? \"on\" . | \"off\" . ]", "output": "\"on\"", "variety": true}
+{"instruction": "What is 68 plus 89?", "input": "", "whisper": "68 89 + .", "output": "157", "variety": true}
+{"instruction": "Product of 23 and 15", "input": "", "whisper": "23 15 * .", "output": "345", "variety": true}
+{"instruction": "abs(96)", "input": "", "whisper": "96 _ 0 < ?? -1 * | ] .", "output": "96", "variety": true}
+{"instruction": "Compute 89+89 via dup", "input": "", "whisper": "89 _ + .", "output": "178", "variety": true}
+{"instruction": "Duplicate the second element and multiply (5, 6)", "input": "", "whisper": "5 6 over * .", "output": "30", "variety": true}
+{"instruction": "2 modulo 11", "input": "", "whisper": "2 11 % .", "output": "2", "variety": true}
+{"instruction": "Compute 89 - 13", "input": "", "whisper": "89 13 - .", "output": "76", "variety": true}
+{"instruction": "Sum of 8 and 63", "input": "", "whisper": "8 63 + .", "output": "71", "variety": true}
+{"instruction": "12 modulo 15", "input": "", "whisper": "12 15 % .", "output": "12", "variety": true}
+{"instruction": "Multiply 13 by 5", "input": "", "whisper": "13 5 * .", "output": "65", "variety": true}
+{"instruction": "Join 'delta' and 'gamma'", "input": "", "whisper": "\"delta\" \"gamma\" strcat .", "output": "\"deltagamma\"", "variety": true}
+{"instruction": "For stack 8 2, use over then multiply", "input": "", "whisper": "8 2 over * .", "output": "16", "variety": true}
+{"instruction": "Duplicate the second element and multiply (28, 34)", "input": "", "whisper": "28 34 over + .", "output": "62", "variety": true}
+{"instruction": "Repeat the string 'king' 6 times", "input": "", "whisper": "6 { \"king\" . } @times", "output": "\"king\" \"king\" \"king\" \"king\" \"king\" \"king\"", "variety": true}
+{"instruction": "Copy the second value (34 11) and multiply", "input": "", "whisper": "34 11 over * .", "output": "374", "variety": true}
+{"instruction": "Length of the list [1 9 25]", "input": "", "whisper": "[1 9 25] len .", "output": "3", "variety": true}
+{"instruction": "Compare 9 and 63: answer pass if 9 > 63, else fail", "input": "", "whisper": "9 63 > ?? \"pass\" . | \"fail\" . ]", "output": "\"fail\"", "variety": true}
+{"instruction": "5 modulo 23", "input": "", "whisper": "5 23 % .", "output": "5", "variety": true}
+{"instruction": "Copy the second value (5 25) and multiply", "input": "", "whisper": "5 25 over - .", "output": "20", "variety": true}
+{"instruction": "What is 23 % 21?", "input": "", "whisper": "23 21 % .", "output": "2", "variety": true}
+{"instruction": "What is 4 divided by 11 (integer)?", "input": "", "whisper": "4 11 / .", "output": "0", "variety": true}
+{"instruction": "Reverse 91 and 47, then compute a-b", "input": "", "whisper": "91 47 ` - .", "output": "-44", "variety": true}
+{"instruction": "Duplicate the second element and multiply (5, 12)", "input": "", "whisper": "5 12 over - .", "output": "7", "variety": true}
+{"instruction": "Double every element of [14 23 28]", "input": "", "whisper": "[14 23 28] { 2 * } @map .", "output": "[28 46 56]", "variety": true}
+{"instruction": "Swap 42 and 71 then subtract", "input": "", "whisper": "42 71 ` - .", "output": "29", "variety": true}
+{"instruction": "Compute 28*28 leaving one result", "input": "", "whisper": "28 _ _ drop * .", "output": "784", "variety": true}
+{"instruction": "Add 42 and 7", "input": "", "whisper": "42 7 + .", "output": "49", "variety": true}
+{"instruction": "Make 13 non-negative", "input": "", "whisper": "13 _ 0 < ?? -1 * | ] .", "output": "13", "variety": true}
+{"instruction": "Concatenate 'hi' 'go'", "input": "", "whisper": "\"hi\" \"go\" strcat .", "output": "\"higo\"", "variety": true}
+{"instruction": "Stick 'jump' onto the end of 'up'", "input": "", "whisper": "\"up\" \"jump\" strcat .", "output": "\"upjump\"", "variety": true}
+{"instruction": "What is 3 % 13?", "input": "", "whisper": "3 13 % .", "output": "3", "variety": true}
+{"instruction": "What is 89 minus 47?", "input": "", "whisper": "89 47 - .", "output": "42", "variety": true}
+{"instruction": "Reverse 15 and 68, then compute a-b", "input": "", "whisper": "15 68 ` - .", "output": "53", "variety": true}
+{"instruction": "Exchange 71 96 and subtract top from second", "input": "", "whisper": "71 96 ` - .", "output": "25", "variety": true}
+{"instruction": "Sum of 52 and 63", "input": "", "whisper": "52 63 + .", "output": "115", "variety": true}
+{"instruction": "Compute 5 * 3", "input": "", "whisper": "5 3 * .", "output": "15", "variety": true}
+{"instruction": "15 modulo 3", "input": "", "whisper": "15 3 % .", "output": "0", "variety": true}
+{"instruction": "Map *2 over [8 14 18 26]", "input": "", "whisper": "[8 14 18 26] { 2 * } @map .", "output": "[16 28 36 52]", "variety": true}
+{"instruction": "Compute 21 / 15", "input": "", "whisper": "21 15 / .", "output": "1", "variety": true}
+{"instruction": "Concatenate 'jump' 'sun'", "input": "", "whisper": "\"jump\" \"sun\" strcat .", "output": "\"jumpsun\"", "variety": true}
+{"instruction": "Stick 'big' onto the end of 'fast'", "input": "", "whisper": "\"fast\" \"big\" strcat .", "output": "\"fastbig\"", "variety": true}
+{"instruction": "Integer-divide 11 by 23", "input": "", "whisper": "11 23 / .", "output": "0", "variety": true}
+{"instruction": "Keep only even numbers from [2 7 19 20 26]", "input": "", "whisper": "[2 7 19 20 26] { 2 % 0 = } @filter .", "output": "[2 20 26]", "variety": true}
+{"instruction": "Cube 89 using dup twice", "input": "", "whisper": "89 _ _ * * .", "output": "704969", "variety": true}
+{"instruction": "Compute 13+13 via dup", "input": "", "whisper": "13 _ + .", "output": "26", "variety": true}
+{"instruction": "Add 4 and 68", "input": "", "whisper": "4 68 + .", "output": "72", "variety": true}
+{"instruction": "What is 25 % 8?", "input": "", "whisper": "25 8 % .", "output": "1", "variety": true}
+{"instruction": "Square 47 using dup", "input": "", "whisper": "47 _ * .", "output": "2209", "variety": true}
+{"instruction": "Concatenate 'early' 'yes'", "input": "", "whisper": "\"early\" \"yes\" strcat .", "output": "\"earlyyes\"", "variety": true}
+{"instruction": "Map *2 over [6 16 29]", "input": "", "whisper": "[6 16 29] { 2 * } @map .", "output": "[12 32 58]", "variety": true}
+{"instruction": "Say 'up' exactly 6 times", "input": "", "whisper": "6 { \"up\" . } @times", "output": "\"up\" \"up\" \"up\" \"up\" \"up\" \"up\"", "variety": true}
+{"instruction": "What is 71 minus 13?", "input": "", "whisper": "71 13 - .", "output": "58", "variety": true}
+{"instruction": "Compute 4 * 8", "input": "", "whisper": "4 8 * .", "output": "32", "variety": true}
+{"instruction": "17 squared (use dup)", "input": "", "whisper": "17 _ * .", "output": "289", "variety": true}
+{"instruction": "Say 'blue' exactly 4 times", "input": "", "whisper": "4 { \"blue\" . } @times", "output": "\"blue\" \"blue\" \"blue\" \"blue\"", "variety": true}
+{"instruction": "Print the word 'slow' 3 times", "input": "", "whisper": "3 { \"slow\" . } @times", "output": "\"slow\" \"slow\" \"slow\"", "variety": true}
+{"instruction": "Subtract 52 from 56", "input": "", "whisper": "56 52 - .", "output": "4", "variety": true}
+{"instruction": "What is 8 % 15?", "input": "", "whisper": "8 15 % .", "output": "8", "variety": true}
+{"instruction": "abs(31)", "input": "", "whisper": "31 _ 0 < ?? -1 * | ] .", "output": "31", "variety": true}
+{"instruction": "Compute 4 * 15", "input": "", "whisper": "4 15 * .", "output": "60", "variety": true}
+{"instruction": "Calculate 63 + 13", "input": "", "whisper": "63 13 + .", "output": "76", "variety": true}
+{"instruction": "Duplicate the second element and multiply (28, 12)", "input": "", "whisper": "28 12 over - .", "output": "-16", "variety": true}
+{"instruction": "Multiply 4 by 3", "input": "", "whisper": "4 3 * .", "output": "12", "variety": true}
+{"instruction": "Exchange 28 2 and subtract top from second", "input": "", "whisper": "28 2 ` - .", "output": "-26", "variety": true}
+{"instruction": "Compare 21 and 9: answer zero if 21 > 9, else nonzero", "input": "", "whisper": "21 9 > ?? \"zero\" . | \"nonzero\" . ]", "output": "\"zero\"", "variety": true}
+{"instruction": "What is 34 plus 12?", "input": "", "whisper": "34 12 + .", "output": "46", "variety": true}
+{"instruction": "23 squared (use dup)", "input": "", "whisper": "23 _ * .", "output": "529", "variety": true}
+{"instruction": "Add 2 and 8", "input": "", "whisper": "2 8 + .", "output": "10", "variety": true}
+{"instruction": "What is 7 divided by 4 (integer)?", "input": "", "whisper": "7 4 / .", "output": "1", "variety": true}
+{"instruction": "Is 34 bigger than 91? Print pass or fail", "input": "", "whisper": "34 91 > ?? \"pass\" . | \"fail\" . ]", "output": "\"fail\"", "variety": true}
+{"instruction": "Reverse 34 and 96, then compute a-b", "input": "", "whisper": "34 96 ` - .", "output": "62", "variety": true}
+{"instruction": "Say 'old' exactly 3 times", "input": "", "whisper": "3 { \"old\" . } @times", "output": "\"old\" \"old\" \"old\"", "variety": true}
+{"instruction": "over: 3 13 — multiply the copy by the top", "input": "", "whisper": "3 13 over * .", "output": "39", "variety": true}
+{"instruction": "Product of 12 and 6", "input": "", "whisper": "12 6 * .", "output": "72", "variety": true}
+{"instruction": "Subtract 9 from 68", "input": "", "whisper": "68 9 - .", "output": "59", "variety": true}
+{"instruction": "Check whether 45 exceeds 91 (adult/minor)", "input": "", "whisper": "45 91 > ?? \"adult\" . | \"minor\" . ]", "output": "\"minor\"", "variety": true}
+{"instruction": "Keep only even numbers from [4 11 18]", "input": "", "whisper": "[4 11 18] { 2 % 0 = } @filter .", "output": "[4 18]", "variety": true}
+{"instruction": "Subtract 52 from 84", "input": "", "whisper": "84 52 - .", "output": "32", "variety": true}
+{"instruction": "Exchange 23 7 and subtract top from second", "input": "", "whisper": "23 7 ` - .", "output": "-16", "variety": true}
