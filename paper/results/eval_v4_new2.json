@@ -1,0 +1,810 @@
+{
+  "model": "/root/autodl-tmp/out/whisper-qwen30b-v4",
+  "tasks": 100,
+  "exact_match": 53,
+  "exact_match_pct": 53.0,
+  "syntax_valid": 86,
+  "syntax_valid_pct": 86.0,
+  "results": [
+    {
+      "task": "task_0",
+      "instruction": "Add 17 and 25",
+      "expected": "17 25 + .",
+      "generated": "17 25 + .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_1",
+      "instruction": "Subtract 9 from 44",
+      "expected": "44 9 - .",
+      "generated": "44 9 - .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_2",
+      "instruction": "Multiply 7 by 8",
+      "expected": "7 8 * .",
+      "generated": "7 8 * .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_3",
+      "instruction": "Integer-divide 100 by 7",
+      "expected": "100 7 / .",
+      "generated": "100 7 / .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_4",
+      "instruction": "Remainder of 87 divided by 11",
+      "expected": "87 11 % .",
+      "generated": "87 11 % .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_5",
+      "instruction": "Sum 4 5 6 in one expression",
+      "expected": "4 5 + 6 + .",
+      "generated": "4 5 + 6 + .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_6",
+      "instruction": "Compute (2+3)*4",
+      "expected": "2 3 + 4 * .",
+      "generated": "2 3 + 4 * .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_7",
+      "instruction": "Compute 100 - 3*7",
+      "expected": "100 3 7 * - .",
+      "generated": "100 3 * 30 - .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_8",
+      "instruction": "Negate 42",
+      "expected": "42 -1 * .",
+      "generated": "42 !",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_9",
+      "instruction": "Absolute value of -13",
+      "expected": "-13 _ 0 < ?? -1 * | ] .",
+      "generated": "-13 _ 0 < ?? 0 swap - ] .",
+      "exact_match": false,
+      "syntax_valid": false
+    },
+    {
+      "task": "task_10",
+      "instruction": "Square 9 using dup",
+      "expected": "9 _ * .",
+      "generated": "9 _ * .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_11",
+      "instruction": "Compute 2*11 with dup",
+      "expected": "11 _ + .",
+      "generated": "11 _ + .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_12",
+      "instruction": "Swap 6 and 7 then multiply",
+      "expected": "6 7 ` * .",
+      "generated": "6 7 ` * .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_13",
+      "instruction": "Over: copy second and add to top (3 8)",
+      "expected": "3 8 over + .",
+      "generated": "3 8 over + . .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_14",
+      "instruction": "Rot three values then drop two (4 5 6)",
+      "expected": "4 5 6 @ drop drop .",
+      "generated": "4 5 6 @ drop drop .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_15",
+      "instruction": "Drop the top of 12 30",
+      "expected": "12 30 drop .",
+      "generated": "12 30 drop .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_16",
+      "instruction": "Pick the third element (1 2 3 -> copy 1)",
+      "expected": "1 2 3 $2 drop drop drop .",
+      "generated": "1 2 3 $2 .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_17",
+      "instruction": "Double-dup then multiply top two (4 -> 4*4... via _ _ *)",
+      "expected": "4 _ _ * * .",
+      "generated": "4 _ _ * * .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_18",
+      "instruction": "Is 12 greater than 5?",
+      "expected": "12 5 > .",
+      "generated": "12 5 > .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_19",
+      "instruction": "Is 3 equal to 4?",
+      "expected": "3 4 = .",
+      "generated": "3 4 = .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_20",
+      "instruction": "Sign check: -4 vs 0",
+      "expected": "-4 0 < ?? \"neg\" . | \"pos\" . ]",
+      "generated": "-4 0 < .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_21",
+      "instruction": "Adult check: age 20 vs 18",
+      "expected": "20 18 >= ?? \"adult\" . | \"minor\" . ]",
+      "generated": "20 18 >= .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_22",
+      "instruction": "Max of 19 and 7 via ??",
+      "expected": ": max { over over < ?? ` drop | drop ] } ;\n19 7 max .",
+      "generated": "19 7 > ?? 19 | 7 ] .",
+      "exact_match": false,
+      "syntax_valid": false
+    },
+    {
+      "task": "task_23",
+      "instruction": "Min of 19 and 7 via ??",
+      "expected": ": min { over over < ?? drop | ` drop ] } ;\n19 7 min .",
+      "generated": "19 7 < ?? 19 | 7 ] .",
+      "exact_match": false,
+      "syntax_valid": false
+    },
+    {
+      "task": "task_24",
+      "instruction": "Classify 0: zero/nonzero",
+      "expected": "0 0 = ?? \"zero\" . | \"nonzero\" . ]",
+      "generated": "0 _ 0 = ?? \"zero\" . | \"nonzero\" . ]",
+      "exact_match": false,
+      "syntax_valid": false
+    },
+    {
+      "task": "task_25",
+      "instruction": "Check 9 < 3",
+      "expected": "9 3 < .",
+      "generated": "9 3 < .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_26",
+      "instruction": "Count 0..4 with a while loop",
+      "expected": "0 { _ . 1 + } { _ 5 < } #",
+      "generated": "0 { 1 + } { _ 5 < } # drop 5 .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_27",
+      "instruction": "Run a block 4 times",
+      "expected": "4 { \"go\" . } @times",
+      "generated": "4 { \"loop\" . } @times",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_28",
+      "instruction": "Double a counter until >= 8",
+      "expected": "1 { _ 2 * } { _ 8 < } # .",
+      "generated": "0 { 2 * _ 4 >= } { _ } # .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_29",
+      "instruction": "Sum 1..6 with while",
+      "expected": "0 1 { over + ` 1 + } { _ 7 < } # ` drop .",
+      "generated": "6 { 0 swap + swap 1 - } { _ 0 > } # drop .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_30",
+      "instruction": "Print countdown 3,2,1",
+      "expected": "3 { _ . 1 - } { _ 0 > } #",
+      "generated": "3 { _ . 1 - } { _ 0 > } #",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_31",
+      "instruction": "Sum five 2s via range and fold",
+      "expected": "5 range-to { drop 2 } @map 0 { + } @fold .",
+      "generated": "5 range-to 0 { + } @fold .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_32",
+      "instruction": "Loop 3 times building a count",
+      "expected": "0 3 { 1 + } @times .",
+      "generated": "0 { 1 + } { _ 3 < } # .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_33",
+      "instruction": "Map square over [2 4 6]",
+      "expected": "[2 4 6] { _ * } @map .",
+      "generated": "[2 4 6] { _ * } @map .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_34",
+      "instruction": "Map +10 over [1 2 3]",
+      "expected": "[1 2 3] { 10 + } @map .",
+      "generated": "[1 2 3] { 10 + } @map .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_35",
+      "instruction": "Filter multiples of 4 in [4 7 8 12]",
+      "expected": "[4 7 8 12] { 4 % 0 = } @filter .",
+      "generated": "[4 7 8 12] { 4 % 0 = } @filter .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_36",
+      "instruction": "Filter strings of length 3",
+      "expected": "[\"ab\" \"cde\" \"f\"] { strlen 3 = } @filter .",
+      "generated": "[\"a\" \"ab\" \"abc\" \"abcd\"] { strlen 3 = } @filter .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_37",
+      "instruction": "Fold subtraction over [10 3 2] from 20",
+      "expected": "[10 3 2] 20 { - } @fold .",
+      "generated": "20 [10 3 2] { - } @fold .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_38",
+      "instruction": "Sum [4 5 6 7]",
+      "expected": "[4 5 6 7] 0 { + } @fold .",
+      "generated": "[4 5 6 7] 0 { + } @fold .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_39",
+      "instruction": "Max of a list via fold with max word",
+      "expected": ": max { over over < ?? ` drop | drop ] } ;\n[3 9 2 7] 0 { max } @fold .",
+      "generated": "[3 1 4 1 5] 0 { over over < ?? ` drop | drop ] } @fold .",
+      "exact_match": false,
+      "syntax_valid": false
+    },
+    {
+      "task": "task_40",
+      "instruction": "Reverse [9 8 7 6]",
+      "expected": "[9 8 7 6] rev .",
+      "generated": "[9 8 7 6] rev .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_41",
+      "instruction": "Sort [6 2 9 1 5]",
+      "expected": "[6 2 9 1 5] sort .",
+      "generated": "[6 2 9 1 5] sort .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_42",
+      "instruction": "Take 3 of [a b c d e]",
+      "expected": "[\"a\" \"b\" \"c\" \"d\" \"e\"] 3 take .",
+      "generated": "[1 2 3 4 5] 3 take .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_43",
+      "instruction": "Drop 2 of [1 2 3 4 5]",
+      "expected": "[1 2 3 4 5] 2 drop-n .",
+      "generated": "5 drop-all [1 2 3 4 5] .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_44",
+      "instruction": "Slice [1..7] from 2 to 5",
+      "expected": "7 range-to 2 5 list-slice .",
+      "generated": "[1 2 3 4 5 6 7] 2 5 strlcpy .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_45",
+      "instruction": "Dedup [4 4 2 2 2 9]",
+      "expected": "[4 4 2 2 2 9] dedup .",
+      "generated": "[4 4 2 2 2 9] dedup .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_46",
+      "instruction": "Nth element 1 of [30 40 50]",
+      "expected": "[30 40 50] 1 @nth .",
+      "generated": "[30 40 50] 1 @nth .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_47",
+      "instruction": "Length of 'whisper lang'",
+      "expected": "\"whisper lang\" strlen .",
+      "generated": "\"whisper lang\" strlen .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_48",
+      "instruction": "Concat 'good' and 'bye'",
+      "expected": "\"good\" \"bye\" strcat .",
+      "generated": "\"good\" \"bye\" strcat .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_49",
+      "instruction": "Slice 'abcdef' 2..5",
+      "expected": "\"abcdef\" 2 5 strslice .",
+      "generated": "\"abcdef\" 2 5 strsl .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_50",
+      "instruction": "Are 'one' and 'one' equal?",
+      "expected": "\"one\" \"one\" streq .",
+      "generated": "\"one\" \"one\" streq .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_51",
+      "instruction": "Find 'de' in 'abcdef'",
+      "expected": "\"abcdef\" \"de\" strfind .",
+      "generated": "\"abcdef\" \"de\" strfind .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_52",
+      "instruction": "Replace 'cat' with 'dog' in 'cat and cat'",
+      "expected": "\"cat and cat\" \"cat\" \"dog\" strreplace .",
+      "generated": "\"cat and cat\" \"cat\" \"dog\" strreplace .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_53",
+      "instruction": "Split 'x-y-z' on '-'",
+      "expected": "\"x-y-z\" \"-\" strsplit .",
+      "generated": "\"x-y-z\" \"-\" strsplit .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_54",
+      "instruction": "Join [p q r] with '+'",
+      "expected": "\"+\" [\"p\" \"q\" \"r\"] strjoin .",
+      "generated": "[1 2 3] { _ } @fold ` + + .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_55",
+      "instruction": "Parse '777' as integer",
+      "expected": "\"777\" strtoi64 .",
+      "generated": "\"777\" strtoi64 .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_56",
+      "instruction": "Convert 365 to string length",
+      "expected": "365 i64tostr strlen .",
+      "generated": "365 i64tostr strlen .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_57",
+      "instruction": "Char codes of 'hi'",
+      "expected": "\"hi\" strchars .",
+      "generated": "\"hi\" strchars .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_58",
+      "instruction": "Character at index 2 of 'xyz'",
+      "expected": "\"xyz\" 2 strnth .",
+      "generated": "\"xyz\" 2 strnth .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_59",
+      "instruction": "Contains 'an' in 'banana'?",
+      "expected": "\"banana\" \"an\" strfind 0 >= .",
+      "generated": "\"banana\" \"an\" strfind 0 >= .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_60",
+      "instruction": "Char from code 122",
+      "expected": "122 ctos .",
+      "generated": "122 cto .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_61",
+      "instruction": "Float add 1.5 + 2.25",
+      "expected": "1.5 2.25 + .",
+      "generated": "1.5 2.25 + .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_62",
+      "instruction": "Float multiply 0.5 * 8.0",
+      "expected": "0.5 8.0 * .",
+      "generated": "0.5 8.0 * .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_63",
+      "instruction": "Float divide 7.0 / 2.0",
+      "expected": "7.0 2.0 / .",
+      "generated": "7.0 2.0 / .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_64",
+      "instruction": "Average of [1 2 3 4 5] as float",
+      "expected": "5 range-to _ len ` 0.0 { + } @fold ` / .",
+      "generated": "[1 2 3 4 5] _ len ` 0.0 { + } @fold ` / .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_65",
+      "instruction": "Square root of 144.0",
+      "expected": "144.0 fsqrt .",
+      "generated": "144.0 fsqrt .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_66",
+      "instruction": "Floor of 3.9",
+      "expected": "3.9 floor .",
+      "generated": "3.9 floor .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_67",
+      "instruction": "Compare floats 0.1+0.2 vs 0.3",
+      "expected": "0.1 0.2 + 0.3 = .",
+      "generated": "0.1 0.2 + 0.3 = .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_68",
+      "instruction": "Bitwise AND 60 and 13",
+      "expected": "60 13 bitand .",
+      "generated": "60 13 and .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_69",
+      "instruction": "Bitwise OR 60 and 13",
+      "expected": "60 13 bitor .",
+      "generated": "60 13 or .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_70",
+      "instruction": "Bitwise XOR 60 and 13",
+      "expected": "60 13 bitxor .",
+      "generated": "60 13 bitxor .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_71",
+      "instruction": "Shift 3 left 5",
+      "expected": "3 5 shl .",
+      "generated": "3 5 lshift .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_72",
+      "instruction": "Shift 200 right 3",
+      "expected": "200 3 shr .",
+      "generated": "200 3 >> .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_73",
+      "instruction": "Bitwise NOT of 0",
+      "expected": "0 bitnot .",
+      "generated": "0 bitnot .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_74",
+      "instruction": "Fibonacci of 11",
+      "expected": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n11 fib .",
+      "generated": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n11 fib .",
+      "exact_match": true,
+      "syntax_valid": false
+    },
+    {
+      "task": "task_75",
+      "instruction": "Fibonacci of 7",
+      "expected": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n7 fib .",
+      "generated": ": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ;\n7 fib .",
+      "exact_match": true,
+      "syntax_valid": false
+    },
+    {
+      "task": "task_76",
+      "instruction": "Factorial of 9",
+      "expected": ": fact { _ 0 = ?? drop 1 | _ 1 - fact * ] } ;\n9 fact .",
+      "generated": ": fact { _ 0 = ?? drop 1 | _ 1 - fact * ] } ;\n9 fact .",
+      "exact_match": true,
+      "syntax_valid": false
+    },
+    {
+      "task": "task_77",
+      "instruction": "Factorial of 4",
+      "expected": ": fact { _ 0 = ?? drop 1 | _ 1 - fact * ] } ;\n4 fact .",
+      "generated": ": fact { _ 0 = ?? drop 1 | _ 1 - fact * ] } ;\n4 fact .",
+      "exact_match": true,
+      "syntax_valid": false
+    },
+    {
+      "task": "task_78",
+      "instruction": "3 to the 5th",
+      "expected": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n3 5 pow .",
+      "generated": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n3 5 pow .",
+      "exact_match": true,
+      "syntax_valid": false
+    },
+    {
+      "task": "task_79",
+      "instruction": "11 to the 3rd",
+      "expected": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n11 3 pow .",
+      "generated": ": pow3 { _ _ * * } ;\n11 pow3 .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_80",
+      "instruction": "Any base to power: 2 20",
+      "expected": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n2 20 pow .",
+      "generated": "2 20 pow .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_81",
+      "instruction": "5 to the 0",
+      "expected": ": pow { _ 0 = ?? drop drop 1 | over swap 1 - pow * ] } ;\n5 0 pow .",
+      "generated": "5 0 pow .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_82",
+      "instruction": "KV roundtrip for a user name",
+      "expected": "\"user\" \"ada\" kv-set \"user\" kv-get .",
+      "generated": "\"alice\" kv-set \"alice\" kv-get .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_83",
+      "instruction": "KV delete then check",
+      "expected": "\"tmp\" \"x\" kv-set \"tmp\" kv-del \"tmp\" kv-get strlen .",
+      "generated": "\"k\" \"v\" kv-set \"k\" kv-del \"k\" kv-get strlen 0 = .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_84",
+      "instruction": "KV keys count after 3 sets",
+      "expected": "\"q1\" \"1\" kv-set \"q2\" \"2\" kv-set \"q3\" \"3\" kv-set kv-keys len .",
+      "generated": ": kv-set { \"k\" swap \"v\" over strcat writekv } ;\n3 { 1 kv-set } @times \"k\" 3 strcat readkv drop 3 .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_85",
+      "instruction": "File roundtrip with content 'persisted'",
+      "expected": "\"ev_r.txt\" \"persisted\" write-file drop \"ev_r.txt\" read-file .",
+      "generated": "\"ft1.txt\" \"persisted\" wstr \"ft1.txt\" rstr .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_86",
+      "instruction": "File length of '1234567'",
+      "expected": "\"ev_l.txt\" \"1234567\" write-file drop \"ev_l.txt\" read-file strlen .",
+      "generated": "\"1234567\" strlen .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_87",
+      "instruction": "PATH env is nonempty",
+      "expected": "\"PATH\" getenv strlen 0 > .",
+      "generated": "import std/path\n\"test\" path-join \"test\" str= .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_88",
+      "instruction": "URL-decode 'x%20y%20z'",
+      "expected": "import \"std/net\"\n\"x%20y%20z\" url-decode .",
+      "generated": "import \"std/net\"\n\"x%20y%20z\" url-decode .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_89",
+      "instruction": "Extract path from 'POST /form?x=1 HTTP/1.0'",
+      "expected": "import \"std/net\"\n\"POST /form?x=1 HTTP/1.0\" req-path path-only .",
+      "generated": "\"POST /form?x=1 HTTP/1.0\" strsplit \" \" nth 0 strlen 3 - strslice .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_90",
+      "instruction": "Is 31 prime?",
+      "expected": ": prime { _ 2 < ?? drop #f | _ 1 - range-to { 1 > } @filter ` { over ` % 0 = ?? drop 0 | 0 max ] } @fold 0 > ] } ;\n31 prime .",
+      "generated": ": prime { _ 2 < ?? drop #f | _ 1 - range-to { 1 > } @filter ` { over ` % 0 = ?? drop 0 | 0 max ] } @fold 0 > ] } ;\n31 prime .",
+      "exact_match": true,
+      "syntax_valid": false
+    },
+    {
+      "task": "task_91",
+      "instruction": "Is 49 prime?",
+      "expected": ": prime { _ 2 < ?? drop #f | _ 1 - range-to { 1 > } @filter ` { over ` % 0 = ?? drop 0 | 0 max ] } @fold 0 > ] } ;\n49 prime .",
+      "generated": ": prime { _ 2 < ?? drop #f | _ 1 - range-to { 1 > } @filter ` { over ` % 0 = ?? drop 0 | 0 max ] } @fold 0 > ] } ;\n49 prime .",
+      "exact_match": true,
+      "syntax_valid": false
+    },
+    {
+      "task": "task_92",
+      "instruction": "Is 1996 a leap year?",
+      "expected": ": leap { _ 4 % 0 = over 100 % 0 != @ 400 % 0 = ` | & } ;\n1996 leap .",
+      "generated": ": leap { _ 4 % 0 = over 100 % 0 != * } ;\n1996 leap .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_93",
+      "instruction": "Is 2100 a leap year?",
+      "expected": ": leap { _ 4 % 0 = over 100 % 0 != @ 400 % 0 = ` | & } ;\n2100 leap .",
+      "generated": ": leap { over 4 % 0 = over 100 % 0 != * over 400 % 0 = + } ;\n2100 leap .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_94",
+      "instruction": "Is 1 prime?",
+      "expected": ": prime { _ 2 < ?? drop #f | _ 1 - range-to { 1 > } @filter ` { over ` % 0 = ?? drop 0 | 0 max ] } @fold 0 > ] } ;\n1 prime .",
+      "generated": "1 _ 2 < ?? drop #t | _ 2 range { _ 1 % 0 = } @fold ` 0 > & ] .",
+      "exact_match": false,
+      "syntax_valid": false
+    },
+    {
+      "task": "task_95",
+      "instruction": "Sum of squares of [1..4]",
+      "expected": "4 range-to { _ * } @map 0 { + } @fold .",
+      "generated": "[1 2 3 4] 0 { _ * + } @fold .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_96",
+      "instruction": "Count even numbers in [1..8]",
+      "expected": "8 range-to { 2 % 0 = } @filter len .",
+      "generated": "8 range-to 0 { _ 2 % 0 = } @filter len .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_97",
+      "instruction": "Concatenate three strings",
+      "expected": "\"x\" \"y\" strcat \"z\" strcat .",
+      "generated": "\"a\" \"b\" strcat \"c\" strcat .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "task_98",
+      "instruction": "Absolute value of -99",
+      "expected": "-99 _ 0 < ?? -1 * | ] .",
+      "generated": "-99 _ 0 < ?? 0 swap - ] .",
+      "exact_match": false,
+      "syntax_valid": false
+    },
+    {
+      "task": "task_99",
+      "instruction": "Modulo chain: (100 % 7) % 3",
+      "expected": "100 7 % 3 % .",
+      "generated": "100 7 % 3 % .",
+      "exact_match": true,
+      "syntax_valid": true
+    }
+  ]
+}

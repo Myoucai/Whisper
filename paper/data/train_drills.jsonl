@@ -1,0 +1,39 @@
+{"instruction": "Copy the second value and multiply (4 7)", "input": "", "whisper": "4 7 over * .", "output": "28", "drill": true}
+{"instruction": "Copy the second value and add it (5 9)", "input": "", "whisper": "5 9 over + .", "output": "14", "drill": true}
+{"instruction": "Copy the second value and subtract top from copy (10 3)", "input": "", "whisper": "10 3 over - .", "output": "-7", "drill": true}
+{"instruction": "Duplicate the second element onto the top (2 8)", "input": "", "whisper": "2 8 over drop .", "output": "8", "drill": true}
+{"instruction": "Compute a*(a+b) for 3 4", "input": "", "whisper": "3 4 over ` + * .", "output": "21", "drill": true}
+{"instruction": "Copy second, then drop original top (6 6)", "input": "", "whisper": "6 6 over ` drop .", "output": "6", "drill": true}
+{"instruction": "Rotate three values and keep the deepest (1 2 3)", "input": "", "whisper": "1 2 3 @ drop drop .", "output": "2", "drill": true}
+{"instruction": "Rotate twice brings the bottom up (1 2 3)", "input": "", "whisper": "1 2 3 @ @ drop drop .", "output": "3", "drill": true}
+{"instruction": "Rotate then add all three (7 8 9)", "input": "", "whisper": "7 8 9 @ + + .", "output": "24", "drill": true}
+{"instruction": "Rotate, swap, then subtract (10 20 30)", "input": "", "whisper": "10 20 30 @ ` - .", "output": "-20", "drill": true}
+{"instruction": "Sum after rotating (4 5 6)", "input": "", "whisper": "4 5 6 @ + + .", "output": "15", "drill": true}
+{"instruction": "Pick the third stack element (11 22 33)", "input": "", "whisper": "11 22 33 $2 drop drop .", "output": "22", "drill": true}
+{"instruction": "Pick the second element (11 22)", "input": "", "whisper": "11 22 $1 drop .", "output": "22", "drill": true}
+{"instruction": "Copy deep element and multiply (1 2 3 4)", "input": "", "whisper": "1 2 3 4 $3 drop drop drop + .", "output": "3", "drill": true}
+{"instruction": "Square via dup (6)", "input": "", "whisper": "6 _ * .", "output": "36", "drill": true}
+{"instruction": "Cube via double dup (2)", "input": "", "whisper": "2 _ _ * * .", "output": "8", "drill": true}
+{"instruction": "a+a*a via dup chain (3)", "input": "", "whisper": "3 _ _ * + .", "output": "12", "drill": true}
+{"instruction": "Compute 2a^2 leaving nothing extra (5)", "input": "", "whisper": "5 _ _ drop * .", "output": "25", "drill": true}
+{"instruction": "Sum of three dups (4)", "input": "", "whisper": "4 _ _ + + .", "output": "12", "drill": true}
+{"instruction": "Is 5 positive? (prints pos/neg)", "input": "", "whisper": "5 0 > ?? \"pos\" . | \"neg\" . ]", "output": "\"pos\"", "drill": true}
+{"instruction": "Is -9 positive? (prints pos/neg)", "input": "", "whisper": "-9 0 > ?? \"pos\" . | \"neg\" . ]", "output": "\"neg\"", "drill": true}
+{"instruction": "Is 12 even? (prints even/odd)", "input": "", "whisper": "12 2 % 0 = ?? \"even\" . | \"odd\" . ]", "output": "\"even\"", "drill": true}
+{"instruction": "Is 7 even? (prints even/odd)", "input": "", "whisper": "7 2 % 0 = ?? \"even\" . | \"odd\" . ]", "output": "\"odd\"", "drill": true}
+{"instruction": "Adult check age 21 (adult/minor)", "input": "", "whisper": "21 18 >= ?? \"adult\" . | \"minor\" . ]", "output": "\"adult\"", "drill": true}
+{"instruction": "Adult check age 15 (adult/minor)", "input": "", "whisper": "15 18 >= ?? \"adult\" . | \"minor\" . ]", "output": "\"minor\"", "drill": true}
+{"instruction": "Compare 3 and 8 (smaller/bigger first)", "input": "", "whisper": "3 8 < ?? \"a<b\" . | \"a>=b\" . ]", "output": "\"a<b\"", "drill": true}
+{"instruction": "Zero test (zero/nonzero)", "input": "", "whisper": "0 0 = ?? \"zero\" . | \"nonzero\" . ]", "output": "\"zero\"", "drill": true}
+{"instruction": "Passing grade test 85 (pass/fail)", "input": "", "whisper": "85 60 >= ?? \"pass\" . | \"fail\" . ]", "output": "\"pass\"", "drill": true}
+{"instruction": "Failing grade test 42 (pass/fail)", "input": "", "whisper": "42 60 >= ?? \"pass\" . | \"fail\" . ]", "output": "\"fail\"", "drill": true}
+{"instruction": "Max of 6 2 via ?? ", "input": "", "whisper": "6 2 over over < ?? ` drop | drop ] .", "output": "6", "drill": true}
+{"instruction": "Min of 6 2 via ??", "input": "", "whisper": "6 2 over over < ?? drop | ` drop ] .", "output": "2", "drill": true}
+{"instruction": "Absolute value of -8", "input": "", "whisper": "-8 _ 0 < ?? -1 * | ] .", "output": "8", "drill": true}
+{"instruction": "Absolute value of 8", "input": "", "whisper": "8 _ 0 < ?? -1 * | ] .", "output": "8", "drill": true}
+{"instruction": "Swap then subtract (9 4 → 4-9)", "input": "", "whisper": "9 4 ` - .", "output": "-5", "drill": true}
+{"instruction": "Swap then divide (3 12 → 12/3)", "input": "", "whisper": "3 12 ` / .", "output": "4", "drill": true}
+{"instruction": "Swap then multiply (3 7)", "input": "", "whisper": "3 7 ` * .", "output": "21", "drill": true}
+{"instruction": "Swap drop keeps original first (8 2)", "input": "", "whisper": "8 2 ` drop .", "output": "2", "drill": true}
+{"instruction": "Drop the top (17 5)", "input": "", "whisper": "17 5 drop .", "output": "17", "drill": true}
+{"instruction": "Keep only the first (13 29)", "input": "", "whisper": "13 29 ` drop .", "output": "29", "drill": true}

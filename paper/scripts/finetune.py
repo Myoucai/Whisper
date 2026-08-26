@@ -85,6 +85,10 @@ def main():
     parser.add_argument("--lora-r", type=int, default=128, help="LoRA rank")
     parser.add_argument("--lora-alpha", type=int, default=256, help="LoRA alpha")
     parser.add_argument("--max-seq-len", type=int, default=2048, help="Max sequence length")
+    parser.add_argument("--lora-scope", default="attn", choices=["attn", "all"],
+                        help="attn: attention-only LoRA (MoE-safe, ~10x faster; "
+                             "expert FFNs untouched). all: also gate/up/down "
+                             "(dense models or big-VRAM rigs)")
     parser.add_argument("--quant", default="4bit", choices=["4bit", "8bit", "none"],
                         help="Quantization mode (4bit for 30B MoE on 48GB; "
                              "8bit only for <=14B dense)")
@@ -125,7 +129,10 @@ def main():
     model_kwargs = {
         "trust_remote_code": True,
         "torch_dtype": torch.bfloat16,
-        "device_map": "auto",
+        "device_map": {"": 0} if bnb_config else "auto",
+        # {"": 0}: pin everything to GPU 0 for QLoRA — accelerate's "auto"
+        # sizes the model at fp16 (61GB for 30B MoE) and would offload to
+        # CPU, which the bitsandbytes quantizer rejects outright.
         "local_files_only": True,   # pre-downloaded on AutoDL
     }
     if bnb_config:
@@ -137,13 +144,17 @@ def main():
         model = prepare_model_for_kbit_training(model)
 
     # LoRA config — target all linear layers for best quality
+    if args.lora_scope == "attn":
+        target_modules = ["q_proj", "k_proj", "v_proj", "o_proj"]
+    else:
+        target_modules = [
+            "q_proj", "k_proj", "v_proj", "o_proj",
+            "gate_proj", "up_proj", "down_proj",
+        ]
     lora_config = LoraConfig(
         r=args.lora_r,
         lora_alpha=args.lora_alpha,
-        target_modules=[
-            "q_proj", "k_proj", "v_proj", "o_proj",
-            "gate_proj", "up_proj", "down_proj",
-        ],
+        target_modules=target_modules,
         lora_dropout=0.05,
         bias="none",
         task_type="CAUSAL_LM",

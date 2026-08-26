@@ -24,7 +24,13 @@ def generate_code(model, tokenizer, instruction: str, input_data: str = "", max_
         user_msg = instruction
 
     messages = [
-        {"role": "system", "content": "You are a Whisper programming language expert. Whisper is an AI-native, stack-based, postfix language. Write only Whisper code unless asked otherwise."},
+        {"role": "system", "content": (
+            "You are a Whisper programming language expert. "
+            "Whisper is an AI-native, stack-based, postfix language. "
+            "Write only Whisper code unless asked otherwise. "
+            "Use minimal tokens: _ for dup, ` for swap, @ for rot, "
+            "?? for conditional, # for loop, : for definition."
+        )},
         {"role": "user", "content": user_msg},
     ]
 
@@ -81,19 +87,48 @@ def main():
 
     print(f"Loading model: {args.model}")
 
-    tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
-
-    # Try loading with quantization, fall back to full precision
-    try:
-        bnb_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16)
-        model = AutoModelForCausalLM.from_pretrained(
-            args.model, quantization_config=bnb_config,
-            device_map="auto", trust_remote_code=True, torch_dtype=torch.bfloat16
+    # PEFT LoRA adapter directory: adapter_config.json records the base
+    # model — load it 4-bit on GPU 0, then attach the adapter.
+    adapter_cfg = os.path.join(args.model, "adapter_config.json")
+    if os.path.exists(adapter_cfg):
+        import json as js
+        from peft import PeftModel
+        with open(adapter_cfg, encoding="utf-8") as f:
+            base_name = js.load(f).get("base_model_name_or_path")
+        print(f"LoRA adapter detected; base model: {base_name}")
+        bnb = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.bfloat16,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
         )
-    except Exception:
-        model = AutoModelForCausalLM.from_pretrained(
-            args.model, device_map="auto", trust_remote_code=True, torch_dtype=torch.bfloat16
+        base = AutoModelForCausalLM.from_pretrained(
+            base_name, quantization_config=bnb, device_map={"": 0},
+            trust_remote_code=True, torch_dtype=torch.bfloat16,
+            local_files_only=True,
         )
+        model = PeftModel.from_pretrained(base, args.model)
+        tokenizer = AutoTokenizer.from_pretrained(
+            base_name, trust_remote_code=True, local_files_only=True)
+        model.eval()
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(
+            args.model, trust_remote_code=True)
+        # Try loading with quantization, fall back to full precision
+        try:
+            bnb_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=torch.bfloat16)
+            model = AutoModelForCausalLM.from_pretrained(
+                args.model, quantization_config=bnb_config,
+                device_map="auto", trust_remote_code=True,
+                torch_dtype=torch.bfloat16,
+            )
+        except Exception:
+            model = AutoModelForCausalLM.from_pretrained(
+                args.model, device_map="auto", trust_remote_code=True,
+                torch_dtype=torch.bfloat16,
+            )
 
     # Load evaluation data
     eval_data = []
@@ -155,7 +190,6 @@ def main():
         "results": results,
     }
 
-    import os
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
     with open(args.output, "w", encoding="utf-8") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)

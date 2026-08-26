@@ -1,0 +1,130 @@
+{
+  "model": "/root/autodl-tmp/out/whisper-qwen30b-v4",
+  "tasks": 15,
+  "exact_match": 3,
+  "exact_match_pct": 20.0,
+  "syntax_valid": 14,
+  "syntax_valid_pct": 93.33333333333333,
+  "results": [
+    {
+      "task": "eval_01",
+      "instruction": "Calculate the sum of 1 to 20",
+      "expected": "[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20] 0 { + } @fold .",
+      "generated": "20 range-to 0 { + } @fold .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "eval_02",
+      "instruction": "Find the minimum of two numbers",
+      "expected": "3 7 _ _ ` < ?? | drop ] .",
+      "generated": ": min { over over < { drop } { swap drop } if } ;\n10 5 min .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "eval_03",
+      "instruction": "Check if a number is positive",
+      "expected": "5 0 > .",
+      "generated": "5 0 > .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "eval_04",
+      "instruction": "Calculate 2^16",
+      "expected": ": pow { _ 0 = ?? drop 1 | _ 1 - _ _ ` pow * ] } ;\n2 16 pow .",
+      "generated": ": pow { over swap 0 = { drop drop 1 } { dup pow dec 1 * } if } ;\n2 16 pow .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "eval_05",
+      "instruction": "Concatenate three strings",
+      "expected": "\"a\" \"b\" strcat \"c\" strcat .",
+      "generated": "\"one\" \"two\" strcat \"three\" strcat .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "eval_06",
+      "instruction": "Get the last element of a list",
+      "expected": "[10 20 30 40 50] _ len 1 - @nth .",
+      "generated": "[10 20 30 40 50] len 1 - @ .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "eval_07",
+      "instruction": "Calculate the average of a list",
+      "expected": "[2 4 6 8 10] _ 0 { + } @fold ` len / .",
+      "generated": "[2 4 6 8 10] dup len swap 0 { + } @ nip .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "eval_08",
+      "instruction": "Repeat a string n times",
+      "expected": ": repeat { _ 0 = ?? drop drop \"\" | _ 1 - _ _ ` repeat strcat ] } ;\n\"abc\" 3 repeat .",
+      "generated": "\"hi\" 4 repeat .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "eval_09",
+      "instruction": "Convert a list of digits to a number",
+      "expected": "[1 2 3] 0 { ` 10 * + } @fold .",
+      "generated": "[1 2 3] 0 { 10 * + } @fold .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "eval_10",
+      "instruction": "Check if a string contains a substring",
+      "expected": "\"hello world\" \"lo\" strfind 0 >= .",
+      "generated": "\"hello world\" \"lo\" strfind 0 >= .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "eval_11",
+      "instruction": "Calculate the product of all elements in a list",
+      "expected": "[2 3 4 5] 1 { * } @fold .",
+      "generated": "[2 3 4 5] 1 { * } @fold .",
+      "exact_match": true,
+      "syntax_valid": true
+    },
+    {
+      "task": "eval_12",
+      "instruction": "Remove the first element from a list",
+      "expected": "[1 2 3 4 5] _ len 1 - 1 strslice .",
+      "generated": "[1 2 3 4 5] 1 drop .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "eval_13",
+      "instruction": "Calculate the distance between two points",
+      "expected": ": dist { @ - _ * ` @ - _ * + fsqrt } ;\n0 0 3 4 dist .",
+      "generated": ": dist { - dup * swap - dup * + fsqrt } ;\n0 0 3 4 dist .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "eval_14",
+      "instruction": "Generate a list of squares from 1 to 10",
+      "expected": "[1 2 3 4 5 6 7 8 9 10] { _ * } @map .",
+      "generated": "10 { dup * } range .",
+      "exact_match": false,
+      "syntax_valid": true
+    },
+    {
+      "task": "eval_15",
+      "instruction": "Check if a number is prime",
+      "expected": ": prime? { _ 2 < ?? drop #f | _ 2 = ?? drop #t | _ 2 % 0 = ?? drop #f | 3 { _ _ * _ _ ` >= } { _ _ _ ` % 0 = ?? drop drop #f | 2 + ] } # drop #t ] ] } ;\n17 prime? .",
+      "generated": ": prime? { dup 2 < [ drop false ] when dup 1 > [ 2 swap 3 upto { over % 0 = [ drop 0 ] when ] fold 0 = ] [ drop 0 ] then ] drop } ;\n17 prime? .",
+      "exact_match": false,
+      "syntax_valid": false
+    }
+  ]
+}
