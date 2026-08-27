@@ -102,11 +102,11 @@ pub fn call(fnptr: i64, fmt: &str, args: &[FArg]) -> Result<i64, String> {
         .collect();
     let _ = buffers;
 
-    let mut ai: [u64; 8] = [0; 8];
+    let mut ai: [u64; 12] = [0; 12];
     let mut ad: [f64; 8] = [0.0; 8];
     for (i, (t, a)) in argt.iter().zip(args.iter()).enumerate() {
-        if i >= 8 {
-            return Err("ffi-call: max 8 args in v1.0.8".into());
+        if i >= 12 {
+            return Err("ffi-call: max 12 args in v1.0.8b".into());
         }
         match (*t, a) {
             (b'i', FArg::I(v)) => ai[i] = *v as u64,
@@ -121,9 +121,27 @@ pub fn call(fnptr: i64, fmt: &str, args: &[FArg]) -> Result<i64, String> {
     // the dependency-free way to hit them.
     macro_rules! dispatch {
         ($n:expr) => {{
-            type FnN = unsafe extern "C" fn(u64, u64, u64, u64, u64, u64, u64, u64) -> u64;
+            type FnN = unsafe extern "C" fn(
+                u64,
+                u64,
+                u64,
+                u64,
+                u64,
+                u64,
+                u64,
+                u64,
+                u64,
+                u64,
+                u64,
+                u64,
+            ) -> u64;
             let f: FnN = unsafe { std::mem::transmute(fnptr as usize) };
-            let r = unsafe { f(ai[0], ai[1], ai[2], ai[3], ai[4], ai[5], ai[6], ai[7]) };
+            let r = unsafe {
+                f(
+                    ai[0], ai[1], ai[2], ai[3], ai[4], ai[5], ai[6], ai[7], ai[8], ai[9], ai[10],
+                    ai[11],
+                )
+            };
             match ret {
                 b'd' => Ok(f64::from_bits(r) as i64),
                 _ => Ok(r as i64),
