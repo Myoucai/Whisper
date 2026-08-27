@@ -25,7 +25,7 @@ import "std/ffi"
     "ippiiiiiii" rot ffi-call drop                 // rc+残留
     "W" kv-get strtoi64 "H" kv-get strtoi64 * 3 *
     buf->str "pix" ` kv-set
-    // 句柄/缓冲随进程退出回收（脚本场景；长驻服务需补 destroy/free）
+    drop drop drop drop drop   // 清 [h,wb,hb,fb,sb]（db 已被 buf->str 消费）
 } ;
 
 // rawRGB W H q → jpeg 串（[pix,W,H,q]）
@@ -35,19 +35,17 @@ import "std/ffi"
     TJ "tjInitCompress" ffi-fn [] "i" rot ffi-call      // [h]
     8 buf-alloc 8 buf-alloc                              // [h,ob,zb]
     TJ "tjCompress2" ffi-fn
-    [] $5 append "pix" kv-get append
-       "W" kv-get strtoi64 append "W" kv-get strtoi64 append
+    [] $4 append "pix" kv-get append
+       "W" kv-get strtoi64 append 0 append
        "H" kv-get strtoi64 append 0 append
        $3 append $2 append 0 append
        "q" kv-get strtoi64 append 0 append
-    "ippiippiiii" rot ffi-call drop
-    // ob 槽=输出缓冲指针（$2），zb 槽=长度（$1）→ buf->str（长度在下）
-    $1 buf-peek
-    $2 buf-peek
-    $1 buf-peek
-    $2 buf-peek
+    "ippiiiippiii" rot ffi-call drop
+    // [h,ob,zb]：zb顶=size槽 ob次=缓冲槽
+    dup buf-peek          // size（zb 槽内容）
+    $2 buf-peek          // ob 槽内容 = turbojpeg 分配的缓冲指针（二次解引用）
     ` buf->str
-    // 泄漏同上
+    ` drop ` drop ` drop  // [h,ob,zb,jpeg]→[jpeg]（三次换删）
 } ;
 export TJ
 export jpeg-decode
