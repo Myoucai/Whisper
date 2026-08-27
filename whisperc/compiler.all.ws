@@ -420,6 +420,8 @@ export group-paired-rec
     [12 "pack"] [13 "unpack"]
     [205 "range"]
     [150 "ffi-open"] [151 "ffi-sym"] [152 "ffi-call"]
+    [86 "?->"]
+    [153 "buf-alloc"] [154 "buf-free"] [155 "buf-peek"] [156 "buf-poke"] [157 "buf->str"]
     [194 "map-new"] [195 "map-get"] [196 "map-set"]
     [197 "map-del"] [198 "map-keys"] [199 "map-has"]
     [208 "now"] [209 "sleep"] [210 "random"] [211 "randint"]
@@ -1133,6 +1135,16 @@ export classify-full
     dup 151 = ?? drop "{ const char*_n=(const char*)w_pop(); int64_t _h=(int64_t)w_pop(); w_push((wval)w_ffi_sym(_h,_n)); }
 " return ]
     dup 152 = ?? drop "{ int64_t _f=(int64_t)w_pop(); const char*_fmt=(const char*)w_pop(); wval*_a=(wval*)w_pop(); w_push((wval)w_ffi_call(_f,_fmt,_a)); }
+" return ]
+    dup 153 = ?? drop "{ int64_t _n=(int64_t)w_pop(); w_push((wval)(int64_t)calloc((size_t)(_n>0?_n:1),1)); }
+" return ]
+    dup 154 = ?? drop "{ free((void*)(int64_t)w_pop()); }
+" return ]
+    dup 155 = ?? drop "{ uint64_t _v=0; memcpy(&_v,(const void*)(int64_t)w_pop(),8); w_push((wval)(int64_t)_v); }
+" return ]
+    dup 156 = ?? drop "{ uint64_t _v=(uint64_t)w_pop(); memcpy((void*)(int64_t)w_pop(),&_v,8); }
+" return ]
+    dup 157 = ?? drop "{ int64_t _l=(int64_t)w_pop(); const char*_p=(const char*)(int64_t)w_pop(); w_push((wval)w_str_new(_p,(uint32_t)(_l>0?_l:0))); }
 " return ]
     drop "// unknown bare opcode\n"
 } ;

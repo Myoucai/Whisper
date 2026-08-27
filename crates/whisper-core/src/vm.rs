@@ -529,6 +529,39 @@ impl Vm {
                     .collect();
                 self.data_stack.push(Value::List(Rc::new(keys)));
             }
+            Opcode::BufAlloc => {
+                let n = self.pop_i64()?.max(0) as usize;
+                let buf = vec![0u8; n].into_boxed_slice();
+                let ptr = Box::into_raw(buf) as *mut u8 as i64;
+                self.data_stack.push(Value::I64(ptr));
+            }
+            Opcode::BufFree => {
+                let ptr = self.pop_i64()? as *mut u8;
+                if !ptr.is_null() {
+                    unsafe { drop(Vec::from_raw_parts(ptr, 0, 0)) };
+                }
+            }
+            Opcode::BufPeek => {
+                let ptr = self.pop_i64()? as *const u8;
+                let mut v = [0u8; 8];
+                unsafe { std::ptr::copy_nonoverlapping(ptr, v.as_mut_ptr(), 8) };
+                self.data_stack
+                    .push(Value::I64(u64::from_le_bytes(v) as i64));
+            }
+            Opcode::BufPoke => {
+                let val = self.pop_i64()? as u64;
+                let ptr = self.pop_i64()? as *mut u8;
+                unsafe { std::ptr::copy_nonoverlapping(val.to_le_bytes().as_ptr(), ptr, 8) };
+            }
+            Opcode::BufToStr => {
+                let len = self.pop_i64()?.max(0) as usize;
+                let ptr = self.pop_i64()? as *const u8;
+                let mut v = vec![0u8; len];
+                unsafe { std::ptr::copy_nonoverlapping(ptr, v.as_mut_ptr(), len) };
+                // byte semantics: binary payload survives as raw bytes
+                let s = unsafe { String::from_utf8_unchecked(v) };
+                self.data_stack.push(Value::Str(Rc::new(s)));
+            }
             Opcode::FfiOpen => {
                 let path = self.pop_str()?;
                 let h = crate::ffi::open(path.as_ref());
@@ -555,14 +588,24 @@ impl Vm {
                         })
                     }
                 };
+                // map by FMT char: 'p' accepts raw pointers (i64) and
+                // strings (byte-data pointer) alike — buffers come in
+                // as buf-alloc integer addresses
+                let fbytes = fmt.as_bytes();
                 let fargs: Vec<crate::ffi::FArg> = args_list
                     .iter()
-                    .map(|v| match v {
-                        Value::I64(n) => Ok(crate::ffi::FArg::I(*n)),
-                        Value::F64(x) => Ok(crate::ffi::FArg::D(*x)),
-                        Value::Str(s) => Ok(crate::ffi::FArg::P(s.as_ptr() as usize)),
-                        other => Err(VmError::TypeMismatch {
-                            expected: "i64|str".into(),
+                    .enumerate()
+                    .map(|(i, v)| match (fbytes.get(i + 1), v) {
+                        (Some(b'p'), Value::Str(s)) => Ok(crate::ffi::FArg::P(s.as_ptr() as usize)),
+                        (Some(b'p'), Value::I64(n)) => Ok(crate::ffi::FArg::P(*n as usize)),
+                        (_, Value::I64(n)) => Ok(crate::ffi::FArg::I(*n)),
+                        (_, Value::F64(x)) => Ok(crate::ffi::FArg::D(*x)),
+                        (Some(b'p'), other) => Err(VmError::TypeMismatch {
+                            expected: "str|i64 ptr".into(),
+                            actual: other.type_name().into(),
+                        }),
+                        (_, other) => Err(VmError::TypeMismatch {
+                            expected: "i64|f64".into(),
                             actual: other.type_name().into(),
                         }),
                     })

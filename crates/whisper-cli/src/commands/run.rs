@@ -89,8 +89,12 @@ pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result
     let mut gen = BytecodeGenerator::new();
     let (bytecode, defs) = gen.compile(&ast);
 
-    // Phase 2b: Optimize bytecode
-    let bytecode = whisper_codegen::optimize(&bytecode);
+    // Phase 2b: Optimize bytecode (WHISPER_NO_OPT=1 skips — debugging aid)
+    let bytecode = if std::env::var("WHISPER_NO_OPT").is_ok() {
+        bytecode
+    } else {
+        whisper_codegen::optimize(&bytecode)
+    };
     let defs: Vec<_> = defs
         .into_iter()
         .map(|(k, v)| (k, whisper_codegen::optimize(&v)))

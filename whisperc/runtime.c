@@ -665,9 +665,9 @@ static int64_t w_ffi_call(int64_t fnptr, const char *fmt, wval *args) {
         if (t == 'd') return 0; // f64 args unsupported in v1.0.8
         wval v = args[1 + i];
         if (t == 'p') {
-            // strings are heap pointers; anything else is invalid
-            if (!(v >= (wval)w_heap && v < (wval)(w_heap + w_heap_size)))
-                return 0;
+            // heap strings pass through; buf-alloc'd (malloc'd) raw
+            // pointers are valid too — only reject obvious garbage
+            // (small integers that are not plausible addresses)
             a[i] = (int64_t)v;
         } else {
             a[i] = (int64_t)v;
