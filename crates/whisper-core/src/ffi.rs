@@ -15,9 +15,9 @@
 //! Treat granting it like granting shell access.
 
 use std::ffi::CString;
-use std::os::raw::{c_char, c_void};
 #[cfg(not(windows))]
 use std::os::raw::c_int;
+use std::os::raw::{c_char, c_void};
 
 #[cfg(windows)]
 extern "system" {
@@ -28,7 +28,7 @@ extern "system" {
 extern "C" {
     fn dlopen(path: *const c_char, flags: c_int) -> *mut c_void;
     fn dlsym(handle: *mut c_void, name: *const c_char) -> *mut c_void;
-    }
+}
 #[cfg(not(windows))]
 const RTLD_NOW: c_int = 2;
 

@@ -476,8 +476,12 @@ impl Vm {
                 }
             }
             Opcode::ReadFile => {
+                // byte semantics (consistent with strlen/Ctos): binary
+                // files survive read-file; UTF-8 validation is NOT applied
                 let path = self.pop_str()?;
-                let content = std::fs::read_to_string(path.as_ref()).unwrap_or_default();
+                let content = std::fs::read(path.as_ref())
+                    .map(|b| unsafe { String::from_utf8_unchecked(b) })
+                    .unwrap_or_default();
                 self.data_stack.push(Value::Str(Rc::new(content)));
             }
             Opcode::WriteFile => {
@@ -940,10 +944,11 @@ impl Vm {
                 let len = len.max(0) as usize;
                 let end = (start + len).min(s.len());
                 let start = start.min(s.len());
-                if !s.is_char_boundary(start) || !s.is_char_boundary(end) {
-                    return Err(VmError::InvalidCharBoundary { start, end });
-                }
-                let substr: String = s[start..end].to_string();
+                // byte semantics (§3.5): slices index bytes; binary data
+                // (PNG headers etc.) slices cleanly. Char-boundary errors
+                // rejected binary files entirely before this change.
+                let substr: String =
+                    unsafe { String::from_utf8_unchecked(s.as_bytes()[start..end].to_vec()) };
                 self.data_stack.push(Value::Str(Rc::new(substr)));
             }
             Opcode::StrEq => {
@@ -983,10 +988,18 @@ impl Vm {
                 self.data_stack.push(Value::Str(Rc::new(n.to_string())));
             }
             Opcode::StrNth => {
-                let idx = self.pop_i64()? as usize;
+                // byte semantics (§3.5): index bytes, return the byte code;
+                // out of range → -1. chars().nth() panicked on binary data
+                // (non-char-boundary) — bytes survive every str op now.
+                let idx = self.pop_i64()?;
                 let s = self.pop_str()?;
-                let ch = s.chars().nth(idx).map(|c| c as i64).unwrap_or(-1);
-                self.data_stack.push(Value::I64(ch));
+                let b = s.as_bytes().get(idx as usize).copied().unwrap_or(u8::MAX);
+                self.data_stack
+                    .push(Value::I64(if idx < 0 || idx as usize >= s.len() {
+                        -1
+                    } else {
+                        b as i64
+                    }));
             }
             Opcode::StrChars => {
                 let s = self.pop_str()?;
@@ -1850,17 +1863,19 @@ mod tests {
     }
 
     #[test]
-    fn strslice_rejects_non_boundary() {
+    fn strslice_binary_semantics() {
+        // v1.0.8: slices are byte-semantic; slicing into a multibyte
+        // char's bytes yields raw bytes (binary files must survive).
         let mut vm = Vm::new();
-        let err = vm
-            .execute(&[
-                Opcode::PushStr(std::rc::Rc::new("héllo".to_string())),
-                Opcode::PushI64(2),
-                Opcode::PushI64(1),
-                Opcode::StrSlice,
-            ])
-            .unwrap_err();
-        assert!(matches!(err, VmError::InvalidCharBoundary { .. }));
+        let mut prog = vec![Opcode::PushStr(std::rc::Rc::new("h\u{e9}llo".to_string()))];
+        prog.push(Opcode::PushI64(1));
+        prog.push(Opcode::PushI64(1));
+        prog.push(Opcode::StrSlice);
+        let out = vm.execute(&prog).unwrap().unwrap();
+        match out {
+            Value::Str(s) => assert_eq!(s.len(), 1, "one byte out"),
+            other => panic!("{other:?}"),
+        }
     }
 
     use super::*;

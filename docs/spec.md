@@ -291,3 +291,28 @@ runtime.c，链接适配不涉编译器逻辑）。
 包管理（v1.0.8）：manifest 新增 `native: ["lib.png"]` 字段声明随包
 分发的二进制轮子；安装时与 .ws 源码同目录落盘，程序用相对路径
 `ffi-open` 加载。
+
+## 14. 词汇附录 v1.0.8b（字节语义补全）+ 轮子生态
+
+**字节语义漏洞修补**（png-size 轮子开发中暴露的四处不一致，均对齐
+§3.5"字符串字节语义"的既定合同）：
+
+| 词 | 修补前 | 修补后 |
+|----|--------|--------|
+| `read-file` | UTF-8 校验失败→空串（二进制文件不可读） | 字节直读（`from_utf8_unchecked`），坏 UTF-8 存活 |
+| `strnth` | `chars().nth()`——二进制上 panic | 字节下标，越界 -1 |
+| `strslice` | char boundary 校验拒绝二进制切片 | 字节切片 |
+| `.`/trace 打印 | 非法 UTF-8 panic | lossy 显示（数据不受影响） |
+
+**std/ffi 胶水习语模块**：
+- `ffi-fn`（libname symname → fnptr）、`ffi-arg1/2/3`（运行时参数表
+  构建——列表字面量是编译期常量，`$N` 会被折叠，参数表必须运行时建）
+- `ffi-go`（fnptr args fmt → result，标准收尾）
+- 三坑文档化：编译期折叠/ffi-call 弹序（fnptr 在顶）/export 过滤
+
+**轮子生态首例**（apps/wheels/png-size）：
+- `be32-of`（s off → 大端 i64，字节切片反转 + unpack 实现）
+- `png-size`（path → "WxH"）——纯 Whisper 零依赖解析 PNG IHDR
+- 验收：自制 8×5 PNG + 系统 WLive48x48.png，与 Python 基线逐位一致，
+  双链（VM + c2）一致
+- package.ws 声明包元数据

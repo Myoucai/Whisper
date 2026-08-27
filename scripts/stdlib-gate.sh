@@ -67,6 +67,8 @@ t fix-strjoin  '"-" ["a" "b" "c"] strjoin .' 'a-b-c'
 t fix-strjoin2 '", " ["x" "y"] strjoin .' 'x, y'
 t p8-ffi-crc32 '"zlib1.dll" ffi-open dup "crc32" ffi-sym ` drop [0 "123456789" 9] "iipi" rot ffi-call .' 3421780262
 t p8-ffi-sym-zero '0 "x" ffi-sym 0 = .' 1
+t whl-png-size 'import "D:/Whisper/apps/wheels/png-size/pngsize" "D:/Whisper/apps/wheels/png-size/test.png" png-size .' 8x5
+t whl-be32    'import "D:/Whisper/apps/wheels/png-size/pngsize" "abcdefgh" 1 be32-of .' 1650680933
 t p0-upper     '"Hello" str-upper .' HELLO
 t p0-lower     '"aBc" str-lower .' abc
 t p0-strip     '"  pad  " str-strip .' pad

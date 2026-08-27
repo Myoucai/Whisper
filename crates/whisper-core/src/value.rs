@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use crate::opcode::Opcode;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Value {
     /// 64-bit signed integer (default integer type)
     I64(i64),
@@ -102,7 +102,9 @@ impl std::fmt::Display for Value {
             Value::I64(n) => write!(f, "{n}"),
             Value::F64(n) => write!(f, "{n}"),
             Value::Bool(b) => write!(f, "{}", if *b { "#t" } else { "#f" }),
-            Value::Str(s) => write!(f, "\"{s}\""),
+            // lossy: Str may hold raw bytes (read-file is byte-semantic);
+            // Display must not panic on invalid UTF-8
+            Value::Str(s) => write!(f, "\"{}\"", String::from_utf8_lossy(s.as_bytes())),
             Value::List(items) => {
                 write!(f, "[")?;
                 for (i, item) in items.iter().enumerate() {
@@ -127,5 +129,13 @@ impl std::fmt::Display for Value {
                 write!(f, "}}")
             }
         }
+    }
+}
+
+/// Debug delegates to the lossy Display: trace/debug printing must
+/// survive byte-semantic strings (raw binary from read-file).
+impl std::fmt::Debug for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
     }
 }
