@@ -14,5 +14,5 @@ TJ "tjDecompress2" ffi-fn
 [] $7 append "j" kv-get append "j" kv-get strlen append $2 append "W" kv-get strtoi64 append 0 append "H" kv-get strtoi64 append 0 append 0 append
 "ippiiiiiii" rot ffi-call
 "rc=" . .
-$1 buf-peek 255 bitand .
-$1 buf-peek 65280 bitand 8 shr .
+dup buf-peek 255 bitand .
+drop

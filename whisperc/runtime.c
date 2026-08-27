@@ -649,8 +649,9 @@ static void *w_ffi_sym(int64_t handle, const char *name) {
 // d=f64 [rejected], v=void). Max 8 args. The 8-register generic shim
 // matches both win-x64 and SysV for integer/pointer args.
 static int64_t w_ffi_call(int64_t fnptr, const char *fmt, wval *args) {
-    typedef int64_t (*fn8)(int64_t, int64_t, int64_t, int64_t,
-                           int64_t, int64_t, int64_t, int64_t);
+    typedef int64_t (*fn8)(int64_t, int64_t, int64_t, int64_t, int64_t,
+                           int64_t, int64_t, int64_t, int64_t, int64_t,
+                           int64_t, int64_t);
     if (!fnptr) return 0;
     size_t fl = w_str_len(fmt);
     if (fl == 0) return 0;
@@ -658,8 +659,8 @@ static int64_t w_ffi_call(int64_t fnptr, const char *fmt, wval *args) {
     size_t na = fl - 1;
     int64_t n = (int64_t)args[0];
     if ((size_t)n != na) return 0; // arity mismatch: silent 0 (sentinel)
-    if (na > 8) return 0;
-    int64_t a[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    if (na > 12) return 0;
+    int64_t a[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     for (int64_t i = 0; i < (int64_t)na; i++) {
         char t = at[i];
         if (t == 'd') return 0; // f64 args unsupported in v1.0.8
@@ -676,7 +677,8 @@ static int64_t w_ffi_call(int64_t fnptr, const char *fmt, wval *args) {
     fn8 f = (fn8)fnptr;
     // void return: the callee leaves rax undefined; treating it as i64
     // matches the VM (which returns the register's bits too).
-    return f(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
+    return f(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7],
+             a[8], a[9], a[10], a[11]);
 }
 
 // ── P2 vocabulary (v1.0.6): struct pack/unpack, little-endian ───────

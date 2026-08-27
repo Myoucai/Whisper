@@ -22,7 +22,7 @@ import "std/ffi"
     [] $7 append "j" kv-get append "j" kv-get strlen append
        $2 append "W" kv-get strtoi64 append 0 append
        "H" kv-get strtoi64 append 0 append 0 append
-    "ippiiiiiii" rot ffi-call drop drop                 // rc+残留
+    "ippiiiiiii" rot ffi-call drop                 // rc+残留
     "W" kv-get strtoi64 "H" kv-get strtoi64 * 3 *
     buf->str "pix" ` kv-set
     // 句柄/缓冲随进程退出回收（脚本场景；长驻服务需补 destroy/free）
@@ -40,7 +40,7 @@ import "std/ffi"
        "H" kv-get strtoi64 append 0 append
        $3 append $2 append 0 append
        "q" kv-get strtoi64 append 0 append
-    "ippiippiiii" rot ffi-call drop drop
+    "ippiippiiii" rot ffi-call drop
     // ob 槽=输出缓冲指针（$2），zb 槽=长度（$1）→ buf->str（长度在下）
     $1 buf-peek
     $2 buf-peek
