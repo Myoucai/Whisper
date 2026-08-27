@@ -740,6 +740,26 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::FfiCall)))
             }
+            TokenKind::BufAlloc => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::BufAlloc)))
+            }
+            TokenKind::BufFree => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::BufFree)))
+            }
+            TokenKind::BufPeek => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::BufPeek)))
+            }
+            TokenKind::BufPoke => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::BufPoke)))
+            }
+            TokenKind::BufToStr => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::BufToStr)))
+            }
             TokenKind::BytesNew => {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::BytesNew)))

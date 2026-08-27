@@ -127,6 +127,11 @@ pub enum Operator {
     FfiOpen,
     FfiSym,
     FfiCall,
+    BufAlloc,
+    BufFree,
+    BufPeek,
+    BufPoke,
+    BufToStr,
 
     // Arithmetic
     Add,

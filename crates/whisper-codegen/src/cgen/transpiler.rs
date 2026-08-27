@@ -627,6 +627,24 @@ fn transpile_opcodes(
                     "{{ wfn _f=(wfn)w_pop(); int64_t _p=(int64_t)w_pop(); w_serve_concurrent(_p,_f); }}"
                 );
             }
+            Opcode::BufAlloc => {
+                let _ = writeln!(out, "{{ int64_t _n=(int64_t)w_pop(); w_push((wval)(int64_t)calloc((size_t)(_n>0?_n:1),1)); }}");
+            }
+            Opcode::BufFree => {
+                let _ = writeln!(out, "{{ free((void*)(int64_t)w_pop()); }}");
+            }
+            Opcode::BufPeek => {
+                let _ = writeln!(out, "{{ uint64_t _v=0; memcpy(&_v,(const void*)(int64_t)w_pop(),8); w_push((wval)(int64_t)_v); }}");
+            }
+            Opcode::BufPoke => {
+                let _ = writeln!(
+                    out,
+                    "{{ uint64_t _v=(uint64_t)w_pop(); memcpy((void*)(int64_t)w_pop(),&_v,8); }}"
+                );
+            }
+            Opcode::BufToStr => {
+                let _ = writeln!(out, "{{ int64_t _l=(int64_t)w_pop(); const char*_p=(const char*)(int64_t)w_pop(); w_push((wval)w_str_new(_p,(uint32_t)(_l>0?_l:0))); }}");
+            }
             Opcode::FfiOpen => {
                 let _ = writeln!(out, "{{ w_push((wval)w_ffi_open(w_pop())); }}");
             }

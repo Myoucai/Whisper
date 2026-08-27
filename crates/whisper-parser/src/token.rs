@@ -112,6 +112,11 @@ impl TokenKind {
             Self::FfiOpen => "ffi-open",
             Self::FfiSym => "ffi-sym",
             Self::FfiCall => "ffi-call",
+            Self::BufAlloc => "buf-alloc",
+            Self::BufFree => "buf-free",
+            Self::BufPeek => "buf-peek",
+            Self::BufPoke => "buf-poke",
+            Self::BufToStr => "buf->str",
             Self::MapNew => "map-new",
             Self::MapGet => "map-get",
             Self::MapSet => "map-set",
@@ -306,6 +311,11 @@ pub enum TokenKind {
     FfiOpen,
     FfiSym,
     FfiCall,
+    BufAlloc,
+    BufFree,
+    BufPeek,
+    BufPoke,
+    BufToStr,
 
     // Float operations
     I64ToF64,

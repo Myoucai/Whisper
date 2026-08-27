@@ -131,6 +131,16 @@ pub enum Opcode {
     FfiSym,
     /// [args] fmt fnptr -> result
     FfiCall,
+    /// n -> ptr (writable zeroed buffer, raw address as i64)
+    BufAlloc,
+    /// ptr -> (free)
+    BufFree,
+    /// ptr -> i64 (read 8 bytes LE at ptr)
+    BufPeek,
+    /// ptr val -> (write 8 bytes LE)
+    BufPoke,
+    /// ptr len -> str (copy len bytes from ptr)
+    BufToStr,
 
     // === Arithmetic (0x10-0x17) ===
     /// Addition: a b → (a+b)
@@ -419,6 +429,11 @@ impl Opcode {
             Opcode::FfiOpen => 150,
             Opcode::FfiSym => 151,
             Opcode::FfiCall => 152,
+            Opcode::BufAlloc => 153,
+            Opcode::BufFree => 154,
+            Opcode::BufPeek => 155,
+            Opcode::BufPoke => 156,
+            Opcode::BufToStr => 157,
             Opcode::ListCheck => 0xE4,
             Opcode::I64Check => 0xE5,
             Opcode::StrCheck => 0xE6,
@@ -629,6 +644,11 @@ impl Opcode {
             Opcode::FfiOpen => "ffi-open",
             Opcode::FfiSym => "ffi-sym",
             Opcode::FfiCall => "ffi-call",
+            Opcode::BufAlloc => "buf-alloc",
+            Opcode::BufFree => "buf-free",
+            Opcode::BufPeek => "buf-peek",
+            Opcode::BufPoke => "buf-poke",
+            Opcode::BufToStr => "buf->str",
             Opcode::Add => "add",
             Opcode::Sub => "sub",
             Opcode::Mul => "mul",
