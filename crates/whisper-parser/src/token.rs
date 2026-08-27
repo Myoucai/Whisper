@@ -108,6 +108,7 @@ impl TokenKind {
             Self::StrFindRe => "strfind-re",
             Self::Pack => "pack",
             Self::Unpack => "unpack",
+            Self::Range => "range",
             Self::MapNew => "map-new",
             Self::MapGet => "map-get",
             Self::MapSet => "map-set",
@@ -298,6 +299,7 @@ pub enum TokenKind {
     StrFindRe,
     Pack,
     Unpack,
+    Range,
 
     // Float operations
     I64ToF64,

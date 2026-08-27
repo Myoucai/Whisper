@@ -418,6 +418,7 @@ export group-paired-rec
     [200 "listdir"] [201 "mkdir"] [202 "file-exists"] [203 "strftime"] [254 "leave"]
     [233 "strmatch"] [204 "strfind-re"]
     [12 "pack"] [13 "unpack"]
+    [205 "range"]
     [194 "map-new"] [195 "map-get"] [196 "map-set"]
     [197 "map-del"] [198 "map-keys"] [199 "map-has"]
     [208 "now"] [209 "sleep"] [210 "random"] [211 "randint"]
@@ -1038,7 +1039,7 @@ export classify-full
     dup 185 = ?? drop "{wval*_l=(wval*)w_pop();w_push((wval)w_charsstr(_l));}\n" return ]
     dup 186 = ?? drop "{const char*_s=(const char*)w_pop();w_striter(_s);}\n" return ]
     dup 187 = ?? drop "{wval _e=w_pop();wval*_l=(wval*)w_pop();w_push((wval)(int64_t)w_listfind(_l,_e));}\n" return ]
-    dup 188 = ?? drop "{wval*_l=(wval*)w_pop();w_push((wval)w_strjoin(_l));}\n" return ]
+    dup 188 = ?? drop "{wval*_l=(wval*)w_pop(); const char*_s=(const char*)w_pop(); w_push((wval)w_strjoin(_l,_s));}\n" return ]
     dup 194 = ?? drop "w_push((wval)w_map_new());\n" return ]
     dup 195 = ?? drop "{const char*_k=(const char*)w_pop();wval*_m=(wval*)w_pop();w_push(w_map_get(_m,_k));}\n" return ]
     dup 196 = ?? drop "{wval _v=w_pop();const char*_k=(const char*)w_pop();wval*_m=(wval*)w_pop();w_push((wval)w_map_set(_m,_k,_v));}\n" return ]
@@ -1123,6 +1124,7 @@ export classify-full
 " return ]
     dup 13 = ?? drop "{ const char*_f=(const char*)w_pop(); const char*_b=(const char*)w_pop(); w_push((wval)w_unpack((wval)_f,(wval)_b)); }
 " return ]
+    dup 205 = ?? drop "{ int64_t _c=(int64_t)w_pop(); int64_t _s=(int64_t)w_pop(); wval*_l=w_list_new(_c); for(int64_t _i=0;_i<_c;_i++)_l[1+_i]=(wval)(_s+_i); w_push((wval)_l); }\n" return ]
     dup 204 = ?? drop "{ const char*_p=(const char*)w_pop(); const char*_s=(const char*)w_pop(); w_push((wval)w_strfind_re((wval)_s,(wval)_p)); }
 " return ]
     drop "// unknown bare opcode\n"

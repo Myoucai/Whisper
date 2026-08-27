@@ -456,6 +456,7 @@ impl Lexer {
             "strfind-re" => TokenKind::StrFindRe,
             "pack" => TokenKind::Pack,
             "unpack" => TokenKind::Unpack,
+            "range" => TokenKind::Range,
             "split-cond" => TokenKind::SplitCond,
             "list?" => TokenKind::ListCheck,
             "i64?" => TokenKind::I64Check,

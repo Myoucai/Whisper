@@ -525,6 +525,16 @@ impl Vm {
                     .collect();
                 self.data_stack.push(Value::List(Rc::new(keys)));
             }
+            Opcode::Range => {
+                let count = self.pop_i64()?;
+                let start = self.pop_i64()?;
+                let v: Vec<Value> = if count > 0 {
+                    (start..start + count).map(Value::I64).collect()
+                } else {
+                    Vec::new()
+                };
+                self.data_stack.push(Value::List(Rc::new(v)));
+            }
             Opcode::Pack => {
                 let fmt = self.pop_str()?;
                 let vals = self.pop_list()?;
@@ -984,14 +994,16 @@ impl Vm {
             }
             Opcode::StrJoin => {
                 let list = self.pop_list()?;
-                let result: String = list
+                let sep = self.pop_str()?;
+                let parts: Vec<String> = list
                     .iter()
                     .filter_map(|v| match v.unwrap_signal_ref() {
                         Value::Str(s) => Some(s.as_ref().clone()),
                         _ => None,
                     })
                     .collect();
-                self.data_stack.push(Value::Str(Rc::new(result)));
+                self.data_stack
+                    .push(Value::Str(Rc::new(parts.join(sep.as_ref()))));
             }
 
             // === Binary output ===

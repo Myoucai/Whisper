@@ -3,6 +3,7 @@
 //   j list            列出全部
 //   j search 关键词    检索
 import "std/str"
+import "std/math"
 
 : JFILE { "journal.txt" } ;
 
@@ -16,10 +17,31 @@ import "std/str"
 // 检索：q 走 KV（引语沙箱不可捕获栈，但可访问进程级 KV）
 : j-foreach {
     JFILE read-file "
-" strsplit
+" strsplit { dup strlen 0 > } @filter
     { dup "jq" kv-get strfind 0 >= ?? . | drop ] } @each
 } ;
 
+: j-tail {
+    j-args dup len 2 >= ?? 1 @nth | drop "5" ] "jq" ` kv-set
+    JFILE read-file "
+" strsplit { dup strlen 0 > } @filter
+    dup len "jq" kv-get strtoi64 - 0 max
+    "jq" kv-get strtoi64
+    list-slice
+    { dup strlen 0 > ?? . | drop ] } @each
+} ;
+: j-del {
+    j-args 1 @nth "jq" ` kv-set
+    "ji" "0" kv-set
+    "out" "" kv-set
+    JFILE read-file "
+" strsplit
+    { "ji" kv-get strtoi64 1 + i64tostr "ji" ` kv-set
+      "ji" kv-get strtoi64 "jq" kv-get strtoi64 - 0 = ?? drop
+      | "out" kv-get ` strcat 10 ctos strcat "out" ` kv-set ] } @each
+    "out" kv-get JFILE ` write-file drop
+    "deleted" .
+} ;
 : j-add {
     now "%Y-%m-%d %H:%M" strftime
     " | " strcat
@@ -37,5 +59,7 @@ j-args dup len 0 > ?? 0 @nth | drop "" ]
 dup "add" streq ?? drop j-add
 | dup "list" streq ?? drop j-list
 | dup "search" streq ?? drop j-search
-| drop "usage: j add text | j list | j search word" .
-] ] ]
+| dup "tail" streq ?? drop j-tail
+| dup "del" streq ?? drop j-del
+| drop "usage: j add text | j list | j tail [n] | j search word | j del N" .
+] ] ] ]

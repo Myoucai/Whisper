@@ -123,6 +123,7 @@ pub enum Operator {
     StrFindRe,
     Pack,
     Unpack,
+    Range,
 
     // Arithmetic
     Add,

@@ -505,13 +505,19 @@ static void w_striter(const char *s) {
     }
 }
 
-static char *w_strjoin(wval *list) {
+static char *w_strjoin(wval *list, const char *sep) {
     int64_t count = w_list_len(list);
+    uint32_t sl = w_str_len(sep);
     size_t total = 0;
-    for (int64_t i = 0; i < count; i++) total += w_str_len((const char *)list[1 + i]);
+    for (int64_t i = 0; i < count; i++)
+        total += w_str_len((const char *)list[1 + i]) + (i > 0 ? sl : 0);
     char *buf = (char *)w_alloc(total + 1);
     size_t pos = 0;
     for (int64_t i = 0; i < count; i++) {
+        if (i > 0) {
+            memcpy(buf + pos, sep, sl);
+            pos += sl;
+        }
         const char *s = (const char *)list[1 + i];
         uint32_t l = w_str_len(s);
         memcpy(buf + pos, s, l);

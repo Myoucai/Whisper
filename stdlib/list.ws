@@ -22,7 +22,7 @@
 : all?      { #t ` { & } @fold } ;
 : any?      { #f ` { | } @fold } ;
 : range     { _ 0 > ?? _ 1 - range _ append | [] ] } ;
-: range-to  { _ 0 > ?? _ 1 - range-to ` append | drop [] ] } ;
+: range-to  { 1 ` range } ;   // n -> [1..n]（range 内建预分配，替代递归 append 的 O(n²)）
 : filter    { @filter } ;
 export length
 export nth

@@ -121,6 +121,8 @@ pub enum Opcode {
     Pack,
     /// bytes fmt -> [values] | []
     Unpack,
+    /// start count -> [start..start+count-1] (pre-allocated)
+    Range,
 
     // === Arithmetic (0x10-0x17) ===
     /// Addition: a b → (a+b)
@@ -405,6 +407,7 @@ impl Opcode {
             Opcode::StrFindRe => 204,
             Opcode::Pack => 12,
             Opcode::Unpack => 13,
+            Opcode::Range => 205,
             Opcode::ListCheck => 0xE4,
             Opcode::I64Check => 0xE5,
             Opcode::StrCheck => 0xE6,
@@ -611,6 +614,7 @@ impl Opcode {
             Opcode::StrFindRe => "strfind-re",
             Opcode::Pack => "pack",
             Opcode::Unpack => "unpack",
+            Opcode::Range => "range",
             Opcode::Add => "add",
             Opcode::Sub => "sub",
             Opcode::Mul => "mul",

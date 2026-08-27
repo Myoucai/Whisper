@@ -724,6 +724,10 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::Unpack)))
             }
+            TokenKind::Range => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Range)))
+            }
             TokenKind::BytesNew => {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::BytesNew)))

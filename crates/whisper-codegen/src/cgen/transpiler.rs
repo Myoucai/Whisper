@@ -403,7 +403,7 @@ fn transpile_opcodes(
                 let _ = writeln!(out, "{{ const char *_s = (const char *)w_pop(); if (w_str_len(_s) == 0) {{ w_push((wval)-1LL); w_push((wval)w_str_new(\"\", 0)); }} else {{ w_push((wval)(int64_t)_s[0]); w_push((wval)w_str_new(_s+1, w_str_len(_s)-1)); }} }}");
             }
             Opcode::StrJoin => {
-                let _ = writeln!(out, "{{ wval *_list = (wval *)w_pop(); int64_t _count = w_list_len(_list); size_t _total = 0; for (int64_t _i = 0; _i < _count; _i++) _total += w_str_len((const char*)_list[1+_i]); char *_buf = w_alloc(_total); size_t _pos = 0; for (int64_t _i = 0; _i < _count; _i++) {{ const char *_s = (const char*)_list[1+_i]; uint32_t _l = w_str_len(_s); memcpy(_buf+_pos, _s, _l); _pos += _l; }} w_push((wval)w_str_new(_buf, _total)); }}");
+                let _ = writeln!(out, "{{ wval *_list = (wval *)w_pop(); const char *_sep = (const char *)w_pop(); w_push((wval)w_strjoin(_list, _sep)); }}");
             }
             Opcode::StrSplit => {
                 let _ = writeln!(out, "{{ const char *_d = (const char *)w_pop(); const char *_s = (const char *)w_pop(); w_push((wval)w_str_split(_s, _d)); }}");
@@ -625,6 +625,12 @@ fn transpile_opcodes(
                 let _ = writeln!(
                     out,
                     "{{ wfn _f=(wfn)w_pop(); int64_t _p=(int64_t)w_pop(); w_serve_concurrent(_p,_f); }}"
+                );
+            }
+            Opcode::Range => {
+                let _ = writeln!(
+                    out,
+                    "{{ int64_t _c=(int64_t)w_pop(); int64_t _s=(int64_t)w_pop(); wval*_l=w_list_new(_c); for(int64_t _i=0;_i<_c;_i++)_l[1+_i]=(wval)(_s+_i); w_push((wval)_l); }}"
                 );
             }
             Opcode::Pack => {

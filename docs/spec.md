@@ -251,3 +251,14 @@ C 链每 worker 独立 64MB 堆 + 512K 栈（`__thread`），已通过 10 路并
 **已记录差异**：VM 的 `unpack 'd'` 返回 F64 值；C 链返回位模式整数
 （该链 f64 的固有表示，见 §4 差异表）。
 一致性由 stdlib-gate 的 6 项 p2 断言强制（双链输出一致，f64 按位断言）。
+
+## 12. 词汇附录 v1.0.7（range 内建）+ strjoin 语义修复
+
+**`range`**（字节 205，v1.0.7）：`start count → [start..start+count-1]`。
+预分配构造（替代递归 append 的 O(n²)；10 万元素从 83s → 19ms）。
+`range-to` 改为薄封装：`n → [1..n]` 即 `1 ` range`。
+
+**`strjoin` 语义修复**（v1.0.7，破坏性）：原实现无视栈上的分隔符
+（实为纯拼接）。现固化为 `sep list strjoin → str`（sep 先入栈），
+双链一致。seed 的两处调用点做了机械签名同步（seed include
+runtime.c，链接适配不涉编译器逻辑）。

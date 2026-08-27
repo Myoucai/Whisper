@@ -34,9 +34,52 @@ static void W_first(void);
 static void W_last(void);
 static void W_rest(void);
 static void W_palindrome_(void);
+static void W_sq(void);
+static void W_cube(void);
+static void W_double(void);
+static void W_halve(void);
+static void W_inc(void);
+static void W_dec(void);
+static void W_neg(void);
+static void W_abs(void);
+static void W_max(void);
+static void W_min(void);
+static void W_clamp(void);
+static void W_even_(void);
+static void W_odd_(void);
+static void W_zero_(void);
+static void W_positive_(void);
+static void W_negative_(void);
+static void W_pow(void);
+static void W_factorial(void);
+static void W_fib(void);
+static void W_even(void);
+static void W_odd(void);
+static void W_lshift(void);
+static void W_rshift(void);
+static void W_sqrt(void);
+static void W_f2i(void);
+static void W_i2f(void);
+static void W_between_(void);
+static void W_pi(void);
+static void W_e(void);
+static void W_tau(void);
+static void W_inf(void);
+static void W_floor(void);
+static void W_ceil(void);
+static void W_round(void);
+static void W_log(void);
+static void W_exp(void);
+static void W_atan2(void);
+static void W_bitand(void);
+static void W_bitor(void);
+static void W_bitxor(void);
+static void W_bitnot(void);
 static void W_JFILE(void);
 static void W_j_args(void);
 static void W_j_foreach(void);
+static void W_j_tail(void);
+static void W_j_del(void);
 static void W_j_add(void);
 static void W_j_list(void);
 static void W_j_search(void);
@@ -74,9 +117,52 @@ if(!strcmp(n,"first")) return W_first;
 if(!strcmp(n,"last")) return W_last;
 if(!strcmp(n,"rest")) return W_rest;
 if(!strcmp(n,"palindrome_")) return W_palindrome_;
+if(!strcmp(n,"sq")) return W_sq;
+if(!strcmp(n,"cube")) return W_cube;
+if(!strcmp(n,"double")) return W_double;
+if(!strcmp(n,"halve")) return W_halve;
+if(!strcmp(n,"inc")) return W_inc;
+if(!strcmp(n,"dec")) return W_dec;
+if(!strcmp(n,"neg")) return W_neg;
+if(!strcmp(n,"abs")) return W_abs;
+if(!strcmp(n,"max")) return W_max;
+if(!strcmp(n,"min")) return W_min;
+if(!strcmp(n,"clamp")) return W_clamp;
+if(!strcmp(n,"even_")) return W_even_;
+if(!strcmp(n,"odd_")) return W_odd_;
+if(!strcmp(n,"zero_")) return W_zero_;
+if(!strcmp(n,"positive_")) return W_positive_;
+if(!strcmp(n,"negative_")) return W_negative_;
+if(!strcmp(n,"pow")) return W_pow;
+if(!strcmp(n,"factorial")) return W_factorial;
+if(!strcmp(n,"fib")) return W_fib;
+if(!strcmp(n,"even")) return W_even;
+if(!strcmp(n,"odd")) return W_odd;
+if(!strcmp(n,"lshift")) return W_lshift;
+if(!strcmp(n,"rshift")) return W_rshift;
+if(!strcmp(n,"sqrt")) return W_sqrt;
+if(!strcmp(n,"f2i")) return W_f2i;
+if(!strcmp(n,"i2f")) return W_i2f;
+if(!strcmp(n,"between_")) return W_between_;
+if(!strcmp(n,"pi")) return W_pi;
+if(!strcmp(n,"e")) return W_e;
+if(!strcmp(n,"tau")) return W_tau;
+if(!strcmp(n,"inf")) return W_inf;
+if(!strcmp(n,"floor")) return W_floor;
+if(!strcmp(n,"ceil")) return W_ceil;
+if(!strcmp(n,"round")) return W_round;
+if(!strcmp(n,"log")) return W_log;
+if(!strcmp(n,"exp")) return W_exp;
+if(!strcmp(n,"atan2")) return W_atan2;
+if(!strcmp(n,"bitand")) return W_bitand;
+if(!strcmp(n,"bitor")) return W_bitor;
+if(!strcmp(n,"bitxor")) return W_bitxor;
+if(!strcmp(n,"bitnot")) return W_bitnot;
 if(!strcmp(n,"JFILE")) return W_JFILE;
 if(!strcmp(n,"j_args")) return W_j_args;
 if(!strcmp(n,"j_foreach")) return W_j_foreach;
+if(!strcmp(n,"j_tail")) return W_j_tail;
+if(!strcmp(n,"j_del")) return W_j_del;
 if(!strcmp(n,"j_add")) return W_j_add;
 if(!strcmp(n,"j_list")) return W_j_list;
 if(!strcmp(n,"j_search")) return W_j_search;
@@ -281,7 +367,7 @@ L_15:
 }
 
 static void W_join(void) {
-{wval*_l=(wval*)w_pop();w_push((wval)w_strjoin(_l));}
+{wval*_l=(wval*)w_pop(); const char*_s=(const char*)w_pop(); w_push((wval)w_strjoin(_l,_s));}
 }
 
 static void W_chars(void) {
@@ -329,6 +415,292 @@ W_str_rev();
 {const char*_b=(const char*)w_pop();const char*_a=(const char*)w_pop();w_push((wval)w_str_eq(_a,_b));}
 }
 
+static void W_sq(void) {
+w_dup();
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a*(int64_t)_b));}
+}
+
+static void W_cube(void) {
+w_dup();
+W_sq();
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a*(int64_t)_b));}
+}
+
+static void W_double(void) {
+w_dup();
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a+(int64_t)_b));}
+}
+
+static void W_halve(void) {
+w_push((wval)(int64_t)2L);
+{wval _b=w_pop(),_a=w_pop();if(!(int64_t)_b)exit(1);w_push((wval)((int64_t)_a/(int64_t)_b));}
+}
+
+static void W_inc(void) {
+w_push((wval)(int64_t)1L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a+(int64_t)_b));}
+}
+
+static void W_dec(void) {
+w_push((wval)(int64_t)1L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a-(int64_t)_b));}
+}
+
+static void W_neg(void) {
+w_push((wval)(int64_t)0L);
+w_swap();
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a-(int64_t)_b));}
+}
+
+static void W_abs(void) {
+w_dup();
+w_push((wval)(int64_t)0L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a<(int64_t)_b?1L:0L));}
+{wval _c=w_pop();if(!(int64_t)_c)goto L_8;}
+w_push((wval)(int64_t)0L);
+w_swap();
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a-(int64_t)_b));}
+goto L_8;
+L_8:
+}
+
+static void W_max(void) {
+w_dup();
+w_pick_n(2);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a>(int64_t)_b?1L:0L));}
+{wval _c=w_pop();if(!(int64_t)_c)goto L_7;}
+w_swap();
+w_drop();
+goto L_8;
+L_7:
+w_drop();
+L_8:
+}
+
+static void W_min(void) {
+w_dup();
+w_pick_n(2);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a<(int64_t)_b?1L:0L));}
+{wval _c=w_pop();if(!(int64_t)_c)goto L_7;}
+w_swap();
+w_drop();
+goto L_8;
+L_7:
+w_drop();
+L_8:
+}
+
+static void W_clamp(void) {
+w_rot();
+w_dup();
+w_pick_n(2);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a>(int64_t)_b?1L:0L));}
+{wval _c=w_pop();if(!(int64_t)_c)goto L_10;}
+w_drop();
+w_swap();
+w_drop();
+return;
+goto L_10;
+L_10:
+w_dup();
+w_pick_n(3);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a<(int64_t)_b?1L:0L));}
+{wval _c=w_pop();if(!(int64_t)_c)goto L_18;}
+w_drop();
+w_drop();
+return;
+goto L_18;
+L_18:
+w_swap();
+w_drop();
+w_swap();
+w_drop();
+}
+
+static void W_even_(void) {
+w_dup();
+w_push((wval)(int64_t)2L);
+{wval _b=w_pop(),_a=w_pop();if(!(int64_t)_b)exit(1);w_push((wval)((int64_t)_a%(int64_t)_b));}
+w_push((wval)(int64_t)0L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a==(int64_t)_b?1L:0L));}
+}
+
+static void W_odd_(void) {
+w_dup();
+w_push((wval)(int64_t)2L);
+{wval _b=w_pop(),_a=w_pop();if(!(int64_t)_b)exit(1);w_push((wval)((int64_t)_a%(int64_t)_b));}
+w_push((wval)(int64_t)1L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a==(int64_t)_b?1L:0L));}
+}
+
+static void W_zero_(void) {
+w_dup();
+w_push((wval)(int64_t)0L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a==(int64_t)_b?1L:0L));}
+}
+
+static void W_positive_(void) {
+w_dup();
+w_push((wval)(int64_t)0L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a>(int64_t)_b?1L:0L));}
+}
+
+static void W_negative_(void) {
+w_dup();
+w_push((wval)(int64_t)0L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a<(int64_t)_b?1L:0L));}
+}
+
+static void W_pow(void) {
+w_dup();
+w_push((wval)(int64_t)0L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a==(int64_t)_b?1L:0L));}
+{wval _c=w_pop();if(!(int64_t)_c)goto L_7;}
+w_drop();
+w_push((wval)(int64_t)1L);
+goto L_10;
+L_7:
+w_push((wval)(int64_t)1L);
+w_swap();
+{ auto void _qb(void) { w_pick_n(1);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a*(int64_t)_b));}
+ } int64_t _n=(int64_t)w_pop(); for (int64_t _i=0;_i<_n;_i++){ _qb(); } }
+L_10:
+}
+
+static void W_factorial(void) {
+w_dup();
+w_push((wval)(int64_t)1L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a>(int64_t)_b?1L:0L));}
+{wval _c=w_pop();if(!(int64_t)_c)goto L_10;}
+w_dup();
+w_push((wval)(int64_t)1L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a-(int64_t)_b));}
+W_factorial();
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a*(int64_t)_b));}
+goto L_12;
+L_10:
+w_drop();
+w_push((wval)(int64_t)1L);
+L_12:
+}
+
+static void W_fib(void) {
+w_dup();
+w_push((wval)(int64_t)1L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a>(int64_t)_b?1L:0L));}
+{wval _c=w_pop();if(!(int64_t)_c)goto L_14;}
+w_dup();
+w_push((wval)(int64_t)1L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a-(int64_t)_b));}
+W_fib();
+w_swap();
+w_push((wval)(int64_t)2L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a-(int64_t)_b));}
+W_fib();
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a+(int64_t)_b));}
+goto L_14;
+L_14:
+}
+
+static void W_even(void) {
+W_even_();
+}
+
+static void W_odd(void) {
+W_odd_();
+}
+
+static void W_lshift(void) {
+{int64_t _b=(int64_t)w_pop();int64_t _a=(int64_t)w_pop();w_push((wval)(_a<<_b));}
+}
+
+static void W_rshift(void) {
+{int64_t _b=(int64_t)w_pop();int64_t _a=(int64_t)w_pop();w_push((wval)(_a>>_b));}
+}
+
+static void W_sqrt(void) {
+{uint64_t _bits=(uint64_t)w_pop();double _f=*(double*)&_bits;_f=w_fsqrt(_f);w_push((wval)*(uint64_t*)&_f);}
+}
+
+static void W_f2i(void) {
+{uint64_t _bits=(uint64_t)w_pop();double _f=*(double*)&_bits;w_push((wval)(int64_t)_f);}
+}
+
+static void W_i2f(void) {
+{int64_t _n=(int64_t)w_pop();double _f=(double)_n;w_push((wval)*(uint64_t*)&_f);}
+}
+
+static void W_between_(void) {
+w_rot();
+w_drop();
+w_dup();
+w_pick_n(1);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a<=(int64_t)_b?1L:0L));}
+w_swap();
+w_dup();
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a>=(int64_t)_b?1L:0L));}
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a&&(int64_t)_b?1L:0L));}
+}
+
+static void W_pi(void) {
+{double _d=3.141592653589793; w_push(*(wval*)&_d);}
+}
+
+static void W_e(void) {
+{double _d=2.718281828459045; w_push(*(wval*)&_d);}
+}
+
+static void W_tau(void) {
+{double _d=6.283185307179586; w_push(*(wval*)&_d);}
+}
+
+static void W_inf(void) {
+{double _d=1.0; w_push(*(wval*)&_d);}
+{double _d=0.0; w_push(*(wval*)&_d);}
+{wval _b=w_pop(),_a=w_pop();if(!(int64_t)_b)exit(1);w_push((wval)((int64_t)_a/(int64_t)_b));}
+}
+
+static void W_floor(void) {
+{uint64_t _bits=(uint64_t)w_pop();double _f=*(double*)&_bits;_f=floor(_f);w_push((wval)*(uint64_t*)&_f);}
+}
+
+static void W_ceil(void) {
+{uint64_t _bits=(uint64_t)w_pop();double _f=*(double*)&_bits;_f=ceil(_f);w_push((wval)*(uint64_t*)&_f);}
+}
+
+static void W_round(void) {
+{uint64_t _bits=(uint64_t)w_pop();double _f=*(double*)&_bits;_f=round(_f);w_push((wval)*(uint64_t*)&_f);}
+}
+
+static void W_log(void) {
+{uint64_t _bits=(uint64_t)w_pop();double _f=*(double*)&_bits;_f=w_flog(_f);w_push((wval)*(uint64_t*)&_f);}
+}
+
+static void W_exp(void) {
+{uint64_t _bits=(uint64_t)w_pop();double _f=*(double*)&_bits;_f=w_fexp(_f);w_push((wval)*(uint64_t*)&_f);}
+}
+
+static void W_atan2(void) {
+{uint64_t _bx=(uint64_t)w_pop();uint64_t _by=(uint64_t)w_pop();double _x=*(double*)&_bx;double _y=*(double*)&_by;double _r=w_fatan2(_y,_x);w_push((wval)*(uint64_t*)&_r);}
+}
+
+static void W_bitand(void) {
+{int64_t _b=(int64_t)w_pop();int64_t _a=(int64_t)w_pop();w_push((wval)(_a&_b));}
+}
+
+static void W_bitor(void) {
+{int64_t _b=(int64_t)w_pop();int64_t _a=(int64_t)w_pop();w_push((wval)(_a|_b));}
+}
+
+static void W_bitxor(void) {
+{int64_t _b=(int64_t)w_pop();int64_t _a=(int64_t)w_pop();w_push((wval)(_a^_b));}
+}
+
+static void W_bitnot(void) {
+{int64_t _a=(int64_t)w_pop();w_push((wval)(~_a));}
+}
+
 static void W_JFILE(void) {
 w_push((wval)w_str_from_cstr("journal.txt"));
 }
@@ -364,6 +736,11 @@ W_JFILE();
 w_push((wval)w_str_from_cstr("\n"));
 {const char*_d=(const char*)w_pop();const char*_s=(const char*)w_pop();w_push((wval)w_str_split(_s,_d));}
 { auto void _qb(void) { w_dup();
+{const char*_s=(const char*)w_pop();w_push((wval)(int64_t)w_str_len(_s));}
+w_push((wval)(int64_t)0L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a>(int64_t)_b?1L:0L));}
+ } wval *_l=(wval*)w_pop(); int64_t _n=w_list_len(_l); wval *_tmp=(wval*)malloc((_n>0?_n:1)*sizeof(wval)); int64_t _c=0; for (int64_t _i=0;_i<_n;_i++){ w_push(_l[1+_i]); _qb(); if ((int64_t)w_pop()!=0) _tmp[_c++]=_l[1+_i]; } wval *_r=w_list_new(_c); for (int64_t _j=0;_j<_c;_j++) _r[1+_j]=_tmp[_j]; free(_tmp); w_push((wval)_r); }
+{ auto void _qb(void) { w_dup();
 w_push((wval)w_str_from_cstr("jq"));
 { const char *_k=(const char*)w_pop(); w_push(w_kv_get(_k)); }
 {const char*_n=(const char*)w_pop();const char*_h=(const char*)w_pop();w_push((wval)w_str_find(_h,_n));}
@@ -376,6 +753,118 @@ L_9:
 w_drop();
 L_10:
  } wval *_l=(wval*)w_pop(); int64_t _n=w_list_len(_l); for (int64_t _i=0;_i<_n;_i++){ int _s0=w_sp; w_push(_l[1+_i]); _qb(); if (w_sp>_s0) w_sp=_s0; } }
+}
+
+static void W_j_tail(void) {
+W_j_args();
+w_dup();
+{wval*_l=(wval*)w_pop();w_push((wval)w_list_len(_l));}
+w_push((wval)(int64_t)2L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a>=(int64_t)_b?1L:0L));}
+{wval _c=w_pop();if(!(int64_t)_c)goto L_9;}
+w_push((wval)(int64_t)1L);
+{int64_t _i=(int64_t)w_pop();wval*_l=(wval*)w_pop();w_push(w_list_nth(_l,_i));}
+goto L_11;
+L_9:
+w_drop();
+w_push((wval)w_str_from_cstr("5"));
+L_11:
+w_push((wval)w_str_from_cstr("jq"));
+w_swap();
+{ const char *_v=(const char*)w_pop(); const char *_k=(const char*)w_pop(); w_kv_set(_k,_v); }
+W_JFILE();
+{ const char *_p=(const char*)w_pop(); w_push(w_read_file(_p)); }
+w_push((wval)w_str_from_cstr("\n"));
+{const char*_d=(const char*)w_pop();const char*_s=(const char*)w_pop();w_push((wval)w_str_split(_s,_d));}
+{ auto void _qb(void) { w_dup();
+{const char*_s=(const char*)w_pop();w_push((wval)(int64_t)w_str_len(_s));}
+w_push((wval)(int64_t)0L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a>(int64_t)_b?1L:0L));}
+ } wval *_l=(wval*)w_pop(); int64_t _n=w_list_len(_l); wval *_tmp=(wval*)malloc((_n>0?_n:1)*sizeof(wval)); int64_t _c=0; for (int64_t _i=0;_i<_n;_i++){ w_push(_l[1+_i]); _qb(); if ((int64_t)w_pop()!=0) _tmp[_c++]=_l[1+_i]; } wval *_r=w_list_new(_c); for (int64_t _j=0;_j<_c;_j++) _r[1+_j]=_tmp[_j]; free(_tmp); w_push((wval)_r); }
+w_dup();
+{wval*_l=(wval*)w_pop();w_push((wval)w_list_len(_l));}
+w_push((wval)w_str_from_cstr("jq"));
+{ const char *_k=(const char*)w_pop(); w_push(w_kv_get(_k)); }
+{const char*_s=(const char*)w_pop();w_push((wval)w_str_to_i64(_s));}
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a-(int64_t)_b));}
+w_push((wval)(int64_t)0L);
+W_max();
+w_push((wval)w_str_from_cstr("jq"));
+{ const char *_k=(const char*)w_pop(); w_push(w_kv_get(_k)); }
+{const char*_s=(const char*)w_pop();w_push((wval)w_str_to_i64(_s));}
+{int64_t _n=(int64_t)w_pop();int64_t _s=(int64_t)w_pop();wval*_l=(wval*)w_pop();w_push((wval)w_list_slice(_l,_s,_n));}
+{ auto void _qb(void) { w_dup();
+{const char*_s=(const char*)w_pop();w_push((wval)(int64_t)w_str_len(_s));}
+w_push((wval)(int64_t)0L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a>(int64_t)_b?1L:0L));}
+{wval _c=w_pop();if(!(int64_t)_c)goto L_7;}
+w_print_val(w_pop());
+goto L_8;
+L_7:
+w_drop();
+L_8:
+ } wval *_l=(wval*)w_pop(); int64_t _n=w_list_len(_l); for (int64_t _i=0;_i<_n;_i++){ int _s0=w_sp; w_push(_l[1+_i]); _qb(); if (w_sp>_s0) w_sp=_s0; } }
+}
+
+static void W_j_del(void) {
+W_j_args();
+w_push((wval)(int64_t)1L);
+{int64_t _i=(int64_t)w_pop();wval*_l=(wval*)w_pop();w_push(w_list_nth(_l,_i));}
+w_push((wval)w_str_from_cstr("jq"));
+w_swap();
+{ const char *_v=(const char*)w_pop(); const char *_k=(const char*)w_pop(); w_kv_set(_k,_v); }
+w_push((wval)w_str_from_cstr("ji"));
+w_push((wval)w_str_from_cstr("0"));
+{ const char *_v=(const char*)w_pop(); const char *_k=(const char*)w_pop(); w_kv_set(_k,_v); }
+w_push((wval)w_str_from_cstr("out"));
+w_push((wval)w_str_from_cstr(""));
+{ const char *_v=(const char*)w_pop(); const char *_k=(const char*)w_pop(); w_kv_set(_k,_v); }
+W_JFILE();
+{ const char *_p=(const char*)w_pop(); w_push(w_read_file(_p)); }
+w_push((wval)w_str_from_cstr("\n"));
+{const char*_d=(const char*)w_pop();const char*_s=(const char*)w_pop();w_push((wval)w_str_split(_s,_d));}
+{ auto void _qb(void) { w_push((wval)w_str_from_cstr("ji"));
+{ const char *_k=(const char*)w_pop(); w_push(w_kv_get(_k)); }
+{const char*_s=(const char*)w_pop();w_push((wval)w_str_to_i64(_s));}
+w_push((wval)(int64_t)1L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a+(int64_t)_b));}
+{int64_t _n=(int64_t)w_pop();w_push((wval)w_i64_to_str(_n));}
+w_push((wval)w_str_from_cstr("ji"));
+w_swap();
+{ const char *_v=(const char*)w_pop(); const char *_k=(const char*)w_pop(); w_kv_set(_k,_v); }
+w_push((wval)w_str_from_cstr("ji"));
+{ const char *_k=(const char*)w_pop(); w_push(w_kv_get(_k)); }
+{const char*_s=(const char*)w_pop();w_push((wval)w_str_to_i64(_s));}
+w_push((wval)w_str_from_cstr("jq"));
+{ const char *_k=(const char*)w_pop(); w_push(w_kv_get(_k)); }
+{const char*_s=(const char*)w_pop();w_push((wval)w_str_to_i64(_s));}
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a-(int64_t)_b));}
+w_push((wval)(int64_t)0L);
+{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a==(int64_t)_b?1L:0L));}
+{wval _c=w_pop();if(!(int64_t)_c)goto L_21;}
+w_drop();
+goto L_31;
+L_21:
+w_push((wval)w_str_from_cstr("out"));
+{ const char *_k=(const char*)w_pop(); w_push(w_kv_get(_k)); }
+w_swap();
+{const char*_b=(const char*)w_pop();const char*_a=(const char*)w_pop();w_push((wval)w_str_concat(_a,_b));}
+w_push((wval)(int64_t)10L);
+{int64_t _n=(int64_t)w_pop();w_push((wval)rt_ctos(_n));}
+{const char*_b=(const char*)w_pop();const char*_a=(const char*)w_pop();w_push((wval)w_str_concat(_a,_b));}
+w_push((wval)w_str_from_cstr("out"));
+w_swap();
+{ const char *_v=(const char*)w_pop(); const char *_k=(const char*)w_pop(); w_kv_set(_k,_v); }
+L_31:
+ } wval *_l=(wval*)w_pop(); int64_t _n=w_list_len(_l); for (int64_t _i=0;_i<_n;_i++){ int _s0=w_sp; w_push(_l[1+_i]); _qb(); if (w_sp>_s0) w_sp=_s0; } }
+w_push((wval)w_str_from_cstr("out"));
+{ const char *_k=(const char*)w_pop(); w_push(w_kv_get(_k)); }
+W_JFILE();
+w_swap();
+{ const char *_d=(const char*)w_pop(); const char *_p=(const char*)w_pop(); w_push(w_write_file(_p,_d)); }
+w_drop();
+w_push((wval)w_str_from_cstr("deleted"));
+w_print_val(w_pop());
 }
 
 static void W_j_add(void) {
@@ -440,7 +929,7 @@ w_push((wval)w_str_from_cstr("add"));
 {wval _c=w_pop();if(!(int64_t)_c)goto L_18;}
 w_drop();
 W_j_add();
-goto L_35;
+goto L_49;
 L_18:
 w_dup();
 w_push((wval)w_str_from_cstr("list"));
@@ -448,7 +937,7 @@ w_push((wval)w_str_from_cstr("list"));
 {wval _c=w_pop();if(!(int64_t)_c)goto L_25;}
 w_drop();
 W_j_list();
-goto L_35;
+goto L_49;
 L_25:
 w_dup();
 w_push((wval)w_str_from_cstr("search"));
@@ -456,12 +945,28 @@ w_push((wval)w_str_from_cstr("search"));
 {wval _c=w_pop();if(!(int64_t)_c)goto L_32;}
 w_drop();
 W_j_search();
-goto L_35;
+goto L_49;
 L_32:
+w_dup();
+w_push((wval)w_str_from_cstr("tail"));
+{const char*_b=(const char*)w_pop();const char*_a=(const char*)w_pop();w_push((wval)w_str_eq(_a,_b));}
+{wval _c=w_pop();if(!(int64_t)_c)goto L_39;}
 w_drop();
-w_push((wval)w_str_from_cstr("usage: j add text | j list | j search word"));
+W_j_tail();
+goto L_49;
+L_39:
+w_dup();
+w_push((wval)w_str_from_cstr("del"));
+{const char*_b=(const char*)w_pop();const char*_a=(const char*)w_pop();w_push((wval)w_str_eq(_a,_b));}
+{wval _c=w_pop();if(!(int64_t)_c)goto L_46;}
+w_drop();
+W_j_del();
+goto L_49;
+L_46:
+w_drop();
+w_push((wval)w_str_from_cstr("usage: j add text | j list | j tail [n] | j search word | j del N"));
 w_print_val(w_pop());
-L_35:
+L_49:
     return 0;
 }
 

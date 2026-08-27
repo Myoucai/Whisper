@@ -662,7 +662,7 @@ static void c_execute_bytecodes(wval bytecodes_val) {
                 case 0xB9: { wval*l=(wval*)w_pop(); w_push((wval)w_charsstr(l)); } break;
                 case 0xBA: { const char*s=(const char*)w_pop(); w_striter(s); } break;
                 case 0xBB: { wval e=w_pop(); wval*l=(wval*)w_pop(); w_push((wval)(int64_t)w_listfind(l,e)); } break;
-                case 0xBC: { wval*l=(wval*)w_pop(); w_push((wval)w_strjoin(l)); } break;
+                case 0xBC: { wval*l=(wval*)w_pop(); const char*s=(const char*)w_pop(); w_push((wval)w_strjoin(l,s)); } break;
                 case 0xC2: w_push((wval)w_map_new()); break;
                 case 0xC3: { const char*k=(const char*)w_pop(); wval*m=(wval*)w_pop(); w_push(w_map_get(m,k)); } break;
                 case 0xC4: { wval v=w_pop(); const char*k=(const char*)w_pop(); wval*m=(wval*)w_pop(); w_push((wval)w_map_set(m,k,v)); } break;
@@ -866,7 +866,7 @@ static void emit_instruction(wval bc, int p) {
             case 0xB9: fputs("{wval*_l=(wval*)w_pop();w_push((wval)w_charsstr(_l));}\n", emit_out); break;
             case 0xBA: fputs("{const char*_s=(const char*)w_pop();w_striter(_s);}\n", emit_out); break;
             case 0xBB: fputs("{wval _e=w_pop();wval*_l=(wval*)w_pop();w_push((wval)(int64_t)w_listfind(_l,_e));}\n", emit_out); break;
-            case 0xBC: fputs("{wval*_l=(wval*)w_pop();w_push((wval)w_strjoin(_l));}\n", emit_out); break;
+            case 0xBC: fputs("{const char*_s=(const char*)w_pop(); wval*_l=(wval*)w_pop(); w_push((wval)w_strjoin(_l,_s));}\n", emit_out); break;
             case 0xC2: fputs("w_push((wval)w_map_new());\n", emit_out); break;
             case 0xC3: fputs("{const char*_k=(const char*)w_pop();wval*_m=(wval*)w_pop();w_push(w_map_get(_m,_k));}\n", emit_out); break;
             case 0xC4: fputs("{wval _v=w_pop();const char*_k=(const char*)w_pop();wval*_m=(wval*)w_pop();w_push((wval)w_map_set(_m,_k,_v));}\n", emit_out); break;

@@ -243,6 +243,7 @@ fn fmt_op(op: Operator) -> String {
         Operator::StrFindRe => "strfind-re".into(),
         Operator::Pack => "pack".into(),
         Operator::Unpack => "unpack".into(),
+        Operator::Range => "range".into(),
         Operator::MapNew => "map-new".into(),
         Operator::MapGet => "map-get".into(),
         Operator::MapSet => "map-set".into(),
