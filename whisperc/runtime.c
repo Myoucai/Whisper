@@ -620,6 +620,65 @@ static wval w_str_strip(wval s) {
 
 // ── P1 vocabulary (v1.0.4): directory ops + UTC strftime ────────────
 // ── P2 vocabulary (v1.0.5): minimal backtracking regex ──────────────
+// ── FFI (v1.0.8): native library loading and symbol calls ───────────
+// Mirrors crates/whisper-core/src/ffi.rs. Handles/fnptrs are raw i64s.
+
+#ifdef _WIN32
+#include <windows.h>
+static void *w_ffi_open(wval path) {
+    const char *p = (const char *)path;
+    HMODULE h = LoadLibraryA(p);
+    return (void *)(int64_t)h;
+}
+static void *w_ffi_sym(int64_t handle, const char *name) {
+    if (handle <= 0) return NULL;
+    return (void *)GetProcAddress((HMODULE)handle, name);
+}
+#else
+#include <dlfcn.h>
+static void *w_ffi_open(const char *path) {
+    return dlopen(p, RTLD_NOW);
+}
+static void *w_ffi_sym(int64_t handle, const char *name) {
+    if (handle <= 0) return NULL;
+    return dlsym((void *)handle, name);
+}
+#endif
+
+// fmt: first char = return type, rest = arg types (i=i64, p=string ptr,
+// d=f64 [rejected], v=void). Max 8 args. The 8-register generic shim
+// matches both win-x64 and SysV for integer/pointer args.
+static int64_t w_ffi_call(int64_t fnptr, const char *fmt, wval *args) {
+    typedef int64_t (*fn8)(int64_t, int64_t, int64_t, int64_t,
+                           int64_t, int64_t, int64_t, int64_t);
+    if (!fnptr) return 0;
+    size_t fl = w_str_len(fmt);
+    if (fl == 0) return 0;
+    const char *at = fmt + 1;
+    size_t na = fl - 1;
+    int64_t n = (int64_t)args[0];
+    if ((size_t)n != na) return 0; // arity mismatch: silent 0 (sentinel)
+    if (na > 8) return 0;
+    int64_t a[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    for (int64_t i = 0; i < (int64_t)na; i++) {
+        char t = at[i];
+        if (t == 'd') return 0; // f64 args unsupported in v1.0.8
+        wval v = args[1 + i];
+        if (t == 'p') {
+            // strings are heap pointers; anything else is invalid
+            if (!(v >= (wval)w_heap && v < (wval)(w_heap + w_heap_size)))
+                return 0;
+            a[i] = (int64_t)v;
+        } else {
+            a[i] = (int64_t)v;
+        }
+    }
+    fn8 f = (fn8)fnptr;
+    // void return: the callee leaves rax undefined; treating it as i64
+    // matches the VM (which returns the register's bits too).
+    return f(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]);
+}
+
 // ── P2 vocabulary (v1.0.6): struct pack/unpack, little-endian ───────
 // Mirrors crates/whisper-core/src/structpack.rs byte for byte.
 

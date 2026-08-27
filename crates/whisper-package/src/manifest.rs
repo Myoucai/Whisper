@@ -20,6 +20,10 @@ pub struct PackageManifest {
     pub exports: Vec<String>,
     #[serde(default)]
     pub dependencies: Vec<String>,
+    /// Native binaries (`.dll`/`.so`) shipped by this package; installed
+    /// alongside the .ws sources and loadable via ffi-open.
+    #[serde(default)]
+    pub native: Vec<String>,
 }
 
 impl PackageManifest {
@@ -31,6 +35,7 @@ impl PackageManifest {
         let mut capabilities = Vec::new();
         let mut exports = Vec::new();
         let mut dependencies = Vec::new();
+        let mut native = Vec::new();
 
         for line in content.lines() {
             let line = line.trim();
@@ -48,6 +53,8 @@ impl PackageManifest {
                 exports = value;
             } else if let Some(value) = parse_list_value(line, "dependencies:") {
                 dependencies = value;
+            } else if let Some(value) = parse_list_value(line, "native:") {
+                native = value;
             }
         }
 
@@ -57,6 +64,7 @@ impl PackageManifest {
             capabilities,
             exports,
             dependencies,
+            native,
         })
     }
 }

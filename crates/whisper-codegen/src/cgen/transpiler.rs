@@ -627,6 +627,21 @@ fn transpile_opcodes(
                     "{{ wfn _f=(wfn)w_pop(); int64_t _p=(int64_t)w_pop(); w_serve_concurrent(_p,_f); }}"
                 );
             }
+            Opcode::FfiOpen => {
+                let _ = writeln!(out, "{{ w_push((wval)w_ffi_open(w_pop())); }}");
+            }
+            Opcode::FfiSym => {
+                let _ = writeln!(
+                    out,
+                    "{{ const char*_n=(const char*)w_pop(); int64_t _h=(int64_t)w_pop(); w_push((wval)w_ffi_sym(_h,_n)); }}"
+                );
+            }
+            Opcode::FfiCall => {
+                let _ = writeln!(
+                    out,
+                    "{{ int64_t _f=(int64_t)w_pop(); const char*_fmt=(const char*)w_pop(); wval*_a=(wval*)w_pop(); w_push((wval)w_ffi_call(_f,_fmt,_a)); }}"
+                );
+            }
             Opcode::Range => {
                 let _ = writeln!(
                     out,

@@ -262,3 +262,32 @@ C 链每 worker 独立 64MB 堆 + 512K 栈（`__thread`），已通过 10 路并
 （实为纯拼接）。现固化为 `sep list strjoin → str`（sep 先入栈），
 双链一致。seed 的两处调用点做了机械签名同步（seed include
 runtime.c，链接适配不涉编译器逻辑）。
+
+## 13. 词汇附录 v1.0.8（FFI：二进制轮子加载）
+
+语法冻结不动；本附录新增 3 个内建词（字节 150-152）。**这是语言中
+最强的能力**——可调用任意 native 函数（包括读写文件、起进程的函数），
+授权语义等同 shell 访问。
+
+| 词 | 字节 | 栈效应 | 说明 |
+|----|------|--------|------|
+| `ffi-open` | 150 | path → handle \| -1 | dlopen/LoadLibrary 加载 .dll/.so |
+| `ffi-sym` | 151 | handle name → fnptr \| 0 | 查符号地址 |
+| `ffi-call` | 152 | [args] fmt fnptr → result | 按约定调用 |
+
+**fmt 约定**：首字符为返回类型，其余为参数类型（按序）。
+类型字符：`i`=i64、`p`=字符串数据指针（Whisper 字符串直接传
+`const char*`；长度用单独的 `i` + `strlen` 传）、`d`=f64（v1.0.8
+**仅返回值支持**，f64 参数不支持）、`v`=void（返回寄存器位模式）。
+参数上限 8 个（寄存器传参的通用垫板覆盖 win-x64 与 SysV 整数/指针
+路径）。
+
+验收基准：`crc32`——`[0 "123456789" 9] "iipi" rot ffi-call` →
+`3421780262`（标准 CRC-32 校验值；三路一致：纯 C / Rust VM / c2）。
+
+**已记录差异**：`ffi-open` 失败时 VM 返回 -1，C 链返回 0（NULL
+指针直接转型）；`ffi-call` 参数数不符时 C 链静默返回 0。
+
+包管理（v1.0.8）：manifest 新增 `native: ["lib.png"]` 字段声明随包
+分发的二进制轮子；安装时与 .ws 源码同目录落盘，程序用相对路径
+`ffi-open` 加载。

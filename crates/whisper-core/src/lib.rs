@@ -2,6 +2,7 @@
 // Provides Value, Opcode, Vm, and Capability primitives
 
 pub mod capability;
+pub mod ffi;
 pub mod opcode;
 pub mod rematch;
 pub mod strftime;

@@ -124,6 +124,9 @@ pub enum Operator {
     Pack,
     Unpack,
     Range,
+    FfiOpen,
+    FfiSym,
+    FfiCall,
 
     // Arithmetic
     Add,

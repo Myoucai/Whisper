@@ -525,6 +525,48 @@ impl Vm {
                     .collect();
                 self.data_stack.push(Value::List(Rc::new(keys)));
             }
+            Opcode::FfiOpen => {
+                let path = self.pop_str()?;
+                let h = crate::ffi::open(path.as_ref());
+                self.data_stack.push(Value::I64(h));
+            }
+            Opcode::FfiSym => {
+                let name = self.pop_str()?;
+                let handle = self.pop_i64()?;
+                let s = crate::ffi::sym(handle, name.as_ref());
+                self.data_stack.push(Value::I64(s));
+            }
+            Opcode::FfiCall => {
+                let fnptr = self.pop_i64()?;
+                let fmt = self.pop_str()?;
+                let args_val = self.pop()?;
+                // keep the args list alive for the whole call: `p` args
+                // borrow string bytes owned by it
+                let args_list = match &args_val {
+                    Value::List(l) => Rc::clone(l),
+                    _ => {
+                        return Err(VmError::TypeMismatch {
+                            expected: "[T]".into(),
+                            actual: args_val.type_name().into(),
+                        })
+                    }
+                };
+                let fargs: Vec<crate::ffi::FArg> = args_list
+                    .iter()
+                    .map(|v| match v {
+                        Value::I64(n) => Ok(crate::ffi::FArg::I(*n)),
+                        Value::F64(x) => Ok(crate::ffi::FArg::D(*x)),
+                        Value::Str(s) => Ok(crate::ffi::FArg::P(s.as_ptr() as usize)),
+                        other => Err(VmError::TypeMismatch {
+                            expected: "i64|str".into(),
+                            actual: other.type_name().into(),
+                        }),
+                    })
+                    .collect::<Result<_, _>>()?;
+                let r =
+                    crate::ffi::call(fnptr, fmt.as_ref(), &fargs).map_err(VmError::ProgramError)?;
+                self.data_stack.push(Value::I64(r));
+            }
             Opcode::Range => {
                 let count = self.pop_i64()?;
                 let start = self.pop_i64()?;

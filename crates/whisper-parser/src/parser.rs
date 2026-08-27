@@ -728,6 +728,18 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::Range)))
             }
+            TokenKind::FfiOpen => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::FfiOpen)))
+            }
+            TokenKind::FfiSym => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::FfiSym)))
+            }
+            TokenKind::FfiCall => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::FfiCall)))
+            }
             TokenKind::BytesNew => {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::BytesNew)))

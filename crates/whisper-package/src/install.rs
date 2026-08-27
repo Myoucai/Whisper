@@ -83,6 +83,9 @@ impl Installer {
         if !manifest.capabilities.is_empty() {
             println!("Capabilities: {:?}", manifest.capabilities);
         }
+        if !manifest.native.is_empty() {
+            println!("Native libs: {:?} (loaded via ffi-open)", manifest.native);
+        }
         if !manifest.dependencies.is_empty() {
             println!("Dependencies: {:?}", manifest.dependencies);
         }

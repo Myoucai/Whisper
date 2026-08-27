@@ -65,6 +65,8 @@ t p2-sp-trunc   '"ab" "<i" unpack .' '[]'
 t p2-sp-f64bits '[3.5] "<d" pack "<d" unpack 0 @nth .' 4615063718147915776
 t fix-strjoin  '"-" ["a" "b" "c"] strjoin .' 'a-b-c'
 t fix-strjoin2 '", " ["x" "y"] strjoin .' 'x, y'
+t p8-ffi-crc32 '"zlib1.dll" ffi-open dup "crc32" ffi-sym ` drop [0 "123456789" 9] "iipi" rot ffi-call .' 3421780262
+t p8-ffi-sym-zero '0 "x" ffi-sym 0 = .' 1
 t p0-upper     '"Hello" str-upper .' HELLO
 t p0-lower     '"aBc" str-lower .' abc
 t p0-strip     '"  pad  " str-strip .' pad

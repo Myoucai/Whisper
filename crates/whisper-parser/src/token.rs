@@ -109,6 +109,9 @@ impl TokenKind {
             Self::Pack => "pack",
             Self::Unpack => "unpack",
             Self::Range => "range",
+            Self::FfiOpen => "ffi-open",
+            Self::FfiSym => "ffi-sym",
+            Self::FfiCall => "ffi-call",
             Self::MapNew => "map-new",
             Self::MapGet => "map-get",
             Self::MapSet => "map-set",
@@ -300,6 +303,9 @@ pub enum TokenKind {
     Pack,
     Unpack,
     Range,
+    FfiOpen,
+    FfiSym,
+    FfiCall,
 
     // Float operations
     I64ToF64,

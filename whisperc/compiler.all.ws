@@ -419,6 +419,7 @@ export group-paired-rec
     [233 "strmatch"] [204 "strfind-re"]
     [12 "pack"] [13 "unpack"]
     [205 "range"]
+    [150 "ffi-open"] [151 "ffi-sym"] [152 "ffi-call"]
     [194 "map-new"] [195 "map-get"] [196 "map-set"]
     [197 "map-del"] [198 "map-keys"] [199 "map-has"]
     [208 "now"] [209 "sleep"] [210 "random"] [211 "randint"]
@@ -1126,6 +1127,12 @@ export classify-full
 " return ]
     dup 205 = ?? drop "{ int64_t _c=(int64_t)w_pop(); int64_t _s=(int64_t)w_pop(); wval*_l=w_list_new(_c); for(int64_t _i=0;_i<_c;_i++)_l[1+_i]=(wval)(_s+_i); w_push((wval)_l); }\n" return ]
     dup 204 = ?? drop "{ const char*_p=(const char*)w_pop(); const char*_s=(const char*)w_pop(); w_push((wval)w_strfind_re((wval)_s,(wval)_p)); }
+" return ]
+    dup 150 = ?? drop "{ w_push((wval)w_ffi_open(w_pop())); }
+" return ]
+    dup 151 = ?? drop "{ const char*_n=(const char*)w_pop(); int64_t _h=(int64_t)w_pop(); w_push((wval)w_ffi_sym(_h,_n)); }
+" return ]
+    dup 152 = ?? drop "{ int64_t _f=(int64_t)w_pop(); const char*_fmt=(const char*)w_pop(); wval*_a=(wval*)w_pop(); w_push((wval)w_ffi_call(_f,_fmt,_a)); }
 " return ]
     drop "// unknown bare opcode\n"
 } ;

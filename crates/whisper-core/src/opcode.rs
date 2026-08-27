@@ -124,6 +124,14 @@ pub enum Opcode {
     /// start count -> [start..start+count-1] (pre-allocated)
     Range,
 
+    // === FFI (v1.0.8) ===
+    /// path -> handle | -1
+    FfiOpen,
+    /// handle name -> fnptr | 0
+    FfiSym,
+    /// [args] fmt fnptr -> result
+    FfiCall,
+
     // === Arithmetic (0x10-0x17) ===
     /// Addition: a b → (a+b)
     Add,
@@ -408,6 +416,9 @@ impl Opcode {
             Opcode::Pack => 12,
             Opcode::Unpack => 13,
             Opcode::Range => 205,
+            Opcode::FfiOpen => 150,
+            Opcode::FfiSym => 151,
+            Opcode::FfiCall => 152,
             Opcode::ListCheck => 0xE4,
             Opcode::I64Check => 0xE5,
             Opcode::StrCheck => 0xE6,
@@ -615,6 +626,9 @@ impl Opcode {
             Opcode::Pack => "pack",
             Opcode::Unpack => "unpack",
             Opcode::Range => "range",
+            Opcode::FfiOpen => "ffi-open",
+            Opcode::FfiSym => "ffi-sym",
+            Opcode::FfiCall => "ffi-call",
             Opcode::Add => "add",
             Opcode::Sub => "sub",
             Opcode::Mul => "mul",
