@@ -450,22 +450,33 @@ static wval *w_list_dedup(wval *list) {
 }
 
 static wval *w_str_split(const char *s, const char *delim) {
-    wval *result = w_list_new(0);
     uint32_t slen = w_str_len(s), dlen = w_str_len(delim);
+    // two passes: count parts first, allocate the list once, then fill.
+    // (w_list_append copies the whole list — appending in a loop is O(n^2),
+    //  which cost ~110ms on a 10k-line file before this fix)
     if (dlen == 0) {
+        wval *result = w_list_new((int64_t)slen);
         for (uint32_t i = 0; i < slen; i++)
-            result = w_list_append(result, (wval)w_str_new(s + i, 1));
-    } else {
-        uint32_t start = 0;
-        for (uint32_t i = 0; i + dlen <= slen; i++) {
-            if (memcmp(s + i, delim, dlen) == 0) {
-                result = w_list_append(result, (wval)w_str_new(s + start, i - start));
-                start = i + dlen;
-                i += dlen - 1;
-            }
-        }
-        result = w_list_append(result, (wval)w_str_new(s + start, slen - start));
+            result[1 + i] = (wval)w_str_new(s + i, 1);
+        return result;
     }
+    uint32_t parts = 1;
+    for (uint32_t i = 0; i + dlen <= slen; i++) {
+        if (memcmp(s + i, delim, dlen) == 0) {
+            parts++;
+            i += dlen - 1;
+        }
+    }
+    wval *result = w_list_new((int64_t)parts);
+    uint32_t idx = 0, start = 0;
+    for (uint32_t i = 0; i + dlen <= slen; i++) {
+        if (memcmp(s + i, delim, dlen) == 0) {
+            result[1 + idx++] = (wval)w_str_new(s + start, i - start);
+            start = i + dlen;
+            i += dlen - 1;
+        }
+    }
+    result[1 + idx] = (wval)w_str_new(s + start, slen - start);
     return result;
 }
 
@@ -1251,12 +1262,17 @@ static wval w_fold_over(wval *list, wval init, wfn f) {
 
 static wval *w_filter_over(wval *list, wfn f) {
     int64_t count = w_list_len(list);
-    wval *result = w_list_new(0);
+    wval *tmp = (wval *)malloc((count > 0 ? count : 1) * sizeof(wval));
+    if (!tmp) return w_list_new(0);
+    int64_t kept = 0;
     for (int64_t i = 0; i < count; i++) {
         w_push(list[1 + i]);
         f();
-        if ((int64_t)w_pop() != 0) result = w_list_append(result, list[1 + i]);
+        if ((int64_t)w_pop() != 0) tmp[kept++] = list[1 + i];
     }
+    wval *result = w_list_new(kept);
+    for (int64_t j = 0; j < kept; j++) result[1 + j] = tmp[j];
+    free(tmp);
     return result;
 }
 
