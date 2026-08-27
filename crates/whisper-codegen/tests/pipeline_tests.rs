@@ -11,7 +11,7 @@ use whisper_parser::Parser;
 fn eval(source: &str) -> Result<Option<Value>, String> {
     let ast = Parser::parse_source(source).map_err(|e| e.message)?;
     let mut gen = BytecodeGenerator::new();
-    let (bytecode, defs) = gen.compile(&ast);
+    let (bytecode, defs) = gen.compile(&ast).unwrap();
     let mut vm = Vm::new();
     for (name, code) in defs {
         vm.define_word(name, code);
@@ -129,7 +129,7 @@ fn test_list_literal_order() {
     let source = "[1 2 3 4 5]";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bytecode, _defs) = gen.compile(&ast);
+    let (bytecode, _defs) = gen.compile(&ast).unwrap();
 
     // Should emit: PushI64(1..5), PushI64(5), PushList
     // Elements first, then count on top (LIFO: count popped first)
@@ -168,7 +168,7 @@ fn test_wbin_roundtrip_full() {
     let source = "3 4 + 7 =";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bytecode, _defs) = gen.compile(&ast);
+    let (bytecode, _defs) = gen.compile(&ast).unwrap();
 
     let wbin_data = WbinWriter::write(&bytecode);
     let decoded = WbinReader::decode(&wbin_data).unwrap();
@@ -225,7 +225,7 @@ fn test_nested_conditionals() {
     // -5 < 0 → true → -1
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bytecode, defs) = gen.compile(&ast);
+    let (bytecode, defs) = gen.compile(&ast).unwrap();
     let mut vm = Vm::new();
     for (name, code) in defs {
         vm.define_word(name, code);
@@ -250,7 +250,7 @@ fn test_recursive_factorial_deep() {
     ";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bytecode, defs) = gen.compile(&ast);
+    let (bytecode, defs) = gen.compile(&ast).unwrap();
     let mut vm = Vm::new();
     for (name, code) in defs {
         vm.define_word(name, code);
@@ -270,7 +270,7 @@ fn test_type_error_undefined_word() {
     let source = ": sq { _ * } ; 5 cube";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bytecode, defs) = gen.compile(&ast);
+    let (bytecode, defs) = gen.compile(&ast).unwrap();
     let mut vm = Vm::new();
     for (name, code) in defs {
         vm.define_word(name, code);
@@ -286,7 +286,7 @@ fn test_wbin_with_definitions() {
     let source = ": double { 2 * } ; 10 double";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bytecode, defs) = gen.compile(&ast);
+    let (bytecode, defs) = gen.compile(&ast).unwrap();
 
     let wbin = WbinWriter::write(&bytecode);
     let decoded = WbinReader::decode(&wbin).unwrap();
@@ -326,7 +326,7 @@ fn debug_fib_bytecode() {
     let source = ": fib { _ 1 > ??_ 1 - fib ` 2 - fib +|] } ;";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (_bc, defs) = gen.compile(&ast);
+    let (_bc, defs) = gen.compile(&ast).unwrap();
     let fib_code = defs.get("fib").unwrap();
     // fib body: dup, 1, gt, cond, dup, 1, sub, call(fib), swap, 2, sub, call(fib), add, jump, drop
     assert_eq!(fib_code[0], Opcode::Dup);
@@ -347,7 +347,7 @@ fn test_fib_recursive_working() {
     ";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bytecode, defs) = gen.compile(&ast);
+    let (bytecode, defs) = gen.compile(&ast).unwrap();
     let mut vm = Vm::new();
     for (name, code) in defs {
         vm.define_word(name, code);
@@ -372,7 +372,7 @@ fn load_stdlib(vm: &mut Vm, modules: &[&str]) -> Result<(), String> {
         };
         let ast = Parser::parse_source(source).map_err(|e| e.message)?;
         let mut gen = BytecodeGenerator::new();
-        let (_bytecode, defs) = gen.compile(&ast);
+        let (_bytecode, defs) = gen.compile(&ast).unwrap();
         for (name, code) in defs {
             vm.define_word(name, code);
         }
@@ -387,7 +387,7 @@ fn test_stdlib_math_sq() {
     load_stdlib(&mut vm, &["math"]).unwrap();
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(result, Some(Value::I64(25)), "5² = 25");
 }
@@ -399,7 +399,7 @@ fn test_stdlib_math_cube() {
     load_stdlib(&mut vm, &["math"]).unwrap();
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(result, Some(Value::I64(27)), "3³ = 27");
 }
@@ -411,7 +411,7 @@ fn test_stdlib_math_abs_positive() {
     load_stdlib(&mut vm, &["math"]).unwrap();
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(result, Some(Value::I64(5)), "|5| = 5");
 }
@@ -423,7 +423,7 @@ fn test_stdlib_math_abs_negative() {
     load_stdlib(&mut vm, &["math"]).unwrap();
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(result, Some(Value::I64(5)), "|-5| = 5");
 }
@@ -435,7 +435,7 @@ fn test_stdlib_math_factorial() {
     let source = "5 factorial";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(result, Some(Value::I64(120)), "5! = 120");
 }
@@ -447,7 +447,7 @@ fn test_stdlib_math_fib() {
     let source = "6 fib";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(result, Some(Value::I64(8)), "fib(6) = 8");
 }
@@ -460,13 +460,13 @@ fn test_stdlib_math_even_odd() {
     let source = "6 even";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(result, Some(Value::Bool(true)), "6 is even");
 
     let source = "7 odd";
     let ast = Parser::parse_source(source).unwrap();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(result, Some(Value::Bool(true)), "7 is odd");
 }
@@ -478,7 +478,7 @@ fn test_stdlib_list_sum() {
     let source = "[1 2 3 4 5] sum";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(result, Some(Value::I64(15)), "sum [1..5] = 15");
 }
@@ -490,7 +490,7 @@ fn test_stdlib_list_length() {
     let source = "[1 2 3] length";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(result, Some(Value::I64(3)), "len [1,2,3] = 3");
 }
@@ -503,7 +503,7 @@ fn test_stdlib_list_map() {
     let source = "[1 2 3 4] { sq } map";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(
         result,
@@ -524,7 +524,7 @@ fn test_stdlib_list_product() {
     let source = "[1 2 3 4] product";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(result, Some(Value::I64(24)), "product [1,2,3,4] = 24");
 }
@@ -537,7 +537,7 @@ fn test_stdlib_test_assert_true() {
     let source = "#t assert-true";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc);
     assert!(result.is_ok());
 }
@@ -550,7 +550,7 @@ fn test_stdlib_test_assert_eq() {
     let source = "3 4 + 7 assert-eq";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc);
     assert!(result.is_ok());
 }
@@ -563,7 +563,7 @@ fn test_stdlib_io_println() {
     let source = "42 println";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc);
     assert!(result.is_ok());
 }
@@ -613,7 +613,7 @@ fn test_stdlib_str_first() {
     let source = "\"hello\" first";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(
         result,
@@ -629,7 +629,7 @@ fn test_stdlib_str_last() {
     let source = "\"hello\" last";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(
         result,
@@ -645,7 +645,7 @@ fn test_stdlib_str_rev() {
     let source = "\"hi\" str-rev";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc);
     assert!(result.is_ok(), "Error: {:?}", result);
     assert_eq!(
@@ -662,7 +662,7 @@ fn test_stdlib_str_upper() {
     let source = "\"hello\" upper";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(
         result,
@@ -678,7 +678,7 @@ fn test_stdlib_str_lower() {
     let source = "\"HELLO\" lower";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(
         result,
@@ -694,7 +694,7 @@ fn test_stdlib_str_capitalize() {
     let source = "\"hello\" capitalize";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(
         result,
@@ -710,7 +710,7 @@ fn test_stdlib_str_capitalize_nonletter() {
     let source = "\"1abc\" capitalize";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(
         result,
@@ -726,7 +726,7 @@ fn test_stdlib_str_upper_mixed() {
     let source = "\"Hello World 123\" upper";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(
         result,
@@ -742,7 +742,7 @@ fn test_stdlib_str_palindrome() {
     let source = "\"racecar\" palindrome?";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(result, Some(Value::Bool(true)), "'racecar' is a palindrome");
 }
@@ -754,7 +754,7 @@ fn test_stdlib_str_lines() {
     let source = "\"hello\\nworld\" lines len";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(result, Some(Value::I64(2)), "lines splits on newlines");
 }
@@ -766,7 +766,7 @@ fn test_stdlib_str_words() {
     let source = "\"hello world\" words len";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let result = vm.execute(&bc).unwrap();
     assert_eq!(result, Some(Value::I64(2)), "words splits on spaces");
 }
@@ -781,7 +781,7 @@ fn test_stdlib_str_words() {
 fn eval_pair(source: &str) -> (Result<Option<Value>, String>, Result<Option<Value>, String>) {
     let ast = Parser::parse_source(source).expect("parse failed");
     let mut gen = BytecodeGenerator::new();
-    let (bytecode, defs) = gen.compile(&ast);
+    let (bytecode, defs) = gen.compile(&ast).unwrap();
 
     let mut vm_raw = Vm::new();
     for (name, code) in &defs {
@@ -854,7 +854,7 @@ fn opt_actually_folds_inside_loop() {
     // Sanity: the loop body's 3 4 + must be folded away (optimizer is live).
     let ast = Parser::parse_source("0 { _ 5 + 3 4 + drop 1 + } { _ 5 < } #").unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bytecode, _) = gen.compile(&ast);
+    let (bytecode, _) = gen.compile(&ast).unwrap();
     let opt = whisper_codegen::optimize(&bytecode);
     assert!(
         !opt.contains(&Opcode::PushI64(3)),

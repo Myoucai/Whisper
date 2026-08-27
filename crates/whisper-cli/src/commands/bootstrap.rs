@@ -222,7 +222,9 @@ pub fn hard_bootstrap_compile(source: &str) -> Result<(), String> {
     // Phase 1: Rust reference (for comparison)
     let ast = Parser::parse_source(source).map_err(|e| format!("Parse: {}", e.message))?;
     let mut gen = BytecodeGenerator::new();
-    let (ref_bytecode, ref_defs) = gen.compile(&ast);
+    let (ref_bytecode, ref_defs) = gen
+        .compile(&ast)
+        .map_err(|e| format!("Compile: {}", whisper_codegen::block_ir::contract_errors_to_string(&e)))?;
 
     // Phase 2: Load whisperc pipeline
     let mut vm = Vm::new();
@@ -389,7 +391,9 @@ pub fn bootstrap_compile(source: &str) -> Result<(), String> {
     // Phase 1: Parse with Rust compiler (reference)
     let ast = Parser::parse_source(source).map_err(|e| format!("Parse: {}", e.message))?;
     let mut gen = BytecodeGenerator::new();
-    let (ref_bytecode, ref_defs) = gen.compile(&ast);
+    let (ref_bytecode, ref_defs) = gen
+        .compile(&ast)
+        .map_err(|e| format!("Compile: {}", whisper_codegen::block_ir::contract_errors_to_string(&e)))?;
 
     // Phase 2: Extract defs and generate tokens
     let mut main_body: Vec<AstNode> = Vec::new();
@@ -696,7 +700,9 @@ fn load_whisperc_pipeline(vm: &mut Vm) {
     for src in files {
         let ast = Parser::parse_source(src).unwrap();
         let mut gen = BytecodeGenerator::new();
-        let (bc, defs) = gen.compile(&ast);
+        let (bc, defs) = gen
+            .compile(&ast)
+            .expect("whisperc compile contract violation");
         for (n, c) in defs {
             vm.define_word(n, c);
         }
@@ -1031,7 +1037,9 @@ mod tests {
 
         let ast = Parser::parse_source(source).unwrap();
         let mut gen = BytecodeGenerator::new();
-        let (rust_ops, _) = gen.compile(&ast);
+        let (rust_ops, _) = gen
+            .compile(&ast)
+            .expect("compile contract violation in test");
 
         // Both should produce valid bytecode
         assert!(!whisperc_ops.is_empty(), "whisperc produced no bytecode");
@@ -1090,7 +1098,9 @@ mod tests {
 
         // Compare with Rust compiler
         let mut gen = BytecodeGenerator::new();
-        let (rust_ops, rust_defs) = gen.compile(&ast);
+        let (rust_ops, rust_defs) = gen
+            .compile(&ast)
+            .expect("compile contract violation in test");
         println!("rust:     main={} defs={}", rust_ops.len(), rust_defs.len());
 
         // Both should produce same number of definitions
@@ -1344,7 +1354,9 @@ mod tests {
         let src = include_str!("../../../../whisperc/lexer.ws");
         let ast = Parser::parse_source(src).unwrap();
         let mut gen = BytecodeGenerator::new();
-        let (bc, defs) = gen.compile(&ast);
+        let (bc, defs) = gen
+            .compile(&ast)
+            .expect("whisperc compile contract violation");
         let mut vm = Vm::new();
         // vm.trace = true;
         for (n, c) in defs {
@@ -1454,7 +1466,9 @@ mod tests {
         let src = include_str!("../../../../whisperc/classify.ws");
         let ast = Parser::parse_source(src).unwrap();
         let mut gen = BytecodeGenerator::new();
-        let (bc, defs) = gen.compile(&ast);
+        let (bc, defs) = gen
+            .compile(&ast)
+            .expect("whisperc compile contract violation");
         let mut vm = Vm::new();
         for (n, c) in defs {
             vm.define_word(n, c);
@@ -1501,7 +1515,9 @@ mod tests {
         let src = include_str!("../../../../whisperc/classify.ws");
         let ast = Parser::parse_source(src).unwrap();
         let mut gen = BytecodeGenerator::new();
-        let (bc, defs) = gen.compile(&ast);
+        let (bc, defs) = gen
+            .compile(&ast)
+            .expect("whisperc compile contract violation");
         let mut vm = Vm::new();
         for (n, c) in defs {
             vm.define_word(n, c);
@@ -1622,7 +1638,9 @@ mod tests {
 
         let ast = Parser::parse_source(source).unwrap();
         let mut gen = BytecodeGenerator::new();
-        let (rust_ops, _) = gen.compile(&ast);
+        let (rust_ops, _) = gen
+            .compile(&ast)
+            .expect("compile contract violation in test");
 
         // Both should produce the same result
         let mut vm1 = Vm::new();

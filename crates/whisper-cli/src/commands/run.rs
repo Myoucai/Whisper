@@ -54,11 +54,64 @@ fn register_core_words(vm: &mut Vm) -> Result<(), String> {
         )
     })?;
     let mut gen = BytecodeGenerator::new();
-    let (_, defs) = gen.compile(&ast);
+    let (_, defs) = gen
+        .compile(&ast)
+        .map_err(|e| format!("Compile error: {}", whisper_codegen::block_ir::contract_errors_to_string(&e)))?;
     for (name, code) in defs {
         vm.define_word(name, code);
     }
     Ok(())
+}
+
+/// Run a compiled .wbin file (v2 blocks are linearized here —
+/// "loading-time linearization"; v1 files run flat as-is).
+pub fn run_wbin(data: &[u8], config: &RunConfig) -> Result<(), String> {
+    use whisper_codegen::wbin::WbinReader;
+
+    let unit = WbinReader::decode_unit(data)
+        .map_err(|e| format!("Invalid .wbin: {e}"))?;
+    let (bytecode, defs) = unit.linearized();
+
+    let bytecode = if std::env::var("WHISPER_NO_OPT").is_ok() {
+        bytecode
+    } else {
+        whisper_codegen::optimize(&bytecode)
+    };
+    let defs: Vec<_> = defs
+        .into_iter()
+        .map(|(k, v)| (k, whisper_codegen::optimize(&v)))
+        .collect();
+
+    let mut capability_table = CapabilityTable::new();
+    if config.allow_file_read {
+        capability_table.bind(Box::new(FileReadCap {
+            id: 0,
+            allowed_paths: vec![std::env::current_dir().unwrap_or_default()],
+        }));
+    }
+    if config.allow_file_write {
+        capability_table.bind(Box::new(FileWriteCap {
+            id: 1,
+            allowed_paths: vec![std::env::current_dir().unwrap_or_default()],
+        }));
+    }
+
+    let mut vm = Vm::with_capabilities(capability_table);
+    if config.trace {
+        vm.trace = true;
+    }
+    register_core_words(&mut vm)?;
+    for (name, code) in &defs {
+        vm.define_word(name.clone(), code.clone());
+    }
+    vm.program_args = std::env::args()
+        .map(|a| whisper_core::value::Value::Str(std::rc::Rc::new(a)))
+        .collect();
+
+    match vm.execute(&bytecode) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(format!("Runtime error: {e}")),
+    }
 }
 
 /// Run a Whisper source file with optional capability bindings.
@@ -87,7 +140,9 @@ pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result
 
     // Phase 2: Compile AST to bytecode
     let mut gen = BytecodeGenerator::new();
-    let (bytecode, defs) = gen.compile(&ast);
+    let (bytecode, defs) = gen
+        .compile(&ast)
+        .map_err(|e| format!("Compile error: {}", whisper_codegen::block_ir::contract_errors_to_string(&e)))?;
 
     // Phase 2b: Optimize bytecode (WHISPER_NO_OPT=1 skips — debugging aid)
     let bytecode = if std::env::var("WHISPER_NO_OPT").is_ok() {

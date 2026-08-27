@@ -10,8 +10,13 @@ use whisper_core::opcode::Opcode;
 
 /// Magic bytes for .wbin files.
 pub const WBIN_MAGIC: &[u8; 4] = b"WHSP";
-/// Current .wbin format version.
-pub const WBIN_VERSION: u32 = 1;
+/// Original flat format: one opcode stream (main only), numeric jump
+/// offsets embedded. Still readable for compatibility.
+pub const WBIN_VERSION_V1: u32 = 1;
+/// Block format since the Block-IR rework: main + defs as block
+/// programs with explicit edges — no offsets on disk; the loader
+/// linearizes (`block_ir::linearize`).
+pub const WBIN_VERSION_V2: u32 = 2;
 
 /// Writer for .wbin binary format.
 pub struct WbinWriter;
@@ -23,7 +28,7 @@ impl WbinWriter {
 
         // Header
         buf.extend_from_slice(WBIN_MAGIC);
-        buf.extend_from_slice(&WBIN_VERSION.to_le_bytes());
+        buf.extend_from_slice(&WBIN_VERSION_V1.to_le_bytes());
 
         // Body — each opcode as a single byte + optional data
         for op in opcodes {
@@ -87,6 +92,94 @@ impl WbinWriter {
 /// Reader for .wbin binary format.
 pub struct WbinReader;
 
+/// A decoded .wbin file.
+pub enum WbinUnit {
+    /// v1: one flat opcode stream (main only; defs were not stored).
+    V1(Vec<Opcode>),
+    /// v2: main + defs as block programs; linearize at load time.
+    V2 {
+        main: crate::block_ir::BlockProgram,
+        defs: Vec<(String, crate::block_ir::BlockProgram)>,
+    },
+}
+
+impl WbinUnit {
+    /// Linearizes to (main_bytecode, defs) ready for the VM.
+    pub fn linearized(&self) -> (Vec<Opcode>, Vec<(String, Vec<Opcode>)>) {
+        match self {
+            WbinUnit::V1(flat) => (flat.clone(), Vec::new()),
+            WbinUnit::V2 { main, defs } => {
+                let main_flat = crate::block_ir::linearize(main);
+                let defs_flat = defs
+                    .iter()
+                    .map(|(n, p)| (n.clone(), crate::block_ir::linearize(p)))
+                    .collect();
+                (main_flat, defs_flat)
+            }
+        }
+    }
+}
+
+impl WbinWriter {
+    /// Serialize a v2 unit: main + defs as block programs.
+    /// Jump offsets never appear on disk — the loader linearizes.
+    pub fn write_unit(
+        main: &crate::block_ir::BlockProgram,
+        defs: &[(String, crate::block_ir::BlockProgram)],
+    ) -> Vec<u8> {
+        use crate::block_ir::Terminator;
+        let mut buf = Vec::new();
+        buf.extend_from_slice(WBIN_MAGIC);
+        buf.extend_from_slice(&WBIN_VERSION_V2.to_le_bytes());
+
+        let count = 1 + defs.len();
+        leb128::write::unsigned(&mut buf, count as u64).ok();
+
+        let write_program =
+            |name: &str, prog: &crate::block_ir::BlockProgram, buf: &mut Vec<u8>| {
+                let name_bytes = name.as_bytes();
+                leb128::write::unsigned(buf, name_bytes.len() as u64).ok();
+                buf.extend_from_slice(name_bytes);
+                leb128::write::unsigned(buf, prog.entry as u64).ok();
+                leb128::write::unsigned(buf, prog.blocks.len() as u64).ok();
+                for block in &prog.blocks {
+                    leb128::write::unsigned(buf, block.instructions.len() as u64).ok();
+                    for op in &block.instructions {
+                        Self::encode_opcode(op, buf);
+                    }
+                    match &block.terminator {
+                        Terminator::Halt => buf.push(0),
+                        Terminator::Return => buf.push(1),
+                        Terminator::Jump(t) => {
+                            buf.push(2);
+                            leb128::write::unsigned(buf, *t as u64).ok();
+                        }
+                        Terminator::Branch { then, els } => {
+                            buf.push(3);
+                            leb128::write::unsigned(buf, *then as u64).ok();
+                            leb128::write::unsigned(buf, *els as u64).ok();
+                        }
+                    }
+                }
+            };
+
+        write_program("", main, &mut buf);
+        for (name, prog) in defs {
+            write_program(name, prog, &mut buf);
+        }
+        buf
+    }
+
+    /// Write a v2 unit to a file.
+    pub fn write_unit_to_file(
+        main: &crate::block_ir::BlockProgram,
+        defs: &[(String, crate::block_ir::BlockProgram)],
+        path: &std::path::Path,
+    ) -> std::io::Result<()> {
+        std::fs::write(path, Self::write_unit(main, defs))
+    }
+}
+
 impl WbinReader {
     /// Read and decode opcodes from a .wbin file.
     pub fn read_from_file(path: &std::path::Path) -> std::io::Result<Vec<Opcode>> {
@@ -94,48 +187,121 @@ impl WbinReader {
         Self::decode(&data)
     }
 
-    /// Decode .wbin bytes into opcodes.
+    /// Decode .wbin bytes into opcodes (v1 flat format).
     pub fn decode(data: &[u8]) -> std::io::Result<Vec<Opcode>> {
+        match Self::decode_unit(data)? {
+            WbinUnit::V1(flat) => Ok(flat),
+            WbinUnit::V2 { .. } => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "this file is .wbin v2 (block format) — use decode_unit",
+            )),
+        }
+    }
+
+    /// Decode any .wbin version: v1 flat stream, or v2 block unit.
+    pub fn decode_unit(data: &[u8]) -> std::io::Result<WbinUnit> {
         if data.len() < 8 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
                 "File too short for .wbin header",
             ));
         }
-
-        // Verify magic
         if &data[0..4] != WBIN_MAGIC {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "Invalid magic bytes — not a .wbin file",
             ));
         }
-
-        // Read version
         let version = u32::from_le_bytes(data[4..8].try_into().unwrap());
-        if version != WBIN_VERSION {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("Unsupported .wbin version: {version}"),
-            ));
-        }
-
         let mut cursor = Cursor::new(&data[8..]);
-        let mut opcodes = Vec::new();
-
-        loop {
-            let mut byte_buf = [0u8; 1];
-            match cursor.read_exact(&mut byte_buf) {
-                Ok(()) => {
-                    let op = Self::decode_opcode(byte_buf[0], &mut cursor)?;
-                    opcodes.push(op);
+        match version {
+            WBIN_VERSION_V1 => {
+                let mut opcodes = Vec::new();
+                loop {
+                    let mut byte_buf = [0u8; 1];
+                    match cursor.read_exact(&mut byte_buf) {
+                        Ok(()) => {
+                            let op = Self::decode_opcode(byte_buf[0], &mut cursor)?;
+                            opcodes.push(op);
+                        }
+                        Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
+                        Err(e) => return Err(e),
+                    }
                 }
-                Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
-                Err(e) => return Err(e),
+                Ok(WbinUnit::V1(opcodes))
             }
+            WBIN_VERSION_V2 => {
+                let count = read_leb(&mut cursor)?;
+                let mut programs: Vec<(String, crate::block_ir::BlockProgram)> =
+                    Vec::with_capacity(count.min(4096) as usize);
+                for _ in 0..count {
+                    programs.push(Self::decode_block_program(&mut cursor)?);
+                }
+                let mut iter = programs.into_iter();
+                let Some((_, main)) = iter.next() else {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "v2 unit has no main program",
+                    ));
+                };
+                Ok(WbinUnit::V2 { main, defs: iter.collect() })
+            }
+            other => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Unsupported .wbin version: {other}"),
+            )),
         }
+    }
 
-        Ok(opcodes)
+    fn decode_block_program(
+        cursor: &mut Cursor<&[u8]>,
+    ) -> std::io::Result<(String, crate::block_ir::BlockProgram)> {
+        use crate::block_ir::{Block, BlockProgram, Terminator};
+        let name_len = read_leb(cursor)? as usize;
+        let mut name_buf = vec![0u8; name_len];
+        cursor.read_exact(&mut name_buf)?;
+        let name = String::from_utf8(name_buf)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+
+        let entry = read_leb(cursor)? as usize;
+        let block_count = read_leb(cursor)? as usize;
+        let mut blocks = Vec::with_capacity(block_count.min(1 << 20));
+        for id in 0..block_count {
+            let instr_count = read_leb(cursor)? as usize;
+            let mut instructions = Vec::with_capacity(instr_count.min(1 << 20));
+            for _ in 0..instr_count {
+                let mut byte_buf = [0u8; 1];
+                cursor.read_exact(&mut byte_buf)?;
+                instructions.push(Self::decode_opcode(byte_buf[0], cursor)?);
+            }
+            let mut term_buf = [0u8; 1];
+            cursor.read_exact(&mut term_buf)?;
+            let terminator = match term_buf[0] {
+                0 => Terminator::Halt,
+                1 => Terminator::Return,
+                2 => Terminator::Jump(read_leb(cursor)? as usize),
+                3 => {
+                    let then = read_leb(cursor)? as usize;
+                    let els = read_leb(cursor)? as usize;
+                    Terminator::Branch { then, els }
+                }
+                other => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!("Unknown terminator kind: {other}"),
+                    ))
+                }
+            };
+            blocks.push(Block {
+                id,
+                instructions,
+                terminator,
+                stack_in: 0,
+                stack_out: 0,
+            });
+        }
+        let program = BlockProgram { blocks, entry };
+        Ok((name, program))
     }
 
     fn decode_opcode(byte: u8, cursor: &mut Cursor<&[u8]>) -> std::io::Result<Opcode> {
@@ -385,6 +551,11 @@ impl WbinReader {
     }
 }
 
+fn read_leb(cursor: &mut Cursor<&[u8]>) -> std::io::Result<u64> {
+    leb128::read::unsigned(cursor)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -472,4 +643,55 @@ mod tests {
         let decoded = WbinReader::decode(&data).unwrap();
         assert_eq!(ops, decoded);
     }
+
+    // ── v2 block format ─────────────────────────────────────────
+
+    #[test]
+    fn test_wbin_v2_roundtrip_and_exec_parity() {
+        use crate::block_ir::linearize;
+        // loop + cond + def: control-flow-heavy program
+        let src = ": sq { _ * } ; 0 { _ 2 = ?? 99 . | _ sq . ] 1 + } { _ 4 < } # drop";
+        let (flat, defs_direct) = crate::block_gen::compile_block(src).unwrap();
+
+        // Rebuild block programs via compile_unit
+        let ast = whisper_parser::parser::Parser::parse_source(src).unwrap();
+        let unit = crate::block_gen::compile_unit(&ast);
+        let data = WbinWriter::write_unit(&unit.main, &unit.defs);
+
+        let decoded = WbinReader::decode_unit(&data).unwrap();
+        let WbinUnit::V2 { main, defs } = &decoded else {
+            panic!("expected v2");
+        };
+        assert_eq!(linearize(main), flat);
+        assert_eq!(defs.len(), 1);
+        assert_eq!(defs[0].0, "sq");
+        // def bytecode must also match the direct compile
+        let (name, code) = &defs[0];
+        let flat_def = defs_direct
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, c)| c.clone())
+            .expect("def present in direct compile");
+        assert_eq!(linearize(code), flat_def);
+
+        // Execution parity: v2 load + linearize == direct compile
+        let (main_flat, defs_flat) = decoded.linearized();
+        let mut vm = whisper_core::vm::Vm::new();
+        for (n, c) in defs_flat {
+            vm.define_word(n, c);
+        }
+        let r = vm.execute(&main_flat).unwrap();
+        assert_eq!(r, None);
+    }
+
+    #[test]
+    fn test_wbin_v1_still_decodable() {
+        let ops = vec![Opcode::PushI64(7), Opcode::Drop];
+        let data = WbinWriter::write(&ops);
+        match WbinReader::decode_unit(&data).unwrap() {
+            WbinUnit::V1(flat) => assert_eq!(flat, ops),
+            _ => panic!("expected v1"),
+        }
+    }
 }
+

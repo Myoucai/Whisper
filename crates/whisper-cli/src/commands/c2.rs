@@ -101,7 +101,9 @@ pub fn compile_via_whisperc_vm(source: &str) -> Result<String, String> {
     let ast = Parser::parse_source(WHISPERC_ALL)
         .map_err(|e| format!("whisperc parse: {} at {}", e.message, e.token.span.line))?;
     let mut gen = BytecodeGenerator::new();
-    let (_main_bc, defs) = gen.compile(&ast);
+    let (_main_bc, defs) = gen
+        .compile(&ast)
+        .map_err(|e| format!("whisperc compile: {}", whisper_codegen::block_ir::contract_errors_to_string(&e)))?;
     let mut vm = Vm::new();
     vm.trace = std::env::var("WHISPER_C2_TRACE").is_ok();
     super::bootstrap::register_host_helpers(&mut vm);

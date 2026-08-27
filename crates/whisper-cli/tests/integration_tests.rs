@@ -18,7 +18,7 @@ use whisper_typecheck::TypeChecker;
 fn compile(source: &str) -> (Vec<Opcode>, std::collections::HashMap<String, Vec<Opcode>>) {
     let ast = Parser::parse_source(source).expect("parse failed");
     let mut gen = BytecodeGenerator::new();
-    let (bc, defs) = gen.compile(&ast);
+    let (bc, defs) = gen.compile(&ast).unwrap();
     let bc = whisper_codegen::optimize(&bc);
     let defs: std::collections::HashMap<_, _> = defs
         .into_iter()
@@ -36,7 +36,7 @@ fn run(source: &str) -> Result<Option<Value>, String> {
         return Err(format!("type error: {}", errors[0].message));
     }
     let mut gen = BytecodeGenerator::new();
-    let (bc, defs) = gen.compile(&ast);
+    let (bc, defs) = gen.compile(&ast).unwrap();
     let bc = whisper_codegen::optimize(&bc);
     let mut vm = Vm::new();
     for (name, code) in &defs {
@@ -458,7 +458,7 @@ fn capability_bound_executes() {
     let source = "\"test.txt\" @0 !";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let mut cap_table = CapabilityTable::new();
     cap_table.bind(Box::new(FileReadCap {
         id: 0,
@@ -490,7 +490,7 @@ fn wbin_roundtrip_program() {
     let source = "3 4 + 2 *";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
-    let (bc, _) = gen.compile(&ast);
+    let (bc, _) = gen.compile(&ast).unwrap();
     let data = whisper_codegen::wbin::WbinWriter::write(&bc);
     let decoded = whisper_codegen::wbin::WbinReader::decode(&data).unwrap();
     let mut vm = Vm::new();
@@ -651,7 +651,7 @@ fn run_with_imports(source: &str) -> Result<Option<Value>, String> {
     let resolved =
         whisper_parser::resolve_imports(ast, &manifest).map_err(|e| format!("import: {e:?}"))?;
     let mut gen = BytecodeGenerator::new();
-    let (bc, defs) = gen.compile(&resolved.ast);
+    let (bc, defs) = gen.compile(&resolved.ast).unwrap();
     let mut vm = Vm::new();
     for (name, code) in defs {
         vm.define_word(name, code);
@@ -772,7 +772,7 @@ mod whisper_c2 {
             whisper_parser::Parser::parse_source(include_str!("../../../whisperc/compiler.all.ws"))
                 .map_err(|e| format!("whisperc parse: {e:?}"))?;
         let mut gen = whisper_codegen::bytecode_gen::BytecodeGenerator::new();
-        let (_main, defs) = gen.compile(&ast);
+        let (_main, defs) = gen.compile(&ast).unwrap();
         let mut vm = whisper_core::vm::Vm::new();
         vm.define_word(
             "PushList".into(),

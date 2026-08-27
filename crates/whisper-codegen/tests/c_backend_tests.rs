@@ -39,7 +39,7 @@ fn runtime_include_dir() -> std::path::PathBuf {
 fn run_in_vm(source: &str) -> String {
     let ast = Parser::parse_source(source).expect("parse failed");
     let mut gen = BytecodeGenerator::new();
-    let (bytecode, defs) = gen.compile(&ast);
+    let (bytecode, defs) = gen.compile(&ast).unwrap();
     let bytecode = whisper_codegen::optimize(&bytecode);
     let defs: Vec<(String, Vec<Opcode>)> = defs
         .into_iter()
@@ -62,7 +62,7 @@ fn compile_and_run_c(source: &str, tag: &str) -> String {
     let cc = find_cc().expect("C compiler required for c_backend_tests");
     let ast = Parser::parse_source(source).expect("parse failed");
     let mut gen = BytecodeGenerator::new();
-    let (bytecode, defs) = gen.compile(&ast);
+    let (bytecode, defs) = gen.compile(&ast).unwrap();
     let bytecode = whisper_codegen::optimize(&bytecode);
     let defs: Vec<(String, Vec<Opcode>)> = defs
         .into_iter()

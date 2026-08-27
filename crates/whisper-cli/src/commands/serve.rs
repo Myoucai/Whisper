@@ -24,7 +24,9 @@ pub fn serve(handler_file: &str, port: u16) -> Result<(), String> {
     let ast =
         Parser::parse_source(&handler_src).map_err(|e| format!("Parse error: {}", e.message))?;
     let mut gen = BytecodeGenerator::new();
-    let (bytecode, defs) = gen.compile(&ast);
+    let (bytecode, defs) = gen
+        .compile(&ast)
+        .map_err(|e| format!("Compile error: {}", whisper_codegen::block_ir::contract_errors_to_string(&e)))?;
 
     let addr = format!("127.0.0.1:{port}");
     let listener = TcpListener::bind(&addr).map_err(|e| format!("Cannot bind to {addr}: {e}"))?;

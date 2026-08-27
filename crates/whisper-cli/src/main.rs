@@ -107,10 +107,6 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
         .skip(2)
         .find(|a| !a.starts_with('-'))
         .ok_or("Expected: whisper run <file.ws>")?;
-    let source = std::fs::read_to_string(file).map_err(|e| format!("Cannot read '{file}': {e}"))?;
-    let source_dir = std::path::Path::new(file)
-        .parent()
-        .unwrap_or(std::path::Path::new("."));
     let config = commands::run::RunConfig {
         allow_file_read: get_flag(args, "--allow-file-read"),
         allow_file_write: get_flag(args, "--allow-file-write"),
@@ -119,6 +115,15 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
         allow_exec: get_flag(args, "--allow-exec"),
         trace: get_flag(args, "--trace"),
     };
+    // .wbin: decode + linearize (v2 blocks) or run flat (v1 legacy)
+    if file.ends_with(".wbin") {
+        let data = std::fs::read(file).map_err(|e| format!("Cannot read '{file}': {e}"))?;
+        return commands::run::run_wbin(&data, &config);
+    }
+    let source = std::fs::read_to_string(file).map_err(|e| format!("Cannot read '{file}': {e}"))?;
+    let source_dir = std::path::Path::new(file)
+        .parent()
+        .unwrap_or(std::path::Path::new("."));
     commands::run::run_source(&source, source_dir, &config)
 }
 
