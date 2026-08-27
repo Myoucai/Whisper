@@ -17,11 +17,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.0-7cffc4" alt="version">
-  <img src="https://img.shields.io/badge/tests-358%20passed-brightgreen" alt="tests">
+  <img src="https://img.shields.io/badge/version-1.0.7-7cffc4" alt="version">
+  <img src="https://img.shields.io/badge/tests-392%20passed%20%2B%205%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
-  <img src="https://img.shields.io/badge/stdlib-9%20modules-blue" alt="stdlib">
+  <img src="https://img.shields.io/badge/stdlib-13%20modules-blue" alt="stdlib">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
 </p>
 
@@ -136,8 +136,18 @@ whisper run hello.ws
 | 比较 | `=` `<` `>` `!=` `<=` `>=` |
 | 逻辑 | `&` and, `\|` or, `!` not |
 | 控制 | `??..\|..]` 条件, `#` 循环, `?->` 单分支 |
-| @词 | `@map` `@each` `@fold` `@nth` `@times` |
+| @词 | `@map` `@each` `@fold` `@filter` `@nth` `@times` |
+| 循环控制 | `leave`（退出最内层 `#` 循环） |
 | IO | `.` 输出栈顶, `..` 输出全部, `,` 读输入 |
+| 交互 | `read-line`（stdin 一行，EOF→空串） |
+| 字符串 | `strcat strlen strslice streq strfind strreplace strsplit strjoin strmatch strfind-re str-upper str-lower str-strip fmt ctos` |
+| 文件/目录 | `read-file write-file listdir mkdir file-exists` |
+| 时间 | `now strftime sleep` |
+| 二进制 | `pack unpack`（struct 小端打包） |
+| 正则 | `strmatch strfind-re`（子集：`. * + ? [] ^$ \d\w\s | (...)`) |
+| 网络 | `listen accept recv send serve-concurrent` |
+| KV | `kv-set kv-get kv-del kv-keys`（进程级 str→str 共享存储） |
+| 生成 | `range`（`start count → [start..start+count-1]`，预分配） |
 
 ## 自举
 
@@ -192,16 +202,33 @@ whisper build hello.ws -t c2 -o hello && ./hello
 ```
 
 - **`-t c`（Rust 转译器）**：覆盖字符串/列表/Map/浮点/高阶函数（`@map`/`@fold`/`@times` 等），12 个端到端 gcc 测试把关。
-- **`-t c2`（自举链）**：编译器完全由 Whisper 自身编写（`whisperc/compiler.all.ws`），在 Rust VM 上运行并生成 C；支持 import 内联（含 `std/*`）、浮点字面量、循环/条件/递归。已知限制：高阶函数（`@map` 等）尚待 cgen 支持；C 运行时值无类型标签，浮点算术仅经显式 f-opcode 流转。
+- **`-t c2`（自举链）**：编译器完全由 Whisper 自身编写（`whisperc/compiler.all.ws`），在 Rust VM 上运行并生成 C；支持 import 内联（含 `std/*`）、浮点字面量、循环/条件/递归、高阶函数融合（`@map`/`@each`/`@fold`/`@filter`/`@times` 编译为嵌套函数 + 循环）、v1.0.3-1.0.7 全部新词汇（regex/struct/目录/时间/leave 等）。已知限制：C 运行时值无类型标签，浮点以位模式流转（经 f-opcode 显式转换）。
 - 固定点（whisper2 编译自身输出逐字节一致）可随时用脚本复验，已纳入 CI。
+
+## 性能
+
+c2 原生输出的实测（journal 工具，10,000 条记录 538KB，输出重定向）：
+
+| 运行形态 | list | search | 纯启动 |
+|---------|------|--------|-------|
+| c2 原生 exe (gcc -O2) | **6.1 ms** | 6.3 ms | 2.9 ms |
+| Rust VM (release) | 26 ms | 27 ms | 4.0 ms |
+| Python 对照 | 20 ms | 20 ms | 13.5 ms |
+
+列表构建已全面预分配（`range`/`strsplit`/`@filter`），此前的 O(n²)
+append 模式已消除（`range-to` 10 万元素 83s → 19ms）。
 
 ## 功能特性
 
 | 功能 | 状态 |
 |------|------|
-| 栈式虚拟机 (109 opcodes) | ✅ |
+| 栈式虚拟机 (137 opcodes) | ✅ |
 | 硬自举编译器 (纯 Whisper + C 种子，固定点已验证) | ✅ |
 | C 转译后端 (gcc 编译为原生可执行) | ✅ |
+| 正则子集 (strmatch/strfind-re，双链手写匹配器) | ✅ |
+| struct 二进制打包 (pack/unpack，小端) | ✅ |
+| 共享 KV 存储 + 并发 Web 服务器 (serve-concurrent) | ✅ |
+| 循环控制 (leave，编译期跳转回填) | ✅ |
 | 静态类型推导（当前仅警告） | ⚠️ |
 | 能力安全沙箱 (6 caps) | ✅ |
 | 置信度系统 + 概率选择 | ✅ |
@@ -215,8 +242,9 @@ whisper build hello.ws -t c2 -o hello && ./hello
 | REPL (多行/历史/补全) | ✅ |
 | JSON 解析/序列化 | ✅ |
 | 浮点数学 (三角函数) | ✅ |
-| 字符串操作 (14 ops) | ✅ |
-| 标准库 (9 模块, 48 函数) | ✅ |
+| 字符串操作 (20+ ops，含正则/大小写/格式化) | ✅ |
+| 标准库 (13 模块, 60+ 函数) | ✅ |
+| 真实工具 (apps/journal 命令行日记) | ✅ |
 
 ## CLI 命令
 
@@ -247,11 +275,14 @@ Whisper/
 │   ├── whisper-lsp/       # LSP 语言服务器
 │   └── whisper-cli/       # CLI 入口
 ├── whisperc/              # 自举编译器 (纯 Whisper 实现)
-│   ├── lexer.ws           #   词法分析器
-│   ├── classify.ws        #   Token 分类器 + 递归分类
-│   ├── parser.ws          #   结构分组 (替代 Rust structify_chunks)
-│   └── main.ws            #   字节码编译器 + 完整管线
-├── stdlib/                # 标准库 (.ws 源码)
+│   ├── compiler.all.ws    #   编译器全源码（权威文件，固定点基准）
+│   ├── runtime.c          #   C 运行时（seed 与 c2 共享）
+│   └── seed/              #   冻结的手写 C 种子
+├── stdlib/                # 标准库 (13 模块 .ws)
+├── apps/
+│   ├── journal/           #   命令行日记（第一个真实工具）
+│   └── webapp/            #   v3 并发 Web 后端
+├── paper/                 #   论文 + 微调实验数据/脚本
 ├── vscode-extension/      # VS Code 插件
 ├── docs/                  # 文档和示例
 └── .github/workflows/     # CI/CD
@@ -262,14 +293,16 @@ Whisper/
 
 
 路由分发、JSON 响应、静态文件、`WS_PORT` 环境变量配置——全部由 Whisper 编写，
-自举编译器编译。FAIL: c2 build failed 在 CI 中验证。
+自举编译器编译。10 路并发全路由验证通过（v1.0.2 每连接一线程）。
 
 ## 测试
 
 ```bash
-cargo test --workspace
-# 381 tests: all passed (Rust 侧)
-bash whisper_test/run_core.sh <seed-bin> run|c   # 自举链 22 核心用例 x2 模式
+cargo test --workspace                           # 392 tests: all passed
+bash scripts/syntax-gate.sh                      # 26 语法断言
+bash scripts/stdlib-gate.sh                      # 54 双链 stdlib 断言（VM+c2 输出一致）
+bash scripts/net-gate.sh                         # 真实 HTTP 服务 + curl
+bash scripts/app-gate.sh                         # 13 路由 Web 应用断言
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验
 ```
 
