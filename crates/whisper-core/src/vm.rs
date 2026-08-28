@@ -1800,29 +1800,11 @@ fn whisper_to_json(v: &Value) -> Result<serde_json::Value, VmError> {
         Value::Bool(b) => Ok(serde_json::Value::Bool(*b)),
         Value::Str(s) => Ok(serde_json::Value::String(s.as_ref().clone())),
         Value::List(items) => {
-            // Heuristic: if all elements are 2-element lists starting with Str,
-            // treat as JSON object; otherwise treat as JSON array.
-            let is_object = items.iter().all(|item| match item {
-                Value::List(pair) if pair.len() == 2 => {
-                    matches!(&pair[0], Value::Str(_))
-                }
-                _ => false,
-            });
-            if is_object && !items.is_empty() {
-                let mut map = serde_json::Map::new();
-                for item in items.iter() {
-                    if let Value::List(pair) = item {
-                        if let Value::Str(k) = &pair[0] {
-                            let val = whisper_to_json(&pair[1])?;
-                            map.insert(k.as_ref().clone(), val);
-                        }
-                    }
-                }
-                Ok(serde_json::Value::Object(map))
-            } else {
-                let arr: Result<Vec<_>, _> = items.iter().map(whisper_to_json).collect();
-                Ok(serde_json::Value::Array(arr?))
-            }
+            // Lists ALWAYS serialize as arrays. The legacy heuristic
+            // (all-2-elem-str-head lists → object) corrupted list-of-
+            // key-lists kv-JSON round-trips; objects are Maps since L-08.
+            let arr: Result<Vec<_>, _> = items.iter().map(whisper_to_json).collect();
+            Ok(serde_json::Value::Array(arr?))
         }
         Value::Signal(inner, _) => whisper_to_json(inner),
         Value::Map(map) => {
