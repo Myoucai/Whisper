@@ -1779,16 +1779,12 @@ fn json_to_whisper(v: &serde_json::Value) -> Value {
             Value::List(Rc::new(items))
         }
         serde_json::Value::Object(obj) => {
-            let items: Vec<Value> = obj
-                .iter()
-                .map(|(k, v)| {
-                    Value::List(Rc::new(vec![
-                        Value::Str(Rc::new(k.clone())),
-                        json_to_whisper(v),
-                    ]))
-                })
-                .collect();
-            Value::List(Rc::new(items))
+            let mut map: std::collections::HashMap<String, Value> =
+                std::collections::HashMap::with_capacity(obj.len());
+            for (k, v) in obj {
+                map.insert(k.clone(), json_to_whisper(v));
+            }
+            Value::Map(Rc::new(map))
         }
     }
 }
@@ -1829,6 +1825,13 @@ fn whisper_to_json(v: &Value) -> Result<serde_json::Value, VmError> {
             }
         }
         Value::Signal(inner, _) => whisper_to_json(inner),
+        Value::Map(map) => {
+            let mut obj = serde_json::Map::new();
+            for (k, v) in map.iter() {
+                obj.insert(k.clone(), whisper_to_json(v)?);
+            }
+            Ok(serde_json::Value::Object(obj))
+        }
         _ => Ok(serde_json::Value::Null),
     }
 }
@@ -2550,19 +2553,13 @@ mod tests {
         let mut vm = Vm::new();
         vm.data_stack.push(Value::Str(Rc::new("{\"a\":1}".into())));
         let r = vm.execute(&[Opcode::JsonParse]).unwrap();
-        // Object becomes list of [key, value] pairs
+        // Object becomes a Map (json-parse round-trips maps as objects)
         match r {
-            Some(Value::List(items)) => {
-                assert_eq!(items.len(), 1);
-                match &items[0] {
-                    Value::List(pair) => {
-                        assert_eq!(pair[0], Value::Str(Rc::new("a".into())));
-                        assert_eq!(pair[1], Value::I64(1));
-                    }
-                    _ => panic!("expected pair"),
-                }
+            Some(Value::Map(map)) => {
+                assert_eq!(map.len(), 1);
+                assert_eq!(map.get("a"), Some(&Value::I64(1)));
             }
-            _ => panic!("expected list"),
+            _ => panic!("expected map"),
         }
     }
 
