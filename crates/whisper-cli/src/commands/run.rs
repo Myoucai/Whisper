@@ -171,19 +171,36 @@ pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result
         }));
     }
     if config.allow_http {
-        capability_table.bind(Box::new(whisper_core::capability::HttpGetCap {
-            id: 2,
-            allowed_hosts: vec![
+        let hosts = || {
+            vec![
                 "api.github.com".into(),
                 "jsonplaceholder.typicode.com".into(),
-            ],
+                "127.0.0.1".into(),
+                "localhost".into(),
+            ]
+        };
+        capability_table.bind(Box::new(whisper_core::capability::HttpGetCap {
+            id: 2,
+            allowed_hosts: hosts(),
         }));
         capability_table.bind(Box::new(whisper_core::capability::HttpPostCap {
             id: 3,
-            allowed_hosts: vec![
-                "api.github.com".into(),
-                "jsonplaceholder.typicode.com".into(),
-            ],
+            allowed_hosts: hosts(),
+        }));
+        // L-06 会话族：共享 cookie 罐与审计日志
+        let jar = std::sync::Arc::new(std::sync::Mutex::new(
+            std::collections::HashMap::new(),
+        ));
+        let audit = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+        capability_table.bind(Box::new(whisper_core::http_session::HttpSessionCap {
+            id: 6,
+            allowed_hosts: hosts(),
+            jar: jar.clone(),
+            audit: audit.clone(),
+        }));
+        capability_table.bind(Box::new(whisper_core::http_session::HttpAuditCap {
+            id: 7,
+            audit,
         }));
     }
     if config.allow_env {

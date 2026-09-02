@@ -339,7 +339,7 @@ impl Capability for HttpPostCap {
 
 /// Check whether a host is allowed by the whitelist.
 /// Exact match or the host is a subdomain of an allowed domain.
-fn host_allowed(host: &str, allowed: &[String]) -> bool {
+pub(crate) fn host_allowed(host: &str, allowed: &[String]) -> bool {
     let host_lower = host.to_lowercase();
     allowed.iter().any(|h| {
         let allow = h.to_lowercase();
@@ -357,14 +357,14 @@ fn http_post(url: &str, body: &str) -> Result<String, String> {
     http_request("POST", &parsed, body)
 }
 
-struct ParsedUrl {
-    use_tls: bool,
-    host: String,
-    port: u16,
-    path: String,
+pub(crate) struct ParsedUrl {
+    pub(crate) use_tls: bool,
+    pub(crate) host: String,
+    pub(crate) port: u16,
+    pub(crate) path: String,
 }
 
-fn parse_url(url: &str) -> Option<ParsedUrl> {
+pub(crate) fn parse_url(url: &str) -> Option<ParsedUrl> {
     let (use_tls, rest) = if let Some(r) = url.strip_prefix("https://") {
         (true, r)
     } else {
