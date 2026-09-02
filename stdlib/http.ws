@@ -9,7 +9,7 @@
 : http-get  { @2 } ;
 : http-post { @3 } ;
 : http-req  { @6 } ;
-: http-audit { @7 } ;
+: http-audit { "" @7 } ;
 
 export http-get
 export http-post
