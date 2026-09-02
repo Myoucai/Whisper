@@ -91,6 +91,10 @@ pub enum Opcode {
     OpEffect,
     QuoteSize,
     WordSize,
+    SetSeed,
+    Rand,
+    ConfOf,
+    UnwrapSig,
 
     // === P0 vocabulary (v1.0.3) ===
     /// -> str (one line from stdin, newline stripped; EOF yields "")
@@ -417,6 +421,10 @@ impl Opcode {
             Opcode::OpEffect => 0x2A,
             Opcode::QuoteSize => 0x2B,
             Opcode::WordSize => 0x2C,
+            Opcode::SetSeed => 0x2D,
+            Opcode::Rand => 0x2E,
+            Opcode::ConfOf => 0x2F,
+            Opcode::UnwrapSig => 0x36,
             Opcode::ReadLine => 249,
             Opcode::StrUpper => 250,
             Opcode::StrLower => 251,
@@ -635,6 +643,10 @@ impl Opcode {
             Opcode::OpEffect => "op-effect",
             Opcode::QuoteSize => "size-of",
             Opcode::WordSize => "word-size",
+            Opcode::SetSeed => "seed!",
+            Opcode::Rand => "rand",
+            Opcode::ConfOf => "conf-of",
+            Opcode::UnwrapSig => "unwrap",
             Opcode::ReadLine => "read-line",
             Opcode::StrUpper => "str-upper",
             Opcode::StrLower => "str-lower",

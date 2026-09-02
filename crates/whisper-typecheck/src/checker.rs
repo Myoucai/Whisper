@@ -839,6 +839,20 @@ impl TypeChecker {
                 self.expect_n(stack, 1, errors, ctx, "word-size");
                 stack.push(Type::I64);
             }
+            Operator::SetSeed => {
+                self.expect_n(stack, 1, errors, ctx, "seed!");
+            }
+            Operator::Rand => {
+                stack.push(Type::F64);
+            }
+            Operator::ConfOf => {
+                // ( v -- v f64 ) 非破坏读置信度
+                stack.push(Type::F64);
+            }
+            Operator::UnwrapSig => {
+                self.expect_n(stack, 1, errors, ctx, "unwrap");
+                stack.push(self.inferer.fresh_var());
+            }
             Operator::KvSet => {
                 self.expect_n(stack, 2, errors, ctx, "kv-set");
             }

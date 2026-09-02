@@ -144,16 +144,39 @@ import "./mylib"                    // loads ./mylib.ws
 ## Confidence System
 
 ```whisper
-// Label values with confidence
+// Label values with confidence (Signal wrapper, clamp [0,1])
 42 :0.5          // 42 with 50% confidence
 
-// Confidence propagates through operations
+// Confidence propagates through arithmetic
 10 :0.5 2 * .    // 20:0.5
 
-// Probabilistic choice
-10 :0.7 { _ * } { 2 * } ?| .
-// 70% chance: 100  (10*10)
-// 30% chance: 20   (10*2)
+// Read confidence without consuming the value (L-04)
+7 :0.3 dup conf-of . .   // 0.3, then 7:0.3
+
+// Strip the Signal wrapper (L-04)
+7 :0.3 unwrap .          // 7
+```
+
+### Probabilistic choice `?|` (L-03 semantics)
+
+```whisper
+// Stack: ... p {preferred} {fallback} ?|
+// P(preferred) = p; p must be f64 in [0,1] or a Signal (uses its
+// confidence, unwraps back to the plain value). Missing/invalid p
+// is a runtime error — no implicit defaults.
+
+0.9 { "go" } { "wait" } ?| .     // 90% "go"
+
+// Signal composes: confidence of x drives the choice,
+// the branch sees the unwrapped value
+10 :0.7 { _ * } { 2 * } ?| .     // 70%: 100, 30%: 20
+```
+
+### Determinism
+
+```whisper
+42 seed!      // pin the xorshift64 RNG (i64 seed)
+rand .        // next uniform f64 in [0,1) — replayable after seed!
 ```
 
 ## File I/O

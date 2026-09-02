@@ -387,6 +387,7 @@ impl Lexer {
                 || ch == '$'
                 || ch == '>'
                 || ch == '<'
+                || ch == '!'
             {
                 name.push(ch);
                 self.advance();
@@ -440,6 +441,10 @@ impl Lexer {
             "op-effect" => TokenKind::OpEffect,
             "size-of" => TokenKind::QuoteSize,
             "word-size" => TokenKind::WordSize,
+            "seed!" => TokenKind::SetSeed,
+            "rand" => TokenKind::Rand,
+            "conf-of" => TokenKind::ConfOf,
+            "unwrap" => TokenKind::UnwrapSig,
             "kv-set" => TokenKind::KvSet,
             "kv-get" => TokenKind::KvGet,
             "kv-del" => TokenKind::KvDel,

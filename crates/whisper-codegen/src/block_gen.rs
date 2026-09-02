@@ -342,10 +342,12 @@ fn compile_node_block(builder: &mut BlockBuilder, node: &AstNode, ctx: &mut Bloc
             emit_value(builder, &v);
         }
         AstNode::ProbChoice { alt1, alt2 } => {
-            let q2 = ast_to_value(&AstNode::Quote(alt2.clone()), ctx);
-            emit_value(builder, &q2);
+            // 约定（L-03）：alt1=preferred（p 概率）、alt2=fallback；
+            // VM 先弹顶 → alt2 在顶。
             let q1 = ast_to_value(&AstNode::Quote(alt1.clone()), ctx);
             emit_value(builder, &q1);
+            let q2 = ast_to_value(&AstNode::Quote(alt2.clone()), ctx);
+            emit_value(builder, &q2);
             builder.emit(Opcode::ProbChoice);
         }
         AstNode::ConfidenceLabel { body, confidence } => {

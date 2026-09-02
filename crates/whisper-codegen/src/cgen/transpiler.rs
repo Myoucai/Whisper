@@ -157,7 +157,8 @@ fn transpile_opcodes(
         }
         let op = &opcodes[i];
         match op {
-            Opcode::OpEffect | Opcode::QuoteSize | Opcode::WordSize => {
+            Opcode::OpEffect | Opcode::QuoteSize | Opcode::WordSize | Opcode::SetSeed
+            | Opcode::Rand | Opcode::ConfOf | Opcode::UnwrapSig => {
                 let _ = writeln!(out, "{pad}#error unsupported: op-effect/size-of/word-size");
             }
             // ── Literals ────────────────────────────────────────

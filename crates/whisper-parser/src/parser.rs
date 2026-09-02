@@ -660,6 +660,22 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::WordSize)))
             }
+            TokenKind::SetSeed => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::SetSeed)))
+            }
+            TokenKind::Rand => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Rand)))
+            }
+            TokenKind::ConfOf => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::ConfOf)))
+            }
+            TokenKind::UnwrapSig => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::UnwrapSig)))
+            }
             TokenKind::KvSet => {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::KvSet)))

@@ -1548,23 +1548,63 @@ impl Vm {
                 self.data_stack.push(Value::Signal(Box::new(v), confidence));
             }
             Opcode::ProbChoice => {
-                // Stack: ... value {alt2} {alt1}
-                // Pop both alternatives (alt1 on top, pushed second by codegen)
-                let branch_true = self.pop_ref()?; // alt1 (preferred branch)
-                let branch_false = self.pop_ref()?; // alt2 (fallback branch)
-                                                    // Peek confidence from the value below (don't pop — branch uses it)
-                let confidence = self
-                    .data_stack
-                    .last()
-                    .map(|v| v.confidence())
-                    .unwrap_or(1.0);
-                // Choose branch probabilistically
-                let r = xorshift64_next(&mut self.rng_state);
-                if r < confidence {
+                // L-03 定稿语义（概率从栈取，显式且可组合）：
+                //   p {alt1} {alt2} ?|   （alt2 在顶）
+                // p 的来源（按序判定）：
+                //   Signal(v, c) → 消费 p，压回 v（解包），取 c
+                //   F64 ∈ [0,1]  → 消费 p，取其值
+                //   其他          → 报错（旧版"窥视下方默认 1.0"的隐式耦合废除）
+                // P(alt1) = p。RNG 为 xorshift64，seed! 可定种子复现。
+                let branch_false = self.pop_ref()?; // alt2（顶）
+                let branch_true = self.pop_ref()?; // alt1
+                let p = match self.data_stack.last() {
+                    Some(Value::Signal(inner, c)) => {
+                        let c = *c;
+                        let inner = (**inner).clone();
+                        self.data_stack.pop();
+                        self.data_stack.push(inner);
+                        c
+                    }
+                    Some(Value::F64(f)) => {
+                        let f = *f;
+                        if !(0.0..=1.0).contains(&f) {
+                            return Err(VmError::ProgramError(format!(
+                                "?| probability out of range: {f} (need [0,1])"
+                            )));
+                        }
+                        self.data_stack.pop();
+                        f
+                    }
+                    other => {
+                        return Err(VmError::ProgramError(format!(
+                            "?| needs probability (Signal or f64 in [0,1]) below the two quotes, got {:?}",
+                            other.map(|v| v.type_name())
+                        )));
+                    }
+                };
+                let r = self.rng_next_f64();
+                if r < p {
                     self.execute_ref(&branch_true)?;
                 } else {
                     self.execute_ref(&branch_false)?;
                 }
+            }
+            Opcode::SetSeed => {
+                let n = self.pop_i64()?;
+                self.rng_state = n as u64;
+            }
+            Opcode::Rand => {
+                let r = self.rng_next_f64();
+                self.data_stack.push(Value::F64(r));
+            }
+            // L-04 定稿：conf-of 读置信度（Signal→c，其余 1.0）；unwrap 剥壳
+            Opcode::ConfOf => {
+                let c = self.data_stack.last().map(|v| v.confidence()).unwrap_or(1.0);
+                self.data_stack.push(Value::F64(c));
+            }
+            Opcode::UnwrapSig => {
+                let v = self.pop()?;
+                self.data_stack.push(v.unwrap_signal());
             }
 
             // === IO ===
@@ -1596,6 +1636,11 @@ impl Vm {
     // === Helper methods ===
 
     /// Xorshift64* PRNG returning raw 64-bit value (for Random/RandInt).
+    fn rng_next_f64(&mut self) -> f64 {
+        let bits = self.xorshift64_next();
+        (bits >> 11) as f64 / (1u64 << 53) as f64
+    }
+
     fn xorshift64_next(&mut self) -> u64 {
         self.rng_state ^= self.rng_state >> 12;
         self.rng_state ^= self.rng_state << 25;
@@ -2246,39 +2291,88 @@ mod tests {
         Value::Ref(Rc::from(opcodes.into_boxed_slice()))
     }
 
-    /// Confidence 1.0 always chooses the preferred branch (alt1).
+    /// P=1.0 always chooses alt1; the f64 probability is consumed.
     #[test]
     fn test_prob_choice_full_confidence() {
         let mut vm = Vm::new();
-        // Stack: value {alt2} {alt1}
-        // alt1 doubles the value, alt2 multiplies by 3
         let alt1 = make_ref(vec![Opcode::PushI64(2), Opcode::Mul, Opcode::Return]);
         let alt2 = make_ref(vec![Opcode::PushI64(3), Opcode::Mul, Opcode::Return]);
-        vm.data_stack.push(Value::I64(10)); // value with implicit conf 1.0
-        vm.data_stack.push(alt2); // alt2 deeper
-        vm.data_stack.push(alt1); // alt1 on top
+        vm.data_stack.push(Value::I64(10));
+        vm.data_stack.push(Value::F64(1.0));
+        vm.data_stack.push(alt1);
+        vm.data_stack.push(alt2);
         let r = vm.execute(&[Opcode::ProbChoice]).unwrap();
-        // 10 * 2 = 20 (always alt1 when confidence is 1.0)
-        assert_eq!(r, Some(Value::I64(20)), "confidence 1.0 → always alt1");
+        assert_eq!(r, Some(Value::I64(20)), "p=1.0 → always alt1");
     }
 
-    /// Confidence 0.0 always chooses the fallback branch (alt2).
+    /// P=0.0 always chooses alt2 (fallback).
     #[test]
     fn test_prob_choice_zero_confidence() {
         let mut vm = Vm::new();
         let alt1 = make_ref(vec![Opcode::PushI64(2), Opcode::Mul, Opcode::Return]);
         let alt2 = make_ref(vec![Opcode::PushI64(3), Opcode::Mul, Opcode::Return]);
-        let conf_val = Value::Signal(Box::new(Value::I64(10)), 0.0);
-        vm.data_stack.push(conf_val);
+        vm.data_stack.push(Value::I64(10));
+        vm.data_stack.push(Value::F64(0.0));
+        vm.data_stack.push(alt1);
+        vm.data_stack.push(alt2);
+        let r = vm.execute(&[Opcode::ProbChoice]).unwrap();
+        assert_eq!(r, Some(Value::I64(30)), "p=0.0 → always alt2");
+    }
+
+    /// Signal(x, c) 概率：消费 Signal、压回 x、以 c 选择。
+    #[test]
+    fn test_prob_choice_signal_probability() {
+        let mut vm = Vm::new();
+        let alt1 = make_ref(vec![Opcode::PushI64(2), Opcode::Mul, Opcode::Return]);
+        let alt2 = make_ref(vec![Opcode::PushI64(3), Opcode::Mul, Opcode::Return]);
+        vm.data_stack
+            .push(Value::Signal(Box::new(Value::I64(10)), 0.0));
+        vm.data_stack.push(alt1);
+        vm.data_stack.push(alt2);
+        let r = vm.execute(&[Opcode::ProbChoice]).unwrap();
+        assert_eq!(r, Some(Value::I64(30)), "Signal conf 0.0 → alt2, x unwrapped");
+    }
+
+    /// 非法概率源（无 f64/Signal 在引号下方）→ 显式报错。
+    #[test]
+    fn test_prob_choice_missing_probability_errors() {
+        let mut vm = Vm::new();
+        let alt1 = make_ref(vec![Opcode::PushI64(2), Opcode::Mul, Opcode::Return]);
+        let alt2 = make_ref(vec![Opcode::PushI64(3), Opcode::Mul, Opcode::Return]);
         vm.data_stack.push(alt2);
         vm.data_stack.push(alt1);
-        let val = vm.execute(&[Opcode::ProbChoice]).unwrap().unwrap();
-        // 10 * 3 = 30, wrapped in Signal since confidence propagates
-        assert_eq!(
-            val.unwrap_signal(),
-            Value::I64(30),
-            "confidence 0.0 → always alt2"
-        );
+        let r = vm.execute(&[Opcode::ProbChoice]);
+        assert!(r.is_err(), "missing probability must error");
+    }
+
+    /// 概率越界（>1.0）→ 显式报错。
+    #[test]
+    fn test_prob_choice_out_of_range_errors() {
+        let mut vm = Vm::new();
+        let alt1 = make_ref(vec![Opcode::PushI64(2), Opcode::Mul, Opcode::Return]);
+        let alt2 = make_ref(vec![Opcode::PushI64(3), Opcode::Mul, Opcode::Return]);
+        vm.data_stack.push(Value::F64(1.5));
+        vm.data_stack.push(alt2);
+        vm.data_stack.push(alt1);
+        let r = vm.execute(&[Opcode::ProbChoice]);
+        assert!(r.is_err(), "p>1 must error");
+    }
+
+    /// seed! 后 rand 序列可复现。
+    #[test]
+    fn test_seed_determinism() {
+        let mut a = Vm::new();
+        let a_top = a
+            .execute(&[Opcode::PushI64(42), Opcode::SetSeed, Opcode::Rand, Opcode::Rand])
+            .unwrap();
+        let a_second = a.pop().unwrap();
+        let mut b = Vm::new();
+        let b_top = b
+            .execute(&[Opcode::PushI64(42), Opcode::SetSeed, Opcode::Rand, Opcode::Rand])
+            .unwrap();
+        let b_second = b.pop().unwrap();
+        assert_eq!(a_top, b_top);
+        assert_eq!(a_second, b_second);
     }
 
     /// Confidence 0.5 should exercise both branches over many trials.
@@ -2316,21 +2410,6 @@ mod tests {
 
     /// Non-Signal values have implicit confidence 1.0 → always alt1.
     #[test]
-    fn test_prob_choice_no_signal_value() {
-        let mut vm = Vm::new();
-        let alt1 = make_ref(vec![Opcode::PushI64(2), Opcode::Mul, Opcode::Return]);
-        let alt2 = make_ref(vec![Opcode::PushI64(3), Opcode::Mul, Opcode::Return]);
-        vm.data_stack.push(Value::I64(7)); // implicit conf 1.0
-        vm.data_stack.push(alt2);
-        vm.data_stack.push(alt1);
-        let r = vm.execute(&[Opcode::ProbChoice]).unwrap();
-        assert_eq!(
-            r,
-            Some(Value::I64(14)),
-            "implicit confidence 1.0 → alt1: 7*2=14"
-        );
-    }
-
     // === String operation tests ===
 
     #[test]
