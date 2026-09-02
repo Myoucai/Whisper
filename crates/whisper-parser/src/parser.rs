@@ -648,6 +648,18 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::EnvGet)))
             }
+            TokenKind::OpEffect => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::OpEffect)))
+            }
+            TokenKind::QuoteSize => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::QuoteSize)))
+            }
+            TokenKind::WordSize => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::WordSize)))
+            }
             TokenKind::KvSet => {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::KvSet)))

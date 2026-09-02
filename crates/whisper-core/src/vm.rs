@@ -78,6 +78,65 @@ fn generate_rng_seed() -> u64 {
         .wrapping_mul(0x2545F4914F6CDD1D)
 }
 
+
+/// 内建词栈效应（名字键）：归纳枚举用的可扩展核心集（L-01）。
+/// 与 codegen stack_effect.rs 的 opcode 表同口径；Call/网络/FFI 等基础设施不列。
+pub fn builtin_effect_by_name(name: &str) -> Option<(i64, i64)> {
+    Some(match name {
+        // 栈
+        "dup" => (1, 2),
+        "swap" => (2, 0 + 2),
+        "drop" => (1, 0),
+        "rot" => (3, 3),
+        "over" => (2, 3),
+        // 算术/比较/逻辑
+        "+" | "-" | "*" | "/" | "%" | "<<" | ">>" => (2, 1),
+        "<" | ">" | "<=" | ">=" | "=" | "!=" => (2, 1),
+        "&" | "|" => (2, 1),
+        "!" => (1, 1),
+        // i64/f64
+        "i64tostr" | "strtoi64" | "i64tof64" | "f64toi64" | "i64?" | "str?" | "bool?" | "list?"
+            | "ctos" | "streq" | "strlt" => (1, 1),
+        "fsqrt" | "fsin" | "fcos" | "ftan" | "floor" | "ceil" | "round" | "log" | "exp" => (1, 1),
+        "atan2" => (2, 1),
+        // 字符串
+        "strcat" | "strfind" | "strslice-aux" | "streq-aux" => (2, 1),
+        "strreplace" | "strslice" | "strfind-re" | "strmatch" => (3, 1),
+        "strlen" | "strchars" | "strrev" | "upper" | "lower" => (1, 1),
+        "charsstr" | "strtrim" => (1, 1),
+        "strjoin" => (2, 1),
+        "strsplit" => (2, 1),
+        "strnth" => (2, 1),
+        // 列表
+        "@nth" | "append" | "prepend" | "@nth-ref" => (2, 1),
+        "len" | "rev" | "sort" | "dedup" | "take" | "drop-n" | "list?" => (1, 1),
+        "list-slice" => (3, 1),
+        "range" => (2, 1),
+        // map
+        "map-new" => (0, 1),
+        "map-get" => (2, 1),
+        "map-set" => (3, 1),
+        "map-has" => (2, 1),
+        "map-del" => (2, 1),
+        "map-keys" => (1, 1),
+        // kv
+        "kv-get" => (1, 1),
+        "kv-set" => (2, 0),
+        "kv-del" => (1, 0),
+        "kv-keys" => (0, 1),
+        // json
+        "json-parse" => (1, 1),
+        "json-stringify" => (1, 1),
+        // 高阶（引号操作数按 1 计）
+        "@each" => (2, 0),
+        "@map" => (2, 1),
+        "@filter" => (2, 1),
+        "@fold" => (3, 1),
+        "@times" => (2, 0),
+        _ => return None,
+    })
+}
+
 impl Vm {
     /// Create a new VM with empty stacks and default settings.
     pub fn new() -> Self {
@@ -519,6 +578,30 @@ impl Vm {
             Opcode::KvDel => {
                 let key = self.pop_str()?;
                 self.kv.borrow_mut().remove(key.as_ref());
+            }
+            Opcode::OpEffect => {
+                let name = self.pop_str()?;
+                match builtin_effect_by_name(name.as_ref()) {
+                    Some((pops, pushes)) => {
+                        self.data_stack.push(Value::I64(pops));
+                        self.data_stack.push(Value::I64(pushes));
+                    }
+                    None => {
+                        self.data_stack.push(Value::I64(-1));
+                        self.data_stack.push(Value::I64(-1));
+                    }
+                }
+            }
+            Opcode::QuoteSize => {
+                let quot = self.pop_ref()?;
+                self.data_stack.push(Value::I64(quot.len() as i64));
+            }
+            Opcode::WordSize => {
+                let name = self.pop_str()?;
+                match self.word_dict.get(name.as_ref()) {
+                    Some(code) => self.data_stack.push(Value::I64(code.len() as i64)),
+                    None => self.data_stack.push(Value::I64(-1)),
+                }
             }
             Opcode::KvKeys => {
                 let keys: Vec<Value> = self

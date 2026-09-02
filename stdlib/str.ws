@@ -19,7 +19,7 @@
 : lower-char { _ 64 > _ 91 < & ?? _ 32 + ` drop | ] } ;
 : upper      { strchars { upper-char } @map charsstr } ;
 : lower      { strchars { lower-char } @map charsstr } ;
-: capitalize { _ strlen 0 = ?? "" | _ 0 strnth upper-char ctos ` 1 9999 strslice strcat ] } ;
+: capitalize { _ strlen 0 = ?? drop "" | _ 0 strnth upper-char ctos ` 1 9999 strslice strcat ] } ;
 : repeat     { _ 0 = ?? drop drop "" | _ 1 - over ` repeat strcat ] } ;
 : join       { strjoin } ;
 : chars      { strchars } ;

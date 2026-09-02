@@ -177,6 +177,65 @@ pub fn get_builtin_signature(name: &str) -> Option<(Vec<Type>, Vec<Type>)> {
         )),
         "map-has" => Some((vec![Type::TypeVar(99), Type::Str], vec![Type::Bool])),
 
+        // KV（词名形态——lexer 也直接给 KvSet 等 opcode，双保险）
+        "kv-set" => Some((vec![Type::Str, Type::Str], vec![])),
+        "op-effect" => Some((vec![Type::Str], vec![Type::I64, Type::I64])),
+        "size-of" => Some((vec![Type::Ref(vec![], vec![])], vec![Type::I64])),
+        "word-size" => Some((vec![Type::Str], vec![Type::I64])),
+        "kv-get" => Some((vec![Type::Str], vec![Type::Str])),
+        "kv-del" => Some((vec![Type::Str], vec![])),
+        "kv-keys" => Some((vec![], vec![Type::List(Box::new(Type::Str))])),
+
+        // 高阶族（@each/@map/@fold/@filter/@times：list/quote 操作数全部消费）
+        "@each" => Some((
+            vec![Type::List(Box::new(tv())), Type::Ref(vec![tv()], vec![])],
+            vec![],
+        )),
+        "@map" => Some((
+            vec![
+                Type::List(Box::new(tv())),
+                Type::Ref(vec![tv()], vec![tv2()]),
+            ],
+            vec![Type::List(Box::new(tv2()))],
+        )),
+        "@fold" => Some((
+            vec![
+                Type::List(Box::new(tv())),
+                tv2(),
+                Type::Ref(vec![tv2(), tv()], vec![tv2()]),
+            ],
+            vec![tv2()],
+        )),
+        "@filter" => Some((
+            vec![
+                Type::List(Box::new(tv())),
+                Type::Ref(vec![tv()], vec![Type::Bool]),
+            ],
+            vec![Type::List(Box::new(tv()))],
+        )),
+        "@times" => Some((
+            vec![Type::I64, Type::Ref(vec![], vec![])],
+            vec![],
+        )),
+
+        // 文件/正则杂项
+        "read-file" => Some((vec![Type::Str], vec![Type::Str])),
+        "write-file" => Some((vec![Type::Str, Type::Str], vec![Type::I64])),
+        "strfind-re" => Some((vec![Type::Str, Type::Str], vec![Type::I64])),
+        "strmatch" => Some((vec![Type::Str, Type::Str], vec![Type::Bool])),
+        "range" => Some((
+            vec![Type::I64, Type::I64],
+            vec![Type::List(Box::new(Type::I64))],
+        )),
+        "rot" => Some((
+            vec![tv(), tv2(), Type::TypeVar(2)],
+            vec![tv2(), Type::TypeVar(2), tv()],
+        )),
+        "i64?" => Some((vec![tv()], vec![Type::Bool])),
+        "str?" => Some((vec![tv()], vec![Type::Bool])),
+        "bool?" => Some((vec![tv()], vec![Type::Bool])),
+        "list?" => Some((vec![tv()], vec![Type::Bool])),
+
         _ => None,
     }
 }

@@ -288,12 +288,14 @@ impl TypeChecker {
             }
 
             AstNode::Loop { body, condition } => {
-                for n in body {
-                    self.check_node(n, stack, errors, &format!("{ctx}/loop"));
+                // 运行时语义：条件在循环顶块先求值（block_gen Loop 也按此编译），
+                // 类型检查按同序执行——先条件、弹出 bool、再查循环体。
+                for n in condition {
+                    self.check_node(n, stack, errors, &format!("{ctx}/loop-cond"));
                 }
                 self.expect(stack, &Type::Bool, errors, ctx, "loop condition");
-                for n in condition {
-                    self.check_node(n, stack, errors, ctx);
+                for n in body {
+                    self.check_node(n, stack, errors, &format!("{ctx}/loop"));
                 }
             }
 
@@ -355,6 +357,29 @@ impl TypeChecker {
                     ));
                 }
             }
+        }
+    }
+
+    fn expect_n(
+        &mut self,
+        stack: &mut Vec<Type>,
+        n: usize,
+        errors: &mut Vec<TypeError>,
+        ctx: &str,
+        what: &str,
+    ) {
+        if stack.len() < n {
+            errors.push(TypeError {
+                message: format!("{}: need {} values, have {}", what, n, stack.len()),
+                context: ctx.into(),
+            });
+            // 补齐占位，让后续推断继续
+            for _ in 0..(n - stack.len()) {
+                stack.push(self.inferer.fresh_var());
+            }
+        }
+        for _ in 0..n {
+            stack.pop();
         }
     }
 
@@ -797,6 +822,86 @@ impl TypeChecker {
             Operator::MapHas => {
                 self.expect(stack, &Type::Str, errors, ctx, "map-has key");
                 stack.pop(); // pop the map
+                stack.push(Type::Bool);
+            }
+
+            // KV：键值均为字符串（与 vm.rs KvSet/KvGet 口径一致）
+            Operator::OpEffect => {
+                self.expect_n(stack, 1, errors, ctx, "op-effect");
+                stack.push(Type::I64);
+                stack.push(Type::I64);
+            }
+            Operator::QuoteSize => {
+                self.expect_n(stack, 1, errors, ctx, "size-of");
+                stack.push(Type::I64);
+            }
+            Operator::WordSize => {
+                self.expect_n(stack, 1, errors, ctx, "word-size");
+                stack.push(Type::I64);
+            }
+            Operator::KvSet => {
+                self.expect_n(stack, 2, errors, ctx, "kv-set");
+            }
+            Operator::KvGet => {
+                self.expect_n(stack, 1, errors, ctx, "kv-get");
+                stack.push(Type::Str);
+            }
+            Operator::KvDel => {
+                self.expect_n(stack, 1, errors, ctx, "kv-del");
+            }
+            Operator::KvKeys => {
+                stack.push(Type::List(Box::new(Type::Str)));
+            }
+            Operator::ReadFile => {
+                self.expect_n(stack, 1, errors, ctx, "read-file");
+                stack.push(Type::Str);
+            }
+            Operator::WriteFile => {
+                self.expect_n(stack, 2, errors, ctx, "write-file");
+                stack.push(Type::I64);
+            }
+            Operator::StrFindRe => {
+                self.expect_n(stack, 2, errors, ctx, "strfind-re");
+                stack.push(Type::I64);
+            }
+            Operator::StrMatch => {
+                self.expect_n(stack, 2, errors, ctx, "strmatch");
+                stack.push(Type::Bool);
+            }
+            Operator::StrUpper | Operator::StrLower | Operator::StrStrip => {
+                self.expect_n(stack, 1, errors, ctx, "str-case/strip");
+                stack.push(Type::Str);
+            }
+            Operator::Range => {
+                self.expect_n(stack, 2, errors, ctx, "range");
+                stack.push(Type::List(Box::new(Type::I64)));
+            }
+            Operator::Pick(n) => {
+                // 非破坏性窥视：pick 复制第 n 值（不弹任何操作数）
+                let idx = n as usize; // 距栈顶第 idx 个（0=顶）
+                if stack.len() > idx {
+                    let t = stack[stack.len() - 1 - idx].clone();
+                    stack.push(t);
+                } else {
+                    if stack.is_empty() {
+                        errors.push(TypeError {
+                            message: "pick: stack empty".into(),
+                            context: ctx.into(),
+                        });
+                    }
+                    stack.push(self.inferer.fresh_var());
+                }
+            }
+            Operator::I64Check | Operator::StrCheck | Operator::BoolCheck | Operator::ListCheck => {
+                self.expect_n(stack, 1, errors, ctx, "type-check");
+                stack.push(Type::Bool);
+            }
+            Operator::EnvGet => {
+                self.expect_n(stack, 1, errors, ctx, "env-get");
+                stack.push(Type::Str);
+            }
+            Operator::FileExists => {
+                self.expect_n(stack, 1, errors, ctx, "file-exists");
                 stack.push(Type::Bool);
             }
 

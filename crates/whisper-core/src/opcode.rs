@@ -88,6 +88,9 @@ pub enum Opcode {
     /// port {handler} -> (serve; never returns. VM: serial accept loop;
     /// C chain: one thread per connection)
     ServeConcurrent,
+    OpEffect,
+    QuoteSize,
+    WordSize,
 
     // === P0 vocabulary (v1.0.3) ===
     /// -> str (one line from stdin, newline stripped; EOF yields "")
@@ -411,6 +414,9 @@ impl Opcode {
             Opcode::KvDel => 247,
             Opcode::KvKeys => 248,
             Opcode::ServeConcurrent => 255,
+            Opcode::OpEffect => 0x2A,
+            Opcode::QuoteSize => 0x2B,
+            Opcode::WordSize => 0x2C,
             Opcode::ReadLine => 249,
             Opcode::StrUpper => 250,
             Opcode::StrLower => 251,
@@ -626,6 +632,9 @@ impl Opcode {
             Opcode::KvDel => "kv-del",
             Opcode::KvKeys => "kv-keys",
             Opcode::ServeConcurrent => "serve-concurrent",
+            Opcode::OpEffect => "op-effect",
+            Opcode::QuoteSize => "size-of",
+            Opcode::WordSize => "word-size",
             Opcode::ReadLine => "read-line",
             Opcode::StrUpper => "str-upper",
             Opcode::StrLower => "str-lower",

@@ -86,6 +86,9 @@ pub fn stack_effect(op: &Opcode) -> Option<(usize, usize)> {
         ReadInput => (0, 1),
 
         // ── KV store ───────────────────────────────────────────
+        OpEffect => (1, 2),
+        QuoteSize => (1, 1),
+        WordSize => (1, 1),
         KvSet => (2, 0),
         KvGet => (1, 1),
         KvDel => (1, 0),
