@@ -104,18 +104,52 @@ impl Capability for HttpSessionCap {
             host = parsed.host,
         );
 
-        let mut stream = std::net::TcpStream::connect((parsed.host.as_str(), parsed.port))
-            .map_err(|e| {
-                VmError::IoError(format!("Connect {}:{} failed: {e}", parsed.host, parsed.port))
-            })?;
-        use std::io::{Read, Write};
-        stream
-            .write_all(request.as_bytes())
-            .map_err(|e| VmError::IoError(e.to_string()))?;
+        use std::io::{ErrorKind, Read, Write};
+        use std::net::{TcpStream, ToSocketAddrs};
+        use std::time::Duration;
+
+        // L-06 真靶加固：连接 10s / 读写 15s 超时。挂死端点（如 Windows
+        // nslookup 对畸形参数进入交互态、永不回包）不得卡死 VM——超时/
+        // 连接后 IO 失败一律化为 status 0 空响应（无证据单位），扫描继续。
+        const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+        const IO_TIMEOUT: Duration = Duration::from_secs(15);
+
+        // ( -- ) 无响应吞吐：status 0 / 空 headers / 空 body + 审计标记
+        macro_rules! no_response {
+            ($why:expr) => {{
+                self.audit
+                    .lock()
+                    .unwrap()
+                    .push(format!("{method} {url} {}", $why));
+                data_stack.push(Value::I64(0));
+                data_stack.push(Value::Str(Rc::new("{}".to_string())));
+                data_stack.push(Value::Str(Rc::new(String::new())));
+                return Ok(());
+            }};
+        }
+
+        let addr = (parsed.host.as_str(), parsed.port)
+            .to_socket_addrs()
+            .map_err(|e| VmError::IoError(e.to_string()))?
+            .next()
+            .ok_or_else(|| VmError::IoError("no address resolved".into()))?;
+        let mut stream = match TcpStream::connect_timeout(&addr, CONNECT_TIMEOUT) {
+            Ok(s) => s,
+            Err(_) => no_response!("TIMEOUT-CONNECT"),
+        };
+        let _ = stream.set_read_timeout(Some(IO_TIMEOUT));
+        let _ = stream.set_write_timeout(Some(IO_TIMEOUT));
+        if stream.write_all(request.as_bytes()).is_err() {
+            no_response!("IOERR-WRITE");
+        }
         let mut response = String::new();
-        stream
-            .read_to_string(&mut response)
-            .map_err(|e| VmError::IoError(e.to_string()))?;
+        match stream.read_to_string(&mut response) {
+            Ok(_) => {}
+            Err(e) if matches!(e.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut) => {
+                no_response!("TIMEOUT-READ");
+            }
+            Err(_) => no_response!("IOERR-READ"),
+        }
 
         let (head, resp_body) = match response.split_once("\r\n\r\n") {
             Some((h, b)) => (h, b.to_string()),
