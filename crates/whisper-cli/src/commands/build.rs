@@ -66,9 +66,49 @@ pub fn build_file(
             // and emits C; the system compiler produces the executable.
             super::c2::build_c2(source, source_dir, output, true)?;
         }
+        "native" => {
+            // Install-time hardware specialization: the c2 chain plus
+            // -O3 -march=native -flto and a content-addressed cache —
+            // unchanged programs on the same machine rebuild instantly.
+            super::native::build_native(source, source_dir, output)?;
+        }
+        "exe" => {
+            // Self-contained executable (SBCL/Starkit style): a copy of the
+            // current whisper binary with the .wbin payload appended after
+            // the image. On startup the runtime detects the trailer and runs
+            // the embedded payload directly — no toolchain needed, single
+            // file, zero hand-written ELF/PE/Mach-O headers.
+            let unit = gen
+                .compile_to_unit(&ast)
+                .map_err(|e| format!("Compile error: {}", whisper_codegen::block_ir::contract_errors_to_string(&e)))?;
+            let payload = WbinWriter::write_unit(&unit.main, &unit.defs);
+            let self_exe = std::env::current_exe()
+                .and_then(|p| std::fs::read(p))
+                .map_err(|e| format!("Failed to read whisper executable: {e}"))?;
+            let mut bundled = self_exe;
+            bundled.extend_from_slice(&payload);
+            bundled.extend_from_slice(&(payload.len() as u64).to_le_bytes());
+            bundled.extend_from_slice(b"WSHPEXE1");
+            std::fs::write(output, &bundled)
+                .map_err(|e| format!("Failed to write executable: {e}"))?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(
+                    output,
+                    std::fs::Permissions::from_mode(0o755),
+                );
+            }
+            let size = std::fs::metadata(output).map(|m| m.len()).unwrap_or(0);
+            println!(
+                "Bundled {} bytes of bytecode ({} defs) into {output} ({size} bytes, self-contained)",
+                payload.len(),
+                unit.defs.len()
+            );
+        }
         other => {
             return Err(format!(
-                "Unknown target: {other}. Supported: wbin, c, c2 (self-hosted chain)"
+                "Unknown target: {other}. Supported: wbin, c, c2, native, exe"
             ));
         }
     }

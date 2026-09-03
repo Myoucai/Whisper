@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <math.h>
 
 #ifdef _WIN32
 // winsock2.h must precede windows.h
@@ -26,7 +27,34 @@
 
 typedef int64_t  wi64;
 typedef double   wf64;
-typedef uint64_t wval;  // all values are 64-bit (i64, f64, pointer, bool)
+typedef struct { uint64_t v; uint8_t t; } wval;
+enum { WT_I64 = 0, WT_F64 = 1, WT_PTR = 2 };
+
+static inline wval W_I64(int64_t x)  { wval r; r.v = (uint64_t)x; r.t = WT_I64; return r; }
+static inline wval W_F64(double d)   { wval r; memcpy(&r.v, &d, 8); r.t = WT_F64; return r; }
+static inline wval W_PTR(void *p)    { wval r; r.v = (uint64_t)p;  r.t = WT_PTR; return r; }
+
+static inline int w_is_f64(wval v) { return v.t == WT_F64; }
+static inline int64_t w_as_i64(wval v) {
+    if (v.t != WT_I64) { fprintf(stderr, "type error: expected i64, got %s (t=%d)\n", v.t == WT_F64 ? "f64" : "ptr", v.t); exit(1); }
+    return (int64_t)v.v;
+}
+static inline double w_as_f64(wval v) {
+    if (v.t != WT_F64) { fprintf(stderr, "type error: expected f64, got t=%d\n", v.t); exit(1); }
+    double d; memcpy(&d, &v.v, 8); return d;
+}
+static inline void *w_as_ptr(wval v) {
+    if (v.t != WT_PTR) { fprintf(stderr, "type error: expected ptr, got t=%d\n", v.t); exit(1); }
+    return (void *)v.v;
+}
+static inline double w_num_f64(wval v) {  // numeric promotion (VM binary_num_op: i64 coerces to f64)
+    if (v.t == WT_F64) return w_as_f64(v);
+    if (v.t == WT_I64) return (double)(int64_t)v.v;
+    fprintf(stderr, "type error: expected i64 or f64, got ptr\n"); exit(1); return 0;
+}
+// Raw identity compare (bits + tag) — used for pointer/identity equality
+// where C does not define == on structs.
+static inline int w_eq_raw(wval a, wval b) { return a.v == b.v && a.t == b.t; }
 
 // ── Stack ───────────────────────────────────────────────────────────
 
@@ -72,7 +100,41 @@ static inline void w_drop(void)         { w_sp--; }
 static inline void w_rot(void)          { wval c=w_pop(),b=w_pop(),a=w_pop(); w_push(b); w_push(c); w_push(a); }
 // Pick: w_pick_n(N) for $N operator, w_pick() reads index from stack
 static inline void w_pick_n(int n) { w_push(w_stack[w_sp - 1 - n]); }
-static void w_pick(void) { int64_t n = (int64_t)w_pop(); w_push(w_stack[w_sp - 1 - (int)n]); }
+static void w_pick(void) { int64_t n = w_as_i64(w_pop()); w_push(w_stack[w_sp - 1 - (int)n]); }
+
+// ── Tag-dispatching polymorphic ops ─────────────────────────────────
+// Mirror the VM's binary_num_op: any f64 operand promotes the result to
+// f64 (i64 coerces via w_num_f64); division/modulo by zero is an error.
+static int wval_is_str(wval v);
+static int64_t w_str_lt(const char *a, const char *b);
+
+static void w_op_add(void) { wval b=w_pop(),a=w_pop();
+    if (a.t==WT_F64 || b.t==WT_F64) { w_push(W_F64(w_num_f64(a)+w_num_f64(b))); return; }
+    w_push(W_I64(w_as_i64(a)+w_as_i64(b))); }
+static void w_op_sub(void) { wval b=w_pop(),a=w_pop();
+    if (a.t==WT_F64 || b.t==WT_F64) { w_push(W_F64(w_num_f64(a)-w_num_f64(b))); return; }
+    w_push(W_I64(w_as_i64(a)-w_as_i64(b))); }
+static void w_op_mul(void) { wval b=w_pop(),a=w_pop();
+    if (a.t==WT_F64 || b.t==WT_F64) { w_push(W_F64(w_num_f64(a)*w_num_f64(b))); return; }
+    w_push(W_I64(w_as_i64(a)*w_as_i64(b))); }
+static void w_op_div(void) { wval b=w_pop(),a=w_pop();
+    if (a.t==WT_F64 || b.t==WT_F64) { double bb=w_num_f64(b); if (bb==0.0){fprintf(stderr,"division by zero\n");exit(1);} w_push(W_F64(w_num_f64(a)/bb)); return; }
+    int64_t bi=w_as_i64(b); if (bi==0){fprintf(stderr,"division by zero\n");exit(1);} w_push(W_I64(w_as_i64(a)/bi)); }
+static void w_op_mod(void) { wval b=w_pop(),a=w_pop();
+    if (a.t==WT_F64 || b.t==WT_F64) { double bb=w_num_f64(b); if (bb==0.0){fprintf(stderr,"division by zero\n");exit(1);} w_push(W_F64(fmod(w_num_f64(a),bb))); return; }
+    int64_t bi=w_as_i64(b); if (bi==0){fprintf(stderr,"division by zero\n");exit(1);} w_push(W_I64(w_as_i64(a)%bi)); }
+// < : both operands strings (PTR in the string arena) → bytewise string
+// compare; any f64 → numeric compare; else i64 compare.
+static void w_op_lt(void) { wval b=w_pop(),a=w_pop();
+    if (a.t==WT_PTR && b.t==WT_PTR && wval_is_str(a) && wval_is_str(b)) {
+        w_push(W_I64(w_str_lt((const char *)w_as_ptr(a), (const char *)w_as_ptr(b)))); return; }
+    if (a.t==WT_F64 || b.t==WT_F64) { w_push(W_I64(w_num_f64(a) < w_num_f64(b))); return; }
+    w_push(W_I64(w_as_i64(a) < w_as_i64(b))); }
+static void w_op_gt(void) { wval b=w_pop(),a=w_pop();
+    if (a.t==WT_PTR && b.t==WT_PTR && wval_is_str(a) && wval_is_str(b)) {
+        w_push(W_I64(w_str_lt((const char *)w_as_ptr(b), (const char *)w_as_ptr(a)))); return; }
+    if (a.t==WT_F64 || b.t==WT_F64) { w_push(W_I64(w_num_f64(a) > w_num_f64(b))); return; }
+    w_push(W_I64(w_as_i64(a) > w_as_i64(b))); }
 
 // ── Heap allocator ──────────────────────────────────────────────────
 // Split-arena bump allocator: strings grow up from the heap base,
@@ -134,7 +196,7 @@ static inline uint32_t w_str_len(const char *s) {
         fprintf(stderr, "w_str_len: NULL, sp=%d\n", w_sp);
         for (int i = (w_sp > 8 ? w_sp - 8 : 0); i < w_sp; i++) {
             wval v = w_stack[i];
-            fprintf(stderr, "  [%d] = %lld (%p)\n", i, (long long)v, (void*)v);
+            fprintf(stderr, "  [%d] = %lld (%p)\n", i, (long long)v.v, (void*)v.v);
         }
         exit(1);
     }
@@ -250,13 +312,14 @@ static int64_t w_str_nth(const char *s, int64_t idx) {
 
 // Address-range type test: top half of the heap is the list arena.
 static int w_is_list_val(wval v) {
-    if (v < (wval)w_heap || v >= (wval)(w_heap + w_heap_size)) return 0;
-    return v >= (wval)(w_heap + w_heap_size / 2);
+    if (v.t != WT_PTR) return 0;
+    if (v.v < (uint64_t)(uintptr_t)w_heap || v.v >= (uint64_t)(uintptr_t)(w_heap + w_heap_size)) return 0;
+    return v.v >= (uint64_t)(uintptr_t)(w_heap + w_heap_size / 2);
 }
 
 static inline wval *w_list_new(int64_t count) {
-    wval *p = (wval *)w_alloc_list(8 * ((size_t)count + 1));
-    p[0] = (wval)count;
+    wval *p = (wval *)w_alloc_list(sizeof(wval) * ((size_t)count + 1));
+    p[0] = W_I64(count);
     return p;
 }
 
@@ -264,10 +327,10 @@ static inline int64_t w_list_len(wval *list) {
     if (!list) {
         fprintf(stderr, "w_list_len: NULL, sp=%d\n", w_sp);
         for (int i = (w_sp > 6 ? w_sp - 6 : 0); i < w_sp; i++)
-            fprintf(stderr, "  [%d] = %p (%lld)\n", i, (void*)w_stack[i], (long long)w_stack[i]);
+            fprintf(stderr, "  [%d] = %p (%lld)\n", i, (void*)w_stack[i].v, (long long)w_stack[i].v);
         exit(1);
     }
-    return (int64_t)list[0];
+    return w_as_i64(list[0]);
 }
 
 static inline wval w_list_nth(wval *list, int64_t n) {
@@ -277,7 +340,7 @@ static inline wval w_list_nth(wval *list, int64_t n) {
 static wval *w_list_append(wval *list, wval elem) {
     int64_t count = w_list_len(list);
     wval *new_list = w_list_new(count + 1);
-    memcpy(new_list + 1, list + 1, count * 8);
+    memcpy(new_list + 1, list + 1, count * sizeof(wval));
     new_list[1 + count] = elem;
     return new_list;
 }
@@ -286,7 +349,7 @@ static wval *w_list_prepend(wval elem, wval *list) {
     int64_t count = w_list_len(list);
     wval *new_list = w_list_new(count + 1);
     new_list[1] = elem;
-    memcpy(new_list + 2, list + 1, count * 8);
+    memcpy(new_list + 2, list + 1, count * sizeof(wval));
     return new_list;
 }
 
@@ -297,19 +360,31 @@ static wval *w_list_slice(wval *list, int64_t start, int64_t len) {
     if (start > count) start = count;
     if (start + len > count) len = count - start;
     wval *new_list = w_list_new(len);
-    memcpy(new_list + 1, list + 1 + start, len * 8);
+    memcpy(new_list + 1, list + 1 + start, len * sizeof(wval));
     return new_list;
+}
+
+// Sort ordering mirroring the VM's Sort: i64/i64 exact, mixed or f64 →
+// f64 compare, str/str → bytewise; non-comparable pairs → "not less"
+// (stable insertion sort keeps their relative order, as VM Equal does).
+static int w_sort_lt(wval a, wval b) {
+    if (a.t == WT_PTR && b.t == WT_PTR && wval_is_str(a) && wval_is_str(b))
+        return w_str_lt((const char *)w_as_ptr(a), (const char *)w_as_ptr(b)) != 0;
+    if (a.t == WT_I64 && b.t == WT_I64) return w_as_i64(a) < w_as_i64(b);
+    if ((a.t == WT_I64 || a.t == WT_F64) && (b.t == WT_I64 || b.t == WT_F64))
+        return w_num_f64(a) < w_num_f64(b);
+    return 0;
 }
 
 static wval *w_list_sort(wval *list) {
     int64_t count = w_list_len(list);
     wval *new_list = w_list_new(count);
-    memcpy(new_list + 1, list + 1, count * 8);
-    // Simple insertion sort for i64 values
+    memcpy(new_list + 1, list + 1, count * sizeof(wval));
+    // Simple insertion sort (stable; handles i64, f64 and strings)
     for (int64_t i = 1; i < count; i++) {
         wval key = new_list[1 + i];
         int64_t j = i - 1;
-        while (j >= 0 && (int64_t)new_list[1 + j] > (int64_t)key) {
+        while (j >= 0 && w_sort_lt(key, new_list[1 + j])) {
             new_list[1 + j + 1] = new_list[1 + j];
             j--;
         }
@@ -332,7 +407,7 @@ static wval *w_list_take(wval *list, int64_t n) {
     if (n > count) n = count;
     if (n < 0) n = 0;
     wval *new_list = w_list_new(n);
-    memcpy(new_list + 1, list + 1, n * 8);
+    memcpy(new_list + 1, list + 1, n * sizeof(wval));
     return new_list;
 }
 
@@ -342,7 +417,7 @@ static wval *w_list_drop(wval *list, int64_t n) {
     if (n < 0) n = 0;
     int64_t new_count = count - n;
     wval *new_list = w_list_new(new_count);
-    memcpy(new_list + 1, list + 1 + n, new_count * 8);
+    memcpy(new_list + 1, list + 1 + n, new_count * sizeof(wval));
     return new_list;
 }
 
@@ -355,47 +430,48 @@ static wval *w_list_drop(wval *list, int64_t n) {
 
 static wval *w_buf_new(int64_t cap0) {
     if (cap0 < 8) cap0 = 8;
-    wval *p = (wval *)w_alloc_list(8 * ((size_t)cap0 + 2));
-    p[0] = (wval)cap0;
-    p[1] = (wval)0;
+    wval *p = (wval *)w_alloc_list(sizeof(wval) * ((size_t)cap0 + 2));
+    p[0] = W_I64(cap0);
+    p[1] = W_I64(0);
     return p + 1;
 }
 
 static wval *w_buf_push(wval *buf, wval elem) {
     wval *meta = buf - 1;
-    int64_t cap = (int64_t)meta[0];
-    int64_t count = (int64_t)buf[0];
+    int64_t cap = w_as_i64(meta[0]);
+    int64_t count = w_as_i64(buf[0]);
     if (count >= cap) {
         int64_t ncap = cap * 2;
-        wval *np = (wval *)w_alloc_list(8 * ((size_t)ncap + 2));
-        np[0] = (wval)ncap;
-        np[1] = (wval)count;
-        memcpy(np + 2, buf + 1, (size_t)count * 8);
+        wval *np = (wval *)w_alloc_list(sizeof(wval) * ((size_t)ncap + 2));
+        np[0] = W_I64(ncap);
+        np[1] = W_I64(count);
+        memcpy(np + 2, buf + 1, (size_t)count * sizeof(wval));
         buf = np + 1;
     }
     buf[1 + count] = elem;
-    buf[0] = (wval)(count + 1);
+    buf[0] = W_I64(count + 1);
     return buf;
 }
 
 // ── Type predicates (heap pointer heuristic) ───────────────────────
 static int wval_is_heap(wval v) {
-    return (v >= (wval)w_heap && v < (wval)(w_heap + w_heap_size));
+    if (v.t != WT_PTR) return 0;
+    return (v.v >= (uint64_t)(uintptr_t)w_heap && v.v < (uint64_t)(uintptr_t)(w_heap + w_heap_size));
 }
 static int wval_is_str(wval v) {
     if (!wval_is_heap(v)) return 0;
-    return (v < (wval)(w_heap + w_heap_size / 2));
+    return (v.v < (uint64_t)(uintptr_t)(w_heap + w_heap_size / 2));
 }
 static int wval_is_list(wval v) {
     if (!wval_is_heap(v)) return 0;
-    return (v >= (wval)(w_heap + w_heap_size / 2));
+    return (v.v >= (uint64_t)(uintptr_t)(w_heap + w_heap_size / 2));
 }
 
 // Tag check for structured tokens: tag 5 = braces {}, tag 6 = brackets []
 static int is_tag(wval v, int64_t tag) {
     if (!wval_is_heap(v)) return 0;
-    wval *p = (wval *)v;
-    return w_list_len(p) == 2 && (int64_t)p[1] == tag;
+    wval *p = (wval *)w_as_ptr(v);
+    return w_list_len(p) == 2 && w_as_i64(p[1]) == tag;
 }
 
 // ── split_cond: parse ?? | ] conditional structure ────────────────
@@ -409,7 +485,7 @@ static void split_cond(wval *tokens, int start, wval **out_then,
     while (i < tlen && depth > 0) {
         wval tok = tokens[1 + i];
         if (wval_is_str(tok)) {
-            const char *s = (const char *)tok;
+            const char *s = (const char *)w_as_ptr(tok);
             if (strcmp(s, "??") == 0) {
                 depth++;
                 if (!in_else) th = w_buf_push(th, tok);
@@ -442,7 +518,7 @@ static wval *w_list_dedup(wval *list) {
     for (int64_t i = 0; i < count; i++) {
         int found = 0;
         for (int64_t j = 0; j < w_list_len(result); j++) {
-            if (result[1 + j] == list[1 + i]) { found = 1; break; }
+            if (w_eq_raw(result[1 + j], list[1 + i])) { found = 1; break; }
         }
         if (!found) result = w_list_append(result, list[1 + i]);
     }
@@ -457,7 +533,7 @@ static wval *w_str_split(const char *s, const char *delim) {
     if (dlen == 0) {
         wval *result = w_list_new((int64_t)slen);
         for (uint32_t i = 0; i < slen; i++)
-            result[1 + i] = (wval)w_str_new(s + i, 1);
+            result[1 + i] = W_PTR(w_str_new(s + i, 1));
         return result;
     }
     uint32_t parts = 1;
@@ -471,37 +547,37 @@ static wval *w_str_split(const char *s, const char *delim) {
     uint32_t idx = 0, start = 0;
     for (uint32_t i = 0; i + dlen <= slen; i++) {
         if (memcmp(s + i, delim, dlen) == 0) {
-            result[1 + idx++] = (wval)w_str_new(s + start, i - start);
+            result[1 + idx++] = W_PTR(w_str_new(s + start, i - start));
             start = i + dlen;
             i += dlen - 1;
         }
     }
-    result[1 + idx] = (wval)w_str_new(s + start, slen - start);
+    result[1 + idx] = W_PTR(w_str_new(s + start, slen - start));
     return result;
 }
 
 static wval *w_strchars(const char *s) {
     uint32_t len = w_str_len(s);
     wval *list = w_list_new(len);
-    for (uint32_t i = 0; i < len; i++) list[1 + i] = (wval)(int64_t)(unsigned char)s[i];
+    for (uint32_t i = 0; i < len; i++) list[1 + i] = W_I64((int64_t)(unsigned char)s[i]);
     return list;
 }
 
 static char *w_charsstr(wval *list) {
     int64_t count = w_list_len(list);
     char *buf = (char *)w_alloc(count + 1);
-    for (int64_t i = 0; i < count; i++) buf[i] = (char)(int64_t)list[1 + i];
+    for (int64_t i = 0; i < count; i++) buf[i] = (char)w_as_i64(list[1 + i]);
     return w_str_new(buf, count);
 }
 
 // StrIter: pushes (first-char, rest-string); on empty pushes (-1, "")
 static void w_striter(const char *s) {
     if (w_str_len(s) == 0) {
-        w_push((wval)-1LL);
-        w_push((wval)w_str_new("", 0));
+        w_push(W_I64(-1));
+        w_push(W_PTR(w_str_new("", 0)));
     } else {
-        w_push((wval)(int64_t)(unsigned char)s[0]);
-        w_push((wval)w_str_new(s + 1, w_str_len(s) - 1));
+        w_push(W_I64((int64_t)(unsigned char)s[0]));
+        w_push(W_PTR(w_str_new(s + 1, w_str_len(s) - 1)));
     }
 }
 
@@ -510,7 +586,7 @@ static char *w_strjoin(wval *list, const char *sep) {
     uint32_t sl = w_str_len(sep);
     size_t total = 0;
     for (int64_t i = 0; i < count; i++)
-        total += w_str_len((const char *)list[1 + i]) + (i > 0 ? sl : 0);
+        total += w_str_len((const char *)w_as_ptr(list[1 + i])) + (i > 0 ? sl : 0);
     char *buf = (char *)w_alloc(total + 1);
     size_t pos = 0;
     for (int64_t i = 0; i < count; i++) {
@@ -518,7 +594,7 @@ static char *w_strjoin(wval *list, const char *sep) {
             memcpy(buf + pos, sep, sl);
             pos += sl;
         }
-        const char *s = (const char *)list[1 + i];
+        const char *s = (const char *)w_as_ptr(list[1 + i]);
         uint32_t l = w_str_len(s);
         memcpy(buf + pos, s, l);
         pos += l;
@@ -528,12 +604,12 @@ static char *w_strjoin(wval *list, const char *sep) {
 
 static int64_t w_listfind(wval *list, wval elem) {
     int64_t count = w_list_len(list);
-    int elem_is_str = w_is_list_val(elem) == 0 && elem >= (wval)w_heap && elem < (wval)(w_heap + w_heap_size);
+    int elem_is_str = wval_is_str(elem);
     for (int64_t i = 0; i < count; i++) {
         wval v = list[1 + i];
-        if (v == elem) return i;
-        if (elem_is_str && v >= (wval)w_heap && v < (wval)(w_heap + w_heap_size) &&
-            w_str_eq((const char *)v, (const char *)elem)) return i;
+        if (w_eq_raw(v, elem)) return i;
+        if (elem_is_str && wval_is_str(v) &&
+            w_str_eq((const char *)w_as_ptr(v), (const char *)w_as_ptr(elem))) return i;
     }
     return -1;
 }
@@ -557,10 +633,10 @@ static void w_print_val(wval v) {
 }
 
 static void w_dump_val(wval v) {
-    if (v >= (wval)w_heap && v < (wval)(w_heap + w_heap_size)) {
+    if (v.t == WT_PTR && v.v >= (uint64_t)(uintptr_t)w_heap && v.v < (uint64_t)(uintptr_t)(w_heap + w_heap_size)) {
         if (w_is_list_val(v)) {
-            wval *l = (wval *)v;
-            int64_t count = (int64_t)l[0];
+            wval *l = (wval *)w_as_ptr(v);
+            int64_t count = w_as_i64(l[0]);
             if (count < 10000000) {
                 printf("[");
                 for (int64_t i = 0; i < count; i++) {
@@ -571,7 +647,7 @@ static void w_dump_val(wval v) {
                 return;
             }
         } else {
-            const char *s = (const char *)v;
+            const char *s = (const char *)w_as_ptr(v);
             uint32_t len = w_str_len(s);
             if (len < 10000000) {
                 fwrite(s, 1, len, stdout);
@@ -579,8 +655,12 @@ static void w_dump_val(wval v) {
             }
         }
     }
+    // f64: %g approximates Rust's Display (shortest roundtrip) for
+    // common magnitudes; extreme exponents still differ (1e+10 vs
+    // 10000000000) — accepted compromise for this pass.
+    if (v.t == WT_F64) { printf("%g", w_as_f64(v)); return; }
     // Default: print as i64
-    printf("%lld", (long long)(int64_t)v);
+    printf("%lld", (long long)(int64_t)v.v);
 }
 
 static char *w_read_line(void) {
@@ -595,27 +675,27 @@ static char *w_read_line(void) {
 // ── P0 vocabulary (v1.0.3): ASCII case / trim / format ──────────────
 
 static wval w_str_case(wval s, int upper) {
-    const char *p = (const char *)s;
+    const char *p = (const char *)w_as_ptr(s);
     uint32_t n = w_str_len(p);
     char *buf = (char *)malloc(n > 0 ? n : 1);
-    if (!buf) return (wval)w_str_new("", 0);
+    if (!buf) return W_PTR(w_str_new("", 0));
     for (uint32_t i = 0; i < n; i++) {
         unsigned char c = (unsigned char)p[i];
         if (upper && c >= 'a' && c <= 'z') c -= 32;
         else if (!upper && c >= 'A' && c <= 'Z') c += 32;
         buf[i] = (char)c;
     }
-    wval r = (wval)w_str_new(buf, n);
+    wval r = W_PTR(w_str_new(buf, n));
     free(buf);
     return r;
 }
 
 static wval w_str_strip(wval s) {
-    const char *p = (const char *)s;
+    const char *p = (const char *)w_as_ptr(s);
     uint32_t n = w_str_len(p), a = 0, b = n;
     while (a < b && (p[a]==' '||p[a]=='\t'||p[a]=='\r'||p[a]=='\n')) a++;
     while (b > a && (p[b-1]==' '||p[b-1]=='\t'||p[b-1]=='\r'||p[b-1]=='\n')) b--;
-    return (wval)w_str_new(p + a, b - a);
+    return W_PTR(w_str_new(p + a, b - a));
 }
 
 // ── P1 vocabulary (v1.0.4): directory ops + UTC strftime ────────────
@@ -625,10 +705,10 @@ static wval w_str_strip(wval s) {
 
 #ifdef _WIN32
 #include <windows.h>
-static void *w_ffi_open(wval path) {
-    const char *p = (const char *)path;
+static wval w_ffi_open(wval path) {
+    const char *p = (const char *)w_as_ptr(path);
     HMODULE h = LoadLibraryA(p);
-    return (void *)(int64_t)h;
+    return W_I64((int64_t)(uintptr_t)h);
 }
 static void *w_ffi_sym(int64_t handle, const char *name) {
     if (handle <= 0) return NULL;
@@ -657,7 +737,7 @@ static int64_t w_ffi_call(int64_t fnptr, const char *fmt, wval *args) {
     if (fl == 0) return 0;
     const char *at = fmt + 1;
     size_t na = fl - 1;
-    int64_t n = (int64_t)args[0];
+    int64_t n = w_as_i64(args[0]);
     if ((size_t)n != na) return 0; // arity mismatch: silent 0 (sentinel)
     if (na > 12) return 0;
     int64_t a[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -669,9 +749,9 @@ static int64_t w_ffi_call(int64_t fnptr, const char *fmt, wval *args) {
             // heap strings pass through; buf-alloc'd (malloc'd) raw
             // pointers are valid too — only reject obvious garbage
             // (small integers that are not plausible addresses)
-            a[i] = (int64_t)v;
+            a[i] = (int64_t)v.v;
         } else {
-            a[i] = (int64_t)v;
+            a[i] = (int64_t)v.v;
         }
     }
     fn8 f = (fn8)fnptr;
@@ -696,57 +776,57 @@ static int w_sp_width(uint8_t c) {
 
 // stack order at call: fmt on top, values under it
 static wval w_pack(wval fmt, wval values) {
-    const char *f = (const char *)fmt;
+    const char *f = (const char *)w_as_ptr(fmt);
     uint32_t fl = w_str_len(f);
     if (fl > 0 && f[0] == '<') { f++; fl--; }
-    wval *vals = (wval *)values;
-    int64_t n = (int64_t)vals[0];
+    wval *vals = (wval *)w_as_ptr(values);
+    int64_t n = w_as_i64(vals[0]);
     char *buf = (char *)malloc((size_t)(fl * 8 + 9 + n * 16));
-    if (!buf) return (wval)w_str_new("", 0);
+    if (!buf) return W_PTR(w_str_new("", 0));
     uint32_t o = 0;
     int64_t vi = 0, i = 0;
     while (i < (int64_t)fl) {
         uint8_t c = (uint8_t)f[i]; i++;
         if (c == 's') {
-            if (vi >= n) { free(buf); return (wval)w_str_new("", 0); }
+            if (vi >= n) { free(buf); return W_PTR(w_str_new("", 0)); }
             wval v = vals[1 + vi]; vi++;
-            if (!(v >= (wval)w_heap && v < (wval)(w_heap + w_heap_size))) {
-                free(buf); return (wval)w_str_new("", 0);
+            if (!wval_is_str(v)) {
+                free(buf); return W_PTR(w_str_new("", 0));
             }
-            const char *s = (const char *)v;
+            const char *s = (const char *)w_as_ptr(v);
             uint32_t sl = w_str_len(s);
             memcpy(buf + o, s, sl); o += sl;
             buf[o++] = 0;
             continue;
         }
         int wdt = w_sp_width(c);
-        if (wdt < 0 || vi >= n) { free(buf); return (wval)w_str_new("", 0); }
+        if (wdt < 0 || vi >= n) { free(buf); return W_PTR(w_str_new("", 0)); }
         wval v = vals[1 + vi]; vi++;
         uint64_t raw;
         if (c == 'd') {
             // f64 travels as its bit pattern in the C chain
-            if (v >= (wval)w_heap && v < (wval)(w_heap + w_heap_size)) {
-                free(buf); return (wval)w_str_new("", 0);
+            if (v.t == WT_PTR) {
+                free(buf); return W_PTR(w_str_new("", 0));
             }
-            raw = (uint64_t)v;
+            raw = v.v;
         } else {
-            if (v >= (wval)w_heap && v < (wval)(w_heap + w_heap_size)) {
-                free(buf); return (wval)w_str_new("", 0);
+            if (v.t == WT_PTR) {
+                free(buf); return W_PTR(w_str_new("", 0));
             }
-            raw = (uint64_t)(int64_t)v;
+            raw = (uint64_t)w_as_i64(v);
         }
         for (int k = 0; k < wdt; k++) buf[o + k] = (char)((raw >> (8 * k)) & 0xFF);
         o += (uint32_t)wdt;
     }
-    if (vi != n) { free(buf); return (wval)w_str_new("", 0); }
-    wval r = (wval)w_str_new(buf, o);
+    if (vi != n) { free(buf); return W_PTR(w_str_new("", 0)); }
+    wval r = W_PTR(w_str_new(buf, o));
     free(buf);
     return r;
 }
 
 static wval w_unpack(wval fmt, wval bytes) {
-    const char *f = (const char *)fmt;
-    const char *b = (const char *)bytes;
+    const char *f = (const char *)w_as_ptr(fmt);
+    const char *b = (const char *)w_as_ptr(bytes);
     uint32_t fl = w_str_len(f), bl = w_str_len(b);
     if (fl > 0 && f[0] == '<') { f++; fl--; }
     wval *lst = w_list_new((int64_t)fl);
@@ -758,13 +838,13 @@ static wval w_unpack(wval fmt, wval bytes) {
         if (c == 's') {
             uint32_t start = pos;
             while (pos < bl && b[pos] != 0) pos++;
-            if (pos == bl) { return (wval)w_list_new(0); }
-            lst[1 + n] = (wval)w_str_new(b + start, pos - start); n++;
+            if (pos == bl) { return W_PTR(w_list_new(0)); }
+            lst[1 + n] = W_PTR(w_str_new(b + start, pos - start)); n++;
             pos += 1;
             continue;
         }
         int wdt = w_sp_width(c);
-        if (wdt < 0 || pos + wdt > bl) { return (wval)w_list_new(0); }
+        if (wdt < 0 || pos + wdt > bl) { return W_PTR(w_list_new(0)); }
         uint64_t raw = 0;
         for (int k = 0; k < wdt; k++)
             raw |= ((uint64_t)(uint8_t)b[pos + k]) << (8 * k);
@@ -776,15 +856,15 @@ static wval w_unpack(wval fmt, wval bytes) {
         } else {
             v = (int64_t)raw;
         }
-        lst[1 + n] = (wval)v; n++;
+        lst[1 + n] = W_I64(v); n++;
     }
     // n == fl for fixed fields; rebuild if 's' shrank the count
     if (n != (int64_t)fl) {
         wval *l2 = w_list_new(n);
         for (int64_t k = 0; k < n; k++) l2[1 + k] = lst[1 + k];
-        return (wval)l2;
+        return W_PTR(l2);
     }
-    return (wval)lst;
+    return W_PTR(lst);
 }
 
 // Mirrors crates/whisper-core/src/rematch.rs byte for byte.
@@ -934,28 +1014,26 @@ static int w_re_match_seq(const char *p, uint32_t start, uint32_t end,
     return -1;
 }
 
-static wval w_strmatch(wval s, wval pat) {
-    const char *sv = (const char *)s, *pv = (const char *)pat;
+static wval w_strmatch(const char *sv, const char *pv) {
     uint32_t sl = w_str_len(sv), pl = w_str_len(pv);
 
     static uint32_t m[W_RE_MAXPAT];
-    if (pl > W_RE_MAXPAT) return (wval)0L;
+    if (pl > W_RE_MAXPAT) return W_I64(0);
     w_re_precompute(pv, pl, m);
     int e = w_re_match_at(pv, 0, pl, sv, 0, sl, m);
-    return (wval)(int64_t)(e >= 0 && (uint32_t)e == sl ? 1 : 0);
+    return W_I64(e >= 0 && (uint32_t)e == sl ? 1 : 0);
 }
 
-static wval w_strfind_re(wval s, wval pat) {
-    const char *sv = (const char *)s, *pv = (const char *)pat;
+static wval w_strfind_re(const char *sv, const char *pv) {
     uint32_t sl = w_str_len(sv), pl = w_str_len(pv);
     static uint32_t m[W_RE_MAXPAT];
-    if (pl > W_RE_MAXPAT) return (wval)(int64_t)-1;
+    if (pl > W_RE_MAXPAT) return W_I64(-1);
     w_re_precompute(pv, pl, m);
     for (uint32_t start = 0; start <= sl; start++) {
         if (w_re_match_at(pv, 0, pl, sv, start, sl, m) >= 0)
-            return (wval)(int64_t)start;
+            return W_I64((int64_t)start);
     }
-    return (wval)(int64_t)-1;
+    return W_I64(-1);
 }
 
 
@@ -971,7 +1049,7 @@ static wval w_strfind_re(wval s, wval pat) {
 #endif
 
 static wval w_mkdir(wval path) {
-    return (wval)(int64_t)(w_mkdir_impl((const char *)path) == 0 ? 0 : -1);
+    return W_I64(w_mkdir_impl((const char *)w_as_ptr(path)) == 0 ? 0 : -1);
 }
 
 // list of entry names, sorted bytewise; empty list on error
@@ -979,9 +1057,9 @@ static int w_cstr_cmp(const void *a, const void *b) {
     return strcmp(*(const char **)a, *(const char **)b);
 }
 static wval w_listdir(wval path) {
-    const char *p = (const char *)path;
+    const char *p = (const char *)w_as_ptr(path);
     DIR *d = opendir(p);
-    if (!d) return (wval)w_list_new(0);
+    if (!d) return W_PTR(w_list_new(0));
     char **names = NULL;
     int64_t n = 0, cap = 0;
     struct dirent *e;
@@ -989,7 +1067,7 @@ static wval w_listdir(wval path) {
         if (n == cap) {
             cap = cap ? cap * 2 : 16;
             names = (char **)realloc(names, cap * sizeof(char *));
-            if (!names) { closedir(d); return (wval)w_list_new(0); }
+            if (!names) { closedir(d); return W_PTR(w_list_new(0)); }
         }
         // copy into the string arena so it outlives the DIR handle
         uint32_t l = (uint32_t)strlen(e->d_name);
@@ -999,9 +1077,9 @@ static wval w_listdir(wval path) {
     closedir(d);
     if (n > 1) qsort(names, (size_t)n, sizeof(char *), w_cstr_cmp);
     wval *lst = w_list_new(n);
-    for (int64_t i = 0; i < n; i++) lst[1 + i] = (wval)names[i];
+    for (int64_t i = 0; i < n; i++) lst[1 + i] = W_PTR(names[i]);
     free(names);
-    return (wval)lst;
+    return W_PTR(lst);
 }
 
 // UTC formatting, subset %Y %m %d %H %M %S %% — mirrors the Rust
@@ -1029,7 +1107,7 @@ static wval w_strftime_utc(int64_t ts, const char *fmt) {
     uint32_t n = w_str_len(f);
     // worst case growth: each %X becomes <= 2 digits replaced by <= 4
     char *buf = (char *)malloc(n * 4 + 8);
-    if (!buf) return (wval)w_str_new("", 0);
+    if (!buf) return W_PTR(w_str_new("", 0));
     uint32_t o = 0;
     for (uint32_t i = 0; i < n; i++) {
         if (f[i] == '%' && i + 1 < n) {
@@ -1059,42 +1137,47 @@ static wval w_strftime_utc(int64_t ts, const char *fmt) {
         }
         buf[o++] = f[i];
     }
-    wval r = (wval)w_str_new(buf, o);
+    wval r = W_PTR(w_str_new(buf, o));
     free(buf);
     return r;
 }
 
 // fmt: replace the first {} in fstr with value rendered as text
-// (heap pointer => string; anything else => i64, mirroring w_dump_val)
+// (string ptr => raw string; f64 => %g; anything else => i64 — mirrors
+// the VM's Fmt rendering: I64/F64 to_string, Str unquoted)
 static wval w_fmt(wval f, wval v) {
-    const char *fs = (const char *)f;
+    const char *fs = (const char *)w_as_ptr(f);
     uint32_t n = w_str_len(fs);
     for (uint32_t i = 0; i + 1 < n; i++) {
         if (fs[i] == '{' && fs[i+1] == '}') {
             const char *vs;
             char tmp[32];
             uint32_t vn;
-            if (v >= (wval)w_heap && v < (wval)(w_heap + w_heap_size)) {
-                vs = (const char *)v;
+            if (wval_is_str(v)) {
+                vs = (const char *)w_as_ptr(v);
                 vn = w_str_len(vs);
+            } else if (v.t == WT_F64) {
+                vs = tmp;
+                snprintf(tmp, sizeof(tmp), "%g", w_as_f64(v));
+                vn = (uint32_t)strlen(tmp);
             } else {
                 vs = tmp;
-                snprintf(tmp, sizeof(tmp), "%lld", (long long)(int64_t)v);
+                snprintf(tmp, sizeof(tmp), "%lld", (long long)w_as_i64(v));
                 vn = (uint32_t)strlen(tmp);
             }
             // new = fs[:i] + vs + fs[i+2:]
             uint32_t total = i + vn + (n - i - 2);
             char *buf = (char *)malloc(total > 0 ? total : 1);
-            if (!buf) return (wval)w_str_new("", 0);
+            if (!buf) return W_PTR(w_str_new("", 0));
             memcpy(buf, fs, i);
             memcpy(buf + i, vs, vn);
             memcpy(buf + i + vn, fs + i + 2, n - i - 2);
-            wval r = (wval)w_str_new(buf, total);
+            wval r = W_PTR(w_str_new(buf, total));
             free(buf);
             return r;
         }
     }
-    return (wval)w_str_new(fs, n); // no placeholder: unchanged
+    return W_PTR(w_str_new(fs, n)); // no placeholder: unchanged
 }
 
 // OutputAll: print the whole stack as [v0 v1 ...]
@@ -1113,7 +1196,7 @@ static void w_output_all(void) {
 
 static char *w_json_stringify(wval v) {
     // For i64 values
-    return w_i64_to_str((int64_t)v);
+    return w_i64_to_str(w_as_i64(v));
 }
 
 // ── Map operations (association list) ───────────────────────────────
@@ -1125,21 +1208,21 @@ static wval *w_map_new(void) {
 static wval w_map_get(wval *map, const char *key) {
     int64_t count = w_list_len(map);
     for (int64_t i = 0; i < count; i++) {
-        wval *pair = (wval *)map[1 + i];
+        wval *pair = (wval *)w_as_ptr(map[1 + i]);
         if (pair && w_list_len(pair) == 2) {
-            const char *k = (const char *)pair[1];
+            const char *k = (const char *)w_as_ptr(pair[1]);
             if (w_str_eq(k, key)) return pair[2];
         }
     }
-    return 0;
+    return W_I64(0);
 }
 
 static int64_t w_map_has(wval *map, const char *key) {
     int64_t count = w_list_len(map);
     for (int64_t i = 0; i < count; i++) {
-        wval *pair = (wval *)map[1 + i];
+        wval *pair = (wval *)w_as_ptr(map[1 + i]);
         if (pair && w_list_len(pair) == 2) {
-            const char *k = (const char *)pair[1];
+            const char *k = (const char *)w_as_ptr(pair[1]);
             if (w_str_eq(k, key)) return 1;
         }
     }
@@ -1150,9 +1233,9 @@ static wval *w_map_set(wval *map, const char *key, wval value) {
     int64_t count = w_list_len(map);
     // Check if key exists
     for (int64_t i = 0; i < count; i++) {
-        wval *pair = (wval *)map[1 + i];
+        wval *pair = (wval *)w_as_ptr(map[1 + i]);
         if (pair && w_list_len(pair) == 2) {
-            const char *k = (const char *)pair[1];
+            const char *k = (const char *)w_as_ptr(pair[1]);
             if (w_str_eq(k, key)) {
                 // Update in place (mutation for simplicity)
                 pair[2] = value;
@@ -1162,20 +1245,20 @@ static wval *w_map_set(wval *map, const char *key, wval value) {
     }
     // Add new entry
     wval *pair = w_list_new(2);
-    pair[1] = (wval)key;
+    pair[1] = W_PTR((void *)key);
     pair[2] = value;
-    return w_list_append(map, (wval)pair);
+    return w_list_append(map, W_PTR((void *)pair));
 }
 
 static wval *w_map_del(wval *map, const char *key) {
     int64_t count = w_list_len(map);
     wval *new_map = w_list_new(0);
     for (int64_t i = 0; i < count; i++) {
-        wval *pair = (wval *)map[1 + i];
+        wval *pair = (wval *)w_as_ptr(map[1 + i]);
         if (pair && w_list_len(pair) == 2) {
-            const char *k = (const char *)pair[1];
+            const char *k = (const char *)w_as_ptr(pair[1]);
             if (!w_str_eq(k, key)) {
-                new_map = w_list_append(new_map, (wval)pair);
+                new_map = w_list_append(new_map, W_PTR((void *)pair));
             }
         }
     }
@@ -1186,8 +1269,8 @@ static wval *w_map_keys(wval *map) {
     int64_t count = w_list_len(map);
     wval *keys = w_list_new(count);
     for (int64_t i = 0; i < count; i++) {
-        wval *pair = (wval *)map[1 + i];
-        keys[1 + i] = pair ? pair[1] : 0;
+        wval *pair = (wval *)w_as_ptr(map[1 + i]);
+        keys[1 + i] = pair ? pair[1] : W_I64(0);
     }
     return keys;
 }
@@ -1248,10 +1331,13 @@ static void w_sleep(int64_t ms) {
 
 static inline int64_t w_shl(int64_t a, int64_t b) { return a << b; }
 static inline int64_t w_shr(int64_t a, int64_t b) { return a >> b; }
-static inline int64_t w_bitand(int64_t a, int64_t b) { return a & b; }
-static inline int64_t w_bitor(int64_t a, int64_t b) { return a | b; }
-static inline int64_t w_bitxor(int64_t a, int64_t b) { return a ^ b; }
-static inline int64_t w_bitnot(int64_t a) { return ~a; }
+// NOTE: renamed from w_bitand/w_bitor/w_bitxor/w_bitnot — the transpiler
+// prefixes user words with w_, and std/math defines bitand/bitor/bitxor/
+// bitnot words, whose generated w_bitand() etc. collided with these.
+static inline int64_t w_bit_and(int64_t a, int64_t b) { return a & b; }
+static inline int64_t w_bit_or(int64_t a, int64_t b)  { return a | b; }
+static inline int64_t w_bit_xor(int64_t a, int64_t b) { return a ^ b; }
+static inline int64_t w_bit_not(int64_t a) { return ~a; }
 
 // ── Program args ────────────────────────────────────────────────────
 
@@ -1261,7 +1347,7 @@ static char **w_argv = NULL;
 static wval *w_args(void) {
     wval *list = w_list_new(w_argc);
     for (int i = 0; i < w_argc; i++) {
-        list[1 + i] = (wval)w_str_from_cstr(w_argv[i]);
+        list[1 + i] = W_PTR(w_str_from_cstr(w_argv[i]));
     }
     return list;
 }
@@ -1271,19 +1357,19 @@ static wval *w_args(void) {
 // ── Type check functions (for Whisper list?, i64?, str?, bool?) ─────
 static void w_list_(void) {
     wval v = w_pop();
-    w_push((wval)(w_is_list_val(v) ? 1L : 0L));
+    w_push(W_I64(w_is_list_val(v) ? 1L : 0L));
 }
 static void w_i64_(void) {
     wval v = w_pop();
-    w_push((wval)(v < (wval)w_heap || v >= (wval)(w_heap + w_heap_size) ? 1L : 0L));
+    w_push(W_I64(v.t == WT_I64 ? 1L : 0L));
 }
 static void w_str_(void) {
     wval v = w_pop();
-    w_push((wval)((v >= (wval)w_heap && v < (wval)(w_heap + w_heap_size) && !w_is_list_val(v)) ? 1L : 0L));
+    w_push(W_I64(wval_is_str(v) ? 1L : 0L));
 }
 static void w_bool_(void) {
     wval v = w_pop();
-    w_push((wval)((v == 0 || v == 1) ? 1L : 0L));
+    w_push(W_I64((v.v == 0 || v.v == 1) ? 1L : 0L));
 }
 
 // ── Quote (closure) support ─────────────────────────────────────────
@@ -1335,7 +1421,7 @@ static wval *w_filter_over(wval *list, wfn f) {
     for (int64_t i = 0; i < count; i++) {
         w_push(list[1 + i]);
         f();
-        if ((int64_t)w_pop() != 0) tmp[kept++] = list[1 + i];
+        if (w_as_i64(w_pop()) != 0) tmp[kept++] = list[1 + i];
     }
     wval *result = w_list_new(kept);
     for (int64_t j = 0; j < kept; j++) result[1 + j] = tmp[j];
@@ -1410,7 +1496,7 @@ static void w_net_init(void) {
 // listen(port) -> server handle | -1
 static wval w_sock_listen(int64_t port) {
     w_socket_t s = socket(AF_INET, SOCK_STREAM, 0);
-    if (s == W_BAD_SOCKET) return -1;
+    if (s == W_BAD_SOCKET) return W_I64(-1);
     int opt = 1;
     setsockopt(s, SOL_SOCKET, SO_REUSEADDR, (const char *)&opt, sizeof(opt));
     struct sockaddr_in a;
@@ -1418,16 +1504,16 @@ static wval w_sock_listen(int64_t port) {
     a.sin_family = AF_INET;
     a.sin_addr.s_addr = htonl(INADDR_ANY);
     a.sin_port = htons((unsigned short)port);
-    if (bind(s, (struct sockaddr *)&a, sizeof(a)) != 0) { w_closesock(s); return -1; }
-    if (listen(s, 16) != 0) { w_closesock(s); return -1; }
-    return (wval)(int64_t)s;
+    if (bind(s, (struct sockaddr *)&a, sizeof(a)) != 0) { w_closesock(s); return W_I64(-1); }
+    if (listen(s, 16) != 0) { w_closesock(s); return W_I64(-1); }
+    return W_I64((int64_t)s);
 }
 
 // accept(server) -> conn handle | -1 (blocking)
 static wval w_sock_accept(wval srv) {
-    w_socket_t c = accept((w_socket_t)(int64_t)srv, NULL, NULL);
-    if (c == W_BAD_SOCKET) return -1;
-    return (wval)(int64_t)c;
+    w_socket_t c = accept((w_socket_t)w_as_i64(srv), NULL, NULL);
+    if (c == W_BAD_SOCKET) return W_I64(-1);
+    return W_I64((int64_t)c);
 }
 
 // recv(conn) -> request string. HTTP-style: stop at header terminator, peer
@@ -1455,7 +1541,7 @@ static int w_hdr_content_length(const char *buf, size_t len) {
 }
 
 static wval w_sock_recv(wval h) {
-    w_socket_t c = (w_socket_t)(int64_t)h;
+    w_socket_t c = (w_socket_t)w_as_i64(h);
 #ifdef _WIN32
     DWORD ms = 2000;
     setsockopt(c, SOL_SOCKET, SO_RCVTIMEO, (const char *)&ms, sizeof(ms));
@@ -1487,48 +1573,48 @@ static wval w_sock_recv(wval h) {
         if (n <= 0) break;
         len += (size_t)n;
     }
-    return (wval)w_str_new(buf, (uint32_t)len);
+    return W_PTR(w_str_new(buf, (uint32_t)len));
 }
 
 // send(conn, data) -> bytes sent | -1
 static wval w_sock_send(wval h, const char *s) {
-    w_socket_t c = (w_socket_t)(int64_t)h;
+    w_socket_t c = (w_socket_t)w_as_i64(h);
     int n = (int)send(c, s, w_str_len(s), 0);
-    return (wval)(int64_t)n;
+    return W_I64((int64_t)n);
 }
 
 static void w_sock_close(wval h) {
-    w_closesock((w_socket_t)(int64_t)h);
+    w_closesock((w_socket_t)w_as_i64(h));
 }
 
 // read-file(path) -> contents | "" on error
 static wval w_read_file(const char *path) {
     FILE *f = fopen(path, "rb");
-    if (!f) return (wval)w_str_new("", 0);
+    if (!f) return W_PTR(w_str_new("", 0));
     fseek(f, 0, SEEK_END);
     long sz = ftell(f);
     fseek(f, 0, SEEK_SET);
-    if (sz < 0) { fclose(f); return (wval)w_str_new("", 0); }
+    if (sz < 0) { fclose(f); return W_PTR(w_str_new("", 0)); }
     char *buf = (char *)w_alloc((size_t)sz + 1);
     size_t rd = fread(buf, 1, (size_t)sz, f);
     fclose(f);
-    return (wval)w_str_new(buf, (uint32_t)rd);
+    return W_PTR(w_str_new(buf, (uint32_t)rd));
 }
 
 // write-file(path, data) -> bytes written | -1
 static wval w_write_file(const char *path, const char *data) {
     FILE *f = fopen(path, "wb");
-    if (!f) return -1;
+    if (!f) return W_I64(-1);
     size_t wr = fwrite(data, 1, w_str_len(data), f);
     fclose(f);
-    return (wval)(int64_t)wr;
+    return W_I64((int64_t)wr);
 }
 
 // getenv(name) -> value | "" if unset
 static wval w_env_get(const char *name) {
     const char *v = getenv(name);
-    if (!v) return (wval)w_str_new("", 0);
-    return (wval)w_str_new(v, (uint32_t)strlen(v));
+    if (!v) return W_PTR(w_str_new("", 0));
+    return W_PTR(w_str_new(v, (uint32_t)strlen(v)));
 }
 
 // ── Shared KV store (v1.0.2 vocabulary) ──────────────────────────────
@@ -1591,13 +1677,13 @@ static wval w_kv_get(const char *key) {
     w_kv_lock_enter();
     for (int i = 0; i < kv_used; i++) {
         if (w_str_eq(kv_keys[i], key)) {
-            wval r = (wval)w_str_new(kv_vals[i], w_str_len(kv_vals[i]));
+            wval r = W_PTR(w_str_new(kv_vals[i], w_str_len(kv_vals[i])));
             w_kv_lock_leave();
             return r;
         }
     }
     w_kv_lock_leave();
-    return (wval)w_str_new("", 0); // missing -> empty string (VM parity)
+    return W_PTR(w_str_new("", 0)); // missing -> empty string (VM parity)
 }
 
 static void w_kv_del(const char *key) {
@@ -1621,7 +1707,7 @@ static wval *w_kv_keys_list(void) {
     w_kv_lock_enter();
     wval *l = w_list_new(kv_used);
     for (int i = 0; i < kv_used; i++)
-        l[1 + i] = (wval)w_str_new(kv_keys[i], w_str_len(kv_keys[i]));
+        l[1 + i] = W_PTR(w_str_new(kv_keys[i], w_str_len(kv_keys[i])));
     w_kv_lock_leave();
     return l;
 }
@@ -1663,9 +1749,9 @@ static void *w_worker_main(void *arg) {
     w_heap_size = W_THREAD_HEAP;
     w_heap_init();
     w_random_seed((uint64_t)(uintptr_t)job ^ (uint64_t)time(NULL));
-    w_push((wval)(int64_t)job->conn);
+    w_push(W_I64((int64_t)job->conn));
     job->handler();
-    w_sock_close(job->conn);
+    w_sock_close(W_I64((int64_t)job->conn));
     w_worker_cleanup();
     free(job);
     return 0;
@@ -1673,9 +1759,9 @@ static void *w_worker_main(void *arg) {
 
 static void w_serve_concurrent(int64_t port, wfn handler) {
     wval srv = w_sock_listen(port);
-    if ((int64_t)srv < 0) { fprintf(stderr, "serve-concurrent: listen failed\n"); exit(1); }
+    if (w_as_i64(srv) < 0) { fprintf(stderr, "serve-concurrent: listen failed\n"); exit(1); }
     for (;;) {
-        w_socket_t c = accept((w_socket_t)(int64_t)srv, NULL, NULL);
+        w_socket_t c = accept((w_socket_t)w_as_i64(srv), NULL, NULL);
         if (c == W_BAD_SOCKET) continue;
         w_job *job = (w_job *)malloc(sizeof(w_job));
         job->conn = c;

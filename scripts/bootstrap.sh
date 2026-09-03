@@ -25,7 +25,7 @@ TMP="$OUT/.tmp"; mkdir -p "$TMP"
 step() { echo "[bootstrap] $*"; }
 
 step "1/5 seed: gcc -> whisper0"
-"$GCC" -O2 -o "$TMP/whisper0" "$ROOT/whisperc/seed/compiler_seed.c" -lm
+"$GCC" -O2 -o "$TMP/whisper0" "$ROOT/whisperc/seed/compiler_seed.c" -lm $EXTRA_LIBS
 
 step "2/5 whisper0 compiles the Whisper-written compiler -> whisper1"
 "$TMP/whisper0" -c < "$ROOT/whisperc/compiler.all.ws" > "$TMP/gen1.c" 2>/dev/null

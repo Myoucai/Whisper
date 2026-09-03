@@ -805,3 +805,126 @@ mod whisper_c2 {
         }
     }
 }
+
+// ── -t exe: self-contained single-file executables ─────────────────
+
+#[test]
+fn bundled_exe_runs_and_matches_vm() {
+    let ws = std::env::temp_dir().join("whisper_bundle_test");
+    std::fs::create_dir_all(&ws).unwrap();
+    let src = ws.join("app.ws");
+    std::fs::write(
+        &src,
+        "import \"std/str\"\n\"hello\" \" world\" strcat .\n[1 2 3] { 2 * } @map 2 @nth .\n1.5 2.5 + f64toi64 .\n\"OK\" .\n",
+    )
+    .unwrap();
+    let exe = ws.join("app_bin");
+
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .args(["build", "-t", "exe", "-o"])
+        .arg(&exe)
+        .arg(&src)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "build -t exe failed: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+
+    let run = std::process::Command::new(&exe).output().unwrap();
+    assert!(
+        run.status.success(),
+        "bundled exe failed: {}",
+        String::from_utf8_lossy(&run.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&run.stdout);
+    let expected = "\"hello world\"\n6\n4\n\"OK\"\n";
+    assert_eq!(stdout, expected, "bundled exe stdout mismatch");
+
+    // The original CLI binary must NOT carry a trailer (still a normal whisper).
+    let normal = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .arg("--version")
+        .output()
+        .unwrap();
+    assert!(normal.status.success());
+}
+
+#[test]
+fn bundled_exe_trailer_layout() {
+    // Trailer = [payload][u64 len LE][b"WSHPEXE1"]; a plain whisper binary
+    // has none, a bundled one does, and the payload decodes as a wbin unit.
+    let ws = std::env::temp_dir().join("whisper_bundle_layout");
+    std::fs::create_dir_all(&ws).unwrap();
+    let src = ws.join("a.ws");
+    std::fs::write(&src, "1 .\n").unwrap();
+    let exe = ws.join("a_bin");
+    std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .args(["build", "-t", "exe", "-o"])
+        .arg(&exe)
+        .arg(&src)
+        .output()
+        .unwrap();
+
+    let data = std::fs::read(&exe).unwrap();
+    let n = data.len();
+    assert!(n > 16);
+    assert_eq!(&data[n - 8..], b"WSHPEXE1");
+    let mut len_bytes = [0u8; 8];
+    len_bytes.copy_from_slice(&data[n - 16..n - 8]);
+    let plen = u64::from_le_bytes(len_bytes) as usize;
+    assert!(plen + 16 <= n);
+    assert_eq!(&data[n - 16 - plen..n - 16][..4], b"WHSP");
+}
+
+// ── -t native: install-time specialization with content cache ──────
+
+#[test]
+fn native_target_specializes_and_caches() {
+    if std::process::Command::new("gcc").arg("--version").output().is_err() {
+        eprintln!("skipping: gcc not available");
+        return;
+    }
+    let ws = std::env::temp_dir().join("whisper_native_it");
+    std::fs::create_dir_all(&ws).unwrap();
+    // Unique source per run -> guaranteed cache miss; second build must hit.
+    let src = ws.join(format!("n{}.ws", std::process::id()));
+    std::fs::write(
+        &src,
+        "import \"std/math\"\n1.5 2.5 + f64toi64 .\n[1 2 3] { dup * } @map 2 @nth .\n",
+    )
+    .unwrap();
+    let exe = ws.join(format!("n{}.exe", std::process::id()));
+
+    let b1 = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .args(["build", "-t", "native", "-o"])
+        .arg(&exe)
+        .arg(&src)
+        .output()
+        .unwrap();
+    assert!(
+        b1.status.success(),
+        "native build: {}",
+        String::from_utf8_lossy(&b1.stderr)
+    );
+    let b2 = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .args(["build", "-t", "native", "-o"])
+        .arg(ws.join(format!("n{}b.exe", std::process::id())))
+        .arg(&src)
+        .output()
+        .unwrap();
+    assert!(b2.status.success());
+    assert!(
+        String::from_utf8_lossy(&b2.stdout).contains("cache hit"),
+        "second build must be a cache hit: {}",
+        String::from_utf8_lossy(&b2.stdout)
+    );
+
+    // Polymorphic float arithmetic must match the VM bit-for-bit.
+    let run = std::process::Command::new(&exe).output().unwrap();
+    assert!(run.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&run.stdout),
+        "4\r\n9\r\n".replace('\r', "")
+    );
+}

@@ -163,25 +163,25 @@ fn transpile_opcodes(
             }
             // ── Literals ────────────────────────────────────────
             Opcode::PushI64(n) => {
-                let _ = writeln!(out, "{pad}w_push((wval)(int64_t){n}L);");
+                let _ = writeln!(out, "{pad}w_push(W_I64((int64_t){n}L));");
             }
             Opcode::PushF64(n) => {
                 let bits = n.to_bits();
-                let _ = writeln!(out, "{pad}w_push((wval){bits}ULL); // f64: {n}");
+                let _ = writeln!(out, "{pad}{{ uint64_t _bits = {bits}ULL; double _d; memcpy(&_d, &_bits, 8); w_push(W_F64(_d)); }} // f64: {n}");
             }
             Opcode::PushBool(b) => {
-                let _ = writeln!(out, "{pad}w_push((wval){}L);", if *b { 1 } else { 0 });
+                let _ = writeln!(out, "{pad}w_push(W_I64({}L));", if *b { 1 } else { 0 });
             }
             Opcode::PushStr(s) => {
                 let idx = strings.intern(s);
-                let _ = writeln!(out, "{pad}w_push((wval)w_str_{idx});");
+                let _ = writeln!(out, "{pad}w_push(W_PTR((void *)w_str_{idx}));");
             }
             Opcode::PushList => {
                 // Previous opcodes should have pushed count + elements
                 // The runtime expects: elements on stack, then count on top
                 // w_list_new allocates, then we copy from stack
                 let _ = writeln!(out, "{{");
-                let _ = writeln!(out, "{pad}  int64_t _count = (int64_t)w_pop();");
+                let _ = writeln!(out, "{pad}  int64_t _count = w_as_i64(w_pop());");
                 let _ = writeln!(out, "{pad}  wval *_list = w_list_new(_count);");
                 let _ = writeln!(
                     out,
@@ -189,13 +189,13 @@ fn transpile_opcodes(
                 );
                 let _ = writeln!(out, "{pad}    _list[1 + _i] = w_pop();");
                 let _ = writeln!(out, "{pad}  }}");
-                let _ = writeln!(out, "{pad}  w_push((wval)_list);");
+                let _ = writeln!(out, "{pad}  w_push(W_PTR(_list));");
                 let _ = writeln!(out, "}}");
             }
             Opcode::PushRef(inner) => {
                 // Quotes are first-class: push the C function pointer.
                 let id = quotes.intern(inner);
-                let _ = writeln!(out, "{pad}w_push((wval)(uintptr_t)W_q{id});");
+                let _ = writeln!(out, "{pad}w_push(W_PTR((void *)(uintptr_t)W_q{id}));");
             }
 
             // ── Stack operations ────────────────────────────────
@@ -215,54 +215,56 @@ fn transpile_opcodes(
                 let _ = writeln!(out, "{pad}w_pick_n({n});");
             }
 
-            // ── Arithmetic ──────────────────────────────────────
+            // ── Arithmetic (tag-dispatching: any f64 operand → f64) ──
             Opcode::Add => {
-                let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); w_push((wval)((int64_t)_a + (int64_t)_b)); }}");
+                let _ = writeln!(out, "{pad}w_op_add();");
             }
             Opcode::Sub => {
-                let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); w_push((wval)((int64_t)_a - (int64_t)_b)); }}");
+                let _ = writeln!(out, "{pad}w_op_sub();");
             }
             Opcode::Mul => {
-                let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); w_push((wval)((int64_t)_a * (int64_t)_b)); }}");
+                let _ = writeln!(out, "{pad}w_op_mul();");
             }
             Opcode::Div => {
-                let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); if ((int64_t)_b == 0) {{ fprintf(stderr, \"division by zero\\n\"); exit(1); }} w_push((wval)((int64_t)_a / (int64_t)_b)); }}");
+                let _ = writeln!(out, "{pad}w_op_div();");
             }
             Opcode::Mod => {
-                let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); if ((int64_t)_b == 0) {{ fprintf(stderr, \"division by zero\\n\"); exit(1); }} w_push((wval)((int64_t)_a % (int64_t)_b)); }}");
+                let _ = writeln!(out, "{pad}w_op_mod();");
             }
 
             // ── Comparison ──────────────────────────────────────
             Opcode::Eq => {
-                let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); w_push((wval)((int64_t)_a == (int64_t)_b ? 1L : 0L)); }}");
+                // Identity compare (bits + tag). Known divergence from
+                // the VM: deep string content equality is NOT performed.
+                let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); w_push(W_I64((_a.v == _b.v && _a.t == _b.t) ? 1L : 0L)); }}");
             }
             Opcode::Neq => {
-                let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); w_push((wval)((int64_t)_a != (int64_t)_b ? 1L : 0L)); }}");
+                let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); w_push(W_I64((_a.v != _b.v || _a.t != _b.t) ? 1L : 0L)); }}");
             }
             Opcode::Lt => {
-                let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); w_push((wval)((int64_t)_a < (int64_t)_b ? 1L : 0L)); }}");
+                let _ = writeln!(out, "{pad}w_op_lt();");
             }
             Opcode::Gt => {
-                let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); w_push((wval)((int64_t)_a > (int64_t)_b ? 1L : 0L)); }}");
+                let _ = writeln!(out, "{pad}w_op_gt();");
             }
             Opcode::Le => {
-                let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); w_push((wval)((int64_t)_a <= (int64_t)_b ? 1L : 0L)); }}");
+                let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); w_push(W_I64(w_as_i64(_a) <= w_as_i64(_b) ? 1L : 0L)); }}");
             }
             Opcode::Ge => {
-                let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); w_push((wval)((int64_t)_a >= (int64_t)_b ? 1L : 0L)); }}");
+                let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); w_push(W_I64(w_as_i64(_a) >= w_as_i64(_b) ? 1L : 0L)); }}");
             }
 
             // ── Logic ───────────────────────────────────────────
             Opcode::And => {
-                let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); w_push((wval)((int64_t)_a && (int64_t)_b ? 1L : 0L)); }}");
+                let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); w_push(W_I64(w_as_i64(_a) && w_as_i64(_b) ? 1L : 0L)); }}");
             }
             Opcode::Or => {
-                let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); w_push((wval)((int64_t)_a || (int64_t)_b ? 1L : 0L)); }}");
+                let _ = writeln!(out, "{{ wval _b = w_pop(), _a = w_pop(); w_push(W_I64(w_as_i64(_a) || w_as_i64(_b) ? 1L : 0L)); }}");
             }
             Opcode::Not => {
                 let _ = writeln!(
                     out,
-                    "{{ wval _a = w_pop(); w_push((wval)((int64_t)_a == 0 ? 1L : 0L)); }}"
+                    "{{ wval _a = w_pop(); w_push(W_I64(w_as_i64(_a) == 0 ? 1L : 0L)); }}"
                 );
             }
 
@@ -270,7 +272,7 @@ fn transpile_opcodes(
             Opcode::Cond(offset) => {
                 let _ = writeln!(
                     out,
-                    "{{ wval _cond = w_pop(); if ((int64_t)_cond == 0) goto L_{}; }}",
+                    "{{ wval _cond = w_pop(); if (w_as_i64(_cond) == 0) goto L_{}; }}",
                     i as i32 + 1 + offset
                 );
             }
@@ -280,13 +282,13 @@ fn transpile_opcodes(
             Opcode::Loop(offset) => {
                 let _ = writeln!(
                     out,
-                    "{{ wval _cond = w_pop(); if ((int64_t)_cond != 0) goto L_{}; }}",
+                    "{{ wval _cond = w_pop(); if (w_as_i64(_cond) != 0) goto L_{}; }}",
                     i as i32 + 1 + offset
                 );
             }
             Opcode::Times => {
                 // stack: n, quote -> call the quote n times
-                let _ = writeln!(out, "{{ wfn _f = (wfn)w_pop(); int64_t _n = (int64_t)w_pop(); for (int64_t _i = 0; _i < _n; _i++) _f(); }}");
+                let _ = writeln!(out, "{{ wfn _f = (wfn)(uintptr_t)w_as_ptr(w_pop()); int64_t _n = w_as_i64(w_pop()); for (int64_t _i = 0; _i < _n; _i++) _f(); }}");
             }
 
             // ── Call/Return ─────────────────────────────────────
@@ -300,206 +302,206 @@ fn transpile_opcodes(
 
             // ── List operations ─────────────────────────────────
             Opcode::Nth => {
-                let _ = writeln!(out, "{{ int64_t _idx = (int64_t)w_pop(); wval *_list = (wval *)w_pop(); w_push(w_list_nth(_list, _idx)); }}");
+                let _ = writeln!(out, "{{ int64_t _idx = w_as_i64(w_pop()); wval *_list = (wval *)w_as_ptr(w_pop()); w_push(w_list_nth(_list, _idx)); }}");
             }
             Opcode::Append => {
-                let _ = writeln!(out, "{{ wval _elem = w_pop(); wval *_list = (wval *)w_pop(); w_push((wval)w_list_append(_list, _elem)); }}");
+                let _ = writeln!(out, "{{ wval _elem = w_pop(); wval *_list = (wval *)w_as_ptr(w_pop()); w_push(W_PTR(w_list_append(_list, _elem))); }}");
             }
             Opcode::Prepend => {
-                let _ = writeln!(out, "{{ wval *_list = (wval *)w_pop(); wval _elem = w_pop(); w_push((wval)w_list_prepend(_elem, _list)); }}");
+                let _ = writeln!(out, "{{ wval *_list = (wval *)w_as_ptr(w_pop()); wval _elem = w_pop(); w_push(W_PTR(w_list_prepend(_elem, _list))); }}");
             }
             Opcode::Len => {
                 let _ = writeln!(
                     out,
-                    "{{ wval *_list = (wval *)w_pop(); w_push((wval)w_list_len(_list)); }}"
+                    "{{ wval *_list = (wval *)w_as_ptr(w_pop()); w_push(W_I64(w_list_len(_list))); }}"
                 );
             }
             Opcode::Map => {
-                let _ = writeln!(out, "{{ wfn _f = (wfn)w_pop(); wval *_l = (wval *)w_pop(); w_push((wval)w_map_over(_l, _f)); }}");
+                let _ = writeln!(out, "{{ wfn _f = (wfn)(uintptr_t)w_as_ptr(w_pop()); wval *_l = (wval *)w_as_ptr(w_pop()); w_push(W_PTR(w_map_over(_l, _f))); }}");
             }
             Opcode::Each => {
                 let _ = writeln!(
                     out,
-                    "{{ wfn _f = (wfn)w_pop(); wval *_l = (wval *)w_pop(); w_each_over(_l, _f); }}"
+                    "{{ wfn _f = (wfn)(uintptr_t)w_as_ptr(w_pop()); wval *_l = (wval *)w_as_ptr(w_pop()); w_each_over(_l, _f); }}"
                 );
             }
             Opcode::Fold => {
-                let _ = writeln!(out, "{{ wfn _f = (wfn)w_pop(); wval _init = w_pop(); wval *_l = (wval *)w_pop(); w_push(w_fold_over(_l, _init, _f)); }}");
+                let _ = writeln!(out, "{{ wfn _f = (wfn)(uintptr_t)w_as_ptr(w_pop()); wval _init = w_pop(); wval *_l = (wval *)w_as_ptr(w_pop()); w_push(w_fold_over(_l, _init, _f)); }}");
             }
             Opcode::Filter => {
-                let _ = writeln!(out, "{{ wfn _f = (wfn)w_pop(); wval *_l = (wval *)w_pop(); w_push((wval)w_filter_over(_l, _f)); }}");
+                let _ = writeln!(out, "{{ wfn _f = (wfn)(uintptr_t)w_as_ptr(w_pop()); wval *_l = (wval *)w_as_ptr(w_pop()); w_push(W_PTR(w_filter_over(_l, _f))); }}");
             }
             Opcode::Sort => {
                 let _ = writeln!(
                     out,
-                    "{{ wval *_list = (wval *)w_pop(); w_push((wval)w_list_sort(_list)); }}"
+                    "{{ wval *_list = (wval *)w_as_ptr(w_pop()); w_push(W_PTR(w_list_sort(_list))); }}"
                 );
             }
             Opcode::Rev => {
                 let _ = writeln!(
                     out,
-                    "{{ wval *_list = (wval *)w_pop(); w_push((wval)w_list_rev(_list)); }}"
+                    "{{ wval *_list = (wval *)w_as_ptr(w_pop()); w_push(W_PTR(w_list_rev(_list))); }}"
                 );
             }
             Opcode::Dedup => {
                 let _ = writeln!(
                     out,
-                    "{{ wval *_l = (wval *)w_pop(); w_push((wval)w_list_dedup(_l)); }}"
+                    "{{ wval *_l = (wval *)w_as_ptr(w_pop()); w_push(W_PTR(w_list_dedup(_l))); }}"
                 );
             }
             Opcode::Take => {
-                let _ = writeln!(out, "{{ int64_t _n = (int64_t)w_pop(); wval *_list = (wval *)w_pop(); w_push((wval)w_list_take(_list, _n)); }}");
+                let _ = writeln!(out, "{{ int64_t _n = w_as_i64(w_pop()); wval *_list = (wval *)w_as_ptr(w_pop()); w_push(W_PTR(w_list_take(_list, _n))); }}");
             }
             Opcode::DropN => {
-                let _ = writeln!(out, "{{ int64_t _n = (int64_t)w_pop(); wval *_list = (wval *)w_pop(); w_push((wval)w_list_drop(_list, _n)); }}");
+                let _ = writeln!(out, "{{ int64_t _n = w_as_i64(w_pop()); wval *_list = (wval *)w_as_ptr(w_pop()); w_push(W_PTR(w_list_drop(_list, _n))); }}");
             }
             Opcode::ListSlice => {
-                let _ = writeln!(out, "{{ int64_t _len = (int64_t)w_pop(); int64_t _start = (int64_t)w_pop(); wval *_list = (wval *)w_pop(); w_push((wval)w_list_slice(_list, _start, _len)); }}");
+                let _ = writeln!(out, "{{ int64_t _len = w_as_i64(w_pop()); int64_t _start = w_as_i64(w_pop()); wval *_list = (wval *)w_as_ptr(w_pop()); w_push(W_PTR(w_list_slice(_list, _start, _len))); }}");
             }
             Opcode::ListFind => {
-                let _ = writeln!(out, "{{ wval _e = w_pop(); wval *_l = (wval *)w_pop(); w_push((wval)w_listfind(_l, _e)); }}");
+                let _ = writeln!(out, "{{ wval _e = w_pop(); wval *_l = (wval *)w_as_ptr(w_pop()); w_push(W_I64(w_listfind(_l, _e))); }}");
             }
 
             // ── String operations ───────────────────────────────
             Opcode::StrLen => {
-                let _ = writeln!(out, "{{ const char *_s = (const char *)w_pop(); w_push((wval)(int64_t)w_str_len(_s)); }}");
+                let _ = writeln!(out, "{{ const char *_s = (const char *)w_as_ptr(w_pop()); w_push(W_I64((int64_t)w_str_len(_s))); }}");
             }
             Opcode::StrCat => {
-                let _ = writeln!(out, "{{ const char *_b = (const char *)w_pop(); const char *_a = (const char *)w_pop(); w_push((wval)w_str_concat(_a, _b)); }}");
+                let _ = writeln!(out, "{{ const char *_b = (const char *)w_as_ptr(w_pop()); const char *_a = (const char *)w_as_ptr(w_pop()); w_push(W_PTR(w_str_concat(_a, _b))); }}");
             }
             Opcode::StrSlice => {
-                let _ = writeln!(out, "{{ int64_t _len = (int64_t)w_pop(); int64_t _start = (int64_t)w_pop(); const char *_s = (const char *)w_pop(); w_push((wval)w_str_slice(_s, _start, _len)); }}");
+                let _ = writeln!(out, "{{ int64_t _len = w_as_i64(w_pop()); int64_t _start = w_as_i64(w_pop()); const char *_s = (const char *)w_as_ptr(w_pop()); w_push(W_PTR(w_str_slice(_s, _start, _len))); }}");
             }
             Opcode::StrEq => {
-                let _ = writeln!(out, "{{ const char *_b = (const char *)w_pop(); const char *_a = (const char *)w_pop(); w_push((wval)w_str_eq(_a, _b)); }}");
+                let _ = writeln!(out, "{{ const char *_b = (const char *)w_as_ptr(w_pop()); const char *_a = (const char *)w_as_ptr(w_pop()); w_push(W_I64(w_str_eq(_a, _b))); }}");
             }
             Opcode::StrLt => {
-                let _ = writeln!(out, "{{ const char *_b = (const char *)w_pop(); const char *_a = (const char *)w_pop(); w_push((wval)w_str_lt(_a, _b)); }}");
+                let _ = writeln!(out, "{{ const char *_b = (const char *)w_as_ptr(w_pop()); const char *_a = (const char *)w_as_ptr(w_pop()); w_push(W_I64(w_str_lt(_a, _b))); }}");
             }
             Opcode::StrFind => {
-                let _ = writeln!(out, "{{ const char *_needle = (const char *)w_pop(); const char *_hay = (const char *)w_pop(); w_push((wval)w_str_find(_hay, _needle)); }}");
+                let _ = writeln!(out, "{{ const char *_needle = (const char *)w_as_ptr(w_pop()); const char *_hay = (const char *)w_as_ptr(w_pop()); w_push(W_I64(w_str_find(_hay, _needle))); }}");
             }
             Opcode::StrReplace => {
-                let _ = writeln!(out, "{{ const char *_new = (const char *)w_pop(); const char *_old = (const char *)w_pop(); const char *_src = (const char *)w_pop(); w_push((wval)w_str_replace(_src, _old, _new)); }}");
+                let _ = writeln!(out, "{{ const char *_new = (const char *)w_as_ptr(w_pop()); const char *_old = (const char *)w_as_ptr(w_pop()); const char *_src = (const char *)w_as_ptr(w_pop()); w_push(W_PTR(w_str_replace(_src, _old, _new))); }}");
             }
             Opcode::StrToI64 => {
                 let _ = writeln!(
                     out,
-                    "{{ const char *_s = (const char *)w_pop(); w_push((wval)w_str_to_i64(_s)); }}"
+                    "{{ const char *_s = (const char *)w_as_ptr(w_pop()); w_push(W_I64(w_str_to_i64(_s))); }}"
                 );
             }
             Opcode::I64ToStr => {
                 let _ = writeln!(
                     out,
-                    "{{ int64_t _n = (int64_t)w_pop(); w_push((wval)w_i64_to_str(_n)); }}"
+                    "{{ int64_t _n = w_as_i64(w_pop()); w_push(W_PTR(w_i64_to_str(_n))); }}"
                 );
             }
             Opcode::StrNth => {
-                let _ = writeln!(out, "{{ int64_t _idx = (int64_t)w_pop(); const char *_s = (const char *)w_pop(); w_push((wval)(int64_t)(unsigned char)_s[_idx]); }}");
+                let _ = writeln!(out, "{{ int64_t _idx = w_as_i64(w_pop()); const char *_s = (const char *)w_as_ptr(w_pop()); w_push(W_I64((int64_t)(unsigned char)_s[_idx])); }}");
             }
             Opcode::StrChars => {
-                let _ = writeln!(out, "{{ const char *_s = (const char *)w_pop(); uint32_t _len = w_str_len(_s); wval *_list = w_list_new(_len); for (uint32_t _i = 0; _i < _len; _i++) _list[1+_i] = (wval)(int64_t)_s[_i]; w_push((wval)_list); }}");
+                let _ = writeln!(out, "{{ const char *_s = (const char *)w_as_ptr(w_pop()); uint32_t _len = w_str_len(_s); wval *_list = w_list_new(_len); for (uint32_t _i = 0; _i < _len; _i++) _list[1+_i] = W_I64((int64_t)_s[_i]); w_push(W_PTR(_list)); }}");
             }
             Opcode::CharsStr => {
-                let _ = writeln!(out, "{{ wval *_list = (wval *)w_pop(); int64_t _count = w_list_len(_list); char *_buf = w_alloc(_count + 1); for (int64_t _i = 0; _i < _count; _i++) _buf[_i] = (char)(int64_t)_list[1+_i]; w_push((wval)w_str_new(_buf, _count)); }}");
+                let _ = writeln!(out, "{{ wval *_list = (wval *)w_as_ptr(w_pop()); int64_t _count = w_list_len(_list); char *_buf = w_alloc(_count + 1); for (int64_t _i = 0; _i < _count; _i++) _buf[_i] = (char)w_as_i64(_list[1+_i]); w_push(W_PTR(w_str_new(_buf, _count))); }}");
             }
             Opcode::StrIter => {
-                let _ = writeln!(out, "{{ const char *_s = (const char *)w_pop(); if (w_str_len(_s) == 0) {{ w_push((wval)-1LL); w_push((wval)w_str_new(\"\", 0)); }} else {{ w_push((wval)(int64_t)_s[0]); w_push((wval)w_str_new(_s+1, w_str_len(_s)-1)); }} }}");
+                let _ = writeln!(out, "{{ const char *_s = (const char *)w_as_ptr(w_pop()); if (w_str_len(_s) == 0) {{ w_push(W_I64(-1)); w_push(W_PTR(w_str_new(\"\", 0))); }} else {{ w_push(W_I64((int64_t)_s[0])); w_push(W_PTR(w_str_new(_s+1, w_str_len(_s)-1))); }} }}");
             }
             Opcode::StrJoin => {
-                let _ = writeln!(out, "{{ wval *_list = (wval *)w_pop(); const char *_sep = (const char *)w_pop(); w_push((wval)w_strjoin(_list, _sep)); }}");
+                let _ = writeln!(out, "{{ wval *_list = (wval *)w_as_ptr(w_pop()); const char *_sep = (const char *)w_as_ptr(w_pop()); w_push(W_PTR(w_strjoin(_list, _sep))); }}");
             }
             Opcode::StrSplit => {
-                let _ = writeln!(out, "{{ const char *_d = (const char *)w_pop(); const char *_s = (const char *)w_pop(); w_push((wval)w_str_split(_s, _d)); }}");
+                let _ = writeln!(out, "{{ const char *_d = (const char *)w_as_ptr(w_pop()); const char *_s = (const char *)w_as_ptr(w_pop()); w_push(W_PTR(w_str_split(_s, _d))); }}");
             }
             Opcode::Ctos => {
                 let _ = writeln!(
                     out,
-                    "{{ int64_t _c = (int64_t)w_pop(); w_push((wval)rt_ctos(_c)); }}"
+                    "{{ int64_t _c = w_as_i64(w_pop()); w_push(W_PTR(rt_ctos(_c))); }}"
                 );
             }
 
             // ── Map operations ──────────────────────────────────
             Opcode::MapNew => {
-                let _ = writeln!(out, "{pad}w_push((wval)w_map_new());");
+                let _ = writeln!(out, "{pad}w_push(W_PTR(w_map_new()));");
             }
             Opcode::MapGet => {
-                let _ = writeln!(out, "{{ const char *_key = (const char *)w_pop(); wval *_map = (wval *)w_pop(); w_push(w_map_get(_map, _key)); }}");
+                let _ = writeln!(out, "{{ const char *_key = (const char *)w_as_ptr(w_pop()); wval *_map = (wval *)w_as_ptr(w_pop()); w_push(w_map_get(_map, _key)); }}");
             }
             Opcode::MapSet => {
-                let _ = writeln!(out, "{{ wval _val = w_pop(); const char *_key = (const char *)w_pop(); wval *_map = (wval *)w_pop(); w_push((wval)w_map_set(_map, _key, _val)); }}");
+                let _ = writeln!(out, "{{ wval _val = w_pop(); const char *_key = (const char *)w_as_ptr(w_pop()); wval *_map = (wval *)w_as_ptr(w_pop()); w_push(W_PTR(w_map_set(_map, _key, _val))); }}");
             }
             Opcode::MapDel => {
-                let _ = writeln!(out, "{{ const char *_key = (const char *)w_pop(); wval *_map = (wval *)w_pop(); w_push((wval)w_map_del(_map, _key)); }}");
+                let _ = writeln!(out, "{{ const char *_key = (const char *)w_as_ptr(w_pop()); wval *_map = (wval *)w_as_ptr(w_pop()); w_push(W_PTR(w_map_del(_map, _key))); }}");
             }
             Opcode::MapKeys => {
                 let _ = writeln!(
                     out,
-                    "{{ wval *_map = (wval *)w_pop(); w_push((wval)w_map_keys(_map)); }}"
+                    "{{ wval *_map = (wval *)w_as_ptr(w_pop()); w_push(W_PTR(w_map_keys(_map))); }}"
                 );
             }
             Opcode::MapHas => {
-                let _ = writeln!(out, "{{ const char *_key = (const char *)w_pop(); wval *_map = (wval *)w_pop(); w_push((wval)w_map_has(_map, _key)); }}");
+                let _ = writeln!(out, "{{ const char *_key = (const char *)w_as_ptr(w_pop()); wval *_map = (wval *)w_as_ptr(w_pop()); w_push(W_I64(w_map_has(_map, _key))); }}");
             }
 
             // ── Float operations ────────────────────────────────
             Opcode::I64ToF64 => {
-                let _ = writeln!(out, "{{ int64_t _n = (int64_t)w_pop(); double _f = (double)_n; w_push((wval)*(uint64_t*)&_f); }}");
+                let _ = writeln!(out, "{{ int64_t _n = w_as_i64(w_pop()); double _f = (double)_n; w_push(W_F64(_f)); }}");
             }
             Opcode::F64ToI64 => {
-                let _ = writeln!(out, "{{ uint64_t _bits = (uint64_t)w_pop(); double _f = *(double*)&_bits; w_push((wval)(int64_t)_f); }}");
+                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); w_push(W_I64((int64_t)_f)); }}");
             }
             Opcode::FSqrt => {
-                let _ = writeln!(out, "{{ uint64_t _bits = (uint64_t)w_pop(); double _f = *(double*)&_bits; _f = w_fsqrt(_f); w_push((wval)*(uint64_t*)&_f); }}");
+                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); _f = w_fsqrt(_f); w_push(W_F64(_f)); }}");
             }
             Opcode::FSin => {
-                let _ = writeln!(out, "{{ uint64_t _bits = (uint64_t)w_pop(); double _f = *(double*)&_bits; _f = w_fsin(_f); w_push((wval)*(uint64_t*)&_f); }}");
+                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); _f = w_fsin(_f); w_push(W_F64(_f)); }}");
             }
             Opcode::FCos => {
-                let _ = writeln!(out, "{{ uint64_t _bits = (uint64_t)w_pop(); double _f = *(double*)&_bits; _f = w_fcos(_f); w_push((wval)*(uint64_t*)&_f); }}");
+                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); _f = w_fcos(_f); w_push(W_F64(_f)); }}");
             }
             Opcode::FTan => {
-                let _ = writeln!(out, "{{ uint64_t _bits = (uint64_t)w_pop(); double _f = *(double*)&_bits; _f = w_ftan(_f); w_push((wval)*(uint64_t*)&_f); }}");
+                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); _f = w_ftan(_f); w_push(W_F64(_f)); }}");
             }
             Opcode::Floor => {
-                let _ = writeln!(out, "{{ uint64_t _bits = (uint64_t)w_pop(); double _f = *(double*)&_bits; _f = floor(_f); w_push((wval)*(uint64_t*)&_f); }}");
+                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); _f = floor(_f); w_push(W_F64(_f)); }}");
             }
             Opcode::Ceil => {
-                let _ = writeln!(out, "{{ uint64_t _bits = (uint64_t)w_pop(); double _f = *(double*)&_bits; _f = ceil(_f); w_push((wval)*(uint64_t*)&_f); }}");
+                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); _f = ceil(_f); w_push(W_F64(_f)); }}");
             }
             Opcode::Round => {
-                let _ = writeln!(out, "{{ uint64_t _bits = (uint64_t)w_pop(); double _f = *(double*)&_bits; _f = round(_f); w_push((wval)*(uint64_t*)&_f); }}");
+                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); _f = round(_f); w_push(W_F64(_f)); }}");
             }
             Opcode::Log => {
-                let _ = writeln!(out, "{{ uint64_t _bits = (uint64_t)w_pop(); double _f = *(double*)&_bits; _f = w_flog(_f); w_push((wval)*(uint64_t*)&_f); }}");
+                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); _f = w_flog(_f); w_push(W_F64(_f)); }}");
             }
             Opcode::Exp => {
-                let _ = writeln!(out, "{{ uint64_t _bits = (uint64_t)w_pop(); double _f = *(double*)&_bits; _f = w_fexp(_f); w_push((wval)*(uint64_t*)&_f); }}");
+                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); _f = w_fexp(_f); w_push(W_F64(_f)); }}");
             }
             Opcode::Atan2 => {
-                let _ = writeln!(out, "{{ uint64_t _bx = (uint64_t)w_pop(); uint64_t _by = (uint64_t)w_pop(); double _x = *(double*)&_bx; double _y = *(double*)&_by; double _r = w_fatan2(_y, _x); w_push((wval)*(uint64_t*)&_r); }}");
+                let _ = writeln!(out, "{{ double _x = w_as_f64(w_pop()); double _y = w_as_f64(w_pop()); double _r = w_fatan2(_y, _x); w_push(W_F64(_r)); }}");
             }
 
             // ── Bitwise operations ──────────────────────────────
             Opcode::Shl => {
-                let _ = writeln!(out, "{{ int64_t _b = (int64_t)w_pop(); int64_t _a = (int64_t)w_pop(); w_push((wval)w_shl(_a, _b)); }}");
+                let _ = writeln!(out, "{{ int64_t _b = w_as_i64(w_pop()); int64_t _a = w_as_i64(w_pop()); w_push(W_I64(w_shl(_a, _b))); }}");
             }
             Opcode::Shr => {
-                let _ = writeln!(out, "{{ int64_t _b = (int64_t)w_pop(); int64_t _a = (int64_t)w_pop(); w_push((wval)w_shr(_a, _b)); }}");
+                let _ = writeln!(out, "{{ int64_t _b = w_as_i64(w_pop()); int64_t _a = w_as_i64(w_pop()); w_push(W_I64(w_shr(_a, _b))); }}");
             }
             Opcode::BitAnd => {
-                let _ = writeln!(out, "{{ int64_t _b = (int64_t)w_pop(); int64_t _a = (int64_t)w_pop(); w_push((wval)w_bitand(_a, _b)); }}");
+                let _ = writeln!(out, "{{ int64_t _b = w_as_i64(w_pop()); int64_t _a = w_as_i64(w_pop()); w_push(W_I64(w_bit_and(_a, _b))); }}");
             }
             Opcode::BitOr => {
-                let _ = writeln!(out, "{{ int64_t _b = (int64_t)w_pop(); int64_t _a = (int64_t)w_pop(); w_push((wval)w_bitor(_a, _b)); }}");
+                let _ = writeln!(out, "{{ int64_t _b = w_as_i64(w_pop()); int64_t _a = w_as_i64(w_pop()); w_push(W_I64(w_bit_or(_a, _b))); }}");
             }
             Opcode::BitXor => {
-                let _ = writeln!(out, "{{ int64_t _b = (int64_t)w_pop(); int64_t _a = (int64_t)w_pop(); w_push((wval)w_bitxor(_a, _b)); }}");
+                let _ = writeln!(out, "{{ int64_t _b = w_as_i64(w_pop()); int64_t _a = w_as_i64(w_pop()); w_push(W_I64(w_bit_xor(_a, _b))); }}");
             }
             Opcode::BitNot => {
                 let _ = writeln!(
                     out,
-                    "{{ int64_t _a = (int64_t)w_pop(); w_push((wval)w_bitnot(_a)); }}"
+                    "{{ int64_t _a = w_as_i64(w_pop()); w_push(W_I64(w_bit_not(_a))); }}"
                 );
             }
 
@@ -515,7 +517,7 @@ fn transpile_opcodes(
             Opcode::JsonStringify => {
                 let _ = writeln!(
                     out,
-                    "{{ wval _v = w_pop(); w_push((wval)w_json_stringify(_v)); }}"
+                    "{{ wval _v = w_pop(); w_push(W_PTR(w_json_stringify(_v))); }}"
                 );
             }
 
@@ -527,7 +529,7 @@ fn transpile_opcodes(
                 let _ = writeln!(out, "{pad}w_output_all();");
             }
             Opcode::ReadInput => {
-                let _ = writeln!(out, "{pad}w_push((wval)w_read_line());");
+                let _ = writeln!(out, "{pad}w_push(W_PTR(w_read_line()));");
             }
 
             // ── Byte buffer ─────────────────────────────────────
@@ -544,37 +546,37 @@ fn transpile_opcodes(
                 // (true, result), matching the VM's success path.
                 let _ = writeln!(
                     out,
-                    "{{ wfn _f = (wfn)w_pop(); _f(); wval _r = w_pop(); w_push((wval)1); w_push(_r); }}"
+                    "{{ wfn _f = (wfn)(uintptr_t)w_as_ptr(w_pop()); _f(); wval _r = w_pop(); w_push(W_I64(1)); w_push(_r); }}"
                 );
             }
 
             // ── Time/Random ─────────────────────────────────────
             Opcode::Now => {
-                let _ = writeln!(out, "{pad}w_push((wval)w_now());");
+                let _ = writeln!(out, "{pad}w_push(W_I64(w_now()));");
             }
             Opcode::Sleep => {
-                let _ = writeln!(out, "{{ int64_t _ms = (int64_t)w_pop(); w_sleep(_ms); }}");
+                let _ = writeln!(out, "{{ int64_t _ms = w_as_i64(w_pop()); w_sleep(_ms); }}");
             }
             Opcode::Random => {
                 let _ = writeln!(
                     out,
-                    "{{ double _f = w_random(); w_push((wval)*(uint64_t*)&_f); }}"
+                    "{{ double _f = w_random(); w_push(W_F64(_f)); }}"
                 );
             }
             Opcode::RandInt => {
-                let _ = writeln!(out, "{{ int64_t _max = (int64_t)w_pop(); int64_t _min = (int64_t)w_pop(); w_push((wval)w_randint(_min, _max)); }}");
+                let _ = writeln!(out, "{{ int64_t _max = w_as_i64(w_pop()); int64_t _min = w_as_i64(w_pop()); w_push(W_I64(w_randint(_min, _max))); }}");
             }
 
             // ── Args ────────────────────────────────────────────
             Opcode::Args => {
-                let _ = writeln!(out, "{pad}w_push((wval)w_args());");
+                let _ = writeln!(out, "{pad}w_push(W_PTR(w_args()));");
             }
 
             // ── Seed-runtime natives ────────────────────────────
             Opcode::Listen => {
                 let _ = writeln!(
                     out,
-                    "{{ int64_t _p=(int64_t)w_pop(); w_push(w_sock_listen(_p)); }}"
+                    "{{ int64_t _p=w_as_i64(w_pop()); w_push(w_sock_listen(_p)); }}"
                 );
             }
             Opcode::Accept => {
@@ -586,7 +588,7 @@ fn transpile_opcodes(
             Opcode::Send => {
                 let _ = writeln!(
                     out,
-                    "{{ const char *_s=(const char*)w_pop(); wval _c=w_pop(); w_push(w_sock_send(_c,_s)); }}"
+                    "{{ const char *_s=(const char*)w_as_ptr(w_pop()); wval _c=w_pop(); w_push(w_sock_send(_c,_s)); }}"
                 );
             }
             Opcode::CloseSock => {
@@ -595,133 +597,133 @@ fn transpile_opcodes(
             Opcode::ReadFile => {
                 let _ = writeln!(
                     out,
-                    "{{ const char *_p=(const char*)w_pop(); w_push(w_read_file(_p)); }}"
+                    "{{ const char *_p=(const char*)w_as_ptr(w_pop()); w_push(w_read_file(_p)); }}"
                 );
             }
             Opcode::WriteFile => {
                 let _ = writeln!(
                     out,
-                    "{{ const char *_d=(const char*)w_pop(); const char *_p=(const char*)w_pop(); w_push(w_write_file(_p,_d)); }}"
+                    "{{ const char *_d=(const char*)w_as_ptr(w_pop()); const char *_p=(const char*)w_as_ptr(w_pop()); w_push(w_write_file(_p,_d)); }}"
                 );
             }
             Opcode::KvSet => {
                 let _ = writeln!(
                     out,
-                    "{{ const char *_v=(const char*)w_pop(); const char *_k=(const char*)w_pop(); w_kv_set(_k,_v); }}"
+                    "{{ const char *_v=(const char*)w_as_ptr(w_pop()); const char *_k=(const char*)w_as_ptr(w_pop()); w_kv_set(_k,_v); }}"
                 );
             }
             Opcode::KvGet => {
                 let _ = writeln!(
                     out,
-                    "{{ const char *_k=(const char*)w_pop(); w_push(w_kv_get(_k)); }}"
+                    "{{ const char *_k=(const char*)w_as_ptr(w_pop()); w_push(w_kv_get(_k)); }}"
                 );
             }
             Opcode::KvDel => {
                 let _ = writeln!(
                     out,
-                    "{{ const char *_k=(const char*)w_pop(); w_kv_del(_k); }}"
+                    "{{ const char *_k=(const char*)w_as_ptr(w_pop()); w_kv_del(_k); }}"
                 );
             }
             Opcode::KvKeys => {
-                let _ = writeln!(out, "w_push((wval)w_kv_keys_list());");
+                let _ = writeln!(out, "w_push(W_PTR(w_kv_keys_list()));");
             }
             Opcode::ServeConcurrent => {
                 let _ = writeln!(
                     out,
-                    "{{ wfn _f=(wfn)w_pop(); int64_t _p=(int64_t)w_pop(); w_serve_concurrent(_p,_f); }}"
+                    "{{ wfn _f=(wfn)(uintptr_t)w_as_ptr(w_pop()); int64_t _p=w_as_i64(w_pop()); w_serve_concurrent(_p,_f); }}"
                 );
             }
             Opcode::BufAlloc => {
-                let _ = writeln!(out, "{{ int64_t _n=(int64_t)w_pop(); w_push((wval)(int64_t)calloc((size_t)(_n>0?_n:1),1)); }}");
+                let _ = writeln!(out, "{{ int64_t _n=w_as_i64(w_pop()); w_push(W_I64((int64_t)(uintptr_t)calloc((size_t)(_n>0?_n:1),1))); }}");
             }
             Opcode::BufFree => {
-                let _ = writeln!(out, "{{ free((void*)(int64_t)w_pop()); }}");
+                let _ = writeln!(out, "{{ free((void*)(uintptr_t)w_as_i64(w_pop())); }}");
             }
             Opcode::BufPeek => {
-                let _ = writeln!(out, "{{ uint64_t _v=0; memcpy(&_v,(const void*)(int64_t)w_pop(),8); w_push((wval)(int64_t)_v); }}");
+                let _ = writeln!(out, "{{ uint64_t _v=0; memcpy(&_v,(const void*)(uintptr_t)w_as_i64(w_pop()),8); w_push(W_I64((int64_t)_v)); }}");
             }
             Opcode::BufPoke => {
                 let _ = writeln!(
                     out,
-                    "{{ uint64_t _v=(uint64_t)w_pop(); memcpy((void*)(int64_t)w_pop(),&_v,8); }}"
+                    "{{ uint64_t _v=(uint64_t)w_as_i64(w_pop()); memcpy((void*)(uintptr_t)w_as_i64(w_pop()),&_v,8); }}"
                 );
             }
             Opcode::BufToStr => {
-                let _ = writeln!(out, "{{ int64_t _l=(int64_t)w_pop(); const char*_p=(const char*)(int64_t)w_pop(); w_push((wval)w_str_new(_p,(uint32_t)(_l>0?_l:0))); }}");
+                let _ = writeln!(out, "{{ int64_t _l=w_as_i64(w_pop()); const char*_p=(const char*)(uintptr_t)w_as_i64(w_pop()); w_push(W_PTR(w_str_new(_p,(uint32_t)(_l>0?_l:0)))); }}");
             }
             Opcode::FfiOpen => {
-                let _ = writeln!(out, "{{ w_push((wval)w_ffi_open(w_pop())); }}");
+                let _ = writeln!(out, "{{ w_push(w_ffi_open(w_pop())); }}");
             }
             Opcode::FfiSym => {
                 let _ = writeln!(
                     out,
-                    "{{ const char*_n=(const char*)w_pop(); int64_t _h=(int64_t)w_pop(); w_push((wval)w_ffi_sym(_h,_n)); }}"
+                    "{{ const char*_n=(const char*)w_as_ptr(w_pop()); int64_t _h=w_as_i64(w_pop()); w_push(W_I64((int64_t)(uintptr_t)w_ffi_sym(_h,_n))); }}"
                 );
             }
             Opcode::FfiCall => {
                 let _ = writeln!(
                     out,
-                    "{{ int64_t _f=(int64_t)w_pop(); const char*_fmt=(const char*)w_pop(); wval*_a=(wval*)w_pop(); w_push((wval)w_ffi_call(_f,_fmt,_a)); }}"
+                    "{{ int64_t _f=w_as_i64(w_pop()); const char*_fmt=(const char*)w_as_ptr(w_pop()); wval*_a=(wval*)w_as_ptr(w_pop()); w_push(W_I64(w_ffi_call(_f,_fmt,_a))); }}"
                 );
             }
             Opcode::Range => {
                 let _ = writeln!(
                     out,
-                    "{{ int64_t _c=(int64_t)w_pop(); int64_t _s=(int64_t)w_pop(); wval*_l=w_list_new(_c); for(int64_t _i=0;_i<_c;_i++)_l[1+_i]=(wval)(_s+_i); w_push((wval)_l); }}"
+                    "{{ int64_t _c=w_as_i64(w_pop()); int64_t _s=w_as_i64(w_pop()); wval*_l=w_list_new(_c); for(int64_t _i=0;_i<_c;_i++)_l[1+_i]=W_I64(_s+_i); w_push(W_PTR(_l)); }}"
                 );
             }
             Opcode::Pack => {
-                let _ = writeln!(out, "{{ w_push((wval)w_pack(w_pop(),w_pop())); }}");
+                let _ = writeln!(out, "{{ w_push(w_pack(w_pop(),w_pop())); }}");
             }
             Opcode::Unpack => {
-                let _ = writeln!(out, "{{ w_push((wval)w_unpack(w_pop(),w_pop())); }}");
+                let _ = writeln!(out, "{{ w_push(w_unpack(w_pop(),w_pop())); }}");
             }
             Opcode::StrMatch => {
                 let _ = writeln!(
                     out,
-                    "{{ const char*_p=(const char*)w_pop(); const char*_s=(const char*)w_pop(); w_push((wval)w_strmatch((wval)_s,(wval)_p)); }}"
+                    "{{ const char*_p=(const char*)w_as_ptr(w_pop()); const char*_s=(const char*)w_as_ptr(w_pop()); w_push(w_strmatch(_s,_p)); }}"
                 );
             }
             Opcode::StrFindRe => {
                 let _ = writeln!(
                     out,
-                    "{{ const char*_p=(const char*)w_pop(); const char*_s=(const char*)w_pop(); w_push((wval)w_strfind_re((wval)_s,(wval)_p)); }}"
+                    "{{ const char*_p=(const char*)w_as_ptr(w_pop()); const char*_s=(const char*)w_as_ptr(w_pop()); w_push(w_strfind_re(_s,_p)); }}"
                 );
             }
             Opcode::ReadLine => {
-                let _ = writeln!(out, "{{ w_push((wval)w_read_line()); }}");
+                let _ = writeln!(out, "{{ w_push(W_PTR(w_read_line())); }}");
             }
             Opcode::StrUpper => {
-                let _ = writeln!(out, "{{ w_push((wval)w_str_case(w_pop(),1)); }}");
+                let _ = writeln!(out, "{{ w_push(w_str_case(w_pop(),1)); }}");
             }
             Opcode::StrLower => {
-                let _ = writeln!(out, "{{ w_push((wval)w_str_case(w_pop(),0)); }}");
+                let _ = writeln!(out, "{{ w_push(w_str_case(w_pop(),0)); }}");
             }
             Opcode::StrStrip => {
-                let _ = writeln!(out, "{{ w_push((wval)w_str_strip(w_pop())); }}");
+                let _ = writeln!(out, "{{ w_push(w_str_strip(w_pop())); }}");
             }
             Opcode::Fmt => {
                 let _ = writeln!(
                     out,
-                    "{{ wval _v=w_pop(); wval _f=w_pop(); w_push((wval)w_fmt(_f,_v)); }}"
+                    "{{ wval _v=w_pop(); wval _f=w_pop(); w_push(w_fmt(_f,_v)); }}"
                 );
             }
             Opcode::ListDir => {
-                let _ = writeln!(out, "{{ w_push((wval)w_listdir(w_pop())); }}");
+                let _ = writeln!(out, "{{ w_push(w_listdir(w_pop())); }}");
             }
             Opcode::Mkdir => {
-                let _ = writeln!(out, "{{ w_push((wval)w_mkdir(w_pop())); }}");
+                let _ = writeln!(out, "{{ w_push(w_mkdir(w_pop())); }}");
             }
             Opcode::FileExists => {
                 let _ = writeln!(
                     out,
-                    "{{ struct stat _st; w_push((wval)(stat((const char*)w_pop(),&_st)==0)); }}"
+                    "{{ struct stat _st; w_push(W_I64(stat((const char*)w_as_ptr(w_pop()),&_st)==0)); }}"
                 );
             }
             Opcode::StrfTime => {
                 let _ = writeln!(
                     out,
-                    "{{ const char*_f=(const char*)w_pop(); int64_t _t=(int64_t)w_pop(); w_push((wval)w_strftime_utc(_t,_f)); }}"
+                    "{{ const char*_f=(const char*)w_as_ptr(w_pop()); int64_t _t=w_as_i64(w_pop()); w_push(w_strftime_utc(_t,_f)); }}"
                 );
             }
             Opcode::Leave(off) => {
@@ -730,28 +732,28 @@ fn transpile_opcodes(
             Opcode::EnvGet => {
                 let _ = writeln!(
                     out,
-                    "{{ const char *_n=(const char*)w_pop(); w_push(w_env_get(_n)); }}"
+                    "{{ const char *_n=(const char*)w_as_ptr(w_pop()); w_push(w_env_get(_n)); }}"
                 );
             }
             Opcode::SplitCond => {
-                let _ = writeln!(out, "{pad}{{int64_t _start=(int64_t)w_pop();wval *_toks=(wval*)w_pop();wval *_th=0,*_el=0;int _next=0;split_cond(_toks,(int)_start,&_th,&_el,&_next);wval *_r=w_list_new(3);_r[1]=(wval)_th;_r[2]=(wval)_el;_r[3]=(wval)(int64_t)_next;w_push((wval)_r);}}");
+                let _ = writeln!(out, "{pad}{{int64_t _start=w_as_i64(w_pop());wval *_toks=(wval*)w_as_ptr(w_pop());wval *_th=0,*_el=0;int _next=0;split_cond(_toks,(int)_start,&_th,&_el,&_next);wval *_r=w_list_new(3);_r[1]=W_PTR((void*)_th);_r[2]=W_PTR((void*)_el);_r[3]=W_I64((int64_t)_next);w_push(W_PTR(_r));}}");
             }
             Opcode::ListCheck => {
-                let _ = writeln!(out, "{pad}w_push((wval)(w_is_list_val(w_pop()) ? 1 : 0));");
+                let _ = writeln!(out, "{pad}w_push(W_I64(w_is_list_val(w_pop()) ? 1 : 0));");
             }
             Opcode::I64Check => {
                 let _ = writeln!(
                     out,
-                    "{pad}{{wval _v=w_pop();w_push((wval)(_v < (wval)w_heap || _v >= (wval)(w_heap + HEAP_SIZE) ? 1 : 0));}}"
+                    "{pad}{{wval _v=w_pop();w_push(W_I64(_v.t == WT_I64 ? 1 : 0));}}"
                 );
             }
             Opcode::StrCheck => {
-                let _ = writeln!(out, "{pad}w_push((wval)(wval_is_str(w_pop()) ? 1 : 0));");
+                let _ = writeln!(out, "{pad}w_push(W_I64(wval_is_str(w_pop()) ? 1 : 0));");
             }
             Opcode::BoolCheck => {
                 let _ = writeln!(
                     out,
-                    "{pad}{{wval _v=w_pop();w_push((wval)(_v == 0 || _v == 1 ? 1 : 0));}}"
+                    "{pad}{{wval _v=w_pop();w_push(W_I64((_v.v == 0 || _v.v == 1) ? 1 : 0));}}"
                 );
             }
 

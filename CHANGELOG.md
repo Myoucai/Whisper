@@ -1,5 +1,39 @@
 # Changelog
 
+## Unreleased (2026-09-03) — C 后端语义统一 + native/exe 分发目标
+
+### C 运行时值带类型标签（三后端算术逐位一致）
+- `wval` 从裸 uint64 改为 `{v, t}` 结构（WT_I64/WT_F64/WT_PTR），构造子
+  W_I64/W_F64/W_PTR + 访问器；`+ - * / % < >` 发射为 tag 分派的
+  `w_op_*()`（任一侧 f64 即按 VM binary_num_op 提升），此前
+  `1.5 2.5 +` 在原生侧静默输出位模式垃圾（I64_MIN 级）而 VM 输出 4。
+- whisperc/runtime.c、Rust transpiler、自举发射器（cgen.ws +
+  compiler.all.ws 全部 opcode 片段）三处同步转换；字符串排序改为
+  字节序（与 VM 一致，此前按指针位排序——陈旧错误）。
+- 已知残留（文档化）：字符串打印无引号、`=`/dedup 值位等同而非深度
+  相等、f64 打印 %g 与 Rust Display 在极端量级上有格式差。
+
+### 种子重生为纯生成 C
+- `whisperc/seed/compiler_seed.c` 此前是 1071 行手工移植的 C 前端；
+  现为 `whisper build -t c2 compiler.all.ws` 自编译产物的冻结快照
+  （188KB，100% 生成代码），自举固定点 gen2==gen3 保持。
+  scripts/bootstrap.sh 补 MINGW 的 -lws2_32。
+
+### 新分发目标
+- **`-t native`（安装期硬件特化）**：c2 链 + 宿主 `cc -O3 -march=native
+  -flto`，内容寻址缓存（键=展开源+编译器+runtime+cc+march 指纹）；
+  同机重建 16ms 缓存命中，源/编译器/CPU 任一变化自动重编。
+  `WHISPER_NATIVE_MARCH` 可覆盖（如 x86-64 出通用包）。
+- **`-t exe`（自包含单文件）**：SBCL/Starkit 式——当前二进制副本 +
+  尾部 wbin 负载 + 8 字节 magic trailer；启动时自检尾部即运行内嵌
+  字节码。零手写 ELF/PE/Mach-O，Windows/Linux 实测通过
+  （macOS 需重签名）。import 在构建期烘入，无需工具链。
+
+### 测试
+- 新增 `-t exe`（运行对拍 VM + trailer 布局）与 `-t native`
+  （缓存命中 + 浮点对拍）集成测试；全套 whisper-cli 98 过；
+  workspace 20 套全绿；bootstrap.sh 五阶段 + verify-fixedpoint.sh 绿。
+
 ## Unreleased (2026-08-21) — 修复与收敛
 
 ### 修复（P0 级）

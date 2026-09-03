@@ -23,7 +23,9 @@ fn help() {
     println!();
     println!("OPTIONS:");
     println!(
-        "  --target wbin|c|c2           Build target (default: wbin; c2 = self-hosted chain + gcc)"
+        "  --target wbin|c|c2|native|exe Build target (default: wbin; c2 = self-hosted chain + gcc;
+                                native = c2 + -O3 -march=native -flto, content-cached;
+                                exe = self-contained single-file executable)"
     );
     println!("  -o <file>                   Output file path");
     println!("  --allow-http                Enable HTTP capabilities");
@@ -56,6 +58,22 @@ fn main() {
 }
 
 fn run_cli(args: Vec<String>) -> Result<(), String> {
+    // Self-contained app mode (`whisper build -t exe`): if this binary has a
+    // wbin payload appended after its own image (trailer: payload_len u64 LE +
+    // "WSHPEXE1"), it IS the app — run the embedded payload, ignore CLI args
+    // except capability flags. The original whisper.exe carries no trailer.
+    if let Some(payload) = embedded_app_payload() {
+        let config = commands::run::RunConfig {
+            allow_file_read: get_flag(&args, "--allow-file-read"),
+            allow_file_write: get_flag(&args, "--allow-file-write"),
+            allow_http: get_flag(&args, "--allow-http"),
+            allow_env: get_flag(&args, "--allow-env"),
+            allow_exec: get_flag(&args, "--allow-exec"),
+            trace: get_flag(&args, "--trace"),
+        };
+        return commands::run::run_wbin(&payload, &config);
+    }
+
     if args.len() < 2 {
         help();
         std::process::exit(1);
@@ -93,6 +111,28 @@ fn run_cli(args: Vec<String>) -> Result<(), String> {
 
 fn get_flag(args: &[String], flag: &str) -> bool {
     args.iter().any(|a| a == flag)
+}
+
+/// Trailer layout appended by `whisper build -t exe`:
+///   [ wbin payload bytes ][ payload_len: u64 LE ][ b"WSHPEXE1" ]
+/// Returns the payload slice when this executable carries one.
+fn embedded_app_payload() -> Option<Vec<u8>> {
+    const MAGIC: &[u8; 8] = b"WSHPEXE1";
+    let data = std::fs::read(std::env::current_exe().ok()?).ok()?;
+    if data.len() < 8 + 8 {
+        return None;
+    }
+    let n = data.len();
+    if &data[n - 8..] != MAGIC {
+        return None;
+    }
+    let mut len_bytes = [0u8; 8];
+    len_bytes.copy_from_slice(&data[n - 16..n - 8]);
+    let payload_len = u64::from_le_bytes(len_bytes) as usize;
+    if payload_len + 16 > n {
+        return None;
+    }
+    Some(data[n - 16 - payload_len..n - 16].to_vec())
 }
 
 fn get_opt(args: &[String], flag: &str) -> Option<String> {

@@ -191,6 +191,8 @@ whisper bootstrap --hard hello.ws
 | 字节码 | `whisper build file.ws` | `.wbin` | Rust VM |
 | C 源码 | `whisper build file.ws -t c -o prog.c` | C 源码 | gcc 编译为原生可执行文件 |
 | **c2 自举链** | `whisper build file.ws -t c2 -o prog` | 原生可执行文件 | gcc |
+| **native 特化** | `whisper build file.ws -t native -o prog` | 按主机 CPU 特化的原生可执行文件（内容寻址缓存） | gcc |
+| **exe 自包含** | `whisper build file.ws -t exe -o app` | 单文件可执行（运行时+wbin 尾部打包） | 无 |
 | 固定点复验 | `scripts/verify-fixedpoint.sh` | 自举链验证 | gcc |
 
 ```bash
@@ -199,10 +201,16 @@ whisper build hello.ws -t c -o hello.c && gcc -O2 -lm -o hello hello.c && ./hell
 
 # c2：import 自动内联 → 自举编译器（在 Rust VM 上运行）生成 C → gcc 一键到底
 whisper build hello.ws -t c2 -o hello && ./hello
+
+# native：c2 + -O3 -march=native -flto，内容寻址缓存（同机重建 = 一次拷贝）
+whisper build hello.ws -t native -o hello && ./hello
+
+# exe：单文件自包含可执行（SBCL 式尾部负载，无需任何工具链）
+whisper build hello.ws -t exe -o app && ./app
 ```
 
 - **`-t c`（Rust 转译器）**：覆盖字符串/列表/Map/浮点/高阶函数（`@map`/`@fold`/`@times` 等），12 个端到端 gcc 测试把关。
-- **`-t c2`（自举链）**：编译器完全由 Whisper 自身编写（`whisperc/compiler.all.ws`），在 Rust VM 上运行并生成 C；支持 import 内联（含 `std/*`）、浮点字面量、循环/条件/递归、高阶函数融合（`@map`/`@each`/`@fold`/`@filter`/`@times` 编译为嵌套函数 + 循环）、v1.0.3-1.0.7 全部新词汇（regex/struct/目录/时间/leave 等）。已知限制：C 运行时值无类型标签，浮点以位模式流转（经 f-opcode 显式转换）。
+- **`-t c2`（自举链）**：编译器完全由 Whisper 自身编写（`whisperc/compiler.all.ws`），在 Rust VM 上运行并生成 C；支持 import 内联（含 `std/*`）、浮点字面量、循环/条件/递归、高阶函数融合（`@map`/`@each`/`@fold`/`@filter`/`@times` 编译为嵌套函数 + 循环）、v1.0.3-1.0.7 全部新词汇（regex/struct/目录/时间/leave 等）。C 运行时值带类型标签（WT_I64/WT_F64/WT_PTR），多态算术（任一侧 f64 即提升）与 VM 逐位一致——`1.5 2.5 +` 原生输出 4，与 VM 相同。已知残留分歧：字符串打印不带引号（VM 带）、`=`/去重按值位等同而非深度相等。
 - 固定点（whisper2 编译自身输出逐字节一致）可随时用脚本复验，已纳入 CI。
 
 ## 性能

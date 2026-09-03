@@ -150,43 +150,45 @@
 // ── Emit bare opcode (integer) → C string ────────────────────────
 // Pattern: dup N = ?? drop "C" return ]
 // ?? pops the Bool; on false the original value stays on stack for next check.
+// NOTE (opcode 24 = Eq): emits identity compare (v+t bits). Deep string
+// equality is a known divergence from the VM — do not try to fix here.
 : emit-bare {
     dup 0  = ?? drop "w_dup();\n" return ]
     dup 1  = ?? drop "w_swap();\n" return ]
     dup 2  = ?? drop "w_drop();\n" return ]
     dup 3  = ?? drop "w_rot();\n" return ]
-    dup 7  = ?? drop "{int64_t _n=(int64_t)w_pop();w_push((wval)rt_ctos(_n));}\n" return ]
-    dup 8  = ?? drop "{int64_t _n=(int64_t)w_pop();int64_t _s=(int64_t)w_pop();wval*_l=(wval*)w_pop();w_push((wval)w_list_slice(_l,_s,_n));}\n" return ]
-    dup 16 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a+(int64_t)_b));}\n" return ]
-    dup 17 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a-(int64_t)_b));}\n" return ]
-    dup 18 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a*(int64_t)_b));}\n" return ]
-    dup 24 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a==(int64_t)_b?1L:0L));}\n" return ]
-    dup 25 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a<(int64_t)_b?1L:0L));}\n" return ]
-    dup 26 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a>(int64_t)_b?1L:0L));}\n" return ]
-    dup 28 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a<=(int64_t)_b?1L:0L));}\n" return ]
-    dup 29 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a>=(int64_t)_b?1L:0L));}\n" return ]
-    dup 32 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a&&(int64_t)_b?1L:0L));}\n" return ]
-    dup 33 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push((wval)((int64_t)_a||(int64_t)_b?1L:0L));}\n" return ]
-    dup 34 = ?? drop "{wval _a=w_pop();w_push((wval)((int64_t)_a==0?1L:0L));}\n" return ]
-    dup 52 = ?? drop "{int64_t _n=(int64_t)w_pop();wval*_l=w_list_new(_n);for(int64_t _i=_n-1;_i>=0;_i--)_l[1+_i]=w_pop();w_push((wval)_l);}\n" return ]
-    dup 64 = ?? drop "{int64_t _i=(int64_t)w_pop();wval*_l=(wval*)w_pop();w_push(w_list_nth(_l,_i));}\n" return ]
-    dup 65 = ?? drop "{wval _e=w_pop();wval*_l=(wval*)w_pop();w_push((wval)w_list_append(_l,_e));}\n" return ]
-    dup 66 = ?? drop "{wval*_l=(wval*)w_pop();w_push((wval)w_list_len(_l));}\n" return ]
-    dup 70 = ?? drop "{const char*_s=(const char*)w_pop();w_push((wval)(int64_t)w_str_len(_s));}\n" return ]
-    dup 71 = ?? drop "{const char*_b=(const char*)w_pop();const char*_a=(const char*)w_pop();w_push((wval)w_str_concat(_a,_b));}\n" return ]
-    dup 72 = ?? drop "{int64_t _n=(int64_t)w_pop();int64_t _s=(int64_t)w_pop();const char*_str=(const char*)w_pop();w_push((wval)w_str_slice(_str,_s,_n));}\n" return ]
-    dup 73 = ?? drop "{const char*_b=(const char*)w_pop();const char*_a=(const char*)w_pop();w_push((wval)w_str_eq(_a,_b));}\n" return ]
-    dup 77 = ?? drop "{const char*_s=(const char*)w_pop();w_push((wval)w_str_to_i64(_s));}\n" return ]
-    dup 78 = ?? drop "{int64_t _n=(int64_t)w_pop();w_push((wval)w_i64_to_str(_n));}\n" return ]
-    dup 79 = ?? drop "{int64_t _i=(int64_t)w_pop();const char*_s=(const char*)w_pop();w_push((wval)(int64_t)w_str_nth(_s,_i));}\n" return ]
+    dup 7  = ?? drop "{int64_t _n=w_as_i64(w_pop());w_push(W_PTR(rt_ctos(_n)));}\n" return ]
+    dup 8  = ?? drop "{int64_t _n=w_as_i64(w_pop());int64_t _s=w_as_i64(w_pop());wval*_l=(wval*)w_as_ptr(w_pop());w_push(W_PTR(w_list_slice(_l,_s,_n)));}\n" return ]
+    dup 16 = ?? drop "w_op_add();\n" return ]
+    dup 17 = ?? drop "w_op_sub();\n" return ]
+    dup 18 = ?? drop "w_op_mul();\n" return ]
+    dup 24 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push(W_I64(_a.v==_b.v&&_a.t==_b.t?1L:0L));}\n" return ]
+    dup 25 = ?? drop "w_op_lt();\n" return ]
+    dup 26 = ?? drop "w_op_gt();\n" return ]
+    dup 28 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push(W_I64(w_as_i64(_a)<=w_as_i64(_b)?1L:0L));}\n" return ]
+    dup 29 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push(W_I64(w_as_i64(_a)>=w_as_i64(_b)?1L:0L));}\n" return ]
+    dup 32 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push(W_I64(w_as_i64(_a)&&w_as_i64(_b)?1L:0L));}\n" return ]
+    dup 33 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push(W_I64(w_as_i64(_a)||w_as_i64(_b)?1L:0L));}\n" return ]
+    dup 34 = ?? drop "{wval _a=w_pop();w_push(W_I64(w_as_i64(_a)==0?1L:0L));}\n" return ]
+    dup 52 = ?? drop "{int64_t _n=w_as_i64(w_pop());wval*_l=w_list_new(_n);for(int64_t _i=_n-1;_i>=0;_i--)_l[1+_i]=w_pop();w_push(W_PTR(_l));}\n" return ]
+    dup 64 = ?? drop "{int64_t _i=w_as_i64(w_pop());wval*_l=(wval*)w_as_ptr(w_pop());w_push(w_list_nth(_l,_i));}\n" return ]
+    dup 65 = ?? drop "{wval _e=w_pop();wval*_l=(wval*)w_as_ptr(w_pop());w_push(W_PTR(w_list_append(_l,_e)));}\n" return ]
+    dup 66 = ?? drop "{wval*_l=(wval*)w_as_ptr(w_pop());w_push(W_I64(w_list_len(_l)));}\n" return ]
+    dup 70 = ?? drop "{const char*_s=(const char*)w_as_ptr(w_pop());w_push(W_I64((int64_t)w_str_len(_s)));}\n" return ]
+    dup 71 = ?? drop "{const char*_b=(const char*)w_as_ptr(w_pop());const char*_a=(const char*)w_as_ptr(w_pop());w_push(W_PTR(w_str_concat(_a,_b)));}\n" return ]
+    dup 72 = ?? drop "{int64_t _n=w_as_i64(w_pop());int64_t _s=w_as_i64(w_pop());const char*_str=(const char*)w_as_ptr(w_pop());w_push(W_PTR(w_str_slice(_str,_s,_n)));}\n" return ]
+    dup 73 = ?? drop "{const char*_b=(const char*)w_as_ptr(w_pop());const char*_a=(const char*)w_as_ptr(w_pop());w_push(W_I64(w_str_eq(_a,_b)));}\n" return ]
+    dup 77 = ?? drop "{const char*_s=(const char*)w_as_ptr(w_pop());w_push(W_I64(w_str_to_i64(_s)));}\n" return ]
+    dup 78 = ?? drop "{int64_t _n=w_as_i64(w_pop());w_push(W_PTR(w_i64_to_str(_n)));}\n" return ]
+    dup 79 = ?? drop "{int64_t _i=w_as_i64(w_pop());const char*_s=(const char*)w_as_ptr(w_pop());w_push(W_I64((int64_t)w_str_nth(_s,_i)));}\n" return ]
     dup 97 = ?? drop "return;\n" return ]
     dup 144 = ?? drop "w_print_val(w_pop());\n" return ]
-    dup 185 = ?? drop "{wval*_l=(wval*)w_pop();w_push((wval)w_charsstr(_l));}\n" return ]
-    dup 186 = ?? drop "{const char*_s=(const char*)w_pop();w_striter(_s);}\n" return ]
+    dup 185 = ?? drop "{wval*_l=(wval*)w_as_ptr(w_pop());w_push(W_PTR(w_charsstr(_l)));}\n" return ]
+    dup 186 = ?? drop "{const char*_s=(const char*)w_as_ptr(w_pop());w_striter(_s);}\n" return ]
     dup 228 = ?? drop "w_list_();\n" return ]
     dup 230 = ?? drop "w_str_();\n" return ]
-    dup 232 = ?? drop "w_push((wval)w_read_all());\n" return ]
-    dup 240 = ?? drop "{int64_t _start=(int64_t)w_pop();wval*_toks=(wval*)w_pop();wval*_th=0,*_el=0;int _next=0;split_cond(_toks,(int)_start,&_th,&_el,&_next);wval*_r=w_list_new(3);_r[1]=(wval)_th;_r[2]=(wval)_el;_r[3]=(wval)(int64_t)_next;w_push((wval)_r);}\n" return ]
+    dup 232 = ?? drop "w_push(W_PTR(w_read_all()));\n" return ]
+    dup 240 = ?? drop "{int64_t _start=w_as_i64(w_pop());wval*_toks=(wval*)w_as_ptr(w_pop());wval*_th=0,*_el=0;int _next=0;split_cond(_toks,(int)_start,&_th,&_el,&_next);wval*_r=w_list_new(3);_r[1]=W_PTR((void*)_th);_r[2]=W_PTR((void*)_el);_r[3]=W_I64((int64_t)_next);w_push(W_PTR(_r));}\n" return ]
     drop "// unknown bare opcode\n"
 } ;
 
@@ -201,7 +203,7 @@
     i64tostr                // opcode, "target"
     over 80 = ??
         swap drop
-        "{wval _c=w_pop();if(!(int64_t)_c)goto L_" swap ";}\n" strcat strcat
+        "{wval _c=w_pop();if(!w_as_i64(_c))goto L_" swap ";}\n" strcat strcat
         return
     ]
     over 81 = ??
@@ -210,16 +212,16 @@
         return
     ]
     swap drop
-    "{wval _c=w_pop();if((int64_t)_c)goto L_" swap ";}\n" strcat strcat
+    "{wval _c=w_pop();if(w_as_i64(_c))goto L_" swap ";}\n" strcat strcat
 } ;
 
 // ── Emit single instruction → C string ───────────────────────────
 : emit-one {
     dup list? ??
         dup 0 @nth
-        dup 48 = ?? drop 1 @nth i64tostr "w_push((wval)(int64_t)" swap "L);\n" strcat strcat return ]
-        dup 50 = ?? drop 1 @nth escape-c-str "w_push((wval)w_str_from_cstr(\"" swap "\"));\n" strcat strcat return ]
-        dup 51 = ?? drop 1 @nth "w_push((wval)" swap "L);\n" strcat strcat return ]
+        dup 48 = ?? drop 1 @nth i64tostr "w_push(W_I64((int64_t)" swap "L));\n" strcat strcat return ]
+        dup 50 = ?? drop 1 @nth escape-c-str "w_push(W_PTR(w_str_from_cstr(\"" swap "\")));\n" strcat strcat return ]
+        dup 51 = ?? drop 1 @nth "w_push(W_I64((int64_t)" swap "L));\n" strcat strcat return ]
         dup 96 = ?? drop 1 @nth safe-c-name "W_" swap "();\n" strcat strcat return ]
         dup 4  = ?? drop 1 @nth i64tostr "w_pick_n(" swap ");\n" strcat strcat return ]
         drop drop "// unknown list instruction\n"
