@@ -928,3 +928,39 @@ fn native_target_specializes_and_caches() {
         "4\r\n9\r\n".replace('\r', "")
     );
 }
+
+// ── std/conf: finalized confidence surface ─────────────────────────
+
+#[test]
+fn conf_stdlib_surface() {
+    let dir = std::env::temp_dir().join("whisper_conf_it");
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = dir.join("conf.ws");
+    std::fs::write(
+        &src,
+        "import \"std/conf\"\n\
+         42 seed!\n\
+         #t:0.75 conf-of . unwrap .\n\
+         0.9 0.5 conf-mul .\n\
+         #t:0.7 labeled? .\n\
+         42 labeled? .\n\
+         0.7 { 1 } { 2 } ?| .\n",
+    )
+    .unwrap();
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .arg("run")
+        .arg(&src)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(
+        s.lines().filter(|l| !l.is_empty()).collect::<Vec<_>>(),
+        vec!["0.75", "#t", "0.45", "#t", "#f", "1"],
+        "confidence surface output mismatch: {s}"
+    );
+}

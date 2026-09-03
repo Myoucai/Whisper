@@ -701,18 +701,41 @@ impl TypeChecker {
             }
 
             Operator::Nth => {
-                let any_list = Type::List(Box::new(self.inferer.fresh_var()));
+                // The element type must flow: @nth on List(T) yields T.
+                let elem = self.inferer.fresh_var();
                 self.expect(stack, &Type::I64, errors, ctx, "@nth index");
-                self.expect(stack, &any_list, errors, ctx, "@nth list");
-                stack.push(self.inferer.fresh_var());
+                self.expect(
+                    stack,
+                    &Type::List(Box::new(elem.clone())),
+                    errors,
+                    ctx,
+                    "@nth list",
+                );
+                stack.push(elem);
             }
             Operator::Append => {
+                // ( list elem -- list' ): elem must unify with the list's
+                // element type and the result keeps the unified type.
+                let elem_ty = stack.pop().unwrap_or_else(|| self.inferer.fresh_var());
                 let elem = self.inferer.fresh_var();
-                let list_ty = Type::List(Box::new(elem.clone()));
-                let any_list = Type::List(Box::new(self.inferer.fresh_var()));
-                stack.pop(); // element — accept anything
-                self.expect(stack, &any_list, errors, ctx, "append list");
-                stack.push(list_ty);
+                self.expect(
+                    stack,
+                    &Type::List(Box::new(elem.clone())),
+                    errors,
+                    ctx,
+                    "append list",
+                );
+                if self.inferer.unify(&elem, &elem_ty).is_err() {
+                    errors.push(TypeError {
+                        message: format!(
+                            "append element: expected {}, got {}",
+                            self.inferer.resolve(&elem),
+                            self.inferer.resolve(&elem_ty),
+                        ),
+                        context: ctx.to_string(),
+                    });
+                }
+                stack.push(Type::List(Box::new(elem)));
             }
             Operator::Prepend => {
                 let t = self.inferer.fresh_var();
@@ -1092,5 +1115,71 @@ mod tests {
         let mut tc = TypeChecker::new();
         let errors = tc.check(&ast);
         assert!(errors.is_empty(), "Unexpected errors: {errors:?}");
+    }
+}
+
+#[cfg(test)]
+mod nth_append_tests {
+    use super::*;
+    use whisper_parser::Parser;
+
+    fn errors_for(source: &str) -> Vec<TypeError> {
+        let ast = Parser::parse_source(source).unwrap();
+        let mut tc = TypeChecker::new();
+        tc.check(&ast)
+    }
+
+    #[test]
+    fn nth_propagates_element_type() {
+        // @nth on a list of i64 yields i64 — feeding it to `len` (which
+        // wants a list) must now error instead of passing silently.
+        let errs = errors_for("[1 2 3] 0 @nth len");
+        assert!(!errs.is_empty(), "@nth result type must flow into len");
+    }
+
+    #[test]
+    fn nth_on_homogeneous_strings() {
+        let errs = errors_for("[\"a\" \"b\"] 0 @nth strlen 0 >");
+        assert!(errs.is_empty(), "expected clean: {errs:?}");
+    }
+
+    #[test]
+    fn append_rejects_mismatched_element() {
+        let errs = errors_for("[1 2 3] \"x\" append");
+        assert!(
+            !errs.is_empty(),
+            "appending a string to List(I64) must error"
+        );
+    }
+
+    #[test]
+    fn append_homogeneous_ok_and_typed() {
+        // After append the list is still List(I64): @nth feeds strlen ->
+        // must error, proving the element type survived.
+        let errs = errors_for("[1 2 3] 4 append 0 @nth strlen");
+        assert!(!errs.is_empty(), "append must keep the element type");
+        let ok = errors_for("[1 2 3] 4 append 0 @nth 1 +");
+        assert!(ok.is_empty(), "expected clean: {ok:?}");
+    }
+
+    #[test]
+    fn occurs_check_rejects_infinite_type() {
+        // The checker gives recursive calls fresh polymorphic vars (the
+        // documented anti-false-positive policy), so infinite types are
+        // only reachable at the unifier level: t0 := List(t0) must fail.
+        let mut inf = crate::infer::TypeInferer::new();
+        let t0 = inf.fresh_var();
+        let t0_id = match &t0 {
+            crate::types::Type::TypeVar(id) => *id,
+            _ => unreachable!(),
+        };
+        let lhs = inf.fresh_var();
+        let list_of_lhs = crate::types::Type::List(Box::new(lhs.clone()));
+        let _ = inf.unify(&lhs, &list_of_lhs); // lhs := List(lhs) — ok so far
+        let r = inf.unify(
+            &crate::types::Type::TypeVar(t0_id),
+            &crate::types::Type::List(Box::new(crate::types::Type::TypeVar(t0_id))),
+        );
+        assert!(r.is_err(), "occurs-check must reject t := List(t)");
     }
 }

@@ -34,6 +34,7 @@ fn help() {
     println!("  --allow-env                 Enable env var capability");
     println!("  --allow-exec                Enable command execution capability");
     println!("  --trace                     Enable VM execution tracing");
+    println!("  --strict-types              Treat type-check errors as fatal");
     println!("  --help, -h                  Show this help");
     println!("  --version, -V               Show version");
 }
@@ -70,6 +71,7 @@ fn run_cli(args: Vec<String>) -> Result<(), String> {
             allow_env: get_flag(&args, "--allow-env"),
             allow_exec: get_flag(&args, "--allow-exec"),
             trace: get_flag(&args, "--trace"),
+            strict_types: get_flag(&args, "--strict-types"),
         };
         return commands::run::run_wbin(&payload, &config);
     }
@@ -154,6 +156,7 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
         allow_env: get_flag(args, "--allow-env"),
         allow_exec: get_flag(args, "--allow-exec"),
         trace: get_flag(args, "--trace"),
+        strict_types: get_flag(args, "--strict-types"),
     };
     // .wbin: decode + linearize (v2 blocks) or run flat (v1 legacy)
     if file.ends_with(".wbin") {
@@ -340,6 +343,7 @@ fn cmd_test(args: &[String]) -> Result<(), String> {
         allow_env: get_flag(args, "--allow-env"),
         allow_exec: get_flag(args, "--allow-exec"),
         trace: false,
+        strict_types: get_flag(args, "--strict-types"),
     };
 
     let mut passed = 0;

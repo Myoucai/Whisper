@@ -213,6 +213,26 @@ whisper build hello.ws -t exe -o app && ./app
 - **`-t c2`（自举链）**：编译器完全由 Whisper 自身编写（`whisperc/compiler.all.ws`），在 Rust VM 上运行并生成 C；支持 import 内联（含 `std/*`）、浮点字面量、循环/条件/递归、高阶函数融合（`@map`/`@each`/`@fold`/`@filter`/`@times` 编译为嵌套函数 + 循环）、v1.0.3-1.0.7 全部新词汇（regex/struct/目录/时间/leave 等）。C 运行时值带类型标签（WT_I64/WT_F64/WT_PTR），多态算术（任一侧 f64 即提升）与 VM 逐位一致——`1.5 2.5 +` 原生输出 4，与 VM 相同。已知残留分歧：字符串打印不带引号（VM 带）、`=`/去重按值位等同而非深度相等。
 - 固定点（whisper2 编译自身输出逐字节一致）可随时用脚本复验，已纳入 CI。
 
+## 置信度与不确定性（std/conf，已定稿）
+
+值的置信度是语言一等公民：`Signal(v, c)`，官方表面共四个原语 + 两个组合词：
+
+```bash
+42 seed!                    # 定种子（不确定性行为可复现）
+#t:0.75 conf-of . unwrap .  # 标注 → 窥视置信度(0.75) → 剥壳(#t)；conf-of 不消耗值
+0.9 0.5 conf-mul .          # 置信度合取 → 0.45（证据链衰减）
+#t:0.7 labeled? .           # 是否 Signal → #t
+0.7 { 1 } { 2 } ?| .        # P(上支)=0.7 的概率分支；p 可来自栈顶 F64 或 Signal 的 c
+```
+
+铁律：置信度（浮点）不进 kv；持久化用 i64 千分比。
+
+## HTTP 能力（--allow-http）
+
+`http-req`（@6）与 `http-get/post`（@2/@3）支持 `https://`（rustls + webpki 根，
+ALPN http/1.1）、`Transfer-Encoding: chunked` 自动解码、cookie 罐、每请求审计行、
+host 白名单（零出域）、连接 10s/读写 15s 超时（挂死端点化为 status 0 无证据响应）。
+
 ## 性能
 
 c2 原生输出的实测（journal 工具，10,000 条记录 538KB，输出重定向）：

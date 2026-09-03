@@ -14,6 +14,8 @@ pub struct RunConfig {
     pub allow_env: bool,
     pub allow_exec: bool,
     pub trace: bool,
+    /// Type-check errors are fatal instead of warnings.
+    pub strict_types: bool,
 }
 
 /// Register core built-in words that are always available without import.
@@ -129,12 +131,16 @@ pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result
         .map_err(|e| format!("Import error: {e}"))?;
     let ast = resolved.ast;
 
-    // Phase 1b: Type check (warnings only — recursive words may produce false positives)
+    // Phase 1b: Type check (warnings by default — recursive words may
+    // produce false positives; --strict-types makes them fatal)
     let mut tc = whisper_typecheck::TypeChecker::new();
     let type_errors = tc.check(&ast);
     if !type_errors.is_empty() {
         for err in &type_errors {
-            eprintln!("Type warning: {} (in {})", err.message, err.context);
+            eprintln!("Type error: {} (in {})", err.message, err.context);
+        }
+        if config.strict_types {
+            return Err(format!("{} type error(s) (--strict-types)", type_errors.len()));
         }
     }
 
@@ -197,6 +203,7 @@ pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result
             allowed_hosts: hosts(),
             jar: jar.clone(),
             audit: audit.clone(),
+            tls_override: None,
         }));
         capability_table.bind(Box::new(whisper_core::http_session::HttpAuditCap {
             id: 7,

@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased (2026-09-03b) — typecheck 语义修复、HTTP TLS+chunked、置信度定稿
+
+### typecheck
+- `@nth` 元素类型传播（List(T) 索引结果 = T；此前丢失致 `@nth len` 漏报）；
+  `append` 元素与列表元素类型统一（`[1 2 3] "x" append` 现在报错；结果类型保持）。
+- occurs-check 核实已在 unifier 层（`t := List(t)` 拒绝）并补直测；递归调用
+  的 fresh-变参宽容策略不变（防误报的既定设计）。
+- 新增 `--strict-types`：类型错误致命化（默认仍为警告打印并继续）。
+
+### HTTP TLS + chunked
+- `https://` 全链路支持（rustls 0.23 ring 后端 + webpki 根 + ALPN http/1.1），
+  此前 @2/@3 明拒、@6 对 443 端口发明文（静默错误）。
+- `Transfer-Encoding: chunked` 自动解码（@2/@3/@6 三路径，截断容错）；
+  TLS 侧显式驱动握手（write 在握手期返回 Ok(0) 的自旋陷阱）+ 对端缺
+  close_notify 容忍。
+- 封闭集成测试：rcgen 自签服务端 + 注入根的客户端 + chunked 响应断言。
+
+### std/conf 定稿
+- 官方表面：`<value>:<conf>` 标注、`conf-of`（窥视，不消耗）、`unwrap`（剥壳）、
+  `p {a} {b} ?|`（显式概率分支，L-03 语义）+ 组合词 `conf-mul`/`labeled?`；
+  文档化"浮点不进 kv，持久化用千分比"铁律。
+
 ## Unreleased (2026-09-03) — C 后端语义统一 + native/exe 分发目标
 
 ### C 运行时值带类型标签（三后端算术逐位一致）

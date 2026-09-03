@@ -418,6 +418,8 @@ fn http_request(method: &str, parsed: &ParsedUrl, body: &str) -> Result<String, 
     stream
         .write_all(request.as_bytes())
         .map_err(|e| e.to_string())?;
+    use std::io::Write as _;
+    stream.flush().map_err(|e| e.to_string())?;
     let mut response = String::new();
     stream
         .read_to_string(&mut response)
