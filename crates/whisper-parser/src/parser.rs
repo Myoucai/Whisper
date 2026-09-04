@@ -1431,3 +1431,53 @@ mod tests {
         }
     }
 }
+
+/// Regression lock: list literals inside conditional branches.
+/// docs/spec.md §3.3 previously documented this as ambiguous ("分支内写
+/// [...] 可能被误判为闭合") — the parser is bracket-depth aware and both
+/// chains (Rust and self-hosted) parse these; the limitation is lifted.
+#[cfg(test)]
+mod list_in_cond_tests {
+    use super::*;
+
+    fn parses(source: &str) -> Vec<AstNode> {
+        Parser::parse_source(source).unwrap_or_else(|e| {
+            panic!("should parse: {source} ({}) at {}", e.message, e.token.span.line)
+        })
+    }
+
+    #[test]
+    fn list_literal_in_then_arm() {
+        parses("#t ?? [1 2 3] 0 @nth | 0 ] .");
+    }
+
+    #[test]
+    fn list_literal_in_else_arm() {
+        parses("#f ?? 0 | [4 5] 0 @nth ] .");
+    }
+
+    #[test]
+    fn lists_in_both_arms() {
+        parses("#t ?? [1] | [2] ] 0 @nth .");
+    }
+
+    #[test]
+    fn list_as_branch_tail() {
+        parses("#t ?? drop [1] | drop [2] ] .");
+    }
+
+    #[test]
+    fn nested_lists_in_cond() {
+        parses("#t ?? [[1] [2]] 0 @nth 0 @nth | 0 ] .");
+    }
+
+    #[test]
+    fn elif_chain_with_lists() {
+        parses("#t ?? [1] | #f ?? [2] | [3] ] ] 0 @nth .");
+    }
+
+    #[test]
+    fn list_in_loop_body_quote() {
+        parses("{ [1 2 3] 0 @nth . } #f # drop");
+    }
+}

@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased (2026-09-04) — `]` 歧义解禁、LSP stdlib 感知补全
+
+### `]` 语法歧义（spec §3.3 已知限制解禁）
+- 实测解析器已是括号深度感知：列表字面量在条件分支内任意位置
+  （分支尾、elif 链、嵌套列表）Rust 链与自举链均正确解析。
+  加 7 项回归测试锁定（parser::list_in_cond_tests），spec.md 更新。
+
+### LSP 补全增强
+- import 路径补全：光标在 `import "..."` 串内时列出 std/* 模块与
+  同目录 .ws（纯函数化 completion_items，可单测）；
+- 模块感知：文档 import 了 std/X 后，补全提供该模块导出词
+  （解析 stdlib 源的 export 列表）；
+- 内建表补 30+ 缺失词（kv-*、map-*、字符串/列表补遗、位运算、
+  时间/随机、置信度定稿原语 conf-of/unwrap、http-req）；
+  5 项补全测试。
+
+### 词级热编译：立项决策文档化
+- docs/hot-word-design.md：机制、四项前置条件、风险、重启触发器；
+  维持不动工（当前无 VM 计算瓶颈负载，-t native 缓存已覆盖主要收益）。
+
 ## Unreleased (2026-09-03b) — typecheck 语义修复、HTTP TLS+chunked、置信度定稿
 
 ### typecheck

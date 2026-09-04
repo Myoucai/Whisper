@@ -318,8 +318,50 @@ impl Server {
     fn completion(&self, req: &Request) -> Option<CompletionResponse> {
         let params: CompletionParams = serde_json::from_value(req.params.clone()).ok()?;
         let doc = self.get_document(&params.text_document_position.text_document.uri)?;
+        let doc_dir = uri_to_path(&params.text_document_position.text_document.uri)
+            .and_then(|p| p.parent().map(|d| d.to_path_buf()));
 
-        let mut items = Vec::new();
+        let pos = params.text_document_position.position;
+        let items = completion_items(&doc.text, doc_dir.as_deref(), Some(pos));
+        Some(CompletionResponse::Array(items))
+    }
+}
+
+/// Minimal file:/// URI → filesystem path (percent-decodes %XX hex).
+fn uri_to_path(uri: &Uri) -> Option<std::path::PathBuf> {
+    let s = uri.as_str();
+    let rest = s.strip_prefix("file:///")?;
+    let mut out = Vec::with_capacity(rest.len());
+    let bytes = rest.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let Ok(v) = u8::from_str_radix(&rest[i + 1..i + 3], 16) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    Some(std::path::PathBuf::from(String::from_utf8_lossy(&out).into_owned()))
+}
+
+/// Pure completion list for a document — unit-testable without a server.
+/// `pos` enables import-path completion when the cursor sits inside an
+/// `import "..."` string.
+fn completion_items(
+    text: &str,
+    doc_dir: Option<&std::path::Path>,
+    pos: Option<Position>,
+) -> Vec<CompletionItem> {
+    if let Some(pos) = pos {
+        if let Some(items) = import_path_completions(text, doc_dir, pos) {
+            return items;
+        }
+    }
+    let mut items = Vec::new();
 
         // Builtin operators with type signatures
         let builtins: Vec<(&str, &str, Option<&str>)> = vec![
@@ -383,6 +425,49 @@ impl Server {
             (",", "Read input", Some("→ str")),
             ("import", "Import module", None),
             ("export", "Export word", None),
+            // kv / 状态
+            ("kv-set", "key val kv-set — store (kv 字符串键值)", Some("str str →")),
+            ("kv-get", "key kv-get — fetch (missing → empty str)", Some("str → str")),
+            ("kv-del", "key kv-del", Some("str →")),
+            ("kv-keys", "all keys", Some("→ [str]")),
+            // map
+            ("map-new", "empty map", Some("→ map")),
+            ("map-get", "map key → val (missing → 0)", Some("map str → val")),
+            ("map-set", "map key val → map", Some("map str val → map")),
+            ("map-keys", "map → keys", Some("map → [str]")),
+            ("map-has", "map key → bool", Some("map str → bool")),
+            // 字符串/列表补遗
+            ("strsplit", "str delim → parts", Some("str str → [str]")),
+            ("strchars", "str → [i64]", Some("str → [i64]")),
+            ("charsstr", "[i64] → str", Some("[i64] → str")),
+            ("striter", "str → first rest", Some("str → i64 str")),
+            ("strjoin", "[str] → str", Some("[str] → str")),
+            ("ctos", "char-code → 1-char str", Some("i64 → str")),
+            ("prepend", "elem list → list", Some("T [T] → [T]")),
+            ("listfind", "[ [T] ] T → bool T", Some("[[T]] T → bool T")),
+            ("sort", "sort list (bytewise for str)", Some("[T] → [T]")),
+            ("rev", "reverse list", Some("[T] → [T]")),
+            ("dedup", "remove adjacent/identity dups", Some("[T] → [T]")),
+            ("take", "list n → first n", Some("[T] i64 → [T]")),
+            ("drop-n", "list n → rest", Some("[T] i64 → [T]")),
+            ("try", "run quote, catch error → bool result", Some("ref → bool T")),
+            // 数值/时间/随机
+            ("now", "unix ms", Some("→ i64")),
+            ("sleep", "ms", Some("i64 →")),
+            ("bitand", "i64 AND", Some("i64 i64 → i64")),
+            ("bitor", "i64 OR", Some("i64 i64 → i64")),
+            ("bitxor", "i64 XOR", Some("i64 i64 → i64")),
+            ("bitnot", "i64 NOT", Some("i64 → i64")),
+            ("<<", "shift left", Some("i64 i64 → i64")),
+            (">>", "shift right", Some("i64 i64 → i64")),
+            // 置信度（std/conf 定稿原语）
+            ("conf-of", "peek confidence of top (plain → 1.0)", Some("x → x f64")),
+            ("unwrap", "strip Signal wrapper", Some("sig → val")),
+            ("seed!", "seed the RNG", Some("i64 →")),
+            ("rand", "random f64 ∈ [0,1)", Some("→ f64")),
+            ("randint", "lo hi → random i64", Some("i64 i64 → i64")),
+            // 能力（需 --allow-* 标志）
+            ("http-req", "method url headers body → status headers body (需 --allow-http)", Some("str str str str → i64 str str")),
         ];
 
         for (name, desc, type_sig) in &builtins {
@@ -406,7 +491,7 @@ impl Server {
         }
 
         // User-defined words with inferred type signatures
-        if let Ok(ast) = Parser::parse_source(&doc.text) {
+        if let Ok(ast) = Parser::parse_source(text) {
             let mut tc = whisper_typecheck::TypeChecker::new();
             let _ = tc.check(&ast);
             for node in &ast {
@@ -436,8 +521,137 @@ impl Server {
             }
         }
 
-        Some(CompletionResponse::Array(items))
+    // Imported stdlib modules: offer their exported words
+    for module in imported_std_modules(text) {
+        for (word, from) in stdlib_module_exports(&module) {
+            items.push(CompletionItem {
+                label: word.clone(),
+                detail: Some(format!("{word}  |  {from}")),
+                kind: Some(CompletionItemKind::FUNCTION),
+                ..Default::default()
+            });
+        }
     }
+
+    items
+}
+
+/// `import "std/X"` module names referenced by the document.
+fn imported_std_modules(text: &str) -> Vec<String> {
+    let mut mods = Vec::new();
+    for line in text.lines() {
+        let t = line.trim();
+        if let Some(rest) = t.strip_prefix("import ") {
+            let name = rest.trim().trim_matches('"');
+            if let Some(m) = name.strip_prefix("std/") {
+                if !m.is_empty() && !mods.iter().any(|x| x == m) {
+                    mods.push(m.to_string());
+                }
+            }
+        }
+    }
+    mods
+}
+
+/// stdlib root: <repo>/stdlib (two levels up from crates/whisper-lsp).
+fn stdlib_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("stdlib")
+}
+
+/// If the cursor is inside an `import "..."` string, complete module paths:
+/// std/<module> plus sibling .ws files of the document.
+fn import_path_completions(
+    text: &str,
+    doc_dir: Option<&std::path::Path>,
+    pos: Position,
+) -> Option<Vec<CompletionItem>> {
+    let line = text.lines().nth(pos.line as usize)?;
+    let col = pos.character as usize;
+    let upto: String = line.chars().take(col).collect();
+    let str_start = upto.rfind('"')?;
+    let prefix_with_quote = &upto[str_start..];
+    // must be on an import line: text before the opening quote is `import ` + optional whitespace
+    let before = &upto[..str_start];
+    if !before.trim_end().ends_with("import") {
+        return None;
+    }
+    let typed: String = prefix_with_quote.chars().skip(1).collect(); // drop the quote
+
+    let mut items = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(stdlib_dir()) {
+        let mut mods: Vec<String> = entries
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().is_some_and(|x| x == "ws"))
+            .filter_map(|e| e.file_name().into_string().ok())
+            .map(|n| format!("std/{}", n.trim_end_matches(".ws")))
+            .collect();
+        mods.sort();
+        for m in mods {
+            if m.starts_with(&typed) {
+                items.push(CompletionItem {
+                    label: m.clone(),
+                    detail: Some("stdlib module".into()),
+                    kind: Some(CompletionItemKind::MODULE),
+                    insert_text: Some(m),
+                    ..Default::default()
+                });
+            }
+        }
+    }
+    if let Some(dir) = doc_dir {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            let mut files: Vec<String> = entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().extension().is_some_and(|x| x == "ws"))
+                .filter_map(|e| e.file_name().into_string().ok())
+                .collect();
+            files.sort();
+            for f in files {
+                if f.starts_with(&typed) && f != typed {
+                    items.push(CompletionItem {
+                        label: f.clone(),
+                        detail: Some("module (same directory)".into()),
+                        kind: Some(CompletionItemKind::MODULE),
+                        insert_text: Some(f.trim_end_matches(".ws").to_string()),
+                        ..Default::default()
+                    });
+                }
+            }
+        }
+    }
+    Some(items)
+}
+
+/// Exported words of a stdlib module (parsed from source, export list wins).
+fn stdlib_module_exports(module: &str) -> Vec<(String, String)> {
+    let path = stdlib_dir().join(format!("{module}.ws"));
+    let Ok(source) = std::fs::read_to_string(&path) else {
+        return Vec::new();
+    };
+    let Ok(ast) = Parser::parse_source(&source) else {
+        return Vec::new();
+    };
+    let defs: Vec<String> = ast
+        .iter()
+        .filter_map(|n| match n {
+            AstNode::Def { name, .. } => Some(name.clone()),
+            _ => None,
+        })
+        .collect();
+    let exports: Vec<String> = ast
+        .iter()
+        .filter_map(|n| match n {
+            AstNode::Export(name) => Some(name.clone()),
+            _ => None,
+        })
+        .collect();
+    let names: Vec<String> = if exports.is_empty() { defs } else { exports };
+    names
+        .into_iter()
+        .map(|n| (n, format!("std/{module}")))
+        .collect()
 }
 
 /// Extract the word/operator at a given position.
@@ -590,4 +804,63 @@ pub fn run_lsp_server() -> anyhow::Result<()> {
     let (connection, _io_threads) = Connection::stdio();
     let server = Server::new(connection);
     server.run()
+}
+
+#[cfg(test)]
+mod completion_tests {
+    use super::*;
+
+    #[test]
+    fn stdlib_words_offered_after_import() {
+        let items = completion_items(
+            "import \"std/str\"\n\"x\" ",
+            None,
+            Some(Position::new(1, 4)),
+        );
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        // std/str exports (spot-check a few from its export list)
+        for expect in ["strsplit", "str-rev", "upper"] {
+            assert!(labels.contains(&expect), "missing std/str export {expect}: {labels:?}");
+        }
+        // builtin still present alongside
+        assert!(labels.contains(&"dup"));
+    }
+
+    #[test]
+    fn no_stdlib_words_without_import() {
+        let items = completion_items("1 2 + .", None, Some(Position::new(0, 3)));
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        assert!(!labels.contains(&"str-rev"), "std word leaked without import");
+    }
+
+    #[test]
+    fn import_path_completion_inside_string() {
+        // cursor right after `import "std/` on line 0 (empty module prefix)
+        let text = "import \"std/";
+        let items = completion_items(text, None, Some(Position::new(0, text.len() as u32)));
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        assert!(labels.contains(&"std/str"), "expected std/str: {labels:?}");
+        assert!(labels.contains(&"std/list"), "expected std/list: {labels:?}");
+        assert!(
+            labels.iter().all(|l| l.starts_with("std/")),
+            "non-std entries leaked into import completion: {labels:?}"
+        );
+    }
+
+    #[test]
+    fn plain_code_does_not_trigger_import_completion() {
+        let items = completion_items("\"std/something\" .", None, Some(Position::new(0, 6)));
+        // falls back to word completion
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        assert!(labels.contains(&"dup"));
+    }
+
+    #[test]
+    fn new_core_words_present() {
+        let items = completion_items("", None, Some(Position::new(0, 0)));
+        let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
+        for expect in ["kv-set", "conf-of", "unwrap", "map-set", "http-req"] {
+            assert!(labels.contains(&expect), "missing {expect}");
+        }
+    }
 }
