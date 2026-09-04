@@ -964,3 +964,48 @@ fn conf_stdlib_surface() {
         "confidence surface output mismatch: {s}"
     );
 }
+
+// ── std/encoding: base64 / base64url / percent ─────────────────────
+
+#[test]
+fn encoding_stdlib_vectors() {
+    let dir = std::env::temp_dir().join("whisper_encoding_it");
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = dir.join("enc.ws");
+    std::fs::write(
+        &src,
+        "import \"std/encoding\"\n\
+         \"Man\" b64-enc .\n\
+         \"M\" b64-enc .\n\
+         \"hello world\" b64-enc b64-dec .\n\
+         \"TWFu\" b64-dec .\n\
+         \"any carnal pleasure.\" b64-enc .\n\
+         \"a b&c\" pct-enc .\n\
+         \"a%20b%26c\" pct-dec .\n\
+         255 ctos 255 ctos strcat dup b64-enc . b64url-enc .
+",
+    )
+    .unwrap();
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .arg("run")
+        .arg(&src)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(
+        s.lines().filter(|l| !l.is_empty()).collect::<Vec<_>>(),
+        vec![
+            "\"TWFu\"",
+            "\"TQ==\"",
+            "\"hello world\"",
+            "\"Man\"",
+            "\"YW55IGNhcm5hbCBwbGVhc3VyZS4=\"",
+            "\"%61%20%62%26%63\"",
+            "\"a b&c\"",
+            "\"//8=\"",
+            "\"__8=\"",
+        ],
+        "encoding vectors mismatch: {s}"
+    );
+}

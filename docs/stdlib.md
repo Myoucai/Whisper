@@ -1,10 +1,39 @@
 # Whisper Standard Library v1.0
 
-9 modules, 48 exported functions.
+10 modules（新增 std/conf、std/encoding）。
 
 All modules are loaded via `import "std/<name>"`.
 
 ---
+
+## std/encoding — base64 / base64url / 百分号编码
+
+纯 Whisper 实现（零依赖，字节语义）。
+
+```whisper
+import "std/encoding"
+"hello world" b64-enc .        // "aGVsbG8gd29ybGQ="
+"aGVsbG8gd29ybGQ=" b64-dec .   // "hello world"
+" Man" pct-enc .               // "%20Man"
+"%20Man" pct-dec .             // " Man"
+```
+
+词表：`b64-enc` `b64-dec` `b64url-enc` `b64url-dec` `pct-enc` `pct-dec`
+（另导出实现层词汇 `sextets/enc-ch/enc-step/enc-tail/sat/dec-ch/sget/
+dec-group/hex-ch/hex-val/pct-byte/keep-set/b64-alpha/b64url-alpha/
+b64-enc-with/b64-dec-with`）。
+
+## std/conf — 置信度（定稿表面）
+
+```whisper
+import "std/conf"
+42 seed!                     # 定种子（复现）
+#t:0.75 conf-of . unwrap .   # 0.75 / #t
+0.9 0.5 conf-mul .           # 0.45（证据链合取）
+0.7 { 1 } { 2 } ?| .         # P(上支)=0.7
+```
+
+铁律：置信度（浮点）不进 kv；持久化用 i64 千分比。
 
 ## std/math — Integer Mathematics
 

@@ -40,43 +40,56 @@ impl Installer {
             return Err("Dependency depth exceeded (circular dependency?)".into());
         }
 
-        // 1. Resolve package info
-        let info = crate::registry::resolve_package(spec)?;
+        // Local-directory install: spec points at a folder containing
+        // package.ws (package-author dev flow — no download, no cleanup).
+        let local_path = PathBuf::from(spec);
+        let local = local_path.is_dir() && local_path.join("package.ws").exists();
+
+        let (info, temp_dir) = if local {
+            println!("Package (local): {}", local_path.display());
+            (None, local_path)
+        } else {
+            // 1. Resolve + 2. Download (git / curl / powershell)
+            let info = crate::registry::resolve_package(spec)?;
+            let temp_dir =
+                std::env::temp_dir().join(format!("whisper-pkg-{}", info.package_name));
+            let _ = std::fs::remove_dir_all(&temp_dir);
+            let download_ok = self
+                .try_git_clone(&info.git_url, &temp_dir)
+                .or_else(|_| self.try_curl_download(&info, &temp_dir))
+                .or_else(|_| self.try_powershell_download(&info, &temp_dir));
+            if let Err(e) = download_ok {
+                let _ = std::fs::remove_dir_all(&temp_dir);
+                return Err(format!(
+                    "Failed to download {}: {}\n\
+                     Install Git (https://git-scm.com) or curl to download packages.",
+                    info.package_name, e
+                ));
+            }
+            (Some(info), temp_dir)
+        };
+
+        // 3. Parse package.ws (from the downloaded copy or the local dir)
+        let manifest = self.read_manifest(&temp_dir)?;
+        let info_ref = info.as_ref();
 
         // Skip if already installed
         let pkg_key = format!(
             "{}@{}",
-            info.package_name,
-            info.version.as_deref().unwrap_or("latest")
+            manifest.name,
+            info_ref
+                .and_then(|i| i.version.clone())
+                .unwrap_or_else(|| manifest.version.clone())
         );
         if self.installed.contains(&pkg_key) {
-            println!("  {} already installed, skipping", info.package_name);
+            println!("  {} already installed, skipping", manifest.name);
             return Ok(());
         }
         self.installed.insert(pkg_key.clone());
 
-        println!("Package: {} ({})", info.package_name, info.git_url);
-
-        // 2. Download
-        let temp_dir = std::env::temp_dir().join(format!("whisper-pkg-{}", info.package_name));
-        let _ = std::fs::remove_dir_all(&temp_dir);
-
-        let download_ok = self
-            .try_git_clone(&info.git_url, &temp_dir)
-            .or_else(|_| self.try_curl_download(&info, &temp_dir))
-            .or_else(|_| self.try_powershell_download(&info, &temp_dir));
-
-        if let Err(e) = download_ok {
-            let _ = std::fs::remove_dir_all(&temp_dir);
-            return Err(format!(
-                "Failed to download {}: {}\n\
-                 Install Git (https://git-scm.com) or curl to download packages.",
-                info.package_name, e
-            ));
+        if let Some(info) = info_ref {
+            println!("Package: {} ({})", info.package_name, info.git_url);
         }
-
-        // 3. Parse package.ws
-        let manifest = self.read_manifest(&temp_dir)?;
 
         println!();
         println!("Package: {} v{}", manifest.name, manifest.version);
@@ -119,7 +132,9 @@ impl Installer {
         let lock = crate::lock::LockEntry {
             name: manifest.name.clone(),
             version: manifest.version.clone(),
-            source: info.git_url.clone(),
+            source: info_ref
+                .map(|i| i.git_url.clone())
+                .unwrap_or_else(|| temp_dir.display().to_string()),
             checksum,
             capabilities: manifest.capabilities.clone(),
         };
@@ -135,8 +150,10 @@ impl Installer {
             .write(&lockfile_path)
             .map_err(|e| format!("Failed to write lockfile: {e}"))?;
 
-        // Cleanup
-        let _ = std::fs::remove_dir_all(&temp_dir);
+        // Cleanup (remote downloads only — never delete a local source dir)
+        if !local {
+            let _ = std::fs::remove_dir_all(&temp_dir);
+        }
 
         println!("Installed: {} v{}", manifest.name, manifest.version);
         println!("Location: {}", pkg_dir.display());

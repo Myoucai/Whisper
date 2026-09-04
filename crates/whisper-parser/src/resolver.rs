@@ -47,7 +47,10 @@ fn search_paths(source_dir: &Path) -> Vec<PathBuf> {
             PathBuf::from(base).join(".whisper")
         });
 
-    paths.push(whisper_home);
+    paths.push(whisper_home.clone());
+    // Installed packages live in $WHISPER_HOME/packages/<name>/ —
+    // `import "pkgname/module"` resolves against that root.
+    paths.push(whisper_home.join("packages"));
     paths
 }
 

@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased (2026-09-04b) — 包生态地基 + std/encoding
+
+### 包管理端到端验收（此前从未跑通）
+- import 解析补 `$WHISPER_HOME/packages/` 搜索路径（注释与实现不符，
+  已装包此前不可解析）；
+- `whisper install ./本地目录`：包作者开发流（不下载不删源），manifest
+  从本地读，lock 记录来源路径；
+- `install` 参数序修复（-y 被当包名）；本地包 → install → import →
+  运行 / list / uninstall / 重装全链路冒烟通过；
+- docs/packages.md：包标准（manifest/模块约定/B2 合同门/能力审查/
+  native 库/路线）。
+
+### std/encoding（样板包，纯 Whisper 零依赖）
+- b64-enc/b64-dec/b64url-enc/b64url-dec（RFC 4648 含填充与 URL 安全
+  字母表）、pct-enc/pct-dec（保留集 + %XX 大写十六进制）；
+- RFC 向量 + 往返 + 字母表分歧用例锁进集成测试
+  （encoding_stdlib_vectors）；docs/stdlib.md 补 std/encoding 与
+  std/conf 条目。
+
+### 修复过程中沉淀的栈编排铁律（新增三条，均踩实）
+- 比较词会消费操作数：`dup 0 >= swap x <=` 吃掉被比较值——须
+  `dup 0 >= over x <= &`；
+- `$N` pick 从栈顶 0 基计数：`[a b c]` 中 a 是 `$2` 不是 `$0/$1`；
+- kv 累积字符串时 `值 kv-get strcat` 是前插（值+旧），`kv-get swap
+  strcat` 才是追加。
+
 ## Unreleased (2026-09-04) — `]` 歧义解禁、LSP stdlib 感知补全
 
 ### `]` 语法歧义（spec §3.3 已知限制解禁）

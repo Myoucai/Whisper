@@ -262,8 +262,10 @@ fn cmd_install(args: &[String]) -> Result<(), String> {
     }
 
     let pkg = args
-        .get(2)
-        .ok_or("Expected: whisper install <github.com/user/repo>")?;
+        .iter()
+        .skip(2)
+        .find(|a| !a.starts_with('-'))
+        .ok_or("Expected: whisper install <github.com/user/repo | ./local-dir>")?;
     installer.install(pkg, auto_yes)
 }
 
