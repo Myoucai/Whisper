@@ -150,10 +150,42 @@ static W_TLS size_t w_heap_list_pos = 0;  // list arena bump (down)
 // split layout (strings up / lists down) works at any size.
 static W_TLS long long w_heap_size = 0;
 
+// Commit-on-demand：只保留地址空间（RESERVE），用到哪提交哪。
+// 长寿命进程的提交内存随实际用量增长，而非启动即吃满 4GB 提交额。
+// Linux/macOS 的 mmap 本就按需换页，无需处理。
+static W_TLS size_t w_heap_committed = 0;
+static W_TLS size_t w_heap_list_committed = 0;
+
+static void w_heap_commit_through(char *end_a, char *end_b) {
+#ifdef _WIN32
+    const size_t GRAN = 65536;
+    size_t need_a = (size_t)(end_a - w_heap);
+    size_t need_b = (size_t)(end_b - w_heap);
+    if (need_a > w_heap_committed) {
+        size_t target = ((need_a + GRAN - 1) / GRAN) * GRAN;
+        if (VirtualAlloc(w_heap, target, MEM_COMMIT, PAGE_READWRITE) == NULL) {
+            fprintf(stderr, "commit a failed at %zu bytes\n", target);
+            exit(1);
+        }
+        w_heap_committed = target;
+    }
+    if (need_b > w_heap_list_committed) {
+        size_t target = ((need_b + GRAN - 1) / GRAN) * GRAN;
+        if (VirtualAlloc(w_heap, target, MEM_COMMIT, PAGE_READWRITE) == NULL) {
+            fprintf(stderr, "commit b failed at %zu bytes\n", target);
+            exit(1);
+        }
+        w_heap_list_committed = target;
+    }
+#else
+    (void)end_a; (void)end_b;
+#endif
+}
+
 static void w_heap_init(void) {
 #ifdef _WIN32
     if (w_heap_size == 0) w_heap_size = HEAP_SIZE;
-    w_heap = (char *)VirtualAlloc(NULL, (SIZE_T)w_heap_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    w_heap = (char *)VirtualAlloc(NULL, (SIZE_T)w_heap_size, MEM_RESERVE, PAGE_READWRITE);
     if (w_heap == NULL) { fprintf(stderr, "VirtualAlloc failed for %lld bytes\n", w_heap_size); exit(1); }
 #else
     if (w_heap_size == 0) w_heap_size = HEAP_SIZE;
@@ -173,6 +205,7 @@ static void *w_alloc(size_t bytes) {
     }
     void *p = w_heap + w_heap_pos;
     w_heap_pos += bytes;
+    w_heap_commit_through(w_heap + w_heap_pos, w_heap + w_heap_size - w_heap_list_pos);
     return p;
 }
 
@@ -184,6 +217,7 @@ static void *w_alloc_list(size_t bytes) {
         exit(1);
     }
     w_heap_list_pos += bytes;
+    w_heap_commit_through(w_heap + w_heap_pos, w_heap + w_heap_size - w_heap_list_pos);
     return w_heap + w_heap_size - w_heap_list_pos;
 }
 

@@ -1228,6 +1228,9 @@ impl Vm {
             }
             Opcode::Try => {
                 let quot = self.pop_ref()?;
+                // 错误恢复的栈卫生：引用块失败时回卷到进入前深度，
+                // 否则残留的半成品值会污染恢复路径（daemon 续跑关键）。
+                let base = self.data_stack.len();
                 match self.execute_ref(&quot) {
                     Ok(()) => {
                         let val = self.data_stack.pop().unwrap_or(Value::I64(0));
@@ -1235,6 +1238,7 @@ impl Vm {
                         self.data_stack.push(val);
                     }
                     Err(e) => {
+                        self.data_stack.truncate(base);
                         self.data_stack.push(Value::Bool(false));
                         self.data_stack.push(Value::Str(Rc::new(e.to_string())));
                     }
@@ -1795,13 +1799,20 @@ impl Vm {
         // Execute only until the ref frame completes (back to initial depth).
         // Must not continue executing the parent frame — that belongs to the
         // caller (e.g. execute, Map, Fold, etc.).
-        while self.call_stack.len() > initial_depth {
+        let result = loop {
+            // Return 等指令可能直接弹掉本块帧：栈空即完成（quote_double 用例）
+            if self.call_stack.len() <= initial_depth {
+                break Ok(());
+            }
             let current_frame = self.call_stack.last_mut().unwrap();
             let ip = current_frame.ip;
             let code_len = current_frame.code.len();
 
             if ip >= code_len {
                 self.call_stack.pop();
+                if self.call_stack.len() <= initial_depth {
+                    break Ok(());
+                }
                 continue;
             }
 
@@ -1817,10 +1828,18 @@ impl Vm {
                 );
             }
 
-            self.step(&code[ip])?;
-        }
+            match self.step(&code[ip]) {
+                Ok(()) => {}
+                // 错误出块前先弹净本块栈帧：否则残留帧会被外层主循环
+                // 继续执行（try 捕获后引用块余下的指令泄漏执行）。
+                Err(e) => {
+                    self.call_stack.truncate(initial_depth);
+                    break Err(e);
+                }
+            }
+        };
 
-        Ok(())
+        result
     }
 
     /// Binary operation on numeric stack values.
@@ -3193,5 +3212,79 @@ c"
         vm.data_stack.push(Value::I64(42));
         let r = vm.execute(&[Opcode::BitNot, Opcode::BitNot]).unwrap();
         assert_eq!(r, Some(Value::I64(42))); // double NOT is identity
+    }
+}
+
+#[cfg(test)]
+mod try_recovery_tests {
+    use super::*;
+    use crate::opcode::Opcode;
+
+    #[test]
+    fn try_unwinds_partial_stack_on_error() {
+        // 引用块半途失败：已压的 1/2/3 必须回卷，不得污染恢复路径。
+        // 程序尾的哨兵 0 供 execute() 的最终 pop 消费。
+        let mut vm = Vm::new();
+        let prog = vec![
+            Opcode::PushRef(vec![
+                Opcode::PushI64(1),
+                Opcode::PushI64(2),
+                Opcode::PushI64(3),
+                Opcode::PushI64(0),
+                Opcode::Div,
+            ]),
+            Opcode::Try,
+            Opcode::PushI64(0),
+        ];
+        vm.execute(&prog).unwrap();
+        assert_eq!(vm.data_stack.len(), 2);
+        assert!(matches!(vm.data_stack[0], Value::Bool(false)));
+        match &vm.data_stack[1] {
+            Value::Str(s) => assert!(s.contains("Division by zero")),
+            other => panic!("expected error message, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn try_does_not_leak_frames_on_error() {
+        // 错误后引用块余下指令（PushI64(5)）不得泄漏执行；块前的 99 完好
+        let mut vm = Vm::new();
+        let prog = vec![
+            Opcode::PushI64(99),
+            Opcode::PushRef(vec![
+                Opcode::PushI64(1),
+                Opcode::PushI64(0),
+                Opcode::Div,
+                Opcode::PushI64(5),
+            ]),
+            Opcode::Try,
+            Opcode::PushI64(0),
+        ];
+        vm.execute(&prog).unwrap();
+        assert_eq!(vm.data_stack.len(), 3);
+        assert!(matches!(vm.data_stack[0], Value::I64(99)));
+        assert!(matches!(vm.data_stack[1], Value::Bool(false)));
+        match &vm.data_stack[2] {
+            Value::Str(s) => assert!(s.contains("Division by zero")),
+            other => panic!("expected error message, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn try_success_path_untouched() {
+        let mut vm = Vm::new();
+        let prog = vec![
+            Opcode::PushRef(vec![
+                Opcode::PushI64(3),
+                Opcode::PushI64(4),
+                Opcode::Add,
+            ]),
+            Opcode::Try,
+            Opcode::PushI64(0),
+        ];
+        vm.execute(&prog).unwrap();
+        assert_eq!(vm.data_stack.len(), 2);
+        assert!(matches!(vm.data_stack[0], Value::Bool(true)));
+        assert!(matches!(vm.data_stack[1], Value::I64(7)));
     }
 }

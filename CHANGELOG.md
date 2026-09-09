@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased (2026-09-04e) — 成熟化第一批：错误恢复栈卫生 + 堆按需提交
+
+### try 错误恢复的两处栈卫生 bug（J-1）
+- 引用块失败时数据栈回卷到进入前深度：此前半成品值残留污染恢复路径
+  （`{ 1 2 3 0 / } try` 留下 [1,2]）；现只剩 [#f, 消息]；
+- execute_ref_inner 错误出块时弹净本块调用帧：此前残留帧被外层主循环
+  继续执行——try 捕获后引用块余下指令泄漏执行（`{ 1 0 / 5 }` 的 5
+  仍会跑）；3 项回归测试（含 quote_double 空帧守卫）。
+
+### C 后端堆 commit-on-demand（J-2 第一步）
+- VirtualAlloc 从 MEM_COMMIT|MEM_RESERVE（一次性提交 4GB 提交额）改为
+  MEM_RESERVE + 64KB 粒度按需提交两个 bump 方向触及的区间；Linux/macOS
+  mmap 本就按需换页；soak：2M 次迭代 ~400MB 字符串 2.7s 跑完 rc=0，
+  自举固定点不受影响。
+
+### CI macOS 矩阵（J-5 可远程部分）
+- test job 增加 ubuntu/macos 双矩阵（fail-fast 关闭）——三平台中唯一
+  无法本地验证的平台由 CI 覆盖。
+
+### J-3（strict 默认）与 J-4（模块命名空间）
+- 体量大且 J-4 触及冻结语法（需双实现+门禁+重调模型），列入下轮专项；
+- Rust 侧（whisper run）为 Rc 生命周期，内存本就回收——J-2 剩余
+  （arena 回收策略/阻塞 TLS 并发化）随 daemon 化需求再议。
+
 ## Unreleased (2026-09-04d) — 说明文档对齐现状
 
 - README：tests 徽章 392→451、stdlib 徽章 13→14 模块；能力沙箱行补
