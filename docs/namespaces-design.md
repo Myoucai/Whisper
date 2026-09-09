@@ -92,3 +92,51 @@ import "mymod"        // 也导出 find
 "abc" "b" str.find .  // 1 —— 限定永不遮蔽
 find .                // "MINE" —— 非限定=现状（警告+后导出遮蔽）
 ```
+
+## 战报（2026-09-09，K 阶段——J4-4 收官，判据未动）
+
+上节"未达成"的两个悬念（未定位的发射分歧）在本阶段全部定位并修复，
+compiler.all.ws 重新携带限定量词法，固定点恢复。
+
+### 根因一：seed 对 >2 层 ?? 嵌套的函数产出错字节码
+
+J4-4 战败的"剩余分歧"实锤：is-wordch? 初版用了 5 层嵌套 ??。
+Rust 编译器容忍任意嵌套 → VM 侧语义全对；seed 编译器对深嵌套
+函数产出损坏字节码 → C 侧错（独立 `.` 输入下 chunk-cont? 往栈上
+泄漏 I64 255，w_as_ptr 崩）。修复：is-wordch? 重写为 &/| 扁平
+布尔链（零 ??）——这是自举子集的硬纪律，此后新增词一律扁平化。
+
+### 根因二：O(源²) 词法分配撞 2GB 字符串 arena（链本就贴崖）
+
+扁平化后六项探针全过，但全源自编译（gen2）爆
+`string heap exhausted (pos≈2^31)`。逐级二分定位：
+
+- 冻结种子在 60KB 合成输入同样爆——**非新词引入**；
+- 自举词法逐字符 `strslice` 全剩余串 → 累计分配 O(源²)；
+  50KB 源 ≈ 2GB，链数月来一直贴着旧限（4GB 总/2GB 每半）运行，
+  新词的每字符 kv/ctos 常数把 w1 顶过崖；
+- 修复：runtime.c HEAP_SIZE 4GB→16GB（VirtualAlloc/mmap 懒提交，
+  实际提交内存不变 ≈2.1GB）。生成 C 以 `#include "runtime.c"`
+  按引用包含 → gen2==gen3 文本比对不受影响；seed 文件保持冻结
+  （它经 `#include "../runtime.c"` 同享该修复）。
+
+### 落地清单
+
+- **词法四词**：is-wordch?（扁平）/dot-joins?/chunk-cont?/
+  chunk-or-delim + read-chunk-acc 门控 + tokenize-loop 分支；
+- **K-1 c2 注入**：expand_imports 内联后追加 `: 末段.词名` 克隆
+  （单行定义体不重拷，真实换行转义修复）；
+- **K-3 硬失败**：未知 token/裸 opcode 发 `#error`；
+- **K-4 数值提升**：`<=`/`>=` 改 w_num_f64，浮点对拍全绿；
+- **K-2 覆盖门禁** tools/opcode_coverage.sh：36 用例双跑对拍，
+  现况 **36 pass / 0 fail / 3 known-gap**（json/conf：C 引用不
+  存在的运行时助手；try：换行存根——均为 c2 目标债务，白名单
+  大声记账，不遮不藏）。
+
+### 验收
+
+- `: mmod.mw { 42 } ; mmod.mw .` → 42（VM=原生）；
+- `3.14 .` → 3.14（双侧）；`5 .` → 5；
+- 固定点 gen2==gen3（scripts/verify-fixedpoint.sh）；
+- cargo test --workspace 全绿；Lexicon 套件不受影响（语言侧无
+  破坏性变更）。

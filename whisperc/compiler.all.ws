@@ -64,14 +64,43 @@
     ]
 } ;
 
+// J-4 限定量：s 以点开头且下一字符为词字符 → 点并入词（mmod.mw）。
+// 只用覆盖门禁已绿的 op（strnth/kv/??/=&/<=/>=/&/ctos）——K-4 纪律。
+: is-wordch? {
+    ctos "WC-S" ` kv-set
+    "WC-S" kv-get 0 strnth drop
+    "WC-S" kv-get 0 strnth 48 >= "WC-S" kv-get 0 strnth 57 <= &
+    "WC-S" kv-get 0 strnth 65 >= "WC-S" kv-get 0 strnth 90 <= & |
+    "WC-S" kv-get 0 strnth 97 >= "WC-S" kv-get 0 strnth 122 <= & |
+    "WC-S" kv-get 0 strnth 95 = "WC-S" kv-get 0 strnth 63 = | |
+    "WC-S" kv-get 0 strnth 45 = "WC-S" kv-get 0 strnth 47 = | |
+} ;
+
+: dot-joins? {
+    "DJ-S" ` kv-set
+    "DJ-S" kv-get 0 strnth 46 =
+    "DJ-S" kv-get 1 strnth is-wordch? &
+} ;
+
+// s → 1/0：chunk 继续消费当前字符（非点，或"点+词字符"连接）
+: chunk-cont? {
+    "DJ-C" ` kv-set
+    "DJ-C" kv-get 0 strnth 46 =
+    ?? "DJ-C" kv-get dot-joins?
+    | 1
+    ]
+} ;
+
 // read-chunk-acc: acc s → acc' rest'   (accumulate until stop char)
 : read-chunk-acc {
     _ "" streq ??
     |   _ 0 strnth is-ws ??
-        |   _ 0 strnth ctos
-            @ ` strcat
-            ` striter ` drop
-            read-chunk-acc
+        |   _ chunk-cont?
+            ?? _ 0 strnth ctos
+               @ ` strcat
+               ` striter ` drop
+               read-chunk-acc
+            |   return ]
         ]
     ]
 } ;
@@ -91,6 +120,17 @@
     ]
 } ;
 
+// 词 token vs 独立点 token 分派（J-4；拆出独立词把 tokenize-loop 的
+// ?? 嵌套深度拉回 seed "max 2-deep" 限制内——深嵌套会产出错字节码）
+: chunk-or-delim {
+    _ chunk-cont?
+    ?? "" ` read-chunk-acc
+       @ @ append ` tokenize-loop
+    |   striter ` ctos
+        @ ` append ` tokenize-loop
+    ]
+} ;
+
 // tokenize-loop: acc s → acc'
 : tokenize-loop {
     _ "" streq ?? drop
@@ -105,8 +145,7 @@
                 |   _ 0 strnth is-ws ??
                         striter ` ctos
                         @ ` append ` tokenize-loop
-                    |   "" ` read-chunk-acc
-                        @ @ append ` tokenize-loop
+                    |   chunk-or-delim
                     ]
                 ]
             ]
@@ -687,7 +726,8 @@ export classify-nested
     dup 15 =  ?? drop op-pick  return ]
     dup 249 >= over 254 <= & ?? drop op-hof return ]
     drop drop
-    [] // unknown token → empty bytecode
+    // K-3：不再静默空码——发 #error 让 gcc 即刻失败（覆盖门禁的响亮化）
+    [["#error whisper-cgen: unknown token\n"]]
 } ;
 
 // ── Concat: append each item from src list to dst ──
@@ -1003,8 +1043,8 @@ export classify-full
     dup 24 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push(W_I64(_a.v==_b.v&&_a.t==_b.t?1L:0L));}\n" return ]
     dup 25 = ?? drop "w_op_lt();\n" return ]
     dup 26 = ?? drop "w_op_gt();\n" return ]
-    dup 28 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push(W_I64(w_as_i64(_a)<=w_as_i64(_b)?1L:0L));}\n" return ]
-    dup 29 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push(W_I64(w_as_i64(_a)>=w_as_i64(_b)?1L:0L));}\n" return ]
+    dup 28 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push(W_I64(w_num_f64(_a)<=w_num_f64(_b)?1L:0L));}\n" return ]
+    dup 29 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push(W_I64(w_num_f64(_a)>=w_num_f64(_b)?1L:0L));}\n" return ]
     dup 32 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push(W_I64(w_as_i64(_a)&&w_as_i64(_b)?1L:0L));}\n" return ]
     dup 33 = ?? drop "{wval _b=w_pop(),_a=w_pop();w_push(W_I64(w_as_i64(_a)||w_as_i64(_b)?1L:0L));}\n" return ]
     dup 34 = ?? drop "{wval _a=w_pop();w_push(W_I64(w_as_i64(_a)==0?1L:0L));}\n" return ]
@@ -1146,7 +1186,7 @@ export classify-full
 " return ]
     dup 157 = ?? drop "{ int64_t _l=w_as_i64(w_pop()); const char*_p=(const char*)w_as_i64(w_pop()); w_push(W_PTR(w_str_new(_p,(uint32_t)(_l>0?_l:0)))); }
 " return ]
-    drop "// unknown bare opcode\n"
+    drop "#error whisper-cgen: unknown bare opcode\n"
 } ;
 
 // ── Emit control flow instruction ────────────────────────────────

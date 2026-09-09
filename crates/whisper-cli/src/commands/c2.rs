@@ -55,7 +55,14 @@ fn expand_into(
                 let imported =
                     std::fs::read_to_string(&path).map_err(|e| format!("import '{spec}': {e}"))?;
                 let parent = path.parent().unwrap_or(Path::new(".")).to_path_buf();
+                // 先展开模块本体……
                 expand_into(&imported, &parent, out, seen, depth + 1)?;
+                // ……再追加命名空间限定克隆（J-4 与 resolver 注入对齐）：
+                // 模块每个 `: name {` 定义克隆为 `: 末段.name {`，导出
+                // 词以 末段.name 同样可用——限定形态即普通词。
+                let ns = spec.rsplit('/').next().unwrap_or(spec.as_str());
+                let ns = ns.trim_end_matches(".ws");
+                append_qualified_clones(&imported, ns, out);
             }
             if !tail.is_empty() {
                 out.push_str(&tail);
@@ -67,6 +74,43 @@ fn expand_into(
         }
     }
     Ok(())
+}
+
+/// Textually clone `: name { ... } ;` definitions of an inlined module as
+/// `: ns.name { ... } ;` so qualified references resolve on the c2 path
+/// (which bypasses the resolver that does this for `whisper run`).
+fn append_qualified_clones(module_src: &str, ns: &str, out: &mut String) {
+    let mut lines = module_src.lines().peekable();
+    while let Some(line) = lines.next() {
+        let t = line.trim();
+        if let Some(rest) = t.strip_prefix(": ") {
+            // def header: name may be followed by body on the same line or
+            // the body opens on the next line(s) until " ;"
+            if let Some(name_end) = rest.find(|c: char| c.is_whitespace()) {
+                let name = &rest[..name_end];
+                let after = &rest[name_end..];
+                if !name.contains('.') {
+                    out.push_str(": ");
+                    out.push_str(ns);
+                    out.push('.');
+                    out.push_str(name);
+                    out.push_str(after);
+                    out.push('\n');
+                    // 单行 def（after 已含 ";"）不再拷贝体行；多行体拷到闭合 ";"
+                    if !after.trim_end().ends_with(";") {
+                        for body in lines.by_ref() {
+                            let done = body.trim().ends_with(";");
+                            out.push_str(body);
+                            out.push('\n');
+                            if done {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Resolve a module spec the same way the Rust resolver does for `std/X`

@@ -68,26 +68,12 @@ static W_TLS int  w_sp = 0;
 static volatile int _dbg_max_sp = 0;
 static volatile int _dbg_call_depth = 0;
 
-// Function trace ring buffer
-#define TRACE_BUF 64
-static const char *_fn_trace[TRACE_BUF];
-static W_TLS int _fn_trace_i = 0;
-static void _trace_fn(const char *fn) { _fn_trace[_fn_trace_i & (TRACE_BUF-1)] = fn; _fn_trace_i++; }
-
 static inline void w_push(wval v) {
     if (w_sp >= STACK_SIZE) { fprintf(stderr, "w_push: stack overflow sp=%d\n", w_sp); exit(1); }
     w_stack[w_sp++] = v;
 }
 static wval w_pop(void) {
-    if (w_sp <= 0) {
-        fprintf(stderr, "w_pop: stack underflow! sp=%d\n", w_sp);
-        fprintf(stderr, "Recent Whisper calls:\n");
-        for (int i = 0; i < TRACE_BUF; i++) {
-            int idx = (_fn_trace_i - TRACE_BUF + i) & (TRACE_BUF-1);
-            if (_fn_trace[idx]) fprintf(stderr, "  %s\n", _fn_trace[idx]);
-        }
-        exit(1);
-    }
+    if (w_sp <= 0) { fprintf(stderr, "w_pop: stack underflow! sp=%d\n", w_sp); exit(1); }
     return w_stack[--w_sp];
 }
 static inline wval w_peek(void) {
@@ -142,7 +128,11 @@ static void w_op_gt(void) { wval b=w_pop(),a=w_pop();
 // by address range alone — no layout heuristics, no misclassification
 // of short strings as lists.
 
-#define HEAP_SIZE (4096LL * 1024 * 1024)  // 4 GB total, 2 GB per arena
+// 16 GB reserve, 8 GB per arena (lazy commit — only touched pages cost RAM).
+// The bootstrap lexer consumes source one char per strslice, so cumulative
+// string allocation is O(source²): the full self-compile crosses 2 GB,
+// which the old 4 GB total / 2 GB per arena could not hold (K-5).
+#define HEAP_SIZE (16384LL * 1024 * 1024)  // 16 GB total, 8 GB per arena
 static W_TLS char *w_heap = NULL;
 static W_TLS size_t w_heap_pos = 0;       // string arena bump (up)
 static W_TLS size_t w_heap_list_pos = 0;  // list arena bump (down)

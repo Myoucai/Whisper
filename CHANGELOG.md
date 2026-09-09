@@ -1,5 +1,39 @@
 # Changelog
 
+## Unreleased (2026-09-09h) — K: J4-4 自举链同步收官（限定量词法全链落地）
+
+- **自举链限定量词法（J4-4）**：`mmod.mw` 在 C 链词法器并入单词，
+  独立 `.`/`..`/`3.14` 不受影响——与 Rust VM 语义一致。
+  `: mmod.mw { 42 } ; mmod.mw .` 全链输出 42；`3.14 .` 双侧 3.14。
+  compiler.all.ws 新增 is-wordch?/dot-joins?/chunk-cont?/chunk-or-delim
+  四词（保守子集纪律：无 #t/#f 字面量、kv 只存字符串）。
+- **两个根因（战报 docs/namespaces-design.md）**：
+  1. seed 编译器对函数内 >2 层 ?? 嵌套产出错字节码（Rust 编译器
+     容忍 → VM 侧全对、原生侧坏）——原 is-wordch? 5 层嵌套重写为
+     &/| 扁平布尔链（零嵌套）；
+  2. 自举词法逐字符 strslice 全剩余串 → 累计分配 O(源²)：50KB
+     compiler.all.ws 自编译越过 2GB 字符串 arena（冻结种子在 60KB
+     合成输入同样爆——非新词引入，链本就贴崖）。runtime.c
+     HEAP_SIZE 4GB→16GB（VirtualAlloc/mmap 懒提交，实际内存不变）；
+     生成 C 以 `#include "runtime.c"` 引用，gen2==gen3 文本比对不受
+     影响，seed 文件保持冻结。
+- **c2 管线命名空间注入（K-1）**：expand_imports 内联模块后追加
+  限定克隆 `: 末段.词名 { ... } ;`——c2 目标编译含 import 源时
+  限定调用可用。
+- **操作码覆盖门禁（K-2）**：tools/opcode_coverage.sh——36 特性
+  用例双跑对拍（VM vs 自举链 -c→gcc→run），归一化已记录打印口径
+  （#t/#f→1/0、去引号）；NSC 环境变量注入预构建自举编译器；
+  已知缺口（json/try/conf）白名单大声记账。现况 36 pass / 0 fail /
+  3 known-gap。
+- **静默兜底→硬失败（K-3）**：seed cgen 未知 token/裸 opcode 发
+  `#error whisper-cgen: ...`——C 编译响亮失败，不再静默垃圾。
+- **数值提升修复（K-4）**：seed cgen 的 `<=`/`>=` 用 w_num_f64
+  （提升，对齐 VM binary_num_op）替代 w_as_i64（F64 硬失败）；
+  浮点算术/比较/打印两实现一致（spec §4 浮点差异行删除）。
+- **回归**：cargo test --workspace 460 全绿；固定点
+  scripts/verify-fixedpoint.sh 通过；runtime.c 死代码 fn-trace
+  调试脚手架移除。
+
 ## Unreleased (2026-09-04g) — J-4 模块命名空间（Rust 侧完整落地）
 
 - 词法：`.` 在前后均为词字符时并入词（`mmod.mw` 单 token）；独立
