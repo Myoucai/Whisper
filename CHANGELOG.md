@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased (2026-09-04d) — 说明文档对齐现状
+
+- README：tests 徽章 392→451、stdlib 徽章 13→14 模块；能力沙箱行补
+  HTTPS/host 白名单；置信度行更新为定稿四原语；
+- docs/stdlib.md：std/http 表补 http-req(@6)/http-audit(@7) 与
+  TLS/chunked/超时语义；
+- docs/tutorial.md：HTTP 节补 https 与会话请求示例；新增 Confidence
+  小节（std/conf 四原语）；
+- docs/packages.md：路线勾掉 Lexicon 拉动包（五件已交付），补 sha256
+  为下一项。
+
 ## Unreleased (2026-09-04c) — Lexicon 拉动包：jwt/html/csv + resolver 顺序 bug
 
 ### resolver 顺序 bug（语言级，I-2 过程中发现）

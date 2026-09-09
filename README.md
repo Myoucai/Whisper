@@ -18,10 +18,10 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.0.7-7cffc4" alt="version">
-  <img src="https://img.shields.io/badge/tests-392%20passed%20%2B%205%20gates-brightgreen" alt="tests">
+  <img src="https://img.shields.io/badge/tests-451%20passed%20%2B%205%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
-  <img src="https://img.shields.io/badge/stdlib-13%20modules-blue" alt="stdlib">
+  <img src="https://img.shields.io/badge/stdlib-14%20modules-blue" alt="stdlib">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
 </p>
 
@@ -37,8 +37,8 @@ Whisper 是一门**栈式、后置表示法**的编程语言，专为 **AI 生�
 |------|------|
 | **Token 极简** | 同样逻辑的 Token 消耗仅为 Python 的 30-60% |
 | **栈式执行** | 后缀表示法，无需括号和优先级规则 |
-| **能力沙箱** | 默认无 IO，所有副作用必须显式授权 |
-| **置信度原生** | 每个值携带置信度，原生支持概率编程 |
+| **能力沙箱** | 默认无 IO，所有副作用必须显式授权；HTTPS（rustls）+ host 白名单 + 审计 |
+| **置信度原生** | 每个值携带置信度：`:c` 标注 / `conf-of` 窥视 / `unwrap` 剥壳 / `p {a} {b} ?|` 概率分支（std/conf 已定稿） |
 | **双模态** | 文本 `.ws` 和二进制 `.wbin` 等价 |
 | **硬自举** | 编译器自身用 Whisper 编写，输出原生代码 |
 
@@ -326,7 +326,7 @@ Whisper/
 ## 测试
 
 ```bash
-cargo test --workspace                           # 392 tests: all passed
+cargo test --workspace                           # 451 tests: all passed
 bash scripts/syntax-gate.sh                      # 26 语法断言
 bash scripts/stdlib-gate.sh                      # 54 双链 stdlib 断言（VM+c2 输出一致）
 bash scripts/net-gate.sh                         # 真实 HTTP 服务 + curl

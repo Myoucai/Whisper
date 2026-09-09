@@ -53,4 +53,6 @@ native: ["vendor/sqlite3.dll"]                 # 随包分发的原生库（ffi-
 - [ ] registry 目录页（静态 JSON over github raw）
 - [ ] `whisper publish`（git tag + 校验和上链）
 - [ ] 安装时对包内词跑 `--strict-types` 报告（可选购前体检）
-- [ ] std/hash（md5/sha256）：Lexicon 指纹比对的拉动到位后启动
+- [x] Lexicon 拉动包已入库：std/encoding（b64/url/percent）、std/jwt、
+      std/html、std/csv、std/hash（md5，RFC 向量全对）
+- [ ] sha256（hash 家族第二个；md5 已验证移植路径）

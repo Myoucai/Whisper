@@ -221,6 +221,13 @@ Requires `--allow-http` flag.
 |----------|-----|-------------|-------------|
 | `http-get` | @2 | `url → body` | HTTP GET request |
 | `http-post` | @3 | `url body → response` | HTTP POST request |
+| `http-req` | @6 | `method url headers-json body → status headers-json body` | 会话请求：cookie 罐、状态码/响应头、审计 |
+| `http-audit` | @7 | `→ 审计行（
+ 连接）` | 导出全量请求审计 |
+
+`http://` 与 `https://` 均支持（rustls + webpki 根）；响应
+`Transfer-Encoding: chunked` 自动解码；连接 10s / 读写 15s 超时，
+挂死端点化为 `status 0` 空响应。
 
 ```whisper
 whisper run --allow-http script.ws

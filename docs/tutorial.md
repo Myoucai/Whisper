@@ -194,7 +194,25 @@ rand .        // next uniform f64 in [0,1) — replayable after seed!
 
 import "std/http"
 
-"https://api.example.com/data" http-get .
+"https://api.example.com/data" http-get .   // https:// 同样支持（rustls）
+```
+
+会话级请求（cookie 罐 + 状态码/响应头 + 审计行）：
+
+```whisper
+"GET" "https://api.example.com/data" "{}" "" http-req
+// → status headers-json body；chunked 响应自动解码
+```
+
+## Confidence（置信度）
+
+```whisper
+import "std/conf"
+
+42 seed!                    # 定种子（概率分支可复现）
+#t:0.75 conf-of . unwrap .  # 0.75 / #t
+0.9 0.5 conf-mul .          # 0.45（证据链合取）
+0.7 { 1 } { 2 } ?| .        # P(上支)=0.7
 ```
 
 ## OS Operations
