@@ -1,6 +1,6 @@
 # Whisper Standard Library v1.0
 
-13 modules（新增 std/conf、std/encoding、std/jwt、std/html、std/csv）。
+14 modules（新增 std/conf、std/encoding、std/hash、std/jwt、std/html、std/csv）。
 
 All modules are loaded via `import "std/<name>"`.
 
@@ -22,6 +22,17 @@ import "std/encoding"
 （另导出实现层词汇 `sextets/enc-ch/enc-step/enc-tail/sat/dec-ch/sget/
 dec-group/hex-ch/hex-val/pct-byte/keep-set/b64-alpha/b64url-alpha/
 b64-enc-with/b64-dec-with`）。
+
+## std/hash — MD5（RFC 1321，纯 Whisper）
+
+```whisper
+import "std/hash"
+"" md5 .        // d41d8cd98f00b204e9800998ecf8427e
+"abc" md5 .     // 900150983cd24fb0d6963f7d28e17f72
+```
+
+RFC 全向量 + 多块消息（200×a）锁进集成测试。实现：字节列表管线
+（UTF-8 安全）、寄存器/常数 kv 字符串化、32 位算术以 0xFFFFFFFF 截断。
 
 ## std/jwt — JWT 解码（不验签）
 

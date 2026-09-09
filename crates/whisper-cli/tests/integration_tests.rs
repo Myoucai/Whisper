@@ -1012,3 +1012,43 @@ fn encoding_stdlib_vectors() {
         "encoding vectors mismatch: {s}"
     );
 }
+
+// ── std/hash: MD5 (RFC 1321) ───────────────────────────────────────
+
+#[test]
+fn md5_stdlib_vectors() {
+    let dir = std::env::temp_dir().join("whisper_md5_it");
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = dir.join("md5.ws");
+    let long_a = "a".repeat(200);
+    std::fs::write(
+        &src,
+        format!(
+            "import \"std/hash\"\n\
+             \"\" md5 .\n\
+             \"abc\" md5 .\n\
+             \"The quick brown fox jumps over the lazy dog\" md5 .\n\
+             \"message digest\" md5 .\n\
+             \"{long_a}\" md5 .\n"
+        ),
+    )
+    .unwrap();
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .arg("run")
+        .arg(&src)
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(
+        s.lines().filter(|l| !l.is_empty()).collect::<Vec<_>>(),
+        vec![
+            "\"d41d8cd98f00b204e9800998ecf8427e\"",
+            "\"900150983cd24fb0d6963f7d28e17f72\"",
+            "\"9e107d9d372bb6826bd81d3542a419d6\"",
+            "\"f96b697d7cb7938d525a2f31aaf161d0\"",
+            "\"887f30b43b2867f4a9accceee7d16e6c\"",
+        ],
+        "md5 vectors mismatch: {s}"
+    );
+}
