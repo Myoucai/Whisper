@@ -1,6 +1,6 @@
 # Whisper Standard Library v1.0
 
-10 modules（新增 std/conf、std/encoding）。
+13 modules（新增 std/conf、std/encoding、std/jwt、std/html、std/csv）。
 
 All modules are loaded via `import "std/<name>"`.
 
@@ -22,6 +22,33 @@ import "std/encoding"
 （另导出实现层词汇 `sextets/enc-ch/enc-step/enc-tail/sat/dec-ch/sget/
 dec-group/hex-ch/hex-val/pct-byte/keep-set/b64-alpha/b64url-alpha/
 b64-enc-with/b64-dec-with`）。
+
+## std/jwt — JWT 解码（不验签）
+
+依赖 std/encoding（b64url 无填充解码）。JWT 靶场（如 VulnOA）的载荷侧
+消费：看 role/iat/exp/username。
+
+```whisper
+import "std/jwt"
+token jwt-header .          // "{"alg":"HS256","typ":"JWT"}"
+token "role" jwt-claim .    // "admin"（数字 claim 转字符串；缺 → ""）
+```
+
+## std/html — 轻量 HTML 文本提取（字节扫描，无 DOM）
+
+```whisper
+import "std/html"
+"<p>Hello <b>W&amp;orld</b></p>" html-text .   // "Hello W&orld"
+"<a href=\"/x\">t</a>" "a" "href" html-attr . // "/x"（仅双引号属性）
+```
+
+## std/csv — CSV 最小集（无引号转义）
+
+```whisper
+import "std/csv"
+"a,b
+1,2" csv-parse 0 @nth 1 @nth .          // "b"
+```
 
 ## std/conf — 置信度（定稿表面）
 

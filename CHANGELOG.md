@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased (2026-09-04c) — Lexicon 拉动包：jwt/html/csv + resolver 顺序 bug
+
+### resolver 顺序 bug（语言级，I-2 过程中发现）
+- 模块的 export 过滤此前把**传递依赖的词也滤掉**（jwt 递归装入
+  encoding 后又被 jwt 自己的 export 名单丢弃），且 visited 已标记导致
+  消费方再 import 时被跳过——import 顺序决定成败。重构为"传递词原样
+  + 自有词按自身 export 过滤"两轨，顺序无关（双向测试锁死）。
+
+### std/encoding 修复
+- b64-dec 无填充余组（len%4 ∈ {2,3}）此前丢字节——b64url 无填充
+  常态下载荷截断；补余组处理 + 无填充向量入测试。
+
+### 新包（Lexicon 拉动）
+- std/jwt：jwt-header/jwt-payload/jwt-claim（数字 claim 转字符串，
+  缺键 → ""），VulnOA 真靶令牌验证；Lexicon tests/t_jwt.ws 冒烟闭环；
+- std/html：html-text（剥标签 + 六个命名实体解码）/ html-attr
+  （仅双引号属性，miss → ""）；
+- std/csv：csv-parse（无引号最小集，如实文档化限制）。
+
+### std/hash（md5）：未入库
+- 纯 Whisper 全管线跑通且与参考实现 64 轮状态逐位一致，但参考转写
+  与 hashlib 不一致（离线无真值源可定位）；whisper 侧移植本身已
+  验证，算法参考修复后即可入库——文件保留在工作区未提交。
+
 ## Unreleased (2026-09-04b) — 包生态地基 + std/encoding
 
 ### 包管理端到端验收（此前从未跑通）

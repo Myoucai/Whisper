@@ -148,6 +148,29 @@ export sat
   "E-B" "" kv-set
   "E-S" kv-get strlen 4 / range-to
   { dec-group } @each
+  // 无填充余组（b64url 常见）：len%4 ∈ {2,3} → 1~2 字节
+  "E-S" kv-get strlen 4 mod
+  dup 2 =
+  ??
+    drop
+    "E-S" kv-get dup strlen 2 - strnth ctos dec-ch 18 <<
+    "E-S" kv-get dup strlen 1 - strnth ctos dec-ch 12 << +
+    dup 16 >> 255 bitand ctos "E-B" kv-get swap strcat "E-B" ` kv-set
+    drop
+  |
+    dup 3 =
+    ??
+      drop
+      "E-S" kv-get dup strlen 3 - strnth ctos dec-ch 18 <<
+      "E-S" kv-get dup strlen 2 - strnth ctos dec-ch 12 << +
+      "E-S" kv-get dup strlen 1 - strnth ctos dec-ch 6 << +
+      dup 16 >> 255 bitand ctos "E-B" kv-get swap strcat "E-B" ` kv-set
+      dup 8 >> 255 bitand ctos "E-B" kv-get swap strcat "E-B" ` kv-set
+      drop
+    |
+      drop
+    ]
+  ]
   // pad 数 = 尾部 '=' 个数（至多 2；空串安全：strslice 钳位后失配）
   "E-S" kv-get dup strlen 1 - 1 strslice "=" streq
   "E-S" kv-get dup strlen 2 - 1 strslice "=" streq &

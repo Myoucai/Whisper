@@ -149,28 +149,17 @@ fn resolve_imports_inner(
             let module_ast = Parser::parse_source(&source)
                 .map_err(|e| format!("Parse error in module '{path}': {}", e.message))?;
 
-            // Recursively resolve imports within the module (shared visited set)
+            // Recursively resolve imports within the module (shared visited set).
+            // The sub-result's own-defs filter (bottom of this function) has
+            // already export-filtered the module's OWN defs, while its
+            // transitive imports' defs pass through unfiltered (they were
+            // filtered by their own modules) — this is what makes import
+            // order irrelevant.
             let module_dir = resolved.parent().unwrap_or(source_dir);
             let sub = resolve_imports_inner(module_ast, module_dir, visited, exported_names)?;
 
-            // Export enforcement: collect exported names from the module
-            let exported_set = collect_exports(&sub.ast);
-            let filtered_defs: Vec<AstNode> = sub
-                .ast
-                .into_iter()
-                .filter(|n| match n {
-                    AstNode::Def { name, .. } => {
-                        // If the module has exports, only include exported defs
-                        // If no exports, include all defs (backward compatibility)
-                        exported_set.is_empty() || exported_set.contains(name)
-                    }
-                    AstNode::Export(_) => false, // Strip export nodes from imports
-                    _ => true,
-                })
-                .collect();
-
-            // Conflict detection
-            for def_node in &filtered_defs {
+            // Conflict detection over everything this module contributes
+            for def_node in &sub.ast {
                 if let AstNode::Def { name, .. } = def_node {
                     if let Some(prev_module) = exported_names.get(name) {
                         eprintln!(
@@ -181,17 +170,32 @@ fn resolve_imports_inner(
                 }
             }
 
-            imported_defs.extend(filtered_defs);
+            imported_defs.extend(sub.ast);
             loaded.extend(sub.loaded);
             loaded.push(resolved);
         }
     }
 
-    // Build result: imported defs first, then original nodes (minus imports)
+    // Own defs of THIS compilation unit: if the unit declares exports, only
+    // exported defs are visible to importers; transitive imports above are
+    // never subject to this filter.
+    let own_exports = collect_exports(&ast);
     let mut result: Vec<AstNode> = imported_defs;
     for node in ast {
-        if !matches!(node, AstNode::Import(_)) {
-            result.push(node);
+        match node {
+            AstNode::Import(_) | AstNode::Export(_) => {}
+            AstNode::Def { .. } => {
+                let exported = match &node {
+                    AstNode::Def { name, .. } => {
+                        own_exports.is_empty() || own_exports.contains(name)
+                    }
+                    _ => unreachable!(),
+                };
+                if exported {
+                    result.push(node);
+                }
+            }
+            _ => result.push(node),
         }
     }
 

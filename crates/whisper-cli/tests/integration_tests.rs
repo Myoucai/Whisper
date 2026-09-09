@@ -982,8 +982,9 @@ fn encoding_stdlib_vectors() {
          \"any carnal pleasure.\" b64-enc .\n\
          \"a b&c\" pct-enc .\n\
          \"a%20b%26c\" pct-dec .\n\
-         255 ctos 255 ctos strcat dup b64-enc . b64url-enc .
-",
+         255 ctos 255 ctos strcat dup b64-enc . b64url-enc .\n\
+         \"aGk\" b64-dec .\n\
+         \"aGVsbG8\" b64-dec .\n",
     )
     .unwrap();
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
@@ -1005,6 +1006,8 @@ fn encoding_stdlib_vectors() {
             "\"a b&c\"",
             "\"//8=\"",
             "\"__8=\"",
+            "\"hi\"",
+            "\"hello\"",
         ],
         "encoding vectors mismatch: {s}"
     );
