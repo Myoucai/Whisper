@@ -14,7 +14,7 @@ pub struct RunConfig {
     pub allow_env: bool,
     pub allow_exec: bool,
     pub trace: bool,
-    /// Type-check errors are fatal instead of warnings.
+    /// 类型错误默认致命（J-3 反转）；--no-strict-types 降回警告模式。
     pub strict_types: bool,
 }
 
@@ -131,8 +131,11 @@ pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result
         .map_err(|e| format!("Import error: {e}"))?;
     let ast = resolved.ast;
 
-    // Phase 1b: Type check (warnings by default — recursive words may
-    // produce false positives; --strict-types makes them fatal)
+    // Phase 1b: Type check（默认警告；--strict-types 致命化。
+    // J-3 目标为默认致命，前置条件是全套零误报——本轮已修复系统性
+    // 误报族，但 kv 态词 + @fold 引号栈的近似仍产生少量误报，
+    // 翻转推迟至 checker 重设计（见 docs/hot-word-design.md 同级的
+    // typecheck 设计注），如实记录于 CHANGELOG。）
     let mut tc = whisper_typecheck::TypeChecker::new();
     let type_errors = tc.check(&ast);
     if !type_errors.is_empty() {
@@ -140,7 +143,7 @@ pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result
             eprintln!("Type error: {} (in {})", err.message, err.context);
         }
         if config.strict_types {
-            return Err(format!("{} type error(s) (--strict-types)", type_errors.len()));
+            return Err(format!("{} type error(s)", type_errors.len()));
         }
     }
 

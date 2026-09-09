@@ -163,6 +163,15 @@ pub fn get_builtin_signature(name: &str) -> Option<(Vec<Type>, Vec<Type>)> {
             vec![Type::List(Box::new(tv()))],
         )),
 
+        // HTTP（@2/@3/@6/@7；会话族栈合同）
+        "http-get" => Some((vec![Type::Str], vec![Type::Str])),
+        "http-post" => Some((vec![Type::Str, Type::Str], vec![Type::Str])),
+        "http-req" => Some((
+            vec![Type::Str, Type::Str, Type::Str, Type::Str],
+            vec![Type::I64, Type::Str, Type::Str],
+        )),
+        "http-audit" => Some((vec![], vec![Type::Str])),
+
         // Map operations
         "map-new" => Some((vec![], vec![Type::TypeVar(99)])),
         "map-get" => Some((vec![Type::TypeVar(99), Type::Str], vec![Type::TypeVar(0)])),

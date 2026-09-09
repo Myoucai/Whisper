@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased (2026-09-04f) — J-3 typecheck strict 默认：未达成，如实归档
+
+- 保留（纯增量）：http-get/post/req/audit 内建签名入 builtins 表
+  （此前未知词按 0 消费 1 产出 Any 建模，http-req 4→3 栈形全断）；
+  docs/examples/api_client.ws 真 bug（`.` 在 `..` 清栈后调用）。
+- 试过并回退（战报详见 docs/typecheck-strict-design.md）：
+  expect_ref 放松、?? 臂逐槽合并、两遍法签名输入推断——三者能把
+  Lexicon 误报压到 0，但 std/encoding 向量链在同一近似下反向失败；
+  两个语料库对 checker 的压力方向相反，修补不可同时满足。
+- 结论：strict 默认的前置（全套零误报）需要 checker 重设计
+  （多态变体推断 + 引号栈合同 + kv 态词 effect 行），已立项存档。
+- `--strict-types` opt-in 维持现状（6cffb62 起可用）。
+
 ## Unreleased (2026-09-04e) — 成熟化第一批：错误恢复栈卫生 + 堆按需提交
 
 ### try 错误恢复的两处栈卫生 bug（J-1）
