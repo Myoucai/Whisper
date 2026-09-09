@@ -203,6 +203,10 @@ impl Lexer {
                 self.read_at_word()
             }
             '.' => {
+                // 限定量词法（J-4）：点前后均为词字符 → 归并进词
+                // （str.find）。到达此分支说明 '.' 是 token 起点——
+                // 前词已在 read_word 内自洽处理点号，这里只可能是
+                // 输出(.) / OutputAll(..) / 限定词首字符非法情形。
                 self.advance();
                 if self.peek() == Some('.') {
                     self.advance();
@@ -391,6 +395,20 @@ impl Lexer {
             {
                 name.push(ch);
                 self.advance();
+            } else if ch == '.'
+                && matches!(
+                    self.source.get(self.pos + 1),
+                    Some(c)
+                        if c.is_alphanumeric()
+                            || *c == '_'
+                            || *c == '-'
+                            || *c == '?'
+                )
+                && !name.is_empty()
+            {
+                // 限定量（J-4）：mod.word —— 点在词中间、后随词字符
+                name.push(ch);
+                self.advance();
             } else {
                 break;
             }
@@ -553,5 +571,54 @@ impl Lexer {
             }
         }
         name
+    }
+}
+
+#[cfg(test)]
+mod qualified_word_tests {
+    use super::*;
+
+    fn kinds(src: &str) -> Vec<String> {
+        let mut lx = Lexer::new(src);
+        let ts = lx.tokenize();
+        let mut out: Vec<String> = Vec::new();
+        for t in &ts {
+            out.push(format!("{:?}", t.kind));
+        }
+        out
+    }
+
+    #[test]
+    fn qualified_word_single_token() {
+        assert_eq!(kinds("mmod.mw"), vec!["Word(\"mmod.mw\")".to_string(), "Eof".to_string()]);
+    }
+
+    #[test]
+    fn standalone_dot_still_output() {
+        assert_eq!(kinds("a ."), vec!["Word(\"a\")".to_string(), "Dot".to_string(), "Eof".to_string()]);
+    }
+
+    #[test]
+    fn float_literal_untouched() {
+        assert_eq!(
+            kinds("3.14"),
+            vec!["Float(3.14)".to_string(), "Eof".to_string()]
+        );
+    }
+
+    #[test]
+    fn dotdot_untouched() {
+        assert_eq!(
+            kinds(".."),
+            vec!["DotDot".to_string(), "Eof".to_string()]
+        );
+    }
+
+    #[test]
+    fn trailing_dot_not_word() {
+        assert_eq!(
+            kinds("a."),
+            vec!["Word(\"a\")".to_string(), "Dot".to_string(), "Eof".to_string()]
+        );
     }
 }

@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased (2026-09-04g) — J-4 模块命名空间（Rust 侧完整落地）
+
+- 词法：`.` 在前后均为词字符时并入词（`mmod.mw` 单 token）；独立
+  `.`/`..`/`3.14` 语义不变；5 项 lexer 单测。
+- resolver 命名空间注入：import 时以路径末段注册，模块每个 Def
+  克隆为 `末段.词名` 附加 Def——限定形态即普通词，永不被非限定
+  冲突遮蔽；冲突语义（警告+后导出遮蔽）对非限定形态保持不变。
+- 实测：std/str 与自定义模块同导出 find——str.find=1、
+  mymod.find="MINE"、非限定 find=遮蔽者；双向限定同时正确。
+- 向后兼容：workspace 20 套全绿；Lexicon 警告基线不变；examples 0。
+- 自举链同步（J4-4）未达成：VM 侧语义全对，C 编译版崩——三个
+  结构性缺口实锤（seed over 的 C-gen 静默垃圾、kv 只存字符串、
+  export 过滤），修复后仍有未定位发射分歧；compiler.all.ws 回退
+  保固定点。战报 docs/namespaces-design.md。spec §2 词法表补
+  限定量行（标注自举链未同步）。
+
 ## Unreleased (2026-09-04f) — J-3 typecheck strict 默认：未达成，如实归档
 
 - 保留（纯增量）：http-get/post/req/audit 内建签名入 builtins 表

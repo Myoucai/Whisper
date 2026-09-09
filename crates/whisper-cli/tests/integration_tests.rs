@@ -1052,3 +1052,42 @@ fn md5_stdlib_vectors() {
         "md5 vectors mismatch: {s}"
     );
 }
+
+// ── J-4: 模块命名空间（限定量词） ─────────────────────────────────
+
+#[test]
+fn namespace_qualified_words() {
+    let dir = std::env::temp_dir().join("whisper_ns_it");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("mymod.ws"),
+        ": find { \"MINE\" } ;\nexport find\n",
+    )
+    .unwrap();
+    let src = dir.join("ns.ws");
+    std::fs::write(
+        &src,
+        "import \"std/str\"\n\
+         import \"mymod\"\n\
+         \"abc\" \"b\" str.find i64tostr .\n\
+         mymod.find .\n\
+         find .\n",
+    )
+    .unwrap();
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .arg("run")
+        .arg(&src)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(
+        s.lines().filter(|l| !l.is_empty()).collect::<Vec<_>>(),
+        vec!["\"1\"", "\"MINE\"", "\"MINE\""],
+        "namespace output mismatch: {s}"
+    );
+}

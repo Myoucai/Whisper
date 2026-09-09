@@ -171,6 +171,27 @@ fn resolve_imports_inner(
             }
 
             imported_defs.extend(sub.ast);
+
+            // J-4 命名空间：以路径末段注册命名空间，模块每个 Def 克隆为
+            // "末段.词名" 的附加 Def —— 限定形态 mod.word 就是普通词，
+            // 永不被非限定冲突遮蔽；运行时/编译器零改动。
+            let ns = path.rsplit('/').next().unwrap_or(path.as_str());
+            let ns = ns.trim_end_matches(".ws");
+            let mut qualified: Vec<AstNode> = Vec::new();
+            for def_node in &imported_defs {
+                if let AstNode::Def { name, body } = def_node {
+                    let qname = format!("{ns}.{name}");
+                    if !exported_names.contains_key(&qname) {
+                        qualified.push(AstNode::Def {
+                            name: qname,
+                            body: body.clone(),
+                        });
+                    }
+                }
+            }
+            let q_count = qualified.len();
+            imported_defs.extend(qualified);
+
             loaded.extend(sub.loaded);
             loaded.push(resolved);
         }
@@ -317,8 +338,16 @@ mod tests {
             AstNode::Literal(whisper_core::value::Value::I64(5)),
         ];
         let result = resolve_imports(ast, &dir).unwrap();
-        // Should have helper def + the literal, no Import or Export nodes
-        assert_eq!(result.ast.len(), 2, "got: {result:?}");
+        // Should have helper def + 命名空间限定克隆 lib.helper + the
+        // literal, no Import or Export nodes（J-4）
+        assert_eq!(result.ast.len(), 3, "got: {result:?}");
+        assert!(
+            result
+                .ast
+                .iter()
+                .any(|n| matches!(n, AstNode::Def { name, .. } if name == "lib.helper")),
+            "qualified clone missing: {result:?}"
+        );
         assert!(!result.ast.iter().any(|n| matches!(n, AstNode::Import(_))));
         let _ = std::fs::remove_dir_all(&dir);
     }
