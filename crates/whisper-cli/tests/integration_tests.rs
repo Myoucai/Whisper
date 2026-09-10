@@ -923,10 +923,8 @@ fn native_target_specializes_and_caches() {
     // Polymorphic float arithmetic must match the VM bit-for-bit.
     let run = std::process::Command::new(&exe).output().unwrap();
     assert!(run.status.success());
-    assert_eq!(
-        String::from_utf8_lossy(&run.stdout),
-        "4\r\n9\r\n".replace('\r', "")
-    );
+    // Windows pipes CRLF; compare newline-agnostically.
+    assert_eq!(String::from_utf8_lossy(&run.stdout).replace('\r', ""), "4\n9\n");
 }
 
 // ── std/conf: finalized confidence surface ─────────────────────────

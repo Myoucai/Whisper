@@ -14,9 +14,9 @@ FAIL=0
 GAP=0
 GAPS=""
 FAILED=""
-# 已记录的 c2 目标债务（docs/namespaces-design.md 战报）：seed 表缺这些词或运行时缺助手。
-# 在白名单中 = 门禁不红，但每行都会大声打印 GAP 提醒，债务不隐形。
-KNOWN_GAPS="json try conf"
+# c2 目标债务清偿记录（L 阶段）：try/json/conf 已全链落地，白名单为空。
+# 新缺口出现时在此登记（大声记账，不遮不藏）。
+KNOWN_GAPS=""
 WS2=""
 case $(uname) in MINGW*|MSYS*|CYGWIN*) WS2="-lws2_32" ;; esac
 
@@ -93,8 +93,11 @@ t list-find  '[[1] [2]] [1] listfind drop "LF" .'
 t map2       'map-new dup "k" ` 1 swap map-set "k" swap map-get . drop'
 # ── kv ──
 t kv         '"K1" "V1" kv-set "K1" kv-get . "NOPE" kv-get strlen .'
-# ── json ──
+# ── json（L-2：C 链全支持，对象键排序对齐 BTreeMap）──
 t json       '"[1,2]" json-parse 1 @nth . [1 2] json-stringify .'
+t json-obj   '"{\"b\":1,\"a\":2}" json-parse "a" map-get .'
+t json-rt    '"[1,2,3]" json-parse json-stringify .'
+t json-nest  '"[1,{\"k\":[2,3]}]" json-parse 1 @nth "k" map-get 1 @nth .'
 # ── 浮点 ──
 t float      '1.5 2.5 + f64toi64 . 3 i64tof64 0.5 + f64toi64 . 2.0 fsqrt f64toi64 .'
 t float-cmp  '1.5 2.5 < . 2.5 2.5 <= .'
@@ -102,7 +105,10 @@ t float-cmp  '1.5 2.5 < . 2.5 2.5 <= .'
 t cond       '1 ?? "T" . | "F" . ] drop drop'
 t cond-nest  '0 ?? "A" . | 1 ?? "B" . | "C" . ] ] drop drop drop'
 t while      '0 { dup 3 < } { 1 + } # . drop drop drop'
+# ── try（L-1：setjmp/longjmp 真错误恢复）──
 t try        '{ 1 0 / } try drop "caught" .'
+t try-ok     '{ 42 } try . .'
+t try-type   '{ "s" 1 + } try drop drop'
 # ── 词定义与递归 ──
 t def        ': sq { dup * } ; 5 sq .'
 t def-rec    ': fib { dup 2 < ?? drop | dup 1 - fib swap 2 - fib + ] } ; 8 fib .'
@@ -110,8 +116,10 @@ t def-rec    ': fib { dup 2 < ?? drop | dup 1 - fib swap 2 - fib + ] } ; 8 fib .
 t ns-def     ': mmod.mw { 42 } ; mmod.mw .'
 t ns-float   '3.14 .'
 t ns-print   '5 .'
-# ── 置信度 ──
-t conf       '#t:0.75 conf-of . #t:0.75 unwrap .'
+# ── 置信度（L-3：#t:0.75 字面量 + conf-of peek + unwrap）──
+t conf       '#t:0.75 conf-of . drop #t:0.5 unwrap .'
+t conf-peek  '#t:0.25 conf-of . drop'
+t conf-flat  '#f:0.5 unwrap .'
 
 echo "coverage: $PASS pass, $FAIL fail, $GAP known-gap"
 echo "$GAPS" | tr '|' '\n' | grep -v '^$' | sed 's/^/  GAP /'

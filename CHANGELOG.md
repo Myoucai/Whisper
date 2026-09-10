@@ -1,5 +1,53 @@
 # Changelog
 
+## Unreleased (2026-09-10i) — L: c2 债务清偿——try/json/conf 全链落地 + 三笔 K 前旧债
+
+覆盖门禁白名单清空：**46 pass / 0 fail / 0 known-gap**；CI 四门
+syntax 26/0、stdlib 58/0、net、app 全绿。
+
+- **try（L-1）**：runtime.c 引入 w_fail + setjmp/longjmp——值级错误
+  （类型错、除零、栈下溢、JSON 错、listen 失败）回卷到最近 `{..} try`
+  并压 [#f, 消息]；成功形状 [#t, 值] 与 VM Try 逐槽对齐（含空体默认
+  0 与栈回卷深度）；cgen 发射 `w_try_call(_qb);`（嵌套 try、
+  try-内-json 错误捕获实测通过）。资源级错误保持致命。
+- **json（L-2）**：W_json_parse_cstr / W_json_stringify 全实现——
+  递归下降（对象/数组/字符串/数/true/false/null，\uXXXX BMP）；
+  紧凑序列化、对象键 bytewise 排序（serde_json BTreeMap 对齐）、
+  f64 文本轮转对齐（4.0 保留 .0、1e30 无 +）；map 升级为标记前缀
+  对表（magic pair 首元素）——map 与形似列表在 C 链可区分，L-08
+  启发式腐坏不会复发；`.` 打印 {"k": v} 对齐 VM Debug。
+- **置信度（L-3）**：`#t:0.75` 三处落地——tokenizer ':' 并入
+  （累积为 "#t"/"#f" 时越过 is-ws 停止判定）、classify [14]/[12]、
+  cgen 发射 w_sig 包装；WT_SIG 第四标签 + w_as_*/w_num_f64/
+  wval_is_str/is_list/dump 透明解包；conf-of peek 不弹、unwrap 剥壳。
+- **裸 HOP + PushRef（旧债 1，K 前即缺）**：`: map { @map } ;` 式
+  包装词要求裸 @map/@each/@fold/@times/@filter/try(67/68/69/83/5/193)
+  发射（引号运行时到栈）——补六个 emit-bare case 接 runtime 现成
+  w_map_over 等；**引号作参数**（`{ 1 + } map`）的 PushRef(53) 发射
+  从未存在——fuse-hof 的"无消费者引号"分支提升为顶层合成词 __qN
+  （[16,名] 压引用 token + [9,名,体] 合成 def，split-defs 全流提取），
+  新指令 [57] 发射 `w_push(W_PTR(W___qN))`。
+- **K-1 克隆注释 bug（旧债 2）**：行尾 "// 注释" 让单行 def 判定
+  失守，下一行 def 被原样吞进克隆体（stdlib/list 的 range-to 注释
+  导致 `: filter` 双定义、gcc redefinition）——判定与体拷贝改按剥
+  注释后代码。
+- **杂项旧债 3**：atan2 弹栈序反了 + 改数值提升（VM 严格 f64、C 链
+  提升并按门禁契约 0 1 atan2 → 0）；ffi-sym 该回 I64 地址（VM 语义，
+  ffi-call 按 i64 收；一修双愈 sym-zero/crc32）；kv-keys 漏 W_PTR
+  包装（server.ws 编不过）。
+- **堆提交 bug（顺带修复）**：list arena 提交从基地址覆盖全跨度
+  （旧 4GB 实为全量急提交，16GB 下 CI 必挂）——改字符串底部/列表
+  顶部各自 64KB 切片懒提交。
+- **方言纪律战报**：本轮五个自举栈序 bug 全部被"VM 先跑、原生对拍"
+  抓住——kv 存值序（值在键下）、$N pick 压栈后索引漂移（$2 $2）、
+  prepend 参数序（elem 在底 list 在顶）、over 在单元素栈越界（用
+  `_`）、?? 包装漏闭合 ]（括号恰好重排进内层臂，语义静默错乱）。
+- **教训（如实记录）**：K-6 验收清单漏跑了 stdlib/app 门禁——
+  PushRef/裸 HOF/克隆注释三笔 K 前旧债因此带病入库（fa947de 的
+  CI selfhost 应为红）。L 阶段补齐：本地 gates 复验入验收清单。
+- **回归**：覆盖门禁 46/0/0；四 CI 门全绿；cargo test --workspace
+  全绿；固定点 gen2==gen3 保持（L 变更后复验）。
+
 ## Unreleased (2026-09-09h) — K: J4-4 自举链同步收官（限定量词法全链落地）
 
 - **自举链限定量词法（J4-4）**：`mmod.mw` 在 C 链词法器并入单词，

@@ -80,6 +80,14 @@ fn expand_into(
 /// `: ns.name { ... } ;` so qualified references resolve on the c2 path
 /// (which bypasses the resolver that does this for `whisper run`).
 fn append_qualified_clones(module_src: &str, ns: &str, out: &mut String) {
+    // 行尾 "//" 注释会让单行 def 看似未闭合（`;` 不在行尾），进而把后续
+    // def 行误吞为体——判定与体拷贝都以剥掉注释后的代码为准。
+    fn code_only(s: &str) -> &str {
+        match s.find("//") {
+            Some(i) => s[..i].trim_end(),
+            None => s.trim_end(),
+        }
+    }
     let mut lines = module_src.lines().peekable();
     while let Some(line) = lines.next() {
         let t = line.trim();
@@ -96,10 +104,10 @@ fn append_qualified_clones(module_src: &str, ns: &str, out: &mut String) {
                     out.push_str(name);
                     out.push_str(after);
                     out.push('\n');
-                    // 单行 def（after 已含 ";"）不再拷贝体行；多行体拷到闭合 ";"
-                    if !after.trim_end().ends_with(";") {
+                    // 单行 def（剥注释后以 ";" 收尾）不再拷贝体行；多行体拷到闭合 ";"
+                    if !code_only(after).ends_with(";") {
                         for body in lines.by_ref() {
-                            let done = body.trim().ends_with(";");
+                            let done = code_only(body).ends_with(";");
                             out.push_str(body);
                             out.push('\n');
                             if done {

@@ -12,6 +12,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <math.h>
+#include <setjmp.h>
 
 #ifdef _WIN32
 // winsock2.h must precede windows.h
@@ -28,30 +29,18 @@
 typedef int64_t  wi64;
 typedef double   wf64;
 typedef struct { uint64_t v; uint8_t t; } wval;
-enum { WT_I64 = 0, WT_F64 = 1, WT_PTR = 2 };
+enum { WT_I64 = 0, WT_F64 = 1, WT_PTR = 2, WT_SIG = 3 };
+// Signal (L-03): confidence-tagged wrapper, VM Value::Signal(inner, c).
+// Transparent for type checks/arithmetic (VM unwraps); conf-of/unwrap
+// are the only observers. malloc'd, never freed — conf literals are rare.
+typedef struct { wval inner; double conf; } wsig;
+static inline wval w_sig(wval inner, double conf) {
+    wsig *s = (wsig *)malloc(sizeof(wsig)); s->inner = inner; s->conf = conf;
+    wval r; r.v = (uint64_t)s; r.t = WT_SIG; return r;
+}
+static inline wval w_sig_inner(wval v) { return ((wsig *)v.v)->inner; }
+static inline double w_conf(wval v) { return v.t == WT_SIG ? ((wsig *)v.v)->conf : 1.0; }
 
-static inline wval W_I64(int64_t x)  { wval r; r.v = (uint64_t)x; r.t = WT_I64; return r; }
-static inline wval W_F64(double d)   { wval r; memcpy(&r.v, &d, 8); r.t = WT_F64; return r; }
-static inline wval W_PTR(void *p)    { wval r; r.v = (uint64_t)p;  r.t = WT_PTR; return r; }
-
-static inline int w_is_f64(wval v) { return v.t == WT_F64; }
-static inline int64_t w_as_i64(wval v) {
-    if (v.t != WT_I64) { fprintf(stderr, "type error: expected i64, got %s (t=%d)\n", v.t == WT_F64 ? "f64" : "ptr", v.t); exit(1); }
-    return (int64_t)v.v;
-}
-static inline double w_as_f64(wval v) {
-    if (v.t != WT_F64) { fprintf(stderr, "type error: expected f64, got t=%d\n", v.t); exit(1); }
-    double d; memcpy(&d, &v.v, 8); return d;
-}
-static inline void *w_as_ptr(wval v) {
-    if (v.t != WT_PTR) { fprintf(stderr, "type error: expected ptr, got t=%d\n", v.t); exit(1); }
-    return (void *)v.v;
-}
-static inline double w_num_f64(wval v) {  // numeric promotion (VM binary_num_op: i64 coerces to f64)
-    if (v.t == WT_F64) return w_as_f64(v);
-    if (v.t == WT_I64) return (double)(int64_t)v.v;
-    fprintf(stderr, "type error: expected i64 or f64, got ptr\n"); exit(1); return 0;
-}
 // Raw identity compare (bits + tag) — used for pointer/identity equality
 // where C does not define == on structs.
 static inline int w_eq_raw(wval a, wval b) { return a.v == b.v && a.t == b.t; }
@@ -65,19 +54,67 @@ static inline int w_eq_raw(wval a, wval b) { return a.v == b.v && a.t == b.t; }
 #define W_TLS __thread
 static W_TLS wval *w_stack = NULL;   // allocated per thread
 static W_TLS int  w_sp = 0;
+
+// ── try (L-01): catchable failure = w_fail; nearest {..} try catches ──
+// Value-level failures (type error, division by zero, stack underflow,
+// JSON errors) unwind to the innermost try and push [0, message];
+// resource failures (heap exhausted, malloc) stay fatal.
+#define W_TRY_MAX 512
+static W_TLS jmp_buf w_try_jb[W_TRY_MAX];
+static W_TLS int w_try_base[W_TRY_MAX];
+static W_TLS int w_try_sp = 0;
+static W_TLS char w_try_msg[512];
+static void w_fail(const char *msg) {
+    if (w_try_sp > 0) {
+        w_try_sp--;
+        w_sp = w_try_base[w_try_sp];
+        snprintf(w_try_msg, sizeof w_try_msg, "%s", msg);
+        longjmp(w_try_jb[w_try_sp], 1);
+    }
+    fprintf(stderr, "whisper: %s\n", msg);
+    exit(1);
+}
+
+static inline wval W_I64(int64_t x)  { wval r; r.v = (uint64_t)x; r.t = WT_I64; return r; }
+static inline wval W_F64(double d)   { wval r; memcpy(&r.v, &d, 8); r.t = WT_F64; return r; }
+static inline wval W_PTR(void *p)    { wval r; r.v = (uint64_t)p;  r.t = WT_PTR; return r; }
+
+static inline int w_is_f64(wval v) { return v.t == WT_F64; }
+static inline int64_t w_as_i64(wval v) {
+    if (v.t == WT_SIG) v = w_sig_inner(v);
+    if (v.t != WT_I64) { w_fail("type error: expected i64"); return 0; }
+    return (int64_t)v.v;
+}
+static inline double w_as_f64(wval v) {
+    if (v.t == WT_SIG) v = w_sig_inner(v);
+    if (v.t != WT_F64) { w_fail("type error: expected f64"); return 0; }
+    double d; memcpy(&d, &v.v, 8); return d;
+}
+static inline void *w_as_ptr(wval v) {
+    if (v.t == WT_SIG) v = w_sig_inner(v);
+    if (v.t != WT_PTR) { w_fail("type error: expected ptr"); return NULL; }
+    return (void *)v.v;
+}
+static inline double w_num_f64(wval v) {  // numeric promotion (VM binary_num_op: i64 coerces to f64)
+    if (v.t == WT_SIG) v = w_sig_inner(v);
+    if (v.t == WT_F64) return w_as_f64(v);
+    if (v.t == WT_I64) return (double)(int64_t)v.v;
+    w_fail("type error: expected i64 or f64"); return 0;
+}
+
 static volatile int _dbg_max_sp = 0;
 static volatile int _dbg_call_depth = 0;
 
 static inline void w_push(wval v) {
-    if (w_sp >= STACK_SIZE) { fprintf(stderr, "w_push: stack overflow sp=%d\n", w_sp); exit(1); }
+    if (w_sp >= STACK_SIZE) w_fail("stack overflow");
     w_stack[w_sp++] = v;
 }
 static wval w_pop(void) {
-    if (w_sp <= 0) { fprintf(stderr, "w_pop: stack underflow! sp=%d\n", w_sp); exit(1); }
+    if (w_sp <= 0) w_fail("stack underflow");
     return w_stack[--w_sp];
 }
 static inline wval w_peek(void) {
-    if (w_sp <= 0) { fprintf(stderr, "w_peek: stack empty!\n"); exit(1); }
+    if (w_sp <= 0) w_fail("stack underflow");
     return w_stack[w_sp - 1];
 }
 static inline void w_dup(void)          { w_push(w_peek()); }
@@ -104,11 +141,11 @@ static void w_op_mul(void) { wval b=w_pop(),a=w_pop();
     if (a.t==WT_F64 || b.t==WT_F64) { w_push(W_F64(w_num_f64(a)*w_num_f64(b))); return; }
     w_push(W_I64(w_as_i64(a)*w_as_i64(b))); }
 static void w_op_div(void) { wval b=w_pop(),a=w_pop();
-    if (a.t==WT_F64 || b.t==WT_F64) { double bb=w_num_f64(b); if (bb==0.0){fprintf(stderr,"division by zero\n");exit(1);} w_push(W_F64(w_num_f64(a)/bb)); return; }
-    int64_t bi=w_as_i64(b); if (bi==0){fprintf(stderr,"division by zero\n");exit(1);} w_push(W_I64(w_as_i64(a)/bi)); }
+    if (a.t==WT_F64 || b.t==WT_F64) { double bb=w_num_f64(b); if (bb==0.0){w_fail("Division by zero");} w_push(W_F64(w_num_f64(a)/bb)); return; }
+    int64_t bi=w_as_i64(b); if (bi==0){w_fail("Division by zero");} w_push(W_I64(w_as_i64(a)/bi)); }
 static void w_op_mod(void) { wval b=w_pop(),a=w_pop();
-    if (a.t==WT_F64 || b.t==WT_F64) { double bb=w_num_f64(b); if (bb==0.0){fprintf(stderr,"division by zero\n");exit(1);} w_push(W_F64(fmod(w_num_f64(a),bb))); return; }
-    int64_t bi=w_as_i64(b); if (bi==0){fprintf(stderr,"division by zero\n");exit(1);} w_push(W_I64(w_as_i64(a)%bi)); }
+    if (a.t==WT_F64 || b.t==WT_F64) { double bb=w_num_f64(b); if (bb==0.0){w_fail("Division by zero");} w_push(W_F64(fmod(w_num_f64(a),bb))); return; }
+    int64_t bi=w_as_i64(b); if (bi==0){w_fail("Division by zero");} w_push(W_I64(w_as_i64(a)%bi)); }
 // < : both operands strings (PTR in the string arena) → bytewise string
 // compare; any f64 → numeric compare; else i64 compare.
 static void w_op_lt(void) { wval b=w_pop(),a=w_pop();
@@ -146,11 +183,11 @@ static W_TLS long long w_heap_size = 0;
 static W_TLS size_t w_heap_committed = 0;
 static W_TLS size_t w_heap_list_committed = 0;
 
-static void w_heap_commit_through(char *end_a, char *end_b) {
+static void w_heap_commit_through(char *end_a, char *list_front) {
 #ifdef _WIN32
     const size_t GRAN = 65536;
+    // string arena grows UP from the base: commit [base, end_a)
     size_t need_a = (size_t)(end_a - w_heap);
-    size_t need_b = (size_t)(end_b - w_heap);
     if (need_a > w_heap_committed) {
         size_t target = ((need_a + GRAN - 1) / GRAN) * GRAN;
         if (VirtualAlloc(w_heap, target, MEM_COMMIT, PAGE_READWRITE) == NULL) {
@@ -159,16 +196,19 @@ static void w_heap_commit_through(char *end_a, char *end_b) {
         }
         w_heap_committed = target;
     }
-    if (need_b > w_heap_list_committed) {
-        size_t target = ((need_b + GRAN - 1) / GRAN) * GRAN;
-        if (VirtualAlloc(w_heap, target, MEM_COMMIT, PAGE_READWRITE) == NULL) {
+    // list arena grows DOWN from the region end: commit the top slice
+    // [list_front, end) only — never the whole span from the base.
+    size_t used_b = (size_t)(w_heap + w_heap_size - list_front);
+    if (used_b > w_heap_list_committed) {
+        size_t target = ((used_b + GRAN - 1) / GRAN) * GRAN;
+        if (VirtualAlloc(w_heap + w_heap_size - target, target, MEM_COMMIT, PAGE_READWRITE) == NULL) {
             fprintf(stderr, "commit b failed at %zu bytes\n", target);
             exit(1);
         }
         w_heap_list_committed = target;
     }
 #else
-    (void)end_a; (void)end_b;
+    (void)end_a; (void)list_front;
 #endif
 }
 
@@ -238,6 +278,25 @@ static char *w_str_new(const char *data, uint32_t len) {
 
 static char *w_str_from_cstr(const char *cstr) {
     return w_str_new(cstr, strlen(cstr));
+}
+
+// try runner (L-01): VM Try semantics — run body; success pushes
+// [1, top-or-default-0], failure rolls the stack back to entry depth
+// and pushes [0, message].
+static void w_try_call(void (*fn)(void)) {
+    if (w_try_sp >= W_TRY_MAX) w_fail("try nesting too deep");
+    w_try_base[w_try_sp] = w_sp;
+    if (setjmp(w_try_jb[w_try_sp]) == 0) {
+        w_try_sp++;
+        fn();
+        w_try_sp--;
+        wval r = (w_sp > 0) ? w_pop() : W_I64(0);
+        w_push(W_I64(1));
+        w_push(r);
+    } else {
+        w_push(W_I64(0));
+        w_push(W_PTR(w_str_from_cstr(w_try_msg)));
+    }
 }
 
 static char *w_str_concat(const char *a, const char *b) {
@@ -483,10 +542,12 @@ static int wval_is_heap(wval v) {
     return (v.v >= (uint64_t)(uintptr_t)w_heap && v.v < (uint64_t)(uintptr_t)(w_heap + w_heap_size));
 }
 static int wval_is_str(wval v) {
+    if (v.t == WT_SIG) v = w_sig_inner(v);
     if (!wval_is_heap(v)) return 0;
     return (v.v < (uint64_t)(uintptr_t)(w_heap + w_heap_size / 2));
 }
 static int wval_is_list(wval v) {
+    if (v.t == WT_SIG) v = w_sig_inner(v);
     if (!wval_is_heap(v)) return 0;
     return (v.v >= (uint64_t)(uintptr_t)(w_heap + w_heap_size / 2));
 }
@@ -656,12 +717,29 @@ static void w_print_val(wval v) {
     putchar('\n');
 }
 
+static int w_pair_is_marker(wval pv);  // defined with the map helpers
 static void w_dump_val(wval v) {
+    if (v.t == WT_SIG) { w_dump_val(w_sig_inner(v)); return; }  // transparent print
     if (v.t == WT_PTR && v.v >= (uint64_t)(uintptr_t)w_heap && v.v < (uint64_t)(uintptr_t)(w_heap + w_heap_size)) {
         if (w_is_list_val(v)) {
             wval *l = (wval *)w_as_ptr(v);
             int64_t count = w_as_i64(l[0]);
             if (count < 10000000) {
+                if (count > 0 && w_pair_is_marker(l[1])) {  // map: {"k": v, ...}
+                    printf("{");
+                    int first = 1;
+                    for (int64_t i = 0; i < count; i++) {
+                        if (w_pair_is_marker(l[1 + i])) continue;
+                        wval *pair = (wval *)w_as_ptr(l[1 + i]);
+                        if (!first) printf(", ");
+                        first = 0;
+                        w_dump_val(pair[1]);
+                        printf(": ");
+                        w_dump_val(pair[2]);
+                    }
+                    printf("}");
+                    return;
+                }
                 printf("[");
                 for (int64_t i = 0; i < count; i++) {
                     if (i > 0) printf(" ");
@@ -1216,22 +1294,33 @@ static void w_output_all(void) {
     printf("]\n");
 }
 
-// ── JSON (simplified) ───────────────────────────────────────────────
-
-static char *w_json_stringify(wval v) {
-    // For i64 values
-    return w_i64_to_str(w_as_i64(v));
-}
 
 // ── Map operations (association list) ───────────────────────────────
 
+// Maps (L-02): marker-prefixed pair lists — element[0] is a magic
+// [MAGIC, 0] pair so maps and plain lists of pairs stay distinguishable
+// (VM has Value::Map; the C chain has one pointer type). json-stringify
+// serializes marker maps as objects, plain lists as arrays — the L-08
+// heuristic corruption cannot recur.
+#define W_MAP_MAGIC 0x774D4150ull // "wMAP"
+static int w_pair_is_marker(wval pv) {
+    if (pv.t != WT_PTR || !wval_is_list(pv)) return 0;
+    wval *p = (wval *)pv.v;
+    return w_list_len(p) == 2 && p[1].t == WT_I64 && p[1].v == W_MAP_MAGIC;
+}
 static wval *w_map_new(void) {
-    return w_list_new(0);
+    wval *m = w_list_new(1);
+    wval *mk = w_list_new(2);
+    mk[1] = W_I64((int64_t)W_MAP_MAGIC);
+    mk[2] = W_I64(0);
+    m[1] = W_PTR(mk);
+    return m;
 }
 
 static wval w_map_get(wval *map, const char *key) {
     int64_t count = w_list_len(map);
     for (int64_t i = 0; i < count; i++) {
+        if (w_pair_is_marker(map[1 + i])) continue;
         wval *pair = (wval *)w_as_ptr(map[1 + i]);
         if (pair && w_list_len(pair) == 2) {
             const char *k = (const char *)w_as_ptr(pair[1]);
@@ -1244,6 +1333,7 @@ static wval w_map_get(wval *map, const char *key) {
 static int64_t w_map_has(wval *map, const char *key) {
     int64_t count = w_list_len(map);
     for (int64_t i = 0; i < count; i++) {
+        if (w_pair_is_marker(map[1 + i])) continue;
         wval *pair = (wval *)w_as_ptr(map[1 + i]);
         if (pair && w_list_len(pair) == 2) {
             const char *k = (const char *)w_as_ptr(pair[1]);
@@ -1257,6 +1347,7 @@ static wval *w_map_set(wval *map, const char *key, wval value) {
     int64_t count = w_list_len(map);
     // Check if key exists
     for (int64_t i = 0; i < count; i++) {
+        if (w_pair_is_marker(map[1 + i])) continue;
         wval *pair = (wval *)w_as_ptr(map[1 + i]);
         if (pair && w_list_len(pair) == 2) {
             const char *k = (const char *)w_as_ptr(pair[1]);
@@ -1278,6 +1369,7 @@ static wval *w_map_del(wval *map, const char *key) {
     int64_t count = w_list_len(map);
     wval *new_map = w_list_new(0);
     for (int64_t i = 0; i < count; i++) {
+        if (w_pair_is_marker(map[1 + i])) continue;
         wval *pair = (wval *)w_as_ptr(map[1 + i]);
         if (pair && w_list_len(pair) == 2) {
             const char *k = (const char *)w_as_ptr(pair[1]);
@@ -1291,15 +1383,285 @@ static wval *w_map_del(wval *map, const char *key) {
 
 static wval *w_map_keys(wval *map) {
     int64_t count = w_list_len(map);
-    wval *keys = w_list_new(count);
+    wval *keys = w_list_new(0);
     for (int64_t i = 0; i < count; i++) {
+        if (w_pair_is_marker(map[1 + i])) continue;
         wval *pair = (wval *)w_as_ptr(map[1 + i]);
-        keys[1 + i] = pair ? pair[1] : W_I64(0);
+        keys = w_list_append(keys, pair ? pair[1] : W_I64(0));
     }
     return keys;
 }
 
-// ── Math ────────────────────────────────────────────────────────────
+// ── JSON (L-02): parity with VM json-parse/json-stringify ──────────
+// Objects → marker maps with keys inserted in sorted (bytewise) order —
+// serde_json's BTreeMap prints objects sorted, and so does stringify.
+// Booleans surface as I64 1/0 (the C chain has no bool tag; spec §4).
+// \uXXXX escapes decode BMP-only (no surrogate pairs) — documented gap.
+static const char *w_json_ws(const char *p) {
+    while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
+    return p;
+}
+static wval w_json_value(const char **pp);
+
+static char *w_json_str(const char **pp) {  // *pp at opening quote
+    const char *p = *pp + 1;
+    size_t cap = 32, len = 0;
+    char *b = (char *)malloc(cap);
+    while (*p && *p != '"') {
+        unsigned cp = (unsigned char)*p;
+        if (*p == '\\' && p[1]) {
+            p++;
+            switch (*p) {
+                case 'n': cp = '\n'; break;
+                case 't': cp = '\t'; break;
+                case 'r': cp = '\r'; break;
+                case 'b': cp = '\b'; break;
+                case 'f': cp = '\f'; break;
+                case 'u': {
+                    cp = 0;
+                    for (int i = 1; i <= 4; i++) {
+                        char h = p[i]; cp <<= 4;
+                        if (h >= '0' && h <= '9') cp |= (unsigned)(h - '0');
+                        else if (h >= 'a' && h <= 'f') cp |= (unsigned)(h - 'a' + 10);
+                        else if (h >= 'A' && h <= 'F') cp |= (unsigned)(h - 'A' + 10);
+                        else w_fail("JSON parse: bad \\u escape");
+                    }
+                    p += 4;
+                    break;
+                }
+                default: cp = (unsigned char)*p; break;  // \" \\ \/ pass through
+            }
+        }
+        if (len + 4 >= cap) { cap *= 2; b = (char *)realloc(b, cap); }
+        if (cp < 0x80) {
+            b[len++] = (char)cp;
+        } else if (cp < 0x800) {
+            b[len++] = (char)(0xC0 | (cp >> 6));
+            b[len++] = (char)(0x80 | (cp & 0x3F));
+        } else {
+            b[len++] = (char)(0xE0 | (cp >> 12));
+            b[len++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+            b[len++] = (char)(0x80 | (cp & 0x3F));
+        }
+        p++;
+    }
+    if (*p != '"') w_fail("JSON parse: unterminated string");
+    *pp = p + 1;
+    char *s = w_str_new(b, (uint32_t)len);
+    free(b);
+    return s;
+}
+
+static wval w_json_value(const char **pp) {
+    const char *p = w_json_ws(*pp);
+    if (*p == '{') {
+        p = w_json_ws(p + 1);
+        size_t n = 0, cap = 8;
+        char **ks = (char **)malloc(cap * sizeof(char *));
+        wval *vs = (wval *)malloc(cap * sizeof(wval));
+        if (*p != '}') {
+            for (;;) {
+                if (*p != '"') w_fail("JSON parse: expected string key");
+                ks[n] = w_json_str(&p);
+                p = w_json_ws(p);
+                if (*p != ':') w_fail("JSON parse: expected ':'");
+                p = w_json_ws(p + 1);
+                vs[n] = w_json_value(&p);
+                n++;
+                if (n == cap) {
+                    cap *= 2;
+                    ks = (char **)realloc(ks, cap * sizeof(char *));
+                    vs = (wval *)realloc(vs, cap * sizeof(wval));
+                }
+                p = w_json_ws(p);
+                if (*p == ',') { p = w_json_ws(p + 1); continue; }
+                break;
+            }
+        }
+        if (*p != '}') w_fail("JSON parse: expected '}'");
+        *pp = p + 1;
+        for (size_t i = 1; i < n; i++) {  // BTreeMap parity: sort keys bytewise
+            char *k = ks[i]; wval v = vs[i]; size_t j = i;
+            while (j > 0 && strcmp(ks[j - 1], k) > 0) { ks[j] = ks[j - 1]; vs[j] = vs[j - 1]; j--; }
+            ks[j] = k; vs[j] = v;
+        }
+        wval *m = w_map_new();
+        for (size_t i = 0; i < n; i++) m = w_map_set(m, ks[i], vs[i]);
+        free(ks); free(vs);
+        return W_PTR(m);
+    }
+    if (*p == '[') {
+        p = w_json_ws(p + 1);
+        size_t n = 0, cap = 8;
+        wval *es = (wval *)malloc(cap * sizeof(wval));
+        if (*p != ']') {
+            for (;;) {
+                es[n++] = w_json_value(&p);
+                if (n == cap) { cap *= 2; es = (wval *)realloc(es, cap * sizeof(wval)); }
+                p = w_json_ws(p);
+                if (*p == ',') { p = w_json_ws(p + 1); continue; }
+                break;
+            }
+        }
+        if (*p != ']') w_fail("JSON parse: expected ']'");
+        *pp = p + 1;
+        wval *l = w_list_new((int64_t)n);
+        for (size_t i = 0; i < n; i++) l[1 + i] = es[i];
+        free(es);
+        return W_PTR(l);
+    }
+    if (*p == '"') { char *s = w_json_str(&p); *pp = p; return W_PTR(s); }
+    if (!strncmp(p, "true", 4))  { *pp = p + 4; return W_I64(1); }
+    if (!strncmp(p, "false", 5)) { *pp = p + 5; return W_I64(0); }
+    if (!strncmp(p, "null", 4))  { *pp = p + 4; return W_I64(0); }
+    {   // number: int unless it carries . e E
+        const char *q = p; int isf = 0;
+        if (*q == '-' || *q == '+') q++;
+        while ((*q >= '0' && *q <= '9') || *q == '.' || *q == 'e' || *q == 'E' || *q == '+' || *q == '-') {
+            if (*q == '.' || *q == 'e' || *q == 'E') isf = 1;
+            q++;
+        }
+        if (q == p) w_fail("JSON parse: unexpected character");
+        char *end;
+        if (isf) {
+            double d = strtod(p, &end);
+            *pp = end;
+            return W_F64(d);
+        }
+        long long iv = strtoll(p, &end, 10);
+        *pp = end;
+        return W_I64((int64_t)iv);
+    }
+}
+
+static wval w_json_parse_cstr(const char *s) {
+    const char *p = s;
+    wval r = w_json_value(&p);
+    p = w_json_ws(p);
+    if (*p) w_fail("JSON parse: trailing characters");
+    return r;
+}
+
+// growable output buffer for stringify
+typedef struct { char *p; size_t len, cap; } w_sb;
+static void w_sb_put(w_sb *b, const char *s, size_t n) {
+    if (b->len + n > b->cap) {
+        size_t nc = b->cap ? b->cap * 2 : 64;
+        while (nc < b->len + n) nc *= 2;
+        b->p = (char *)realloc(b->p, nc);
+        b->cap = nc;
+    }
+    memcpy(b->p + b->len, s, n);
+    b->len += n;
+}
+static void w_sb_c(w_sb *b, char c) { w_sb_put(b, &c, 1); }
+
+static void w_json_escape(w_sb *b, const char *s, uint32_t n) {
+    w_sb_c(b, '"');
+    for (uint32_t i = 0; i < n; i++) {
+        unsigned char c = (unsigned char)s[i];
+        switch (c) {
+            case '"':  w_sb_put(b, "\\\"", 2); break;
+            case '\\': w_sb_put(b, "\\\\", 2); break;
+            case '\n': w_sb_put(b, "\\n", 2); break;
+            case '\r': w_sb_put(b, "\\r", 2); break;
+            case '\t': w_sb_put(b, "\\t", 2); break;
+            case '\b': w_sb_put(b, "\\b", 2); break;
+            case '\f': w_sb_put(b, "\\f", 2); break;
+            default:
+                if (c < 0x20) { char t[8]; snprintf(t, sizeof t, "\\u%04x", c); w_sb_put(b, t, 6); }
+                else w_sb_c(b, (char)c);
+        }
+    }
+    w_sb_c(b, '"');
+}
+
+// f64 text: ryu parity for common shapes — integral → "4.0"; otherwise
+// %g with exponent fixup (1e+30 → 1e30, 1.5e-07 → 1.5e-7).
+static void w_json_num(w_sb *b, double d) {
+    char t[64];
+    if (d == (double)(long long)d && fabs(d) < 1e15) {
+        snprintf(t, sizeof t, "%.1f", d);
+        w_sb_put(b, t, strlen(t));
+        return;
+    }
+    snprintf(t, sizeof t, "%g", d);
+    char *e = strchr(t, 'e');
+    if (e) {
+        char fix[64]; size_t o = (size_t)(e - t);
+        memcpy(fix, t, o);
+        e++;                    // skip 'e'
+        int neg = 0;
+        if (*e == '+') e++;
+        else if (*e == '-') { neg = 1; e++; }
+        while (*e == '0' && e[1] >= '0' && e[1] <= '9') e++;  // strip leading zeros
+        fix[o++] = 'e';
+        if (neg) fix[o++] = '-';
+        size_t el = strlen(e);
+        memcpy(fix + o, e, el);
+        fix[o + el] = 0;
+        w_sb_put(b, fix, o + el);
+        return;
+    }
+    w_sb_put(b, t, strlen(t));
+}
+
+static void w_json_dump(w_sb *b, wval v) {
+    if (v.t == WT_SIG) { w_json_dump(b, w_sig_inner(v)); return; }
+    if (v.t == WT_I64) { char t[32]; snprintf(t, sizeof t, "%lld", (long long)(int64_t)v.v); w_sb_put(b, t, strlen(t)); return; }
+    if (v.t == WT_F64) { w_json_num(b, w_as_f64(v)); return; }
+    if (v.t != WT_PTR) { w_sb_put(b, "null", 4); return; }
+    if (wval_is_str(v)) {
+        const char *s = (const char *)w_as_ptr(v);
+        w_json_escape(b, s, w_str_len(s));
+        return;
+    }
+    wval *l = (wval *)w_as_ptr(v);
+    int64_t n = w_list_len(l);
+    if (n > 0 && w_pair_is_marker(l[1])) {
+        // object: collect + sort keys (BTreeMap parity), compact emit
+        char **ks = (char **)malloc((size_t)n * sizeof(char *));
+        wval *vs = (wval *)malloc((size_t)n * sizeof(wval));
+        int64_t m = 0;
+        for (int64_t i = 0; i < n; i++) {
+            if (w_pair_is_marker(l[1 + i])) continue;
+            wval *pair = (wval *)w_as_ptr(l[1 + i]);
+            ks[m] = (char *)w_as_ptr(pair[1]);
+            vs[m] = pair[2];
+            m++;
+        }
+        for (int64_t i = 1; i < m; i++) {
+            char *k = ks[i]; wval v2 = vs[i]; int64_t j = i;
+            while (j > 0 && strcmp(ks[j - 1], k) > 0) { ks[j] = ks[j - 1]; vs[j] = vs[j - 1]; j--; }
+            ks[j] = k; vs[j] = v2;
+        }
+        w_sb_c(b, '{');
+        for (int64_t i = 0; i < m; i++) {
+            if (i) w_sb_c(b, ',');
+            w_json_escape(b, ks[i], w_str_len(ks[i]));
+            w_sb_c(b, ':');
+            w_json_dump(b, vs[i]);
+        }
+        w_sb_c(b, '}');
+        free(ks); free(vs);
+        return;
+    }
+    w_sb_c(b, '[');
+    for (int64_t i = 0; i < n; i++) {
+        if (i) w_sb_c(b, ',');
+        w_json_dump(b, l[1 + i]);
+    }
+    w_sb_c(b, ']');
+}
+
+static char *w_json_stringify(wval v) {
+    w_sb b = {0};
+    w_json_dump(&b, v);
+    char *s = w_str_new(b.p, (uint32_t)(b.len ? b.len : 0));
+    free(b.p);
+    return s;
+}
+
 
 #include <math.h>
 

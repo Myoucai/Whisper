@@ -126,9 +126,15 @@ export name                ;; 导出（一词一行）
 | 字符串 `.` 输出 | 带引号 `"hi"` | 裸文本 `hi`（driver 依赖） |
 | 布尔输出 | `#t` / `#f` | `1` / `0` |
 | `..` 格式 | `Stack: [...]` | `[...]` |
-| json-parse / bytes-* / conf-of | 支持 | 拒绝编译——`#error`（K-3 硬失败）或引用不存在的运行时助手，gcc 响亮报错；见 tools/opcode_coverage.sh 已知缺口白名单 |
-| try | 捕获后 [#f, 消息] | 发射为换行存根（已知缺口，见 opcode_coverage.sh） |
+| try 捕获的错误消息文本 | Rust VmError 全文（含位置上下文） | 简短消息（"Division by zero" 等关键字一致）；形状 [#t,值]/[#f,消息] 与栈回卷完全一致 |
+| atan2 参数类型 | 严格要求 f64（i64 报错） | 数值提升接受 i64（stdlib 门禁契约：`0 1 atan2` → 0） |
+| JSON `\uXXXX` 代理对 | 完整解码 | BMP-only（罕见，已记录） |
 | 能力 `@0-@5` | 支持 | no-op |
+
+L 阶段（2026-09-10）起两实现全量对齐：try（setjmp/longjmp 真错误恢复）、
+json-parse/json-stringify（对象键排序对齐 serde_json BTreeMap）、
+`#t:0.75` 置信度字面量 + conf-of/unwrap（WT_SIG 透明包装）在 C 链全部
+落地——tools/opcode_coverage.sh 46 项对拍 0 失败、白名单为空。
 
 浮点算术/比较/打印（`1.5 2.5 + .`、`1.5 2.5 < .`、`3.14 .`）两实现已一致
 （K-4 数值提升修复，opcode_coverage.sh 对拍锁死）。

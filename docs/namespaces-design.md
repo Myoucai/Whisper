@@ -140,3 +140,40 @@ Rust 编译器容忍任意嵌套 → VM 侧语义全对；seed 编译器对深�
 - 固定点 gen2==gen3（scripts/verify-fixedpoint.sh）；
 - cargo test --workspace 全绿；Lexicon 套件不受影响（语言侧无
   破坏性变更）。
+
+## 战报（2026-09-10，L 阶段——c2 债务清偿）
+
+覆盖门禁白名单清空（46/0/0），CI 四门（syntax/stdlib/net/app）全绿。
+
+### 三笔登记债务的清偿
+
+- **try**：runtime.c w_fail + setjmp/longjmp；值级错误回卷压
+  [#f,消息]，成功 [#t,值]（含空体默认 0、栈回卷深度）；嵌套 try、
+  try 捕 json 错实测。资源级错误保持致命。
+- **json**：递归下降解析 + 紧凑序列化；对象键排序对齐 serde_json
+  BTreeMap；f64 轮转对齐 ryu（4.0/1e30）。map 改标记前缀对表
+  （与形似列表可区分——L-08 启发式腐坏不会复发）。
+- **置信度**：`#t:0.75` 词法（':' 越过 is-ws 停止判定）+ classify
+  [14]/[12] + WT_SIG 透明包装；conf-of peek、unwrap 剥壳。
+
+### 挖出的三笔 K 前旧债（如实记录）
+
+1. **裸 HOF + PushRef 发射从未存在**：`: map { @map } ;` 式包装词
+   与引号作参数（`{ 1 + } map`）在 C 链从未工作——stdlib-gate 的
+   list-* 全灭根因。补六个裸码 case + fuse-hof 引号提升为合成词
+   __qN（[16] 压引用 + [9] 合成 def，新指令 [57]）。
+2. **K-1 克隆注释 bug**：行尾注释让单行 def 判定失守，`: filter`
+   被原样双定义。判定改按剥注释代码。
+3. **杂项**：atan2 弹栈序反+改提升；ffi-sym 应回 I64 地址；
+   kv-keys 漏 W_PTR（server.ws 编不过）。
+
+**教训**：K-6 验收漏跑 stdlib/app 门禁，三笔旧债带病入库
+（fa947de 的 CI selfhost 应为红）。本地 gates 复验已入验收清单。
+另发现：Windows 下 cargo test 带 gcc 时 native_target 测试的
+CRLF 断言写反（一直靠 Linux CI 掩盖）——已修。
+
+### 自举方言战报（本轮五个栈序 bug，全部被"VM 先跑+原生对拍"抓住）
+
+kv 存值序（值在键下）、$N pick 压栈后索引漂移、prepend 参数序
+（elem 底 list 顶）、over 单元素栈越界（用 `_`）、?? 包装漏闭括号
+（括号恰好重排进内层臂——语义静默错乱最难查，靠 bisect 定位）。

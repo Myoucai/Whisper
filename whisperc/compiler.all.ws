@@ -91,10 +91,20 @@
     ]
 } ;
 
+// L-03 置信度字面量：累积到 "#t"/"#f" 时 ':' 并入（#t:0.75 一段）
+// (acc s → 1/0) 消耗型；kv 先存 s 后存 acc（` = swap：值在键下）
+: conf-colon? {
+    "CC-S" ` kv-set
+    "CC-A" ` kv-set
+    "CC-A" kv-get "#t" streq "CC-A" kv-get "#f" streq |
+    "CC-S" kv-get 0 strnth 58 = &
+} ;
+
 // read-chunk-acc: acc s → acc' rest'   (accumulate until stop char)
 : read-chunk-acc {
     _ "" streq ??
-    |   _ 0 strnth is-ws ??
+    |   _ 0 strnth is-ws $2 $2 conf-colon? ! &
+        ??  return
         |   _ chunk-cont?
             ?? _ 0 strnth ctos
                @ ` strcat
@@ -470,6 +480,8 @@ export group-paired-rec
     [240 "split-cond"]
     [52 "PushList"]
     [193 "try"]
+    [47 "conf-of"] [54 "unwrap"]
+    [182 "json-parse"] [183 "json-stringify"]
     [234 "buf-new"] [235 "buf-push"]
 ] } ;
 
@@ -500,8 +512,23 @@ export group-paired-rec
     swap 0 table-lookup-helper
 } ;
 
+// L-03：#t:0.75 / #f:0.25 置信度字面量（Rust lexer 单 token 的对齐）
+: is-conf-tok? {
+    dup "#t:" strfind 0 =
+    swap
+    dup "#f:" strfind 0 =
+    swap drop
+    |
+} ;
+: conf-tok {
+    "CT-S" ` kv-set
+    "CT-S" kv-get "#t:" strfind 0 = ?? [14] | [12] ]
+    "CT-S" kv-get 3 999999 strslice append
+} ;
+
 : classify-one {
-    _ "#t"  streq ?? drop [13] 1 append
+    _ is-conf-tok? ?? conf-tok return
+    | _ "#t"  streq ?? drop [13] 1 append
     | _ "#f"  streq ?? drop [13] 0 append
     | _ "over" streq ?? drop [15] 1 append
     | op-table $1 table-lookup
@@ -517,6 +544,7 @@ export group-paired-rec
             swap drop [3] swap append
         ]
     ]]
+    ]
 } ;
 
 // ── classify: map classify-one over tokens (no @map, for self-hosting) ──
@@ -611,6 +639,9 @@ export classify-nested
 : op-f64   { tk-val [49] swap append 1 PushList } ;   // [[49, bits]]
 : op-str   { tk-val [50] swap append 1 PushList } ;   // [[50, string]]
 : op-bool  { tk-val [51] swap append 1 PushList } ;   // [[51, value]]
+: op-conf1 { tk-val [55] swap append 1 PushList } ;   // [[55, "conf"]]  #t:c
+: op-conf0 { tk-val [56] swap append 1 PushList } ;   // [[56, "conf"]]  #f:c
+: op-qref  { tk-val [57] swap append 1 PushList } ;   // [[57, name]] 压引号函数指针
 : op-call  { tk-val [96] swap append 1 PushList } ;    // [[96, name]]
 : op-pick  { tk-val [4] swap append 1 PushList } ;     // [[4, N]]
 : op-hof   { dup tk-type swap tk-val compile 2 PushList 1 PushList } ; // [[op', inner_bc]]
@@ -723,6 +754,9 @@ export classify-nested
     dup 7 =   ?? drop op-cond  return ]
     dup 8 =   ?? drop op-loop  return ]
     dup 13 =  ?? drop op-bool  return ]
+    dup 14 =  ?? drop op-conf1 return ]
+    dup 12 =  ?? drop op-conf0 return ]
+    dup 16 =  ?? drop op-qref  return ]
     dup 15 =  ?? drop op-pick  return ]
     dup 249 >= over 254 <= & ?? drop op-hof return ]
     drop drop
@@ -780,6 +814,15 @@ export classify-nested
     ]
 } ;
 : next-consumer-op { dup 1 @nth consumer-op } ;
+// 非融合引号（引号作参数：`{ 1 + } map`）提升为顶层合成词 __qN。
+// kv 计数器产生全局唯一名（kv 只存字符串铁律）。
+: genq-name {
+    "__QN" kv-get dup strlen 0 = ??
+        drop "__q0" "0" "__QN" ` kv-set
+    |   "__QN" kv-get strtoi64 1 + i64tostr dup "__QN" ` kv-set "__q" swap strcat
+    ]
+} ;
+
 : fuse-hof {
     dup len 1 < ?? return ]
     tok-head-quote? ??
@@ -790,6 +833,13 @@ export classify-nested
             fuse-hof prepend
             return
         | drop
+          genq-name "__FH-N" ` kv-set
+          _ 0 @nth 1 @nth
+          "__FH-N" kv-get
+          9 mk3
+          swap tok-advance fuse-hof prepend
+          [16] "__FH-N" kv-get append swap prepend
+          return
         ]
     | ]
     dup 0 @nth swap tok-advance fuse-hof prepend
@@ -1098,7 +1148,7 @@ export classify-full
     dup 214 = ?? drop "{double _f=w_as_f64(w_pop());w_push(W_F64(round(_f)));}\n" return ]
     dup 215 = ?? drop "{double _f=w_as_f64(w_pop());w_push(W_F64(w_flog(_f)));}\n" return ]
     dup 216 = ?? drop "{double _f=w_as_f64(w_pop());w_push(W_F64(w_fexp(_f)));}\n" return ]
-    dup 217 = ?? drop "{double _y=w_as_f64(w_pop());double _x=w_as_f64(w_pop());w_push(W_F64(w_fatan2(_y,_x)));}\n" return ]
+    dup 217 = ?? drop "{double _x=w_num_f64(w_pop());double _y=w_num_f64(w_pop());w_push(W_F64(w_fatan2(_y,_x)));}\n" return ]
     dup 218 = ?? drop "{int64_t _b=w_as_i64(w_pop());int64_t _a=w_as_i64(w_pop());w_push(W_I64(_a&_b));}\n" return ]
     dup 219 = ?? drop "{int64_t _b=w_as_i64(w_pop());int64_t _a=w_as_i64(w_pop());w_push(W_I64(_a|_b));}\n" return ]
     dup 220 = ?? drop "{int64_t _b=w_as_i64(w_pop());int64_t _a=w_as_i64(w_pop());w_push(W_I64(_a^_b));}\n" return ]
@@ -1139,7 +1189,7 @@ export classify-full
 " return ]
     dup 247 = ?? drop "{ const char *_k=(const char*)w_as_ptr(w_pop()); w_kv_del(_k); }
 " return ]
-    dup 248 = ?? drop "w_push(w_kv_keys_list());
+    dup 248 = ?? drop "w_push(W_PTR(w_kv_keys_list()));
 " return ]
     dup 255 = ?? drop "{ const char *_n=(const char*)w_as_ptr(w_pop()); int64_t _p=w_as_i64(w_pop()); w_serve_concurrent(_p, w_find_word(_n)); }
 " return ]
@@ -1172,7 +1222,7 @@ export classify-full
 " return ]
     dup 150 = ?? drop "{ w_push(w_ffi_open(w_pop())); }
 " return ]
-    dup 151 = ?? drop "{ const char*_n=(const char*)w_as_ptr(w_pop()); int64_t _h=w_as_i64(w_pop()); w_push(W_PTR(w_ffi_sym(_h,_n))); }
+    dup 151 = ?? drop "{ const char*_n=(const char*)w_as_ptr(w_pop()); int64_t _h=w_as_i64(w_pop()); w_push(W_I64((int64_t)(uintptr_t)w_ffi_sym(_h,_n))); }
 " return ]
     dup 152 = ?? drop "{ int64_t _f=w_as_i64(w_pop()); const char*_fmt=(const char*)w_as_ptr(w_pop()); wval*_a=(wval*)w_as_ptr(w_pop()); w_push(W_I64(w_ffi_call(_f,_fmt,_a))); }
 " return ]
@@ -1186,6 +1236,17 @@ export classify-full
 " return ]
     dup 157 = ?? drop "{ int64_t _l=w_as_i64(w_pop()); const char*_p=(const char*)w_as_i64(w_pop()); w_push(W_PTR(w_str_new(_p,(uint32_t)(_l>0?_l:0)))); }
 " return ]
+    dup 47 = ?? drop "{ wval _v=(w_sp>0)?w_stack[w_sp-1]:W_I64(0); w_push(W_F64(w_conf(_v))); }\n" return ]
+    dup 54 = ?? drop "{ wval _v=w_pop(); if (_v.t==WT_SIG) _v=w_sig_inner(_v); w_push(_v); }\n" return ]
+    dup 182 = ?? drop "{ w_push(w_json_parse_cstr((const char*)w_as_ptr(w_pop()))); }\n" return ]
+    dup 183 = ?? drop "{ wval _v=w_pop(); if (_v.t==WT_SIG) _v=w_sig_inner(_v); w_push(W_PTR(w_json_stringify(_v))); }\n" return ]
+    // 裸 HOF（stdlib 包装词：: map { @map } ; ——引号运行时才到栈上）
+    dup 67 = ?? drop "{ wfn _f=(wfn)w_as_ptr(w_pop()); wval *_l=(wval*)w_as_ptr(w_pop()); w_push(W_PTR(w_map_over(_l,_f))); }\n" return ]
+    dup 68 = ?? drop "{ wfn _f=(wfn)w_as_ptr(w_pop()); wval *_l=(wval*)w_as_ptr(w_pop()); w_each_over(_l,_f); }\n" return ]
+    dup 69 = ?? drop "{ wfn _f=(wfn)w_as_ptr(w_pop()); wval _a=w_pop(); wval *_l=(wval*)w_as_ptr(w_pop()); w_push(w_fold_over(_l,_a,_f)); }\n" return ]
+    dup 83 = ?? drop "{ wfn _f=(wfn)w_as_ptr(w_pop()); int64_t _n=w_as_i64(w_pop()); for(int64_t _i=0;_i<_n;_i++) _f(); }\n" return ]
+    dup 5  = ?? drop "{ wfn _f=(wfn)w_as_ptr(w_pop()); wval *_l=(wval*)w_as_ptr(w_pop()); w_push(W_PTR(w_filter_over(_l,_f))); }\n" return ]
+    dup 193 = ?? drop "{ w_try_call((wfn)w_as_ptr(w_pop())); }\n" return ]
     drop "#error whisper-cgen: unknown bare opcode\n"
 } ;
 
@@ -1223,9 +1284,12 @@ export classify-full
         dup 251 = ?? drop 1 @nth emit-func-body "{ auto void _qb(void) { " swap strcat " } wval _a=w_pop(); wval *_l=(wval*)w_as_ptr(w_pop()); int64_t _n=w_list_len(_l); for (int64_t _i=0;_i<_n;_i++){ w_push(_a); w_push(_l[1+_i]); _qb(); _a=w_pop(); } w_push(_a); }\n" strcat return ]
         dup 252 = ?? drop 1 @nth emit-func-body "{ auto void _qb(void) { " swap strcat " } int64_t _n=w_as_i64(w_pop()); for (int64_t _i=0;_i<_n;_i++){ _qb(); } }\n" strcat return ]
         dup 253 = ?? drop 1 @nth emit-func-body "{ auto void _qb(void) { " swap strcat " } wval *_l=(wval*)w_as_ptr(w_pop()); int64_t _n=w_list_len(_l); wval *_tmp=(wval*)malloc((_n>0?_n:1)*sizeof(wval)); int64_t _c=0; for (int64_t _i=0;_i<_n;_i++){ w_push(_l[1+_i]); _qb(); if (w_as_i64(w_pop())!=0) _tmp[_c++]=_l[1+_i]; } wval *_r=w_list_new(_c); for (int64_t _j=0;_j<_c;_j++) _r[1+_j]=_tmp[_j]; free(_tmp); w_push(W_PTR(_r)); }\n" strcat return ]
-        dup 254 = ?? drop 1 @nth emit-func-body "{ auto void _qb(void) { " swap strcat " } _qb(); wval _r=w_pop(); w_push(W_I64(1)); w_push(_r); }\n" strcat return ]
+        dup 254 = ?? drop 1 @nth emit-func-body "{ auto void _qb(void) { " swap strcat " } w_try_call(_qb); }\n" strcat return ]
         dup 50 = ?? drop 1 @nth escape-c-str "w_push(W_PTR(w_str_from_cstr(\"" swap "\")));\n" strcat strcat return ]
         dup 51 = ?? drop 1 @nth i64tostr "w_push(W_I64((int64_t)" swap "L));\n" strcat strcat return ]
+        dup 55 = ?? drop 1 @nth "{ wval _s=w_sig(W_I64(1)," swap "); w_push(_s); }\n" strcat strcat return ]
+        dup 56 = ?? drop 1 @nth "{ wval _s=w_sig(W_I64(0)," swap "); w_push(_s); }\n" strcat strcat return ]
+        dup 57 = ?? drop 1 @nth safe-c-name "w_push(W_PTR((void*)W_" swap "));\n" strcat strcat return ]
         dup 96 = ?? drop 1 @nth safe-c-name "W_" swap "();\n" strcat strcat return ]
         dup 4  = ?? drop 1 @nth i64tostr "w_pick_n(" swap ");\n" strcat strcat return ]
         swap drop emit-bare return
