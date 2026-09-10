@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased (2026-09-10l) — N-2 Phase 1：引号栈合同——lexicon 诊断 32→18
+
+- **消费者合同重设计**（checker.rs）：expect_ref 的 t→t 净零形状
+  （J-3 战败根因之一）改为按消费者 arity——@map/@filter 至少 1
+  产出、@each 产出不限（体合法地追加多输出）、@fold 2 提供槽 +
+  至少 1 产出、@times 不设形状；产出检查带消费者视角换算
+  （`o + (提供 − 声称)`，@fold 的 `{ + }` 正确过）。
+- **引号体入口栈参数化**：从固定单元素栈改为（环境 Σ×4 + 元素
+  槽×2）起查，`$N` 越过元素落到真槽；Ref 的 arity 按**低水位触底**
+  构造（自产自弃不计触底），产出按入口边界切片。
+- **关键语义发现**：VM Each/Fold 清栈单元素执行（父栈停靠）——
+  引号根本够不到环境栈；入元数触底审计在该粒度下是噪声（t_q9
+  实证），撤入检查、留给 Phase 2 按消费者入口重查。
+- **战果**：typecheck-gate lexicon **32→18**（净清 14：t_ind10/
+  t_ind10c/t_ind3/t_ind4/t_ind7/t_ind7a/t_ind9/t_dump/t_q9 全清，
+  t_ind6/t_ind6s7 各 4→1）；conformance 2 / encoding 0 维持基线。
+  剩余 18 全为槽污染类（t_q1-qc/t_mk4/t_base）——Phase 2 多态
+  实例化的靶子。
+- **回归**：cargo 460/0；覆盖门禁 52/0/0；stdlib 58/0；syntax 26/0；
+  棘轮降档 18 并 PASS。
+
 ## Unreleased (2026-09-10k) — N-1 bool/atan2 语义统一（VM 协变）+ N-2 Phase 0 判据 harness
 
 - **N-1（预注册判据全部兑现，tests/n1_preregistered.md）**：

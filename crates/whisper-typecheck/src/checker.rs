@@ -198,7 +198,14 @@ impl TypeChecker {
             }
 
             AstNode::Quote(body) => {
-                let mut quote_stack: Vec<Type> = vec![self.inferer.fresh_var()];
+                // N-2 Phase 1: body checked on (ambient Sigma, e1, e2) —
+                // two entry slots covers @fold's (acc, elem); @map/@each
+                // bodies treat the second slot as extra ambient.
+                let ambient: usize = 4;
+                let entry: usize = ambient + 2;
+                let mut quote_stack: Vec<Type> =
+                    (0..entry).map(|_| self.inferer.fresh_var()).collect();
+                let mut low_water: usize = entry;
                 let mut quote_errors = Vec::new();
                 for n in body {
                     self.check_node(
@@ -207,6 +214,7 @@ impl TypeChecker {
                         &mut quote_errors,
                         &format!("{ctx}/quote"),
                     );
+                    low_water = low_water.min(quote_stack.len());
                 }
                 for err in &quote_errors {
                     if !err.message.contains("Stack underflow") {
@@ -216,14 +224,22 @@ impl TypeChecker {
                         });
                     }
                 }
-                // Build a Ref type from the quote's consumed/produced stack effect
-                let input = self.inferer.fresh_var();
-                let output = if quote_stack.len() > 1 {
-                    quote_stack[1..].to_vec()
+                // Honest Ref arity from REACH (low-water), not net — a body
+                // that produces-then-drops its own value must not be counted
+                // as reaching into the ambient stack:
+                //   in  = entry - low_water (how deep it truly dipped)
+                //   out = slots above the entry boundary at the end
+                let final_len = quote_stack.len();
+                let in_arity = std::cmp::max(1, entry.saturating_sub(low_water));
+                let inputs: Vec<Type> =
+                    (0..in_arity).map(|_| self.inferer.fresh_var()).collect();
+                let keep_from = entry - in_arity;
+                let outputs: Vec<Type> = if final_len > keep_from {
+                    quote_stack[keep_from..].to_vec()
                 } else {
-                    vec![self.inferer.fresh_var()]
+                    vec![]
                 };
-                stack.push(Type::Ref(vec![input], output));
+                stack.push(Type::Ref(inputs, outputs));
             }
 
             AstNode::List(items) => {
@@ -751,25 +767,25 @@ impl TypeChecker {
             }
             Operator::Map => {
                 let any_list = Type::List(Box::new(self.inferer.fresh_var()));
-                self.expect_ref(stack, errors, ctx, "@map quot");
+                self.expect_ref_shape(stack, 1, Some(1), errors, ctx, "@map quot");
                 self.expect(stack, &any_list, errors, ctx, "@map list");
                 stack.push(Type::List(Box::new(self.inferer.fresh_var())));
             }
             Operator::Each => {
                 let any_list = Type::List(Box::new(self.inferer.fresh_var()));
-                self.expect_ref(stack, errors, ctx, "@each quot");
+                self.expect_ref_shape(stack, 1, None, errors, ctx, "@each quot");
                 self.expect(stack, &any_list, errors, ctx, "@each list");
             }
             Operator::Fold => {
                 let any_list = Type::List(Box::new(self.inferer.fresh_var()));
-                self.expect_ref(stack, errors, ctx, "@fold quot");
+                self.expect_ref_shape(stack, 2, Some(1), errors, ctx, "@fold quot");
                 stack.pop(); // init — accept anything
                 self.expect(stack, &any_list, errors, ctx, "@fold list");
                 stack.push(self.inferer.fresh_var());
             }
             Operator::Filter => {
                 let any_list = Type::List(Box::new(self.inferer.fresh_var()));
-                self.expect_ref(stack, errors, ctx, "@filter quot");
+                self.expect_ref_shape(stack, 1, Some(1), errors, ctx, "@filter quot");
                 self.expect(stack, &any_list, errors, ctx, "@filter list");
                 stack.push(Type::List(Box::new(self.inferer.fresh_var())));
             }
@@ -798,7 +814,13 @@ impl TypeChecker {
                 stack.push(Type::List(Box::new(Type::Str)));
             }
             Operator::AtTimes => {
-                self.expect_ref(stack, errors, ctx, "@times body");
+                // times body runs N times with free effects: no shape check
+                if stack.pop().is_none() {
+                    errors.push(TypeError {
+                        message: "Stack underflow: @times body needs quote".into(),
+                        context: ctx.into(),
+                    });
+                }
                 self.expect(stack, &Type::I64, errors, ctx, "@times count");
             }
 
@@ -975,6 +997,52 @@ impl TypeChecker {
                     context: ctx.to_string(),
                 });
             }
+        }
+    }
+
+    /// N-2 Phase 1 consumer contract: arity-only checks (slot types are
+    /// Phase 2 polymorphism). Unresolved TypeVar quotes pass (no false pos).
+    #[allow(clippy::too_many_arguments)]
+    fn expect_ref_shape(
+        &mut self,
+        stack: &mut Vec<Type>,
+        in_provided: usize,
+        out_arity: Option<usize>,
+        errors: &mut Vec<TypeError>,
+        ctx: &str,
+        desc: &str,
+    ) {
+        let popped = stack.pop();
+        let resolved = popped.as_ref().map(|t| self.inferer.resolve(t));
+        match resolved {
+            Some(Type::Ref(i, o)) => {
+                if let Some(n) = out_arity {
+                    // 消费者视角产出：Ref 的 out 只数到自声明 in 之上；
+                    // 消费者多提供的槽（@fold 的 acc）也应计入产出底座
+                    let provided = in_provided;
+                    let out_eff = o.len() + provided.saturating_sub(i.len());
+                    if out_eff < n {
+                        errors.push(TypeError {
+                            message: format!(
+                                "{}: quote produces {} value(s), consumer needs at least {}",
+                                desc,
+                                out_eff,
+                                n
+                            ),
+                            context: ctx.into(),
+                        });
+                    }
+                }
+            }
+            Some(Type::TypeVar(_)) => {}
+            Some(other) => errors.push(TypeError {
+                message: format!("{}: expected quote, got {}", desc, other.name()),
+                context: ctx.into(),
+            }),
+            None => errors.push(TypeError {
+                message: format!("Stack underflow: {} needs quote", desc),
+                context: ctx.into(),
+            }),
         }
     }
 

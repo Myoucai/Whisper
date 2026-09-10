@@ -9,12 +9,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
-# 预注册棘轮上限（2026-09-10 实测基线 = N-1 前后完全一致：
-# encoding 0 / conformance 2 / lexicon 32——J-3 报告的 6 是当时语料规模，
-# 后续新增测试（t_q*/t_mk4 等）带入存量近似。只许降，降了要更新此表）
+# 预注册棘轮上限（2026-09-10：Phase 1 引号栈合同后 lexicon 32→18，
+# conformance 2 / encoding 0 为存量。剩余 18 全为槽污染类——Phase 2
+# 多态实例化的靶子。只许降，降了要更新此表）
 readonly CEIL_ENCODING=0
 readonly CEIL_CONFORMANCE=2
-readonly CEIL_LEXICON=32
+readonly CEIL_LEXICON=18
 
 count_diag() {  # file → stdout: diagnostic count
   timeout 60 "$W" run "$1" 2>&1 >/dev/null | grep -c "^Type error:" || true
