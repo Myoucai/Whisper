@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased (2026-09-10k) — N-1 bool/atan2 语义统一（VM 协变）+ N-2 Phase 0 判据 harness
+
+- **N-1（预注册判据全部兑现，tests/n1_preregistered.md）**：
+  `#t 1 +`→2、`"ab" #t strnth`→98、`0 1 atan2`→0、`#t bitnot`→-2、
+  `#t 0.5 +`→1.5——VM 三咽喉点 Bool 数值协变（binary_num_op 归一 /
+  pop_i64 / pop_f64）+ equals 跨标签按数值比，与 C 链（bool 即
+  i64）全量对齐。16 格行为矩阵实测兑现；永久分歧仅剩
+  `#t .`（#t vs 1）与 `#t json-stringify`（"true" vs 1，wval 无
+  bool 标签），spec §4 记录。
+- **typecheck 数值协变**：infer.rs unify 加 Bool↔I64↔F64 两两可合
+  六臂——静态假阳性清零优先，反向泄漏（f64 进 i64 位）由运行时
+  动态检查兜底。诊断零扰动实证（N-1 前后双二进制 32/2/0 完全一致）。
+- **N-2 Phase 0**：scripts/typecheck-gate.sh 判据棘轮——std/encoding
+  向量链 0 / conformance 2 / **lexicon 32**（实测真基线；J-3 报告
+  的 6 是当时语料规模，后续新增测试带入存量近似）。只许降不许升。
+- **回归**：cargo 460/0；覆盖门禁 **52/0/0**（+bool 四用例）；
+  Lexicon 双跑 0 diff/50。
+
 ## Unreleased (2026-09-10j) — M: map 顺序确定化 + ] 歧义文档化 + 后续战役登记
 
 - **map 遍历顺序非确定（语言级修复）**：VM `Value::Map` 底层

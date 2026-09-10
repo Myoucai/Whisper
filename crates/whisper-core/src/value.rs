@@ -72,6 +72,9 @@ impl Value {
             (Value::I64(a), Value::I64(b)) => a == b,
             (Value::F64(a), Value::F64(b)) => a == b,
             (Value::Bool(a), Value::Bool(b)) => a == b,
+            // N-1: 跨标签按数值比（C 链 bool 即 i64，#t 1 = → 1）
+            (Value::Bool(a), Value::I64(b)) => (*a as i64) == *b,
+            (Value::I64(a), Value::Bool(b)) => *a == (*b as i64),
             (Value::Str(a), Value::Str(b)) => Rc::ptr_eq(a, b) || a == b,
             (Value::List(a), Value::List(b)) => {
                 Rc::ptr_eq(a, b)

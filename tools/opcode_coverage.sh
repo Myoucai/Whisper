@@ -122,6 +122,11 @@ t ns-print   '5 .'
 t conf       '#t:0.75 conf-of . drop #t:0.5 unwrap .'
 t conf-peek  '#t:0.25 conf-of . drop'
 t conf-flat  '#f:0.5 unwrap .'
+# ── N-1 bool 数值协变（VM 放松对齐 C 链，tests/n1_preregistered.md）──
+t bool-arith '#t 1 + . #f 5 - . #t #f + .'
+t bool-atan2 '0 1 atan2 f64toi64 .'
+t bool-bit   '#t bitnot .'
+t bool-f64   '#t 0.5 + .'
 
 echo "coverage: $PASS pass, $FAIL fail, $GAP known-gap"
 echo "$GAPS" | tr '|' '\n' | grep -v '^$' | sed 's/^/  GAP /'

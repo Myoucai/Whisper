@@ -133,16 +133,21 @@ export name                ;; 导出（一词一行）
 |------|---------|-----------|
 | 字符串 `.` 输出 | 带引号 `"hi"` | 裸文本 `hi`（driver 依赖） |
 | 布尔输出 | `#t` / `#f` | `1` / `0` |
+| `#t json-stringify` | `"true"` | `1`（wval 无 bool 标签——永久分歧，除非另立 WT_BOOL） |
 | `..` 格式 | `Stack: [...]` | `[...]` |
 | try 捕获的错误消息文本 | Rust VmError 全文（含位置上下文） | 简短消息（"Division by zero" 等关键字一致）；形状 [#t,值]/[#f,消息] 与栈回卷完全一致 |
-| atan2 参数类型 | 严格要求 f64（i64 报错） | 数值提升接受 i64（stdlib 门禁契约：`0 1 atan2` → 0） |
 | JSON `\uXXXX` 代理对 | 完整解码 | BMP-only（罕见，已记录） |
 | 能力 `@0-@5` | 支持 | no-op |
+
+N-1（2026-09-10）起 **bool 数值协变两侧一致**：`#t 1 +`→2、
+`"ab" #t strnth`→98、`0 1 atan2`→0、`#t bitnot`→-2、`#t 0.5 +`→1.5
+（VM 三咽喉点协变 + typecheck unify 数值协变；16 格矩阵见
+tests/n1_preregistered.md，覆盖门禁 4 用例锁死）。
 
 L 阶段（2026-09-10）起两实现全量对齐：try（setjmp/longjmp 真错误恢复）、
 json-parse/json-stringify（对象键排序对齐 serde_json BTreeMap）、
 `#t:0.75` 置信度字面量 + conf-of/unwrap（WT_SIG 透明包装）在 C 链全部
-落地——tools/opcode_coverage.sh 46 项对拍 0 失败、白名单为空。
+落地——tools/opcode_coverage.sh 对拍 0 失败、白名单为空。
 
 浮点算术/比较/打印（`1.5 2.5 + .`、`1.5 2.5 < .`、`3.14 .`）两实现已一致
 （K-4 数值提升修复，opcode_coverage.sh 对拍锁死）。

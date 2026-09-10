@@ -1679,6 +1679,7 @@ impl Vm {
     fn pop_i64(&mut self) -> Result<i64, VmError> {
         match self.pop()?.unwrap_signal() {
             Value::I64(n) => Ok(n),
+            Value::Bool(b) => Ok(b as i64), // N-1: Bool 数值协变（C 链 bool 即 i64）
             other => Err(VmError::TypeMismatch {
                 expected: "i64".into(),
                 actual: other.type_name().into(),
@@ -1690,6 +1691,7 @@ impl Vm {
         match self.pop()?.unwrap_signal() {
             Value::F64(n) => Ok(n),
             Value::I64(n) => Ok(n as f64), // auto-coerce i64 → f64
+            Value::Bool(b) => Ok(if b { 1.0 } else { 0.0 }), // N-1: Bool 数值协变
             other => Err(VmError::TypeMismatch {
                 expected: "f64".into(),
                 actual: other.type_name().into(),
@@ -1853,8 +1855,15 @@ impl Vm {
 
         let a_conf = a.confidence();
         let b_conf = b.confidence();
-        let a_val = a.unwrap_signal();
-        let b_val = b.unwrap_signal();
+        // N-1: Bool 数值协变（与 C 链对齐——那边 bool 即 i64）
+        let a_val = match a.unwrap_signal() {
+            Value::Bool(b) => Value::I64(b as i64),
+            v => v,
+        };
+        let b_val = match b.unwrap_signal() {
+            Value::Bool(b) => Value::I64(b as i64),
+            v => v,
+        };
 
         let result = match (&a_val, &b_val) {
             (Value::I64(a), Value::I64(b)) => i64_op(*a, *b)?,
