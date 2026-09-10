@@ -91,6 +91,8 @@ t str-split  '"a,b,c" "," strsplit len .'
 t list-find  '[[1] [2]] [1] listfind drop "LF" .'
 # ── map ──
 t map2       'map-new dup "k" ` 1 swap map-set "k" swap map-get . drop'
+t map-order  'map-new "c" 1 map-set "a" 2 map-set "b" 3 map-set map-keys . drop'
+t map-order2 '"{\"c\":1,\"a\":2}" json-parse map-keys . drop'
 # ── kv ──
 t kv         '"K1" "V1" kv-set "K1" kv-get . "NOPE" kv-get strlen .'
 # ── json（L-2：C 链全支持，对象键排序对齐 BTreeMap）──

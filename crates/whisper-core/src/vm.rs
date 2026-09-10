@@ -1247,7 +1247,7 @@ impl Vm {
 
             // === Map operations ===
             Opcode::MapNew => {
-                let map = HashMap::new();
+                let map = std::collections::BTreeMap::new();
                 self.data_stack.push(Value::Map(Rc::new(map)));
             }
             Opcode::MapGet => {
@@ -1755,7 +1755,7 @@ impl Vm {
         }
     }
 
-    fn pop_map(&mut self) -> Result<Rc<HashMap<String, Value>>, VmError> {
+    fn pop_map(&mut self) -> Result<Rc<std::collections::BTreeMap<String, Value>>, VmError> {
         match self.pop()? {
             Value::Map(m) => Ok(m),
             Value::Signal(v, _) => match *v {
@@ -1926,8 +1926,8 @@ fn json_to_whisper(v: &serde_json::Value) -> Value {
             Value::List(Rc::new(items))
         }
         serde_json::Value::Object(obj) => {
-            let mut map: std::collections::HashMap<String, Value> =
-                std::collections::HashMap::with_capacity(obj.len());
+            let mut map: std::collections::BTreeMap<String, Value> =
+                std::collections::BTreeMap::new();
             for (k, v) in obj {
                 map.insert(k.clone(), json_to_whisper(v));
             }

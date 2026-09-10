@@ -1,6 +1,6 @@
 /// Value type for the Whisper VM.
 /// All data on the stack is represented as a Value.
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use crate::opcode::Opcode;
@@ -24,7 +24,7 @@ pub enum Value {
     /// Signal with confidence tensor: (value, confidence 0.0-1.0)
     Signal(Box<Value>, f64),
     /// String-keyed map (reference-counted for cheap clone)
-    Map(Rc<HashMap<String, Value>>),
+    Map(Rc<BTreeMap<String, Value>>),
 }
 
 impl Value {

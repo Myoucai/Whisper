@@ -1345,7 +1345,10 @@ static int64_t w_map_has(wval *map, const char *key) {
 
 static wval *w_map_set(wval *map, const char *key, wval value) {
     int64_t count = w_list_len(map);
-    // Check if key exists
+    int64_t ins_at = count;  // default: append at end
+    // Key exists → update in place; otherwise find the sorted insert
+    // position. M-1: the VM Map is a BTreeMap, so map-keys / iteration
+    // order is bytewise-sorted in BOTH implementations.
     for (int64_t i = 0; i < count; i++) {
         if (w_pair_is_marker(map[1 + i])) continue;
         wval *pair = (wval *)w_as_ptr(map[1 + i]);
@@ -1356,13 +1359,21 @@ static wval *w_map_set(wval *map, const char *key, wval value) {
                 pair[2] = value;
                 return map;
             }
+            if (w_str_lt(key, k)) { ins_at = i; break; }
         }
     }
-    // Add new entry
+    // Add new entry at the sorted position
     wval *pair = w_list_new(2);
     pair[1] = W_PTR((void *)key);
     pair[2] = value;
-    return w_list_append(map, W_PTR((void *)pair));
+    wval *new_map = w_list_new(count + 1);
+    int64_t j = 0;
+    for (int64_t i = 0; i < count; i++, j++) {
+        if (i == ins_at) j++;  // reserve the slot for the new pair
+        new_map[1 + j] = map[1 + i];
+    }
+    new_map[1 + ins_at] = W_PTR((void *)pair);
+    return new_map;
 }
 
 static wval *w_map_del(wval *map, const char *key) {

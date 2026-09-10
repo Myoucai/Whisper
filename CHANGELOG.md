@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased (2026-09-10j) — M: map 顺序确定化 + ] 歧义文档化 + 后续战役登记
+
+- **map 遍历顺序非确定（语言级修复）**：VM `Value::Map` 底层
+  HashMap→BTreeMap——此前同一程序三次运行 map-keys 输出
+  `["c" "a" "b"]`/`["a" "b" "c"]`/`["c" "a" "b"]`（RandomState），
+  且与 C 链插入序不一致；现两实现统一为 bytewise 排序（C 链
+  w_map_set 改排序插入）。覆盖门禁新增 map-order 双用例锁死。
+- **`]` then-臂列表贴近闭合括号的两实现分歧（文档化已知限制）**：
+  `#t ?? [1 2 3] ] ...` VM 解析器拒绝（Unexpected RBracket）、自举
+  链接受——spec §2 补已知限制与规范写法（臂内列表后至少跟一词，
+  或列表前置构造）。
+- **后续战役登记（docs/language-backlog.md）**：N-1 bool/atan2
+  语义统一（两后端行为分叉，`#t 1 +` VM 报错/C 链=2；含 16 格
+  预注册判据矩阵要求）；N-2 typecheck strict（J-3 复活，前置为
+  checker 重设计：多态变体推断+引号栈合同+kv effect 行）。
+- **回归**：覆盖门禁 48/0/0；四 CI 门全绿；cargo 460 全绿；
+  固定点 gen2==gen3 OK；Lexicon 50 测试双二进制对照输出
+  **字节级一致**（BTreeMap 零行为扰动实证）。
+
 ## Unreleased (2026-09-10i) — L: c2 债务清偿——try/json/conf 全链落地 + 三笔 K 前旧债
 
 覆盖门禁白名单清空：**46 pass / 0 fail / 0 known-gap**；CI 四门
