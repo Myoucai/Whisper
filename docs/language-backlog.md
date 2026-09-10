@@ -28,6 +28,29 @@ I64/F64/PTR/SIG 四标签、**无法表达独立 bool**。
 bool×{算术,比较,json,打印}×{VM,C 链} 的 16 格行为矩阵 + Lexicon
 两语料库误报数不升。
 
+**实施方案（2026-09-10 规划，推荐 A——VM 放松）**
+
+VM 侧三咽喉点各加一行 Bool 协变，即可全量对齐 C 链（bool 即 1/0）：
+
+1. `binary_num_op`（vm.rs ~1846）：match 加两臂
+   `(Bool(a), I64/F64(b))`/`(I64/F64, Bool)` → 按 1/0 提升；
+2. `pop_i64` / `pop_f64`（~1826/~1836）：`Value::Bool(b) => Ok(if b
+   {1} else {0})`——atan2/位运算/索引等全部 pop_* 站点自动受益；
+3. `Value::equals`（value.rs ~70）：`(Bool, I64)`/`(I64, Bool)`
+   跨标签按数值比（`#t 1 =` → #t，与 C 链 1 一致）。
+
+**明确不动**（永久分歧，维持 spec §4 记录）：`#t .`（#t vs 1）、
+`#t json-stringify`（"true" vs "1"）——修复需 C 链第五标签
+WT_BOOL（收益低、触面大，另立项才做）。
+
+**typecheck 侧**（与 N-2 的热身）：checker 的 expect/协变助手中加
+规则 `Bool <: I64 <: F64`（数值位接受 Bool）——builtins 表签名不用改。
+
+**步骤**：① 预注册 16 格矩阵（tests/n1_preregistered.md，含
+Lexicon 双跑差异预告——曾依赖报错的测试列出白名单）→ ② VM 三点
+→ ③ typecheck 协变 → ④ 覆盖门禁补 bool 算术用例 + Lexicon 双跑
+复核（预期 diff 仅白名单内）→ ⑤ spec §4 行更新。约半个战役日。
+
 ## 战役 N-2：typecheck strict 默认（J-3 复活）
 
 **事实**：详见 docs/typecheck-strict-design.md 战报——expect_ref
@@ -38,6 +61,35 @@ bool×{算术,比较,json,打印}×{VM,C 链} 的 16 格行为矩阵 + Lexicon
 **前置**：checker 重设计——多态变体推断 + 引号栈合同 + kv 态词
 effect 行。非修补可达，需独立设计文档 + 分阶段实施
 （先 effect 行，后变体推断）。
+
+**实施方案（2026-09-10 规划：四阶段，每阶段独立验收可停）**
+
+现状锚点：checker.rs 1185 行（全局约束求解 + Union-Find，
+Type 已有 TypeVar/Ref(in,out)/Union）；基线 = Lexicon 6 警告
+（t_ind6s7:4 / t_ind10c:1 / t_ind10:1，**全部引号栈近似类**）+
+std/encoding 255-ctos 向量链 0 错误——两语料反向拉扯是战败根因。
+
+- **Phase 0 判据 harness（先于一切）**：scripts/typecheck-gate.sh——
+  strict 模式跑 Lexicon 50 + std/encoding 链，机器断言
+  「Lexicon 错误=0 且警告≤6 且编码链错误=0」。此门为后续每阶段
+  的通过条件，防"压一头翘一头"。
+- **Phase 1 引号栈合同**（靶子=基线 6 警告全部）：引号体检查从
+  "固定单元素入口栈"参数化为（入口栈形 Σ，元素 e）→ 检查
+  Σ·e → Σ·输出；@each/@map/@fold/@filter/@times 各自的栈形
+  合同显式化。验收：typecheck-gate 中 Lexicon 警告 6→0。
+- **Phase 2 多态变体推断**：词签名按调用点实例化——def 首次调用
+  深拷贝签名（fresh TypeVar），occurs-check 防 Ref 递归。消灭
+  "单形签名被一个调用点污染全程序"。验收：两语料均 0 新错。
+- **Phase 3 kv effect 行**（最难，先独立设计注再动手）：
+  kv-set/kv-get 以 A-SK 风格键序 effect 建模（符号键→类型），
+  "`"swap 模式词的检查器栈序与运行时对齐。若 Phase 1+2 后
+  两语料已零误报，本阶段可降级为纯保险层（可选）。
+- **Phase 4 默认翻转**：strict 默认 + `--no-strict-types` 逃逸口 +
+  spec/tutorial 更新 + Lexicon 全语料复跑定档。
+
+工作量：Phase 0+1 ≈ 一个战役日；Phase 2 ≈ 一个战役日；
+Phase 3 视 Phase 1/2 战果伸缩；Phase 0.5 日。每阶段独立提交，
+预注册判据未动。
 
 ## 附：已关闭项（勿重复立项）
 
