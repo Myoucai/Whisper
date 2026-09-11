@@ -158,6 +158,15 @@ json-parse/json-stringify（对象键排序对齐 serde_json BTreeMap）、
 - `scripts/syntax-gate.sh` — 执行上述对拍（CI 强制）
 - `scripts/stdlib-gate.sh` — stdlib 24 项门槛（CI 强制）
 - `scripts/verify-fixedpoint.sh` — 自举固定点字节级验证（CI 强制）
+- `scripts/typecheck-gate.sh` — 类型检查假阳性棘轮（CI 强制；lexicon
+  语料无仓库时跳过）
+
+**类型检查语义（N-2，2026-09-10 起）**：`whisper run` 前的类型检查错误
+**默认致命**；`--no-strict-types` 降级为警告。前置条件为全套零假阳性
+（三语料实测 FP=0：encoding 0 / conformance 0 / lexicon 0，真阳性
+不罚——详见 docs/typecheck-strict-design.md 收官注与
+scripts/typecheck-gate.sh 棘轮）。构建目标（wbin/c2/native）不做
+Rust 侧类型检查，不受影响。
 
 冻结版本：**v1.0**（2026-08-22）
 

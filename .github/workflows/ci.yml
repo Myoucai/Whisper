@@ -87,6 +87,8 @@ jobs:
           bash scripts/stdlib-gate.sh
       - name: Opcode coverage gate (VM vs self-hosted C chain, per-feature dual-run)
         run: bash tools/opcode_coverage.sh ./target/debug/whisper
+      - name: Typecheck FP-ratchet gate (encoding/conformance; lexicon skipped on CI)
+        run: bash scripts/typecheck-gate.sh ./target/debug/whisper
       - name: Syntax freeze gate (dual-implementation conformance)
         run: bash scripts/syntax-gate.sh
       - name: Net gate (real HTTP server via self-hosted chain)
