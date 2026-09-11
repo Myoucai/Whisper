@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased (2026-09-10m) — N-2 Phase 2：多态实例化 + 假阳性普查（FP 仅剩 3）
+
+- **调用点实例化**（checker.rs freshen）：WordRef 每次调用深拷贝
+  签名并把 TypeVar 整体换新——消灭签名 var-id 被首个调用点绑定后
+  全程序污染的一类。
+- **决定性普查**：剩余 18 诊断 × 运行时成败交叉表——**假阳性仅 3**
+  （t_base:1 + t_mk4:2，均为共享闭括号多 `??` 链的臂槽建模类，
+  J-3 撤回项真身）；**真阳性 15**——检查器抓到的真 bug（t_q*
+  全家 + t_ind6/s7，运行时确实错；早先手工 rc 读数有误，由门禁
+  修正）。检查器的价值首次被定量。
+- **门禁升级**：typecheck-gate 改为 FP 感知棘轮——运行时成功文件
+  上的诊断才计 FP（CEIL_FP=3）；真阳性不惩罚。
+- **回归**：cargo 460/0；覆盖门禁 52/0/0；encoding 0 /
+  conformance 2 基线不动。
+- **后续**：Phase 2.5（?? 臂逐槽建模）清 FP 3→0 即达 strict 默认
+  前置。
+
 ## Unreleased (2026-09-10l) — N-2 Phase 1：引号栈合同——lexicon 诊断 32→18
 
 - **消费者合同重设计**（checker.rs）：expect_ref 的 t→t 净零形状

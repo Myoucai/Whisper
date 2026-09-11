@@ -156,8 +156,24 @@ impl TypeChecker {
 
             AstNode::WordRef(name) => {
                 let resolved_sig: Option<(Vec<Type>, Vec<Type>)> =
-                    if let Some(sig) = self.word_sigs.get(name) {
-                        Some((sig.inputs.clone(), sig.outputs.clone()))
+                    if let Some(sig) = self.word_sigs.get(name).cloned() {
+                        // N-2 Phase 2 多态实例化：每次调用深拷贝签名并把
+                        // TypeVar 整体换成新 var——签名里的 var id 若被两个
+                        // 调用点共享，首个调用点的 unify 会污染全局（id:=str
+                        // 连锁，"单形签名被一个调用点污染全程序"）。
+                        let mut mapping: std::collections::HashMap<u64, Type> =
+                            std::collections::HashMap::new();
+                        let inputs: Vec<Type> = sig
+                            .inputs
+                            .iter()
+                            .map(|t| self.freshen(t, &mut mapping))
+                            .collect();
+                        let outputs: Vec<Type> = sig
+                            .outputs
+                            .iter()
+                            .map(|t| self.freshen(t, &mut mapping))
+                            .collect();
+                        Some((inputs, outputs))
                     } else if let Some((inputs, outputs)) = get_builtin_signature(name) {
                         Some((inputs, outputs))
                     } else {
@@ -997,6 +1013,36 @@ impl TypeChecker {
                     context: ctx.to_string(),
                 });
             }
+        }
+    }
+
+    /// N-2 Phase 2: structural deep-copy replacing TypeVar ids with fresh
+    /// vars (consistent within one instantiation).
+    fn freshen(
+        &mut self,
+        t: &Type,
+        mapping: &mut std::collections::HashMap<u64, Type>,
+    ) -> Type {
+        match t {
+            Type::TypeVar(id) => {
+                if let Some(f) = mapping.get(id) {
+                    return f.clone();
+                }
+                let f = self.inferer.fresh_var();
+                mapping.insert(*id, f.clone());
+                f
+            }
+            Type::List(inner) => Type::List(Box::new(self.freshen(inner, mapping))),
+            Type::Ref(i, o) => Type::Ref(
+                i.iter().map(|t| self.freshen(t, mapping)).collect(),
+                o.iter().map(|t| self.freshen(t, mapping)).collect(),
+            ),
+            Type::Signal(inner) => Type::Signal(Box::new(self.freshen(inner, mapping))),
+            Type::Union(a, b) => Type::Union(
+                Box::new(self.freshen(a, mapping)),
+                Box::new(self.freshen(b, mapping)),
+            ),
+            other => other.clone(),
         }
     }
 
