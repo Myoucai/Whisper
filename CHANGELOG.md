@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased (2026-09-10n) — N-2 Phase 2.5+4 收官：**strict 默认达成**（J-3 战役关闭）
+
+J-3 归档为"不可修补"的目标经分阶段重设计达成：**type 错误默认致命，
+`--no-strict-types` 降级逃逸**。三语料假阳性全零。
+
+- **?? 臂逐槽合并**：两臂按槽位对齐合并（unify/union），不再只取
+  last()——J-3 当年撤回是因被坏签名放大，Phase 2 freshen 后放大源
+  已除，重试成功（t_mk4 双 FP 清零）。
+- **内建签名实例化**：builtins 表的 TypeVar(99)/(0) 是固定 id，
+  所有调用点共享同一变量、首点绑定污染全局（t_base 最后一条 FP
+  的根）——与词签名同走 freshen。
+- **借位计数**：infer_sig 模式下词体欠压操作（体首 `dup`/`drop`
+  等）合成 fresh 输入并计数，签名输入数=借位数——J-3 "体首即消费
+  给 0 输入"（tp-key 族）的修正。真阳性 15→6（部分真 bug 转为
+  静默，如实记录）。
+- **异构列表 union**：`[1 2 [3 4]]` 运行时合法——元素型升级 union
+  而非报错（conformance 2→0）。
+- **翻转**：main.rs 三处 flag 改 `!get_flag(--no-strict-types)`；
+  帮助文本更新；覆盖门禁 VM 侧加逃逸口（行为对拍用例含刻意栈残留）。
+- **验收**：cargo 460/0、syntax 26/0、stdlib 58/0、net、app、
+  覆盖门禁 52/0/0、typecheck-gate 三语料 FP=0（TP 6 不罚）。
+- 调试辅助保留：WHISPER_TC_TRACE=1 打印语句级类型栈。
+
 ## Unreleased (2026-09-10m) — N-2 Phase 2：多态实例化 + 假阳性普查（FP 仅剩 3）
 
 - **调用点实例化**（checker.rs freshen）：WordRef 每次调用深拷贝

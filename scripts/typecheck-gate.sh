@@ -11,13 +11,13 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
-# 预注册棘轮上限（2026-09-10 Phase 2 普查：FP = t_base:1 + t_mk4:2 = 3
-# ——均为共享闭括号多 ?? 链的臂槽建模类（J-3 撤回项真身，Phase 2.5
-# 靶子）；真阳性 15 = 检查器抓到的真 bug（t_ind6/s7 运行时亦错，
-# 早先手工 rc 读数有误已由本门禁修正）。只许降，降了要更新此注）
-readonly CEIL_FP_LEXICON=3
+# 预注册棘轮上限（2026-09-10 Phase 2.5 后全零：FP=0 / conformance=0 /
+# encoding=0——strict 默认翻转的前提。借位计数修 tp-key 族 + 臂逐槽
+# 合并修 t_mk4 族 + 内建签名实例化 + 异构列表 union。真阳性 6 不罚。
+# 任何回升即 RATCHET-BROKEN）
+readonly CEIL_FP_LEXICON=0
 readonly CEIL_ENCODING=0
-readonly CEIL_CONFORMANCE=2
+readonly CEIL_CONFORMANCE=0
 
 count_diag() {  # file → stdout: diagnostic count
   timeout 60 "$W" run "$1" 2>&1 >/dev/null | grep -c "^Type error:" || true

@@ -35,6 +35,11 @@ pub struct TypeChecker {
     pub word_sigs: HashMap<String, WordSig>,
     /// The type inference engine, kept alive for the whole program.
     pub inferer: TypeInferer,
+    /// N-2 Phase 2.5：infer_sig 模式标志 + 借位计数——词体欠压操作
+    /// （体首 dup/drop 等）合成 fresh 输入并计数，而非报错跳过。
+    /// 签名输入数 = 借位数（J-3 "体首即消费给 0 输入" 的修正）。
+    inferring: bool,
+    borrowed: usize,
 }
 
 impl TypeChecker {
@@ -42,6 +47,8 @@ impl TypeChecker {
         TypeChecker {
             word_sigs: HashMap::new(),
             inferer: TypeInferer::new(),
+            inferring: false,
+            borrowed: 0,
         }
     }
 
@@ -59,11 +66,17 @@ impl TypeChecker {
 
         // Pass 2: check main program body
         let mut stack: Vec<Type> = Vec::new();
+        let trace = std::env::var("WHISPER_TC_TRACE").is_ok();
         for node in nodes {
             if matches!(node, AstNode::Def { .. }) {
                 continue;
             }
             self.check_node(node, &mut stack, &mut errors, "<main>");
+            if trace {
+                let rendered: Vec<String> =
+                    stack.iter().map(|t| self.inferer.resolve(t).name()).collect();
+                eprintln!("[tc-trace] {:?} => {:?}", node_brief(node), rendered);
+            }
         }
 
         errors
@@ -77,6 +90,8 @@ impl TypeChecker {
         // Swap in a fresh inferer for inference, restore afterwards
         let mut temp_inferer = TypeInferer::new();
         std::mem::swap(&mut self.inferer, &mut temp_inferer);
+        self.inferring = true;
+        self.borrowed = 0;
 
         let mut errors = Vec::new();
         let mut stack: Vec<Type> = Vec::new();
@@ -107,11 +122,15 @@ impl TypeChecker {
                 && !e.message.contains("underflow")
         });
 
-        // Resolve type variables using the temp inferer before swapping back
-        let inputs: Vec<Type> = input_types
+        // N-2 Phase 2.5：输入数以借位计数为准（欠压操作真实消耗的入参）
+        let mut inputs: Vec<Type> = input_types
             .iter()
             .map(|t| self.inferer.resolve(t))
             .collect();
+        while inputs.len() < self.borrowed {
+            inputs.push(self.inferer.fresh_var());
+        }
+        self.inferring = false;
         let outputs: Vec<Type> = stack.iter().map(|t| self.inferer.resolve(t)).collect();
 
         // Restore the main inferer (discard inference temporaries)
@@ -175,7 +194,17 @@ impl TypeChecker {
                             .collect();
                         Some((inputs, outputs))
                     } else if let Some((inputs, outputs)) = get_builtin_signature(name) {
-                        Some((inputs, outputs))
+                        // N-2 Phase 2.5：内建签名同样实例化——builtins 表里的
+                        // TypeVar(99)/(0) 是固定 id，不换新则所有调用点共享
+                        // 同一变量，首个调用点的绑定污染全局（t_base 最后一条
+                        // FP 的根源）。
+                        let mut mapping: std::collections::HashMap<u64, Type> =
+                            std::collections::HashMap::new();
+                        let i2: Vec<Type> =
+                            inputs.iter().map(|t| self.freshen(t, &mut mapping)).collect();
+                        let o2: Vec<Type> =
+                            outputs.iter().map(|t| self.freshen(t, &mut mapping)).collect();
+                        Some((i2, o2))
                     } else {
                         None
                     };
@@ -265,14 +294,12 @@ impl TypeChecker {
                     if let Some(popped) = stack.pop() {
                         if let Some(ref expected) = elem_type {
                             if self.inferer.unify(expected, &popped).is_err() {
-                                errors.push(TypeError {
-                                    message: format!(
-                                        "List element type mismatch: expected {}, got {}",
-                                        self.inferer.resolve(expected),
-                                        self.inferer.resolve(&popped),
-                                    ),
-                                    context: ctx.to_string(),
-                                });
+                                // N-2 Phase 2.5：异构列表运行时合法（[1 2 [3 4]]）
+                                // ——元素型升级为 union 而非报错
+                                elem_type = Some(Type::Union(
+                                    Box::new(expected.clone()),
+                                    Box::new(popped.clone()),
+                                ));
                             }
                         } else {
                             elem_type = Some(popped);
@@ -300,22 +327,30 @@ impl TypeChecker {
                     }
                 }
                 stack.truncate(depth);
-                let then_result = then_stack
-                    .last()
-                    .cloned()
-                    .unwrap_or_else(|| self.inferer.fresh_var());
-                let else_result = else_stack
-                    .last()
-                    .cloned()
-                    .unwrap_or_else(|| self.inferer.fresh_var());
-                if self.inferer.unify(&then_result, &else_result).is_ok() {
-                    stack.push(self.inferer.resolve(&then_result));
-                } else {
-                    // Branches produce different types → union type
-                    stack.push(Type::Union(
-                        Box::new(self.inferer.resolve(&then_result)),
-                        Box::new(self.inferer.resolve(&else_result)),
-                    ));
+                // N-2 Phase 2.5 臂逐槽合并：两臂按槽位对齐合并（unify 成
+                // 功用合并型，失败用 union），不再只取 last()——last() 丢
+                // 掉其余槽位是共享闭括号多 ?? 链误报的根源。J-3 当年撤回
+                // 是因被坏签名放大；Phase 2 调用点 freshen 后放大源已除。
+                let then_tail = &then_stack[depth.min(then_stack.len())..];
+                let else_tail = &else_stack[depth.min(else_stack.len())..];
+                let n = then_tail.len().max(else_tail.len());
+                for i in 0..n {
+                    let t_slot = then_tail
+                        .get(i)
+                        .cloned()
+                        .unwrap_or_else(|| self.inferer.fresh_var());
+                    let e_slot = else_tail
+                        .get(i)
+                        .cloned()
+                        .unwrap_or_else(|| self.inferer.fresh_var());
+                    if self.inferer.unify(&t_slot, &e_slot).is_ok() {
+                        stack.push(self.inferer.resolve(&t_slot));
+                    } else {
+                        stack.push(Type::Union(
+                            Box::new(self.inferer.resolve(&t_slot)),
+                            Box::new(self.inferer.resolve(&e_slot)),
+                        ));
+                    }
                 }
             }
 
@@ -429,10 +464,18 @@ impl TypeChecker {
             // Stack ops
             Operator::Dup => {
                 if stack.is_empty() {
-                    errors.push(TypeError {
-                        message: "Dup: stack empty".into(),
-                        context: ctx.into(),
-                    });
+                    if self.inferring {
+                        // 借位：dup 的操作数来自词入参
+                        self.borrowed += 1;
+                        let f = self.inferer.fresh_var();
+                        stack.push(f.clone());
+                        stack.push(f);
+                    } else {
+                        errors.push(TypeError {
+                            message: "Dup: stack empty".into(),
+                            context: ctx.into(),
+                        });
+                    }
                 } else {
                     let t = stack.last().unwrap().clone();
                     stack.push(t);
@@ -440,11 +483,20 @@ impl TypeChecker {
             }
             Operator::Swap => {
                 if stack.len() < 2 {
-                    errors.push(TypeError {
-                        message: "Swap: need 2 values".into(),
-                        context: ctx.into(),
-                    });
-                } else {
+                    if self.inferring {
+                        while stack.len() < 2 {
+                            self.borrowed += 1;
+                            let f = self.inferer.fresh_var();
+                            stack.insert(0, f);
+                        }
+                    } else {
+                        errors.push(TypeError {
+                            message: "Swap: need 2 values".into(),
+                            context: ctx.into(),
+                        });
+                    }
+                }
+                if stack.len() >= 2 {
                     let a = stack.pop().unwrap();
                     let b = stack.pop().unwrap();
                     stack.push(a);
@@ -453,10 +505,14 @@ impl TypeChecker {
             }
             Operator::Drop => {
                 if stack.is_empty() {
-                    errors.push(TypeError {
-                        message: "Drop: stack empty".into(),
-                        context: ctx.into(),
-                    });
+                    if self.inferring {
+                        self.borrowed += 1; // 借位后即弃
+                    } else {
+                        errors.push(TypeError {
+                            message: "Drop: stack empty".into(),
+                            context: ctx.into(),
+                        });
+                    }
                 } else {
                     stack.pop();
                 }
@@ -1008,10 +1064,15 @@ impl TypeChecker {
                 }
             }
             None => {
-                errors.push(TypeError {
-                    message: format!("Stack underflow: {} needs {}", desc, expected),
-                    context: ctx.to_string(),
-                });
+                if self.inferring {
+                    // 借位：本槽是词入参，检查继续（消费即输入）
+                    self.borrowed += 1;
+                } else {
+                    errors.push(TypeError {
+                        message: format!("Stack underflow: {} needs {}", desc, expected),
+                        context: ctx.to_string(),
+                    });
+                }
             }
         }
     }
@@ -1295,5 +1356,17 @@ mod nth_append_tests {
             &crate::types::Type::List(Box::new(crate::types::Type::TypeVar(t0_id))),
         );
         assert!(r.is_err(), "occurs-check must reject t := List(t)");
+    }
+}
+
+/// One-line description of a node for tc-trace (N-2 Phase 2.5 debug aid).
+fn node_brief(node: &AstNode) -> String {
+    match node {
+        AstNode::WordRef(n) => format!("word:{n}"),
+        AstNode::Literal(v) => format!("lit:{}", v.type_name()),
+        AstNode::Op(o) => format!("op:{o:?}"),
+        AstNode::Quote(_) => "quote".into(),
+        AstNode::List(items) => format!("list[{}]", items.len()),
+        other => format!("{:?}", std::mem::discriminant(other)),
     }
 }

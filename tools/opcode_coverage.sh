@@ -32,7 +32,8 @@ t() {  # t <name> <source>
   local name="$1" src="$2"
   printf '%s\n' "$src" > "$TMP/$name.ws"
   local vm_out c_out
-  vm_out=$(timeout 20 "$W" run "$TMP/$name.ws" 2>/dev/null)
+  # 行为对拍门禁：类型检查降级警告（用例含刻意的栈残留 drop）
+  vm_out=$(timeout 20 "$W" run --no-strict-types "$TMP/$name.ws" 2>/dev/null)
   gap() { GAP=$((GAP+1)); GAPS="$GAPS|$name:$1"; return 0; }
   if ! "$NSC" -c < "$TMP/$name.ws" > "$TMP/$name.c" 2>"$TMP/$name.err"; then
     case " $KNOWN_GAPS " in *" $name "*) gap bootstrap-compile-failed; return ;; esac
