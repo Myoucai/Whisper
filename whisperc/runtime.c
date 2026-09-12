@@ -29,7 +29,7 @@
 typedef int64_t  wi64;
 typedef double   wf64;
 typedef struct { uint64_t v; uint8_t t; } wval;
-enum { WT_I64 = 0, WT_F64 = 1, WT_PTR = 2, WT_SIG = 3 };
+enum { WT_I64 = 0, WT_F64 = 1, WT_PTR = 2, WT_SIG = 3, WT_BOOL = 4 };
 // Signal (L-03): confidence-tagged wrapper, VM Value::Signal(inner, c).
 // Transparent for type checks/arithmetic (VM unwraps); conf-of/unwrap
 // are the only observers. malloc'd, never freed — conf literals are rare.
@@ -44,6 +44,16 @@ static inline double w_conf(wval v) { return v.t == WT_SIG ? ((wsig *)v.v)->conf
 // Raw identity compare (bits + tag) — used for pointer/identity equality
 // where C does not define == on structs.
 static inline int w_eq_raw(wval a, wval b) { return a.v == b.v && a.t == b.t; }
+
+// N-1/N-3 值相等：对齐 VM Value::equals——仅 Bool↔I64 跨标签按数值
+// （Bool↔F64 与 I64↔F64 在 VM 亦为假，保持 tag 严格）。
+static inline int w_val_eq(wval a, wval b) {
+    if (a.t == WT_SIG) a = w_sig_inner(a);
+    if (b.t == WT_SIG) b = w_sig_inner(b);
+    if (a.t == WT_BOOL && b.t == WT_I64) return (a.v ? 1 : 0) == (int64_t)b.v;
+    if (a.t == WT_I64 && b.t == WT_BOOL) return (int64_t)a.v == (b.v ? 1 : 0);
+    return a.v == b.v && a.t == b.t;
+}
 
 // ── Stack ───────────────────────────────────────────────────────────
 
@@ -78,10 +88,12 @@ static void w_fail(const char *msg) {
 static inline wval W_I64(int64_t x)  { wval r; r.v = (uint64_t)x; r.t = WT_I64; return r; }
 static inline wval W_F64(double d)   { wval r; memcpy(&r.v, &d, 8); r.t = WT_F64; return r; }
 static inline wval W_PTR(void *p)    { wval r; r.v = (uint64_t)p;  r.t = WT_PTR; return r; }
+static inline wval W_BOOL(int64_t b) { wval r; r.v = (uint64_t)b;  r.t = WT_BOOL; return r; }
 
 static inline int w_is_f64(wval v) { return v.t == WT_F64; }
 static inline int64_t w_as_i64(wval v) {
     if (v.t == WT_SIG) v = w_sig_inner(v);
+    if (v.t == WT_BOOL) return v.v ? 1 : 0;  // N-1 数值协变（bool 即 1/0）
     if (v.t != WT_I64) { w_fail("type error: expected i64"); return 0; }
     return (int64_t)v.v;
 }
@@ -97,6 +109,7 @@ static inline void *w_as_ptr(wval v) {
 }
 static inline double w_num_f64(wval v) {  // numeric promotion (VM binary_num_op: i64 coerces to f64)
     if (v.t == WT_SIG) v = w_sig_inner(v);
+    if (v.t == WT_BOOL) return v.v ? 1.0 : 0.0;
     if (v.t == WT_F64) return w_as_f64(v);
     if (v.t == WT_I64) return (double)(int64_t)v.v;
     w_fail("type error: expected i64 or f64"); return 0;
@@ -150,14 +163,14 @@ static void w_op_mod(void) { wval b=w_pop(),a=w_pop();
 // compare; any f64 → numeric compare; else i64 compare.
 static void w_op_lt(void) { wval b=w_pop(),a=w_pop();
     if (a.t==WT_PTR && b.t==WT_PTR && wval_is_str(a) && wval_is_str(b)) {
-        w_push(W_I64(w_str_lt((const char *)w_as_ptr(a), (const char *)w_as_ptr(b)))); return; }
-    if (a.t==WT_F64 || b.t==WT_F64) { w_push(W_I64(w_num_f64(a) < w_num_f64(b))); return; }
-    w_push(W_I64(w_as_i64(a) < w_as_i64(b))); }
+        w_push(W_BOOL(w_str_lt((const char *)w_as_ptr(a), (const char *)w_as_ptr(b)))); return; }
+    if (a.t==WT_F64 || b.t==WT_F64) { w_push(W_BOOL(w_num_f64(a) < w_num_f64(b))); return; }
+    w_push(W_BOOL(w_as_i64(a) < w_as_i64(b))); }
 static void w_op_gt(void) { wval b=w_pop(),a=w_pop();
     if (a.t==WT_PTR && b.t==WT_PTR && wval_is_str(a) && wval_is_str(b)) {
-        w_push(W_I64(w_str_lt((const char *)w_as_ptr(b), (const char *)w_as_ptr(a)))); return; }
-    if (a.t==WT_F64 || b.t==WT_F64) { w_push(W_I64(w_num_f64(a) > w_num_f64(b))); return; }
-    w_push(W_I64(w_as_i64(a) > w_as_i64(b))); }
+        w_push(W_BOOL(w_str_lt((const char *)w_as_ptr(b), (const char *)w_as_ptr(a)))); return; }
+    if (a.t==WT_F64 || b.t==WT_F64) { w_push(W_BOOL(w_num_f64(a) > w_num_f64(b))); return; }
+    w_push(W_BOOL(w_as_i64(a) > w_as_i64(b))); }
 
 // ── Heap allocator ──────────────────────────────────────────────────
 // Split-arena bump allocator: strings grow up from the heap base,
@@ -291,10 +304,10 @@ static void w_try_call(void (*fn)(void)) {
         fn();
         w_try_sp--;
         wval r = (w_sp > 0) ? w_pop() : W_I64(0);
-        w_push(W_I64(1));
+        w_push(W_BOOL(1));
         w_push(r);
     } else {
-        w_push(W_I64(0));
+        w_push(W_BOOL(0));
         w_push(W_PTR(w_str_from_cstr(w_try_msg)));
     }
 }
@@ -761,6 +774,7 @@ static void w_dump_val(wval v) {
     // common magnitudes; extreme exponents still differ (1e+10 vs
     // 10000000000) — accepted compromise for this pass.
     if (v.t == WT_F64) { printf("%g", w_as_f64(v)); return; }
+    if (v.t == WT_BOOL) { fputs(v.v ? "#t" : "#f", stdout); return; }  // VM Display 对齐
     // Default: print as i64
     printf("%lld", (long long)(int64_t)v.v);
 }
@@ -1522,8 +1536,8 @@ static wval w_json_value(const char **pp) {
         return W_PTR(l);
     }
     if (*p == '"') { char *s = w_json_str(&p); *pp = p; return W_PTR(s); }
-    if (!strncmp(p, "true", 4))  { *pp = p + 4; return W_I64(1); }
-    if (!strncmp(p, "false", 5)) { *pp = p + 5; return W_I64(0); }
+    if (!strncmp(p, "true", 4))  { *pp = p + 4; return W_BOOL(1); }  // VM: Bool
+    if (!strncmp(p, "false", 5)) { *pp = p + 5; return W_BOOL(0); }
     if (!strncmp(p, "null", 4))  { *pp = p + 4; return W_I64(0); }
     {   // number: int unless it carries . e E
         const char *q = p; int isf = 0;
@@ -1619,6 +1633,7 @@ static void w_json_num(w_sb *b, double d) {
 
 static void w_json_dump(w_sb *b, wval v) {
     if (v.t == WT_SIG) { w_json_dump(b, w_sig_inner(v)); return; }
+    if (v.t == WT_BOOL) { w_sb_put(b, v.v ? "true" : "false", v.v ? 4 : 5); return; }
     if (v.t == WT_I64) { char t[32]; snprintf(t, sizeof t, "%lld", (long long)(int64_t)v.v); w_sb_put(b, t, strlen(t)); return; }
     if (v.t == WT_F64) { w_json_num(b, w_as_f64(v)); return; }
     if (v.t != WT_PTR) { w_sb_put(b, "null", 4); return; }
@@ -1754,19 +1769,21 @@ static wval *w_args(void) {
 // ── Type check functions (for Whisper list?, i64?, str?, bool?) ─────
 static void w_list_(void) {
     wval v = w_pop();
-    w_push(W_I64(w_is_list_val(v) ? 1L : 0L));
+    w_push(W_BOOL(w_is_list_val(v) ? 1L : 0L));
 }
 static void w_i64_(void) {
     wval v = w_pop();
-    w_push(W_I64(v.t == WT_I64 ? 1L : 0L));
+    w_push(W_BOOL(v.t == WT_I64 ? 1L : 0L));
 }
 static void w_str_(void) {
     wval v = w_pop();
-    w_push(W_I64(wval_is_str(v) ? 1L : 0L));
+    w_push(W_BOOL(wval_is_str(v) ? 1L : 0L));
 }
 static void w_bool_(void) {
+    // VM Bool?: 仅 Bool 值为真（I64 1 不是 bool）——有 WT_BOOL 后精确判定
     wval v = w_pop();
-    w_push(W_I64((v.v == 0 || v.v == 1) ? 1L : 0L));
+    if (v.t == WT_SIG) v = w_sig_inner(v);
+    w_push(W_BOOL(v.t == WT_BOOL ? 1L : 0L));
 }
 
 // ── Quote (closure) support ─────────────────────────────────────────

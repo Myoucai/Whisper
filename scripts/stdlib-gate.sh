@@ -40,7 +40,7 @@ t p1-mkdir     '"t_g1" mkdir . "t_g1" file-exists .' $'0
 1'
 t p1-strftime  '0 "%Y-%m-%d" strftime .' 1970-01-01
 t p1-strftime2 '1770000000 "%H:%M:%S" strftime .' 02:40:00
-t p1-listdir   '"." listdir len 0 > .' 1
+t p1-listdir   '"." listdir len 0 > .' '#t'
 t p1-leave     '0 { _ 3 = ?? leave | ] _ . 1 + } { _ 5 < } # drop "end" .' $'0
 1
 2
@@ -66,7 +66,7 @@ t p2-sp-f64bits '[3.5] "<d" pack "<d" unpack 0 @nth .' 4615063718147915776
 t fix-strjoin  '"-" ["a" "b" "c"] strjoin .' 'a-b-c'
 t fix-strjoin2 '", " ["x" "y"] strjoin .' 'x, y'
 t p8-ffi-crc32 '"zlib1.dll" ffi-open dup "crc32" ffi-sym ` drop [0 "123456789" 9] "iipi" rot ffi-call .' 3421780262
-t p8-ffi-sym-zero '0 "x" ffi-sym 0 = .' 1
+t p8-ffi-sym-zero '0 "x" ffi-sym 0 = .' '#t'
 t whl-png-size 'import "D:/Whisper/apps/wheels/png-size/pngsize" "D:/Whisper/apps/wheels/png-size/test.png" png-size .' 8x5
 t whl-be32    'import "D:/Whisper/apps/wheels/png-size/pngsize" "abcdefgh" 1 be32-of .' 1650680933
 t p0-upper     '"Hello" str-upper .' HELLO
@@ -79,7 +79,7 @@ t str-len      'import "std/str" "hello" strlen .' 5
 t str-concat   'import "std/str" "hello" "world" strcat strlen .' 10
 t str-upper    'import "std/str" "hello" upper .' HELLO
 t str-split    'import "std/str" "a,b,c" "," strsplit len .' 3
-t str-contains 'import "std/str" "hello" "ell" contains? .' 1
+t str-contains 'import "std/str" "hello" "ell" contains? .' '#t'
 t str-fromint  'import "std/str" 42 from-int strlen .' 2
 t mathf-sqrt   'import "std/mathf" 9 i64>f64 fsqrt f64>i64 .' 3
 t core-gcd     'import "std/core" 12 18 gcd .' 6

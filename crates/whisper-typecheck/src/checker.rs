@@ -153,6 +153,7 @@ impl TypeChecker {
                     whisper_core::value::Value::F64(_) => Type::F64,
                     whisper_core::value::Value::Bool(_) => Type::Bool,
                     whisper_core::value::Value::Str(_) => Type::Str,
+                    whisper_core::value::Value::Map(_) => Type::Map,
                     whisper_core::value::Value::List(items) => {
                         let elem = items
                             .first()
@@ -913,32 +914,32 @@ impl TypeChecker {
 
             // Map operations
             Operator::MapNew => {
-                stack.push(self.inferer.fresh_var());
+                stack.push(Type::Map);
             }
             Operator::MapGet => {
                 self.expect(stack, &Type::Str, errors, ctx, "map-get key");
-                stack.pop(); // pop the map
+                self.expect(stack, &Type::Map, errors, ctx, "map-get map");
                 stack.push(self.inferer.fresh_var()); // value (any type)
             }
             Operator::MapSet => {
                 let v = self.inferer.fresh_var();
                 self.expect(stack, &v, errors, ctx, "map-set value");
                 self.expect(stack, &Type::Str, errors, ctx, "map-set key");
-                stack.pop(); // pop the map
-                stack.push(self.inferer.fresh_var()); // new map
+                self.expect(stack, &Type::Map, errors, ctx, "map-set map");
+                stack.push(Type::Map);
             }
             Operator::MapDel => {
                 self.expect(stack, &Type::Str, errors, ctx, "map-del key");
-                stack.pop(); // pop the map
-                stack.push(self.inferer.fresh_var()); // new map
+                self.expect(stack, &Type::Map, errors, ctx, "map-del map");
+                stack.push(Type::Map);
             }
             Operator::MapKeys => {
-                stack.pop(); // pop the map
+                self.expect(stack, &Type::Map, errors, ctx, "map-keys map");
                 stack.push(Type::List(Box::new(Type::Str)));
             }
             Operator::MapHas => {
                 self.expect(stack, &Type::Str, errors, ctx, "map-has key");
-                stack.pop(); // pop the map
+                self.expect(stack, &Type::Map, errors, ctx, "map-has map");
                 stack.push(Type::Bool);
             }
 
@@ -1179,6 +1180,7 @@ fn value_to_type(val: &whisper_core::value::Value, inferer: &mut TypeInferer) ->
         whisper_core::value::Value::F64(_) => Type::F64,
         whisper_core::value::Value::Bool(_) => Type::Bool,
         whisper_core::value::Value::Str(_) => Type::Str,
+        whisper_core::value::Value::Map(_) => Type::Map,
         whisper_core::value::Value::List(items) => {
             let elem = items
                 .first()

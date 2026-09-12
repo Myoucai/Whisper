@@ -132,8 +132,6 @@ export name                ;; 导出（一词一行）
 | 差异 | Rust VM | 自举 C 链 |
 |------|---------|-----------|
 | 字符串 `.` 输出 | 带引号 `"hi"` | 裸文本 `hi`（driver 依赖） |
-| 布尔输出 | `#t` / `#f` | `1` / `0` |
-| `#t json-stringify` | `"true"` | `1`（wval 无 bool 标签——永久分歧，除非另立 WT_BOOL） |
 | `..` 格式 | `Stack: [...]` | `[...]` |
 | try 捕获的错误消息文本 | Rust VmError 全文（含位置上下文） | 简短消息（"Division by zero" 等关键字一致）；形状 [#t,值]/[#f,消息] 与栈回卷完全一致 |
 | JSON `\uXXXX` 代理对 | 完整解码 | BMP-only（罕见，已记录） |
@@ -143,6 +141,12 @@ N-1（2026-09-10）起 **bool 数值协变两侧一致**：`#t 1 +`→2、
 `"ab" #t strnth`→98、`0 1 atan2`→0、`#t bitnot`→-2、`#t 0.5 +`→1.5
 （VM 三咽喉点协变 + typecheck unify 数值协变；16 格矩阵见
 tests/n1_preregistered.md，覆盖门禁 4 用例锁死）。
+
+N-3（2026-09-10）起 **布尔输出与 JSON 布尔两侧一致**（WT_BOOL 第五
+值标签）：`#t .`→#t、`1 2 < .`→#t、`#t json-stringify`→true、
+`"[true]" json-parse 0 @nth .`→#t、`{ 42 } try . .`→42/#t、
+`#t:0.5 unwrap .`→#t——bool? 谓词精确判定（I64 1 非 bool）。相等
+语义对齐 VM：仅 Bool↔I64 跨标签数值比（Bool↔F64 两侧均为假）。
 
 L 阶段（2026-09-10）起两实现全量对齐：try（setjmp/longjmp 真错误恢复）、
 json-parse/json-stringify（对象键排序对齐 serde_json BTreeMap）、

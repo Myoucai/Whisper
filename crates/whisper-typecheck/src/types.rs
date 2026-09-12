@@ -18,6 +18,9 @@ pub enum Type {
     Str,
     /// Homogeneous list of type T
     List(Box<Type>),
+    /// Map (string-keyed) — N-3 保险层：map-* 词的参数精确化，
+    /// 找回 map-get-on-non-map 类真阳性
+    Map,
     /// Quotation: input stack -> output stack
     Ref(Vec<Type>, Vec<Type>),
     /// Capability token
@@ -37,6 +40,7 @@ impl Type {
             Type::I64 => "i64".into(),
             Type::F64 => "f64".into(),
             Type::Bool => "bool".into(),
+            Type::Map => "map".into(),
             Type::Str => "str".into(),
             Type::List(t) => format!("[{}]", t.name()),
             Type::Ref(inputs, outputs) => {

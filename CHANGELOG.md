@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased (2026-09-10o) — N-3：WT_BOOL 第五标签（布尔全对齐）+ Type::Map 保险层
+
+- **WT_BOOL**（runtime.c 值模型第五标签 + cgen 全量发射改造）：
+  原 N-1 判定的两格"永久分歧"闭合——`#t .`→#t、`1 2 < .`→#t、
+  `#t json-stringify`→true、`"[true]" json-parse 0 @nth .`→#t、
+  `{ 42 } try . .`→42/#t、`#t:0.5 unwrap .`→#t。布尔字面量/比较
+  （= < > != <= >=）/逻辑（& | !）/streq/map-has/谓词（list? i64?
+  str? bool?）全部 W_BOOL；w_val_eq 对齐 VM equals（仅 Bool↔I64
+  跨标签数值比）；bool? 精确判定（I64 1 非 bool——旧 0/1 启发式
+  修正）；数值位协变（w_as_i64/w_num_f64 收 BOOL）。12 项探针
+  双侧一致；spec §4 撤两行永久分歧。stdlib 门禁 3 例期望值更新
+  为 VM 真值（#t）。
+- **Type::Map**（typecheck 保险层，替代 kv effect 行）：借位计数
+  丢失的 9 条真阳性经调查全部为 map 类型形状（map-get 收 i64）而
+  非 kv 键序——A-SK effect 行以证据裁决不做；对症加 Type::Map +
+  map-* 五词参数精确化：**TP 6→7、FP 保持 0**。
+- **回归**：cargo 460/0；覆盖门禁 52/0/0；syntax 26/0、stdlib 58/0、
+  net、app 四门全绿；typecheck-gate FP=0/TP=7；固定点
+  gen2==gen3 OK。
+
 ## Unreleased (2026-09-10n) — N-2 Phase 2.5+4 收官：**strict 默认达成**（J-3 战役关闭）
 
 J-3 归档为"不可修补"的目标经分阶段重设计达成：**type 错误默认致命，
