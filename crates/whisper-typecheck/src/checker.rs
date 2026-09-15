@@ -932,6 +932,7 @@ impl TypeChecker {
                 stack.push(self.inferer.fresh_var()); // value (any type)
             }
             Operator::MapSet => {
+                // VM 弹序：[map, key, val]，值在顶（惯用形："键" 值 map-set）
                 let v = self.inferer.fresh_var();
                 self.expect(stack, &v, errors, ctx, "map-set value");
                 self.expect(stack, &Type::Str, errors, ctx, "map-set key");
