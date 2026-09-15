@@ -40,6 +40,8 @@ pub struct TypeChecker {
     /// 签名输入数 = 借位数（J-3 "体首即消费给 0 输入" 的修正）。
     inferring: bool,
     borrowed: usize,
+    /// `return` 之后的节点不可达（12 臂分发链的借位虚高根因）
+    terminated: bool,
 }
 
 impl TypeChecker {
@@ -49,6 +51,7 @@ impl TypeChecker {
             inferer: TypeInferer::new(),
             inferring: false,
             borrowed: 0,
+            terminated: false,
         }
     }
 
@@ -99,8 +102,12 @@ impl TypeChecker {
         let mut input_types: Vec<Type> = Vec::new();
 
         for node in body {
+            if self.terminated { break; }
             let _depth_before = stack.len() as isize;
             self.check_node(node, &mut stack, &mut errors, "<word>");
+            if self.terminated {
+                // return 后的栈形以当前深度封盘
+            }
             let depth_after = stack.len() as isize;
 
             // Track minimum depth — when it goes negative, those are inputs
@@ -556,6 +563,9 @@ impl TypeChecker {
                 self.expect(stack, &Type::Bool, errors, ctx, "logic rhs");
                 self.expect(stack, &Type::Bool, errors, ctx, "logic lhs");
                 stack.push(Type::Bool);
+            }
+            Operator::Return => {
+                self.terminated = true;
             }
             Operator::Not => {
                 self.expect(stack, &Type::Bool, errors, ctx, "not");
