@@ -180,13 +180,24 @@ pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result
         }));
     }
     if config.allow_http {
+        // WHISPER_HTTP_HOSTS=host1,host2 附加授权靶场（逗号分隔；
+        // 自建靶场在线验收用，白名单机制本身不变）。
+        let extra = std::env::var("WHISPER_HTTP_HOSTS")
+            .unwrap_or_default()
+            .split(',')
+            .map(str::trim)
+            .filter(|h| !h.is_empty())
+            .map(String::from)
+            .collect::<Vec<_>>();
         let hosts = || {
-            vec![
+            let mut v = vec![
                 "api.github.com".into(),
                 "jsonplaceholder.typicode.com".into(),
                 "127.0.0.1".into(),
                 "localhost".into(),
-            ]
+            ];
+            v.extend(extra.iter().cloned());
+            v
         };
         capability_table.bind(Box::new(whisper_core::capability::HttpGetCap {
             id: 2,
