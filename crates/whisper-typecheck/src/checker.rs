@@ -95,6 +95,7 @@ impl TypeChecker {
         std::mem::swap(&mut self.inferer, &mut temp_inferer);
         self.inferring = true;
         self.borrowed = 0;
+        self.terminated = false;
 
         let mut errors = Vec::new();
         let mut stack: Vec<Type> = Vec::new();
