@@ -118,13 +118,20 @@ pub fn run_wbin(data: &[u8], config: &RunConfig) -> Result<(), String> {
 
 /// Run a Whisper source file with optional capability bindings.
 pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result<(), String> {
-    // Phase 1: Parse source to AST
-    let ast = Parser::parse_source(source).map_err(|e| {
-        format!(
-            "Parse error at {}:{}: {}",
-            e.token.span.line, e.token.span.column, e.message
-        )
-    })?;
+    // Phase 1: Parse source to AST (warnings: def/keyword collisions etc.)
+    let (ast, parse_warnings) = {
+        let (nodes, errors, warnings) = Parser::parse_source_recovering_full(source);
+        if let Some(e) = errors.into_iter().next() {
+            return Err(format!(
+                "Parse error at {}:{}: {}",
+                e.token.span.line, e.token.span.column, e.message
+            ));
+        }
+        (nodes, warnings)
+    };
+    for w in &parse_warnings {
+        eprintln!("Parse warning: {w}");
+    }
 
     // Phase 1a: Resolve imports
     let resolved = whisper_parser::resolve_imports(ast, source_dir)

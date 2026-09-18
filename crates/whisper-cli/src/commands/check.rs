@@ -5,13 +5,20 @@ use whisper_typecheck::TypeChecker;
 
 /// Type-check a Whisper source file.
 pub fn check_file(source: &str) -> Result<(), String> {
-    // Phase 1: Parse
-    let ast = Parser::parse_source(source).map_err(|e| {
-        format!(
-            "Parse error at {}:{}: {}",
-            e.token.span.line, e.token.span.column, e.message
-        )
-    })?;
+    // Phase 1: Parse (surface def/keyword collision warnings too)
+    let (ast, warnings) = {
+        let (nodes, errors, warns) = Parser::parse_source_recovering_full(source);
+        if let Some(e) = errors.into_iter().next() {
+            return Err(format!(
+                "Parse error at {}:{}: {}",
+                e.token.span.line, e.token.span.column, e.message
+            ));
+        }
+        (nodes, warns)
+    };
+    for w in &warnings {
+        eprintln!("Parse warning: {w}");
+    }
 
     println!("Parsed: {} nodes", ast.len());
 

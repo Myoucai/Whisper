@@ -23,6 +23,8 @@ pub struct Parser {
     pos: usize,
     /// Accumulated errors (for recovering mode).
     errors: Vec<ParseError>,
+    /// Non-fatal diagnostics (e.g. def names colliding with keywords).
+    pub warnings: Vec<String>,
     /// Brace nesting depth tracker.  Used to auto-close at EOF.
     brace_depth: usize,
     bracket_depth: usize,
@@ -53,6 +55,7 @@ impl Parser {
             tokens,
             pos: 0,
             errors: Vec::new(),
+            warnings: Vec::new(),
             brace_depth: 0,
             bracket_depth: 0,
             recovering: false,
@@ -62,12 +65,21 @@ impl Parser {
     /// Parse source text with error recovery.
     /// Always returns an AST (best-effort).  Errors are collected separately.
     pub fn parse_source_recovering(source: &str) -> (Vec<AstNode>, Vec<ParseError>) {
+        let (nodes, errors, _warnings) = Self::parse_source_recovering_full(source);
+        (nodes, errors)
+    }
+
+    /// Like parse_source_recovering, but also returns non-fatal warnings
+    /// (def/keyword collisions etc.) so CLI frontends can surface them.
+    pub fn parse_source_recovering_full(
+        source: &str,
+    ) -> (Vec<AstNode>, Vec<ParseError>, Vec<String>) {
         let mut lexer = Lexer::new(source);
         let tokens = lexer.tokenize();
         let mut parser = Parser::new(tokens);
         parser.recovering = true;
         let nodes = parser.parse_inner();
-        (nodes, parser.errors)
+        (nodes, parser.errors, parser.warnings)
     }
 
     /// Strict parse — returns first error (backward-compatible signature).
@@ -254,6 +266,7 @@ impl Parser {
             // Word definitions: : name { body } ;
             TokenKind::Colon => {
                 self.advance();
+                let def_tok = self.current().clone();
                 let name = match self.recoverable_expect_word() {
                     Ok(n) => n,
                     Err(e) => {
@@ -261,6 +274,12 @@ impl Parser {
                         return Ok(None);
                     }
                 };
+                // Defining a word whose name is a builtin keyword is a silent
+                // dead end: call sites lex as the keyword token and resolve to
+                // the builtin (builtin-wins). Warn — unless the body is a
+                // single op (stdlib passthrough shape like `: floor { floor } ;`,
+                // where the author is aware the def is a re-export no-op).
+                let keyword_def = !matches!(def_tok.kind, TokenKind::Word(_));
                 // Expect { body }
                 if !matches!(self.current().kind, TokenKind::LBrace) {
                     self.errors.push(ParseError {
@@ -278,6 +297,14 @@ impl Parser {
                 let body = self.parse_until_recovering(TokenKind::RBrace);
                 if self.brace_depth > 0 {
                     self.brace_depth -= 1;
+                }
+                if keyword_def
+                    && !(body.len() == 1 && matches!(body[0], AstNode::Op(_)))
+                {
+                    self.warnings.push(format!(
+                        "def '{name}' collides with builtin keyword '{name}'; \
+                         call sites resolve to the builtin — rename this word"
+                    ));
                 }
                 if !matches!(self.current().kind, TokenKind::Semicolon) {
                     self.errors.push(ParseError {
@@ -1210,6 +1237,74 @@ static EOF_TOKEN: std::sync::LazyLock<Token> = std::sync::LazyLock::new(|| {
 });
 
 #[cfg(test)]
+
+    // ── def/keyword 冲突（#48：builtin-wins 下用户词不可达，须警告）──
+
+    #[test]
+    fn test_def_keyword_collision_warns() {
+        // 覆盖三类代表：socket 族（send/recv）、str 族（len/strcat）、
+        // math 透传形（floor）与栈族（over/drop）
+        for name in ["send", "recv", "listen", "len", "strcat", "floor", "over", "drop"] {
+            let src = format!(": {name} {{ 1 2 + }} ;
+");
+            let (ast, errors, warnings) = Parser::parse_source_recovering_full(&src);
+            assert!(errors.is_empty(), "{name}: unexpected parse errors {errors:?}");
+            assert!(
+                warnings
+                    .iter()
+                    .any(|w| w.contains(&format!("def '{name}' collides"))),
+                "{name}: expected collision warning, got {warnings:?}"
+            );
+            assert!(!ast.is_empty(), "{name}: def body should parse");
+        }
+    }
+
+    #[test]
+    fn test_def_normal_name_no_warning() {
+        let (_, errors, warnings) =
+            Parser::parse_source_recovering_full(": chsend { 1 2 + } ;
+");
+        assert!(errors.is_empty());
+        assert!(warnings.is_empty(), "normal def must not warn: {warnings:?}");
+    }
+
+    #[test]
+    fn test_keyword_call_resolves_to_builtin_not_def() {
+        // 调用点 send lex 为关键字 token → AST 必须是内建 Op(Send)，
+        // 不是 Word("send")——builtin-wins 语义的回归锁。
+        let src = ": send { 99 } ;
+1 2 send";
+        let (ast, errors, warnings) = Parser::parse_source_recovering_full(src);
+        assert!(errors.is_empty());
+        assert!(!warnings.is_empty());
+        let has_send_op = ast.iter().any(|n| matches!(
+            n,
+            AstNode::Op(crate::ast::Operator::Send)
+        ));
+        let has_word_send = ast.iter().any(|n| matches!(
+            n,
+            AstNode::WordRef(w) if w == "send"
+        ));
+        assert!(has_send_op, "call site must emit builtin Send op");
+        assert!(!has_word_send, "call site must not emit Word(\"send\")");
+    }
+
+
+    #[test]
+    fn test_def_keyword_passthrough_silent() {
+        // stdlib 透传形（单 Op 体）知情使用——不警告
+        let (_, errors, warnings) =
+            Parser::parse_source_recovering_full(": floor { floor } ;
+");
+        assert!(errors.is_empty());
+        assert!(warnings.is_empty(), "passthrough must stay silent: {warnings:?}");
+        // 非 Op 单元（字面量）仍警告
+        let (_, _, warnings2) =
+            Parser::parse_source_recovering_full(": send { 99 } ;
+");
+        assert!(!warnings2.is_empty(), "literal body must warn");
+    }
+
 mod tests {
     use super::*;
 
