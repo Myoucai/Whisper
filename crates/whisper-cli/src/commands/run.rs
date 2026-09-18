@@ -236,6 +236,17 @@ pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result
             tls_override: None,
             raw_body: true,
         }));
+        capability_table.bind(Box::new(whisper_core::http_session::HttpSessionParallelCap {
+            id: 9,
+            inner: whisper_core::http_session::HttpSessionCap {
+                id: 9,
+                allowed_hosts: hosts(),
+                jar: jar.clone(),
+                audit: audit.clone(),
+                tls_override: None,
+                raw_body: false,
+            },
+        }));
         capability_table.bind(Box::new(whisper_core::http_session::HttpAuditCap {
             id: 7,
             audit,

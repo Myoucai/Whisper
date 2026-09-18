@@ -63,6 +63,24 @@ impl Capability for HttpSessionCap {
         let headers_json = pop_str(data_stack, "headers-json")?;
         let url = pop_str(data_stack, "url")?;
         let method = pop_str(data_stack, "method")?;
+        let (status, hj, resp_body) = self.request_once(method, url, headers_json, body)?;
+        data_stack.push(Value::I64(status));
+        data_stack.push(Value::Str(Rc::new(hj)));
+        data_stack.push(Value::Str(Rc::new(resp_body)));
+        Ok(())
+    }
+}
+
+impl HttpSessionCap {
+    /// 单次会话请求核心（call 与并发 cap 共用）。返回
+    /// (status, headers-json, body)；无响应路径返回 (0, "{}", "")。
+    pub fn request_once(
+        &self,
+        method: String,
+        url: String,
+        headers_json: String,
+        body: String,
+    ) -> Result<(i64, String, String), VmError> {
 
         let parsed = parse_url(&url)
             .ok_or_else(|| VmError::ProgramError(format!("Invalid URL: {url}")))?;
@@ -136,16 +154,13 @@ impl Capability for HttpSessionCap {
         const IO_TIMEOUT: Duration = Duration::from_secs(15);
 
         // ( -- ) 无响应吞吐：status 0 / 空 headers / 空 body + 审计标记
-        macro_rules! no_response {
+        macro_rules! no_resp {
             ($why:expr) => {{
                 self.audit
                     .lock()
                     .unwrap()
                     .push(format!("{method} {url} {}", $why));
-                data_stack.push(Value::I64(0));
-                data_stack.push(Value::Str(Rc::new("{}".to_string())));
-                data_stack.push(Value::Str(Rc::new(String::new())));
-                return Ok(());
+                return Ok((0, "{}".to_string(), String::new()));
             }};
         }
 
@@ -176,13 +191,13 @@ impl Capability for HttpSessionCap {
                         };
                         match tls {
                             Ok(t) => Box::new(t),
-                            Err(_) => no_response!("IOERR-TLS"),
+                            Err(_) => no_resp!("IOERR-TLS"),
                         }
                     } else {
                         Box::new(s)
                     }
                 }
-                Err(_) => no_response!("TIMEOUT-CONNECT"),
+                Err(_) => no_resp!("TIMEOUT-CONNECT"),
             };
         let write_res = stream.write_all(request.as_bytes()).and_then(|_| {
             match &raw_bytes {
@@ -191,7 +206,7 @@ impl Capability for HttpSessionCap {
             }
         });
         if write_res.is_err() {
-            no_response!("IOERR-WRITE");
+            no_resp!("IOERR-WRITE");
         }
         // TLS 路径：Write 实现只进 rustls 缓冲，必须显式 flush 落 socket
         let _ = stream.flush();
@@ -217,9 +232,9 @@ impl Capability for HttpSessionCap {
                         if e.kind() == ErrorKind::UnexpectedEof {
                             break;
                         }
-                        no_response!("TIMEOUT-READ");
+                        no_resp!("TIMEOUT-READ");
                     }
-                    Err(_) => no_response!("IOERR-READ"),
+                    Err(_) => no_resp!("IOERR-READ"),
                 }
             }
             response = String::from_utf8_lossy(&raw).into_owned();
@@ -267,7 +282,6 @@ impl Capability for HttpSessionCap {
             .unwrap()
             .push(format!("{method} {url} {status}"));
 
-        data_stack.push(Value::I64(status));
         let hj = if out_headers.is_empty() {
             "{}".to_string()
         } else {
@@ -277,13 +291,107 @@ impl Capability for HttpSessionCap {
                 .collect();
             format!("{{{}}}", items.join(","))
         };
-        data_stack.push(Value::Str(Rc::new(hj)));
-        data_stack.push(Value::Str(Rc::new(resp_body)));
-        Ok(())
+        Ok((status, hj, resp_body))
     }
 }
 
+/// L-11 并发会话能力（id 9）。
+/// 栈型（http-req-parallel / @9）：
+///   `count method url headers-json body -- results-json`
+/// 内部对同一请求并发发出 count 份（服务端 latch/竞态窗口探测），
+/// **按请求序聚合**（确定性输出），共用 cookie 罐与零出域审计。
+/// VM 侧仍是单次调用——不引入语言级并发语义。
+pub struct HttpSessionParallelCap {
+    pub id: u16,
+    pub inner: HttpSessionCap,
+}
+
+impl Capability for HttpSessionParallelCap {
+    fn id(&self) -> u16 {
+        self.id
+    }
+    fn name(&self) -> &str {
+        "http_session_parallel"
+    }
+    fn description(&self) -> &str {
+        "Concurrent fan-out of one request (race/latch probing), indexed aggregation"
+    }
+
+    fn call(&self, data_stack: &mut Vec<Value>, args: &[Value]) -> Result<(), VmError> {
+        let pop_str = |ds: &mut Vec<Value>, what: &str| -> Result<String, VmError> {
+            let v = ds
+                .pop()
+                .ok_or_else(|| VmError::StackUnderflow { expected: 1, actual: 0 })?;
+            match v {
+                Value::Str(s) => Ok(s.as_ref().clone()),
+                other => Err(VmError::TypeMismatch {
+                    expected: what.into(),
+                    actual: other.type_name().into(),
+                }),
+            }
+        };
+        let body = match args.first() {
+            Some(Value::Str(s)) => s.as_ref().clone(),
+            Some(other) => {
+                return Err(VmError::TypeMismatch {
+                    expected: "body".into(),
+                    actual: other.type_name().into(),
+                })
+            }
+            None => String::new(),
+        };
+        let headers_json = pop_str(data_stack, "headers-json")?;
+        let url = pop_str(data_stack, "url")?;
+        let method = pop_str(data_stack, "method")?;
+        let count = match data_stack.pop() {
+            Some(Value::I64(n)) if (1..=16).contains(&n) => n as usize,
+            Some(other) => {
+                return Err(VmError::TypeMismatch {
+                    expected: "count (1..=16)".into(),
+                    actual: other.type_name().into(),
+                })
+            }
+            None => return Err(VmError::StackUnderflow { expected: 1, actual: 0 }),
+        };
+
+        // 并发扇出；scoped threads 借用 &self.inner（字段全 Sync）。
+        // 结果按线程序（= 请求序）聚合——确定性；线程 panic 视为无响应。
+        let joined: Vec<Result<(i64, String, String), VmError>> =
+            std::thread::scope(|scope| {
+                let mut handles = Vec::with_capacity(count);
+                for _ in 0..count {
+                    handles.push(scope.spawn(|| {
+                        self.inner.request_once(
+                            method.clone(),
+                            url.clone(),
+                            headers_json.clone(),
+                            body.clone(),
+                        )
+                    }));
+                }
+                handles
+                    .into_iter()
+                    .map(|h| match h.join() {
+                        Ok(r) => r,
+                        Err(_) => Ok((0, "{}".to_string(), String::new())),
+                    })
+                    .collect()
+            });
+        // 零出域 denial 等错误必须传播（不被并发聚合吞掉）
+        let results: Vec<(i64, String, String)> = joined
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let items: Vec<String> = results
+            .iter()
+            .map(|(s, h, b)| format!("{{\"status\":{s},\"headers\":{h},\"body\":{b:?}}}"))
+            .collect();
+        data_stack.push(Value::Str(Rc::new(format!("[{}]", items.join(",")))));
+        Ok(())
+    }
+}
 /// 审计导出能力（id 7）：-- 审计行（\n 连接）
+
 pub struct HttpAuditCap {
     pub id: u16,
     pub audit: Arc<Mutex<Vec<String>>>,
