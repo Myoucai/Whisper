@@ -194,6 +194,7 @@ fn fmt_op(op: Operator) -> String {
         Operator::BytesPush => "bytes-push".into(),
         Operator::BytesLen => "bytes-len".into(),
         Operator::BytesWriteFile => "bytes-write".into(),
+        Operator::BytesToHex => "bytes->hex".into(),
         Operator::Try => "try".into(),
         Operator::I64ToF64 => "i64tof64".into(),
         Operator::F64ToI64 => "f64toi64".into(),

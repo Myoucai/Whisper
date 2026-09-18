@@ -413,6 +413,7 @@ impl WbinReader {
             0xBE => Ok(Opcode::BytesPush),
             0xBF => Ok(Opcode::BytesLen),
             0xC0 => Ok(Opcode::BytesWriteFile),
+            0xC1 => Ok(Opcode::BytesToHex),
             0xC1 => Ok(Opcode::Try),
             0xC2 => Ok(Opcode::MapNew),
             0xC3 => Ok(Opcode::MapGet),

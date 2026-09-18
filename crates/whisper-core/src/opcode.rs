@@ -254,6 +254,7 @@ pub enum Opcode {
     BytesLen,
     /// Write buffer to file: handle filename →
     BytesWriteFile,
+    BytesToHex,
     /// Try-catch: {body} → [#t result] | [#f "error"]
     Try,
 
@@ -510,6 +511,7 @@ impl Opcode {
             Opcode::BytesPush => 0xBE,
             Opcode::BytesLen => 0xBF,
             Opcode::BytesWriteFile => 0xC0,
+            Opcode::BytesToHex => 0xC1,
             Opcode::Try => 0xC1,
 
             // Map ops
@@ -716,6 +718,7 @@ impl Opcode {
             Opcode::BytesPush => "bytes_push",
             Opcode::BytesLen => "bytes_len",
             Opcode::BytesWriteFile => "bytes_write",
+            Opcode::BytesToHex => "bytes_to_hex",
             Opcode::Try => "try",
             Opcode::MapNew => "map_new",
             Opcode::MapGet => "map_get",

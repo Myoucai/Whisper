@@ -533,7 +533,11 @@ fn transpile_opcodes(
             }
 
             // ── Byte buffer ─────────────────────────────────────
-            Opcode::BytesNew | Opcode::BytesPush | Opcode::BytesLen | Opcode::BytesWriteFile => {
+            Opcode::BytesNew
+            | Opcode::BytesPush
+            | Opcode::BytesLen
+            | Opcode::BytesWriteFile
+            | Opcode::BytesToHex => {
                 let _ = writeln!(
                     out,
                     "#error \"bytes-* opcodes are not supported by the C backend (no byte-buffer runtime)\""

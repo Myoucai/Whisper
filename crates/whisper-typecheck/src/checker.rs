@@ -679,6 +679,10 @@ impl TypeChecker {
                 self.expect(stack, &Type::I64, errors, ctx, "bytes-len handle");
                 stack.push(Type::I64);
             }
+            Operator::BytesToHex => {
+                self.expect(stack, &Type::I64, errors, ctx, "bytes->hex handle");
+                stack.push(Type::Str);
+            }
             Operator::BytesWriteFile => {
                 self.expect(stack, &Type::Str, errors, ctx, "bytes-write filename");
                 self.expect(stack, &Type::I64, errors, ctx, "bytes-write handle");

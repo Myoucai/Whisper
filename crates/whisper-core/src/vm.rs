@@ -1226,6 +1226,19 @@ impl Vm {
                 std::fs::write(filename.as_ref(), &data)
                     .map_err(|e| VmError::IoError(e.to_string()))?;
             }
+            Opcode::BytesToHex => {
+                let handle = self.pop_i64()? as usize;
+                if handle >= self.byte_buffers.len() {
+                    return Err(VmError::ProgramError(format!(
+                        "BytesToHex: invalid handle {handle}"
+                    )));
+                }
+                let hex: String = self.byte_buffers[handle]
+                    .iter()
+                    .map(|b| format!("{b:02x}"))
+                    .collect();
+                self.data_stack.push(Value::Str(Rc::new(hex)));
+            }
             Opcode::Try => {
                 let quot = self.pop_ref()?;
                 // 错误恢复的栈卫生：引用块失败时回卷到进入前深度，

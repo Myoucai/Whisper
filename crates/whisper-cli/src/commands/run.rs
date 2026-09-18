@@ -225,6 +225,16 @@ pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result
             jar: jar.clone(),
             audit: audit.clone(),
             tls_override: None,
+            raw_body: false,
+        }));
+        // L-12 raw 通道：hex body → 原始字节（multipart/二进制），共用罐与审计
+        capability_table.bind(Box::new(whisper_core::http_session::HttpSessionCap {
+            id: 8,
+            allowed_hosts: hosts(),
+            jar: jar.clone(),
+            audit: audit.clone(),
+            tls_override: None,
+            raw_body: true,
         }));
         capability_table.bind(Box::new(whisper_core::http_session::HttpAuditCap {
             id: 7,

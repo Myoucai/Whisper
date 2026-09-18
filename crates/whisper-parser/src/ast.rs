@@ -189,6 +189,7 @@ pub enum Operator {
     BytesPush,
     BytesLen,
     BytesWriteFile,
+    BytesToHex,
     Try,
 
     // Map

@@ -831,6 +831,10 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::BytesWriteFile)))
             }
+            TokenKind::BytesToHex => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::BytesToHex)))
+            }
             TokenKind::Try => {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::Try)))

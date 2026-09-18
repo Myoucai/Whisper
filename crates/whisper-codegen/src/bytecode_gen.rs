@@ -259,6 +259,7 @@ impl BytecodeGenerator {
             Operator::BytesPush => Opcode::BytesPush,
             Operator::BytesLen => Opcode::BytesLen,
             Operator::BytesWriteFile => Opcode::BytesWriteFile,
+            Operator::BytesToHex => Opcode::BytesToHex,
             Operator::Try => Opcode::Try,
             Operator::MapNew => Opcode::MapNew,
             Operator::MapGet => Opcode::MapGet,

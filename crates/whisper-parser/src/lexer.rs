@@ -507,6 +507,7 @@ impl Lexer {
             "bytes-push" => TokenKind::BytesPush,
             "bytes-len" => TokenKind::BytesLen,
             "bytes-write" => TokenKind::BytesWriteFile,
+            "bytes->hex" => TokenKind::BytesToHex,
             "try" => TokenKind::Try,
             "i64tof64" => TokenKind::I64ToF64,
             "f64toi64" => TokenKind::F64ToI64,

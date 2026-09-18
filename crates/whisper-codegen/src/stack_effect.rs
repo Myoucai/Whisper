@@ -68,6 +68,7 @@ pub fn stack_effect(op: &Opcode) -> Option<(usize, usize)> {
         BytesPush => (2, 1),   // handle byte -> handle
         BytesLen => (1, 1),    // handle -> i64
         BytesWriteFile => (2, 0), // handle filename ->
+        BytesToHex => (1, 1),    // handle -> hex-str
 
         // ── Binary struct pack ─────────────────────────────────
         Pack => (2, 1),   // [values] fmt -> bytes

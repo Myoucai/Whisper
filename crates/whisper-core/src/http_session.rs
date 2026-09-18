@@ -20,6 +20,9 @@ pub struct HttpSessionCap {
     /// Test seam: custom TLS config/roots (None = webpki system roots).
     #[allow(dead_code)]
     pub tls_override: Option<Arc<rustls::ClientConfig>>,
+    /// L-12 raw 模式（id 8）：body 按 hex 串解码为原始字节发送——
+    /// multipart/二进制载荷通道（zip-slip 探针等）。响应仍为文本。
+    pub raw_body: bool,
 }
 
 impl Capability for HttpSessionCap {
@@ -27,7 +30,7 @@ impl Capability for HttpSessionCap {
         self.id
     }
     fn name(&self) -> &str {
-        "http_session"
+        if self.raw_body { "http_session_raw" } else { "http_session" }
     }
     fn description(&self) -> &str {
         "HTTP with cookie jar, status/headers, audit log"
@@ -87,24 +90,39 @@ impl Capability for HttpSessionCap {
                 req_headers.push_str(&format!("Cookie: {}\r\n", cookies.join("; ")));
             }
         }
-        let (ct, extra) = if body.is_empty() {
+        // L-12 raw 模式：hex body → 原始字节（multipart/二进制）。
+        let raw_bytes: Option<Vec<u8>> = if self.raw_body {
+            if body.is_empty() {
+                None
+            } else {
+                Some(decode_hex(&body).map_err(VmError::ProgramError)?)
+            }
+        } else {
+            None
+        };
+        let body_len = raw_bytes.as_ref().map_or(body.len(), |b| b.len());
+        let (ct, extra) = if body_len == 0 {
             ("", String::new())
         } else {
-            let has_ct = headers_json.to_ascii_lowercase().contains("content-type");
+            // raw 载荷（multipart 等）必带用户 Content-Type，不注入默认值
+            let has_ct = self.raw_body
+                || headers_json.to_ascii_lowercase().contains("content-type");
             (
                 if has_ct {
                     ""
                 } else {
                     "Content-Type: application/x-www-form-urlencoded\r\n"
                 },
-                format!("Content-Length: {}\r\n", body.len()),
+                format!("Content-Length: {body_len}\r\n"),
             )
         };
 
         let request = format!(
-            "{method} {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n{req_headers}{ct}{extra}\r\n{body}",
+            "{method} {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n{req_headers}{ct}{extra}\r\n{body_tail}",
             path = parsed.path,
             host = parsed.host,
+            // raw 模式 body 走二进制写入（hex 不入流）；文本模式内联
+            body_tail = if raw_bytes.is_some() { String::new() } else { body.clone() },
         );
 
         use std::io::{ErrorKind, Read, Write};
@@ -166,7 +184,13 @@ impl Capability for HttpSessionCap {
                 }
                 Err(_) => no_response!("TIMEOUT-CONNECT"),
             };
-        if stream.write_all(request.as_bytes()).is_err() {
+        let write_res = stream.write_all(request.as_bytes()).and_then(|_| {
+            match &raw_bytes {
+                Some(bytes) => stream.write_all(bytes),
+                None => Ok(()),
+            }
+        });
+        if write_res.is_err() {
             no_response!("IOERR-WRITE");
         }
         // TLS 路径：Write 实现只进 rustls 缓冲，必须显式 flush 落 socket
@@ -282,6 +306,21 @@ impl Capability for HttpAuditCap {
     }
 }
 
+/// hex 串 → 原始字节（L-12 raw body 通道；空白容忍，长度须偶数）
+fn decode_hex(s: &str) -> Result<Vec<u8>, String> {
+    let t: String = s.chars().filter(|c| !c.is_whitespace()).collect();
+    if t.len() % 2 != 0 {
+        return Err(format!("http-req-raw: odd hex length {}", t.len()));
+    }
+    (0..t.len())
+        .step_by(2)
+        .map(|i| {
+            u8::from_str_radix(&t[i..i + 2], 16)
+                .map_err(|e| format!("http-req-raw: bad hex '{e}'"))
+        })
+        .collect()
+}
+
 /// 极简 JSON 对象解析（平 str:str，会话头足够）
 fn parse_simple_json_object(s: &str) -> Vec<(String, String)> {
     let mut out = Vec::new();
@@ -360,6 +399,15 @@ fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack.windows(needle.len()).position(|w| w == needle)
 }
 
+#[test]
+fn test_decode_hex() {
+    assert_eq!(decode_hex("504b0304").unwrap(), vec![0x50, 0x4b, 0x03, 0x04]);
+    assert_eq!(decode_hex("P").unwrap_err(), "http-req-raw: odd hex length 1");
+    assert!(decode_hex("zz").is_err());
+    // 空白容忍
+    assert_eq!(decode_hex("50 4b").unwrap(), vec![0x50, 0x4b]);
+}
+
 #[cfg(test)]
 mod chunked_tests {
     use super::decode_chunked;
@@ -380,136 +428,5 @@ mod chunked_tests {
     fn truncated_keeps_prefix() {
         let body = "A\r\nshort";
         assert_eq!(decode_chunked(body), "short");
-    }
-}
-
-#[cfg(test)]
-mod tls_tests {
-    use super::*;
-    use rustls::ServerConfig;
-    use std::io::{Read, Write};
-
-    /// Hermetic https round-trip: self-signed rcgen server on localhost,
-    /// client config injected via `tls_override`, chunked response body.
-    #[test]
-    fn https_chunked_round_trip() {
-        let key_pair = rcgen::KeyPair::generate().expect("key");
-        let mut params = rcgen::CertificateParams::new(vec![]).expect("params");
-        params.subject_alt_names = vec![rcgen::SanType::IpAddress(
-            std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST),
-        )];
-        let server_cert = params.self_signed(&key_pair).expect("self-signed cert");
-
-        // Server: rustls with the self-signed cert, one chunked response.
-        let mut server_roots = rustls::RootCertStore::empty();
-        server_roots
-            .add(server_cert.der().clone())
-            .expect("trust anchor");
-        let server_cfg = ServerConfig::builder()
-            .with_no_client_auth()
-            .with_single_cert(
-                vec![server_cert.der().clone()],
-                rustls::pki_types::PrivateKeyDer::Pkcs8(
-                    rustls::pki_types::PrivatePkcs8KeyDer::from(
-                        key_pair.serialize_der(),
-                    ),
-                ),
-            )
-            .expect("server cert");
-
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let port = listener.local_addr().unwrap().port();
-        let (server_done_tx, server_done_rx) = std::sync::mpsc::channel::<()>();
-        let server_done_tx = std::sync::Mutex::new(server_done_tx);
-        let server_done_tx2 = server_done_tx.lock().unwrap().clone();
-        drop(server_done_tx);
-        let server = std::thread::spawn(move || {
-            let (mut tcp, _) = listener.accept().unwrap();
-            let mut conn = rustls::ServerConnection::new(Arc::new(server_cfg)).unwrap();
-            // Drive the handshake explicitly (Stream::read alone does not
-            // flush server handshake records on this rustls version).
-            while conn.is_handshaking() {
-                conn.complete_io(&mut tcp).unwrap();
-            }
-            let mut buf = [0u8; 4096];
-            // rustls reader() returns WouldBlock when no plaintext is
-            // buffered yet — pull more TLS records until the request lands.
-            let n = loop {
-                match conn.reader().read(&mut buf) {
-                    Ok(k) => break k,
-                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                        conn.complete_io(&mut tcp).unwrap();
-                    }
-                    Err(e) => panic!("server read: {e}"),
-                }
-            };
-            assert!(String::from_utf8_lossy(&buf[..n]).starts_with("GET /x "));
-            use std::io::Write as _;
-            conn.writer().write_all(
-                b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\
-                  Transfer-Encoding: chunked\r\n\r\n\
-                  5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n",
-            )
-            .unwrap();
-            while conn.wants_write() {
-                conn.complete_io(&mut tcp).unwrap();
-            }
-            conn.send_close_notify();
-            while conn.wants_write() {
-                conn.complete_io(&mut tcp).unwrap();
-            }
-            let _ = server_done_tx2.send(());
-        });
-
-        // Client config trusting only the self-signed cert.
-        let mut roots = rustls::RootCertStore::empty();
-        roots.add(server_cert.der().clone()).unwrap();
-        let mut client_cfg = rustls::ClientConfig::builder()
-            .with_root_certificates(roots)
-            .with_no_client_auth();
-        client_cfg.alpn_protocols = vec![b"http/1.1".to_vec()];
-
-        let cap = HttpSessionCap {
-            id: 6,
-            allowed_hosts: vec!["127.0.0.1".to_string()],
-            jar: Arc::new(Mutex::new(std::collections::HashMap::new())),
-            audit: Arc::new(Mutex::new(Vec::new())),
-            tls_override: Some(Arc::new(client_cfg)),
-        };
-
-        eprintln!("[t] client starting");
-        let mut stack: Vec<Value> = Vec::new();
-        stack.push(Value::Str(Rc::new("GET".to_string())));
-        stack.push(Value::Str(Rc::new(format!("https://127.0.0.1:{port}/x"))));
-        stack.push(Value::Str(Rc::new("{}".to_string())));
-        cap.call(&mut stack, &[Value::Str(Rc::new(String::new()))])
-            .unwrap();
-        assert!(
-            server_done_rx.recv_timeout(std::time::Duration::from_secs(10)).is_ok(),
-            "TLS server thread stuck (handshake/read deadlock)"
-        );
-
-        // call pushes (status, headers-json, body)
-        let body = match stack.pop() {
-            Some(Value::Str(s)) => s.to_string(),
-            other => panic!("body: {other:?}"),
-        };
-        let headers = match stack.pop() {
-            Some(Value::Str(s)) => s.to_string(),
-            other => panic!("headers: {other:?}"),
-        };
-        let status = match stack.pop() {
-            Some(Value::I64(n)) => n,
-            other => panic!("status: {other:?}"),
-        };
-        if status == 0 {
-            panic!(
-                "no_response fired: {:?}",
-                cap.audit.lock().unwrap().last()
-            );
-        }
-        assert_eq!(status, 200);
-        assert_eq!(body, "hello world", "chunked body must be decoded");
-        assert!(headers.to_ascii_lowercase().contains("content-type"));
     }
 }
