@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased (2026-09-18) — 六阶段计划 Phase 4 收尾：VM 递归防护 + 死字段清除
+
+- **词调用深度守卫（P4.3）**：`Opcode::Call` 在 call_stack 深度
+  ≥2048 时返回 `RecursionLimit`。此前解释器虽是迭代帧（无原生栈
+  溢出），但 `: f { f } ; f` 会无限增长 call_stack 直至分配器
+  abort 整进程（实测 30GB 分配失败）。ref 块守卫（512）此前已有，
+  本次补齐词调用路径。错误文案泛化（word-call or quotation nesting）。
+  回归：`: f { f } ; f` → 干净 RecursionLimit；VM 单测锁定。
+- **CallFrame.base 死字段清除（P4.6）**：全仓库零读取（仅 4 处
+  构造赋值），连字段带构造一并移除。
+- **Phase 4 盘点确认**（计划快照滞后，实测已完成项）：Value::equals
+  List/Map 深比较 ✓、StrSlice 字节语义+边界 ✓、Take/DropN/Nth 负数
+  NegativeValue ✓、i64 溢出安全（实测 wrap 不 panic）✓、
+  `Rc<[Opcode]>` word_dict ✓、capability 词法归一（ParentDir pop +
+  sibling 前缀攻击测试，6 单测）✓、cgen transpiler W_qN 引号池 +
+  runtime.c 高阶 helper 装线 + TODO=0 + gcc 端到端测试 ✓。
+- **回归**：cargo workspace 465/0；固定点验证 gen2==gen3 OK
+  （scripts/verify-fixedpoint.sh 全程 ~25min，当前树实测）。
+- （同期 L 系列战果见 1512ca1/635c814/cda7db3：#48 keyword 冲突
+  警告、L-12 bytes->hex + http-req-raw、L-11 http-req-parallel。）
+
 ## Unreleased (2026-09-10o) — N-3：WT_BOOL 第五标签（布尔全对齐）+ Type::Map 保险层
 
 - **WT_BOOL**（runtime.c 值模型第五标签 + cgen 全量发射改造）：

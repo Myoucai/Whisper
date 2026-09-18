@@ -44,7 +44,7 @@ pub enum VmError {
     #[error("Program error: {0}")]
     ProgramError(String),
 
-    #[error("Recursion limit exceeded: quotation nesting deeper than {0}")]
+    #[error("Recursion limit exceeded: word-call or quotation nesting deeper than {0}")]
     RecursionLimit(usize),
 
     #[error("Index out of bounds: {index} (length {length})")]

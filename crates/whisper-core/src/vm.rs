@@ -34,8 +34,6 @@ pub struct CallFrame {
     pub code: Rc<[Opcode]>,
     /// Instruction pointer into the code
     pub ip: usize,
-    /// Base pointer for local stack frame
-    pub base: usize,
 }
 
 /// The Whisper stack-based virtual machine.
@@ -208,7 +206,6 @@ impl Vm {
             word_name: Some("<main>".into()),
             code,
             ip: 0,
-            base: self.data_stack.len(),
         };
         self.call_stack.push(frame);
 
@@ -1505,6 +1502,14 @@ impl Vm {
 
             // === Call/Return ===
             Opcode::Call(name) => {
+                // P4.3: word-call depth guard. The interpreter is iterative
+                // (frames, not native recursion) so unbounded word recursion
+                // otherwise grows call_stack until the allocator aborts the
+                // whole process (observed: 30 GB allocation on `: f { f } ; f`).
+                const MAX_CALL_DEPTH: usize = 2048;
+                if self.call_stack.len() >= MAX_CALL_DEPTH {
+                    return Err(VmError::RecursionLimit(MAX_CALL_DEPTH));
+                }
                 // Check 4-slot cache first (Rc::clone is just a refcount bump)
                 let word_code = if let Some(code) = self.word_cache_lookup(name) {
                     code
@@ -1521,8 +1526,7 @@ impl Vm {
                     word_name: Some(name.clone()),
                     code: word_code,
                     ip: 0,
-                    base: self.data_stack.len(),
-                };
+                        };
                 self.call_stack.push(frame);
             }
             Opcode::Return => {
@@ -1807,7 +1811,6 @@ impl Vm {
             word_name: Some("<block>".into()),
             code: Rc::clone(code),
             ip: 0,
-            base: self.data_stack.len(),
         };
         self.call_stack.push(frame);
 
@@ -2213,6 +2216,17 @@ mod tests {
             "Direct @nth should give 0, got {:?}",
             r
         );
+    }
+
+
+    #[test]
+    fn test_word_recursion_depth_guard() {
+        // `: f { f } ; f` — iterative frames would otherwise grow until the
+        // allocator aborts the process; must surface a clean RecursionLimit.
+        let mut vm = Vm::new();
+        vm.define_word("f".to_string(), vec![Opcode::Call("f".to_string())]);
+        let err = vm.execute(&[Opcode::Call("f".to_string())]).unwrap_err();
+        assert!(matches!(err, VmError::RecursionLimit(2048)), "got {err:?}");
     }
 
     #[test]
