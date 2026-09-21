@@ -136,6 +136,7 @@ whisper run hello.ws
 | 比较 | `=` `<` `>` `!=` `<=` `>=` |
 | 逻辑 | `&` and, `\|` or, `!` not |
 | 控制 | `??..\|..]` 条件, `#` 循环, `?->` 单分支 |
+| 引号 | `call`（调用栈顶引号）, `try`（捕获失败） |
 | @词 | `@map` `@each` `@fold` `@filter` `@nth` `@times` |
 | 循环控制 | `leave`（退出最内层 `#` 循环） |
 | IO | `.` 输出栈顶, `..` 输出全部, `,` 读输入 |
@@ -341,7 +342,7 @@ Whisper/
 ## 测试
 
 ```bash
-cargo test --workspace                           # 470 tests: all passed
+cargo test --workspace                           # 473 tests: all passed
 bash scripts/syntax-gate.sh                      # 26 语法断言（conformance 语料，VM 与 c2 双侧）
 bash scripts/stdlib-gate.sh                      # 58 双链 stdlib 断言（VM+c2 输出一致）
 bash scripts/net-gate.sh                         # 真实 HTTP 服务 + curl
@@ -351,9 +352,9 @@ bash scripts/typecheck-gate.sh                   # 类型检查假阳性棘轮�
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验
 ```
 
-测试覆盖（470 项，`cargo test --workspace` 实测）：
-- 142 项 CLI（31 单元 + 6 基准 + 105 集成：stdlib 导入冒烟、关键字作 def 名回归、软/硬自举管线、c2 链端到端、能力 ABI 双链对拍、exe 产物零 Rust 断言、bundle 尾负载）
-- 133 项核心 VM（122 单元 + 7 模糊测试 2500+ 随机程序 + 4 项 opcode 元数据）
+测试覆盖（473 项，`cargo test --workspace` 实测）：
+- 143 项 CLI（31 单元 + 6 基准 + 106 集成：stdlib 导入冒烟、关键字作 def 名回归、软/硬自举管线、c2 链端到端、能力 ABI 与 `call` 双链对拍、exe 产物零 Rust 断言、bundle 尾负载）
+- 135 项核心 VM（124 单元 + 7 模糊测试 2500+ 随机程序 + 4 项 opcode 元数据）
 - 139 项 codegen（62 单元 + 65 流水线 + 12 C 后端端到端 gcc）
 - 34 项 parser（含「每个关键字都可作 def 名」参数化回归）
 - 15 项 typecheck + 5 项 LSP + 2 项包管理器

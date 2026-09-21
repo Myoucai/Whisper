@@ -1,5 +1,83 @@
 # Changelog
 
+## Unreleased (2026-09-21f) — 语言侧：`call` 补上缺失的拼写 + 两处修复
+
+### 新增 —— `call`：动态调用引号（把一个悬空的 opcode 变得可达）
+
+`Opcode::CapExec` 自始就在 VM 里实现（`Value::Ref(code) =>
+execute_ref(code)`），但**从源码不可达**：设计原意是 `!`，而 `!` 已被
+逻辑非占用（spec §3.2 冻结），词法层的 `TokenKind::Bang` 从此不再被产出，
+opcode 就此悬空——文件里留着 `!` 的注释，parser 里留着
+`Bang => CapExec` 的分支，但没有任何输入能走到它。
+
+现以 `call` 词暴露（`call` 此前未被占用；`exec` 已被 std/os 的能力包装
+占用故不可用）。语义：消费栈顶引号并执行，引号的输入取自调用者数据栈、
+产出留在调用者数据栈——与 `@map`/`@fold` 这类提供元素槽的消费者不同。
+
+    { 42 } call .                   # 42
+    10 { 2 * } call .               # 20
+    : ap { call } ; 5 { 1 + } ap .  # 6
+
+- Rust 侧：`token.rs` 把误导性的 `Bang` 正名为 `CapExec` 并补
+  `keyword_name` 往返（`call` 可作 def 名）；`lexer.rs` 加关键字；
+  `checker.rs` 建模栈效应（弹引号、把其声明产出压回栈）。
+- **C 链**：cgen 一直把 `call` 当普通词发射 `W_call()`，但没有任何地方
+  定义该符号——于是 VM 能跑、c2 编译报 gcc 错。与 `@n` 同一模式，因此在
+  `runtime.c` 里实现 `W_call`，**不动冻结的 compiler.all.ws**：引号字面量
+  发射为裸函数指针（`w_push(W_PTR((void*)W_qN))`），正是高阶 helper 已在
+  用的 `wfn` 形状；用 `wval_is_heap` 把代码指针与 arena 里的字符串/列表
+  区分开，失败走 `w_fail` 以便被 `try` 捕获（对齐 VM 的可捕获 TypeMismatch）。
+- 门禁：`opcode_coverage.sh` **56 → 59**；新增集成测试
+  `call_invokes_quotation_on_both_chains`（每个程序只放一个引号字面量，
+  理由见下）；spec 新增 §16 词汇附录 v1.0.9。
+
+**发现的边界（先前就存在，与 `call` 无关）**：自举链只在程序含**单个**
+引号字面量时能编含 `call` 的程序。引号作为一等值——两个及以上引号字面量、
+或引号出现在列表字面量里——会让 `whisperc compile-full` 报
+`Type mismatch`。`[{ 1 + }] len .` 不含任何新语法，在引入 `call` 之前就
+编不过（已用 stash 在 HEAD 上对照复现）。`call` 只是让这个洞变得可见：
+动态分发（把引号放进列表/map 再取出来调用）正是引号作为一等值的主要
+用途。已立项为**战役 O**（`docs/language-backlog.md`），含实测对照表与
+预注册判据——修它要动固定点基准并重生种子，故需要独立立项。
+
+### 修复 —— `try` 的引号合同过严，strict 默认下误拒合法代码
+
+`checker.rs` 对 `try` 用 `expect_ref`，即要求引号是净零 `[T] → [T]`。
+但 `try` 是**捕获**体的产出的（VM 跑完弹一个值、默认 0，再压
+`[flag, value]`），体有净产出完全合法。于是默认 strict 下：
+
+    { 1 0 / } try drop "caught" .   ->  try quot: expected [T7] → [T7],
+                                       got [T6] → [T5 i64 | f64]
+
+而 VM 一直跑得好好的（`--no-strict-types` 下输出 `"caught"`）。
+改用 `expect_ref_shape(stack, 0, None, ...)`——"产出不限"，与 `@each`
+同一个合同。引号体内的真错误仍照抓（`{ "s" 1 + } try ...` 依旧报
+`arithmetic lhs: expected i64 | f64, got str`）。
+
+### 修复 —— 文件能力的相对路径永远被拒
+
+`path_is_allowed` 把请求路径归一化后直接与白名单根比较，而根是绝对路径
+（`current_dir()`），所以相对路径**永远不可能** `starts_with` 它——
+`--allow-file-write` 下 `write-file "x.txt"` 根本用不了。失败关闭，不是
+安全洞，但是不可用。
+
+现在相对路径先与 CWD 拼接再归一化比较——这正是文件系统打开文件时做的事。
+`..` 仍在拼接**之后**按词法解析，所以逃逸的相对路径照样被包含性检查拦下。
+用 `has_root()` 而非 `is_absolute()`：后者在 Windows 上对
+`/allowed/dir/file.txt`（无盘符的盘相对路径）返回 false，会把它错误地送进
+CWD 拼接分支——这个 bug 是本机（Windows）跑既有安全单测时抓到的，Linux
+上不会暴露。
+
+新增 2 个单测（相对路径可用、相对路径逃逸仍拒），原有 6 个安全单测行为
+不变（它们全用绝对路径）。
+
+### 验证
+
+    cargo test --workspace        473 / 0
+    cargo clippy -D warnings      0
+    cargo fmt --all --check       0
+    opcode_coverage               59 / 0 / 0
+
 ## Unreleased (2026-09-21e) — 整体回顾：CI 从未运转 + 一个被它掩盖的字节冲突
 
 对独立性工作做整体复核时发现的问题。第一条是根因，后面几条都是它掩盖的。
