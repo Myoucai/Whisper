@@ -244,7 +244,10 @@ impl WbinReader {
                         "v2 unit has no main program",
                     ));
                 };
-                Ok(WbinUnit::V2 { main, defs: iter.collect() })
+                Ok(WbinUnit::V2 {
+                    main,
+                    defs: iter.collect(),
+                })
             }
             other => Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
@@ -413,7 +416,6 @@ impl WbinReader {
             0xBE => Ok(Opcode::BytesPush),
             0xBF => Ok(Opcode::BytesLen),
             0xC0 => Ok(Opcode::BytesWriteFile),
-            0xC1 => Ok(Opcode::BytesToHex),
             0xC1 => Ok(Opcode::Try),
             0xC2 => Ok(Opcode::MapNew),
             0xC3 => Ok(Opcode::MapGet),
@@ -421,6 +423,7 @@ impl WbinReader {
             0xC5 => Ok(Opcode::MapDel),
             0xC6 => Ok(Opcode::MapKeys),
             0xC7 => Ok(Opcode::MapHas),
+            0xCE => Ok(Opcode::BytesToHex),
             0xDE => Ok(Opcode::Prepend),
 
             // Float ops
@@ -702,4 +705,3 @@ mod tests {
         }
     }
 }
-

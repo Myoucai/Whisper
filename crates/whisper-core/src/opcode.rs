@@ -511,7 +511,14 @@ impl Opcode {
             Opcode::BytesPush => 0xBE,
             Opcode::BytesLen => 0xBF,
             Opcode::BytesWriteFile => 0xC0,
-            Opcode::BytesToHex => 0xC1,
+            // NOTE: BytesToHex used to be 0xC1 as well — the same byte as
+            // Try, which had held 0xC1 since 2026-06-07. Two opcodes sharing
+            // a byte made the .wbin decoder (wbin.rs) resolve 0xC1 to
+            // whichever arm came first, so every `try` block survived a
+            // write/read round-trip as `bytes->hex` and blew up at runtime
+            // ("expected i64, got ref"). The newcomer yields: BytesToHex
+            // moves to a free slot and Try keeps the byte it always had.
+            Opcode::BytesToHex => 0xCE,
             Opcode::Try => 0xC1,
 
             // Map ops
@@ -771,5 +778,211 @@ impl Opcode {
             Opcode::Import => "import",
             Opcode::Export => "export",
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::rc::Rc;
+
+    /// Every opcode's `to_byte()` must be distinct.
+    ///
+    /// A duplicate silently makes one of the pair unreachable in *every*
+    /// decoder. `BytesToHex` was handed 0xC1 — the byte `Try` had held since
+    /// 2026-06-07 — and all three decode tables (`wbin.rs`,
+    /// `bootstrap.rs` encode + decode) resolved 0xC1 to whichever arm came
+    /// first. So every `try` block written to a `.wbin` came back as
+    /// `bytes->hex` and died at runtime with "expected i64, got ref".
+    ///
+    /// Nothing caught it for a week because the CI workflow file was
+    /// unparseable YAML, so no job ran at all; clippy's
+    /// `unreachable_patterns` would have pointed at the decode tables.
+    ///
+    /// Keep this list in sync when adding an opcode. A variant missing from
+    /// it is simply unchecked, so a collision involving the newcomer would
+    /// slip through exactly as this one did.
+    #[test]
+    fn to_byte_is_injective() {
+        let all: Vec<Opcode> = vec![
+            Opcode::Dup,
+            Opcode::Swap,
+            Opcode::Drop,
+            Opcode::Rot,
+            Opcode::Pick(0),
+            Opcode::Filter,
+            Opcode::StrSplit,
+            Opcode::Ctos,
+            Opcode::ListSlice,
+            Opcode::Shl,
+            Opcode::Shr,
+            Opcode::Args,
+            Opcode::SplitCond,
+            Opcode::ListCheck,
+            Opcode::I64Check,
+            Opcode::StrCheck,
+            Opcode::BoolCheck,
+            Opcode::Listen,
+            Opcode::Accept,
+            Opcode::Recv,
+            Opcode::Send,
+            Opcode::CloseSock,
+            Opcode::ReadFile,
+            Opcode::WriteFile,
+            Opcode::EnvGet,
+            Opcode::KvSet,
+            Opcode::KvGet,
+            Opcode::KvDel,
+            Opcode::KvKeys,
+            Opcode::ServeConcurrent,
+            Opcode::OpEffect,
+            Opcode::QuoteSize,
+            Opcode::WordSize,
+            Opcode::SetSeed,
+            Opcode::Rand,
+            Opcode::ConfOf,
+            Opcode::UnwrapSig,
+            Opcode::ReadLine,
+            Opcode::StrUpper,
+            Opcode::StrLower,
+            Opcode::StrStrip,
+            Opcode::Fmt,
+            Opcode::ListDir,
+            Opcode::Mkdir,
+            Opcode::FileExists,
+            Opcode::StrfTime,
+            Opcode::Leave(0),
+            Opcode::StrMatch,
+            Opcode::StrFindRe,
+            Opcode::Pack,
+            Opcode::Unpack,
+            Opcode::Range,
+            Opcode::FfiOpen,
+            Opcode::FfiSym,
+            Opcode::FfiCall,
+            Opcode::BufAlloc,
+            Opcode::BufFree,
+            Opcode::BufPeek,
+            Opcode::BufPoke,
+            Opcode::BufToStr,
+            Opcode::Add,
+            Opcode::Sub,
+            Opcode::Mul,
+            Opcode::Div,
+            Opcode::Mod,
+            Opcode::Eq,
+            Opcode::Lt,
+            Opcode::Gt,
+            Opcode::Neq,
+            Opcode::Le,
+            Opcode::Ge,
+            Opcode::And,
+            Opcode::Or,
+            Opcode::Not,
+            Opcode::PushI64(0),
+            Opcode::PushF64(0.0),
+            Opcode::PushStr(Rc::new(String::new())),
+            Opcode::PushBool(false),
+            Opcode::PushList,
+            Opcode::PushRef(Vec::new()),
+            Opcode::Nth,
+            Opcode::Append,
+            Opcode::Len,
+            Opcode::Map,
+            Opcode::Each,
+            Opcode::Fold,
+            Opcode::Prepend,
+            Opcode::StrLen,
+            Opcode::StrCat,
+            Opcode::StrSlice,
+            Opcode::StrEq,
+            Opcode::StrLt,
+            Opcode::StrFind,
+            Opcode::StrReplace,
+            Opcode::StrToI64,
+            Opcode::I64ToStr,
+            Opcode::StrNth,
+            Opcode::StrChars,
+            Opcode::CharsStr,
+            Opcode::StrIter,
+            Opcode::ListFind,
+            Opcode::StrJoin,
+            Opcode::BytesNew,
+            Opcode::BytesPush,
+            Opcode::BytesLen,
+            Opcode::BytesWriteFile,
+            Opcode::BytesToHex,
+            Opcode::Try,
+            Opcode::MapNew,
+            Opcode::MapGet,
+            Opcode::MapSet,
+            Opcode::MapDel,
+            Opcode::MapKeys,
+            Opcode::MapHas,
+            Opcode::Cond(0),
+            Opcode::Jump(0),
+            Opcode::Loop(0),
+            Opcode::Times,
+            Opcode::Call(String::new()),
+            Opcode::Return,
+            Opcode::CapCall(0),
+            Opcode::CapExec,
+            Opcode::I64ToF64,
+            Opcode::F64ToI64,
+            Opcode::FSqrt,
+            Opcode::FSin,
+            Opcode::FCos,
+            Opcode::FTan,
+            Opcode::JsonParse,
+            Opcode::JsonStringify,
+            Opcode::Now,
+            Opcode::Sleep,
+            Opcode::Random,
+            Opcode::RandInt,
+            Opcode::Floor,
+            Opcode::Ceil,
+            Opcode::Round,
+            Opcode::Log,
+            Opcode::Exp,
+            Opcode::Atan2,
+            Opcode::BitAnd,
+            Opcode::BitOr,
+            Opcode::BitXor,
+            Opcode::BitNot,
+            Opcode::Sort,
+            Opcode::Rev,
+            Opcode::Dedup,
+            Opcode::Take,
+            Opcode::DropN,
+            Opcode::ConfLabel(0.0),
+            Opcode::ProbChoice,
+            Opcode::OutputTop,
+            Opcode::OutputAll,
+            Opcode::ReadInput,
+            Opcode::DefWord(String::new()),
+            Opcode::EndDef,
+            Opcode::Import,
+            Opcode::Export,
+        ];
+
+        let mut seen: std::collections::HashMap<u8, String> = std::collections::HashMap::new();
+        let mut dupes: Vec<String> = Vec::new();
+        for op in &all {
+            let byte = op.to_byte();
+            if let Some(prev) = seen.insert(byte, format!("{op:?}")) {
+                dupes.push(format!("0x{byte:02X} shared by {prev} and {op:?}"));
+            }
+        }
+        assert!(
+            dupes.is_empty(),
+            "opcode byte collisions (one of each pair becomes undecodable): {}",
+            dupes.join("; ")
+        );
+        assert_eq!(seen.len(), all.len());
+
+        // The three decode tables must agree with the encoder for the two
+        // opcodes this bug involved — a direct regression pin.
+        assert_eq!(Opcode::Try.to_byte(), 0xC1);
+        assert_eq!(Opcode::BytesToHex.to_byte(), 0xCE);
     }
 }

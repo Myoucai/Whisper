@@ -68,6 +68,36 @@ jobs:
       - name: Run C backend tests
         run: cargo test -p whisper-codegen --test c_backend_tests -- --nocapture
 
+  # Compiler matrix (independence Step 6): C is meant to be a *substitutable*
+  # portable assembly, so the emitted C must not lean on one compiler's
+  # extensions or on non-default flags. clang is the second leg — it rejects
+  # different things than gcc and is where a stray GCC-ism surfaces.
+  # The runtime no longer needs -fno-strict-aliasing (removed 2026-09-21:
+  # byte-identical output with and without it on the heaviest workload, and
+  # the aliasing audit is clean), so this leg also guards that assumption.
+  c-backend-clang:
+    name: C backend (clang leg)
+    runs-on: ubuntu-latest
+    env:
+      # c2/native honour WHISPER_CC; the shell gates compile emitted C
+      # themselves and read GCC. Both must point at clang for this leg.
+      WHISPER_CC: clang
+      GCC: clang
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install clang
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: C backend tests under clang
+        run: cargo test -p whisper-codegen --test c_backend_tests -- --nocapture
+      - name: c2 chain under clang
+        run: |
+          cargo build -p whisper-cli
+          bash scripts/stdlib-gate.sh
+      - name: Opcode coverage gate under clang
+        run: bash tools/opcode_coverage.sh ./target/debug/whisper
+
   selfhost:
     name: Self-hosting chain (C seed)
     runs-on: ubuntu-latest
@@ -93,7 +123,7 @@ jobs:
         run: bash scripts/syntax-gate.sh
       - name: Net gate (real HTTP server via self-hosted chain)
         run: bash scripts/net-gate.sh
-      - name: App gate (Whisper web backend: JSON/static/404 routes)
+      - name: "App gate (Whisper web backend: JSON/static/404 routes)"
         run: bash scripts/app-gate.sh
 
   lint:

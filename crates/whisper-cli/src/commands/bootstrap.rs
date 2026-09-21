@@ -75,7 +75,7 @@ fn op_to_byte(op: Operator) -> u8 {
         Operator::BytesPush => 0xBE,
         Operator::BytesLen => 0xBF,
         Operator::BytesWriteFile => 0xC0,
-        Operator::BytesToHex => 0xC1,
+        Operator::BytesToHex => 0xCE,
         Operator::Try => 0xC1,
         Operator::I64ToF64 => 0xB0,
         Operator::F64ToI64 => 0xB1,
@@ -223,9 +223,12 @@ pub fn hard_bootstrap_compile(source: &str) -> Result<(), String> {
     // Phase 1: Rust reference (for comparison)
     let ast = Parser::parse_source(source).map_err(|e| format!("Parse: {}", e.message))?;
     let mut gen = BytecodeGenerator::new();
-    let (ref_bytecode, ref_defs) = gen
-        .compile(&ast)
-        .map_err(|e| format!("Compile: {}", whisper_codegen::block_ir::contract_errors_to_string(&e)))?;
+    let (ref_bytecode, ref_defs) = gen.compile(&ast).map_err(|e| {
+        format!(
+            "Compile: {}",
+            whisper_codegen::block_ir::contract_errors_to_string(&e)
+        )
+    })?;
 
     // Phase 2: Load whisperc pipeline
     let mut vm = Vm::new();
@@ -392,9 +395,12 @@ pub fn bootstrap_compile(source: &str) -> Result<(), String> {
     // Phase 1: Parse with Rust compiler (reference)
     let ast = Parser::parse_source(source).map_err(|e| format!("Parse: {}", e.message))?;
     let mut gen = BytecodeGenerator::new();
-    let (ref_bytecode, ref_defs) = gen
-        .compile(&ast)
-        .map_err(|e| format!("Compile: {}", whisper_codegen::block_ir::contract_errors_to_string(&e)))?;
+    let (ref_bytecode, ref_defs) = gen.compile(&ast).map_err(|e| {
+        format!(
+            "Compile: {}",
+            whisper_codegen::block_ir::contract_errors_to_string(&e)
+        )
+    })?;
 
     // Phase 2: Extract defs and generate tokens
     let mut main_body: Vec<AstNode> = Vec::new();
@@ -639,7 +645,8 @@ fn byte_to_opcode(byte: u8) -> Opcode {
         0xBE => Opcode::BytesPush,
         0xBF => Opcode::BytesLen,
         0xC0 => Opcode::BytesWriteFile,
-        0xC1 => Opcode::BytesToHex,
+        // BytesToHex moved off 0xC1 — it collided with Try (see opcode.rs).
+        0xCE => Opcode::BytesToHex,
         0xC1 => Opcode::Try,
         0xB0 => Opcode::I64ToF64,
         0xB1 => Opcode::F64ToI64,
