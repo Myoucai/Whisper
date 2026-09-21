@@ -169,9 +169,10 @@ t call-in-def  ': ap { call } ; 5 { 1 + } ap .'
 #      这是 VM 与 C 链的真实语义分歧，已改用带类型守卫的 str-eq?。
 #
 # 列表字面量里的引号：fuse-hof 为"引号作值"合成的 [9,name,body] 定义只有
-# 落在顶层才会被 split-defs 收走并发射成静态函数；落在 [6,...] 里就会在
-# compile-one 处被丢弃（它只认 tag 16 的引用），引用悬空 → gcc 报
-# `'W___q0' undeclared`。lift-list 现在把定义抬到列表节点之外。
+# 落在顶层才会被 split-defs 收走并发射成静态函数；落在容器节点内部就会走到
+# compile-one 的兜底分支（它只认 tag 16 的引用），变成
+# `#error whisper-cgen: unknown bare opcode`，引用悬空。hs/part 现在把定义
+# 抬到容器之外——五种容器共用同一条通路。
 t quote-pair   '{ 1 + } { 2 * } drop drop 7 .'
 t quote-triple '{ 1 + } { 2 * } { 3 * } drop drop drop 7 .'
 t quote-quad   '{ 1 + } { 2 * } { 3 * } { 4 * } drop drop drop drop 9 .'
@@ -185,6 +186,20 @@ t qlist-call   '[{ 1 + }] 0 @nth 5 swap call .'
 t qlist-disp   '[{ 1 + } { 2 * } { 3 * }] 1 @nth 5 swap call .'
 t qlist-deep   '[[{ 1 + }]] 0 @nth 0 @nth 5 swap call .'
 t qlist-arity  '9 [{ 1 + }] 0 @nth call .'
+
+# ── 战役 O₂：另外四种容器（条件/循环/词定义/高阶融合体）里的引号 ──
+# 同一条根因，hs 按 tag 区间 6..9 与 249..254 统一处理；这十例把另外四种
+# 钉住，并各带一条"无引号"对照证明没误伤正常路径。
+t qcond-then   '#t ?? { 9 } | { 8 } ] call .'
+t qcond-else   '#f ?? { 9 } | { 8 } ] call .'
+t qcond-multi  '#t ?? { 9 } { 10 } | { 8 } ] drop call .'
+t qcond-word   ': f { 3 } ; #t ?? { f } | { 7 } ] call .'
+t qcond-plain  '#t ?? 1 | 2 ] .'
+t qloop-body   '2 { { 5 } drop 1 - } { dup 0 > } # .'
+t qloop-plain  '0 { 1 + } { dup 3 < } # .'
+t qdef-body    ': f { { 5 } drop 7 } ; f .'
+t qquote-nest  '{ { 5 } } call call .'
+t qhof-body    '[1 2] { { 7 } drop 1 + } @map .'
 
 echo "coverage: $PASS pass, $FAIL fail, $GAP known-gap"
 echo "$GAPS" | tr '|' '\n' | grep -v '^$' | sed 's/^/  GAP /'

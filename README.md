@@ -136,7 +136,7 @@ whisper run hello.ws
 | 比较 | `=` `<` `>` `!=` `<=` `>=` |
 | 逻辑 | `&` and, `\|` or, `!` not |
 | 控制 | `??..\|..]` 条件, `#` 循环, `?->` 单分支 |
-| 引号 | `call`（调用栈顶引号）, `try`（捕获失败）；引号是一等值——可存进列表字面量再取出来 `call`（动态分发），两链一致 |
+| 引号 | `call`（调用栈顶引号）, `try`（捕获失败）；引号是一等值——可存进列表、条件分支、循环体、词定义体或高阶词体，再取出来 `call`（动态分发），两链一致 |
 | @词 | `@map` `@each` `@fold` `@filter` `@nth` `@times` |
 | 循环控制 | `leave`（退出最内层 `#` 循环） |
 | IO | `.` 输出栈顶, `..` 输出全部, `,` 读输入 |
@@ -342,18 +342,18 @@ Whisper/
 ## 测试
 
 ```bash
-cargo test --workspace                           # 475 tests: all passed
+cargo test --workspace                           # 476 tests: all passed
 bash scripts/syntax-gate.sh                      # 26 语法断言（conformance 语料，VM 与 c2 双侧）
 bash scripts/stdlib-gate.sh                      # 58 双链 stdlib 断言（VM+c2 输出一致）
 bash scripts/net-gate.sh                         # 真实 HTTP 服务 + curl
 bash scripts/app-gate.sh                         # 13 路由 Web 应用断言
-bash tools/opcode_coverage.sh                    # 70 项逐特性双跑（VM vs 自举链）
+bash tools/opcode_coverage.sh                    # 80 项逐特性双跑（VM vs 自举链）
 bash scripts/typecheck-gate.sh                   # 类型检查假阳性棘轮（三语料 FP=0）
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验
 ```
 
-测试覆盖（475 项，`cargo test --workspace` 实测）：
-- 145 项 CLI（31 单元 + 6 基准 + 108 集成：stdlib 导入冒烟、关键字作 def 名回归、软/硬自举管线、c2 链端到端、能力 ABI 与 `call`/多引号/列表内引号双链对拍、exe 产物零 Rust 断言、bundle 尾负载）
+测试覆盖（476 项，`cargo test --workspace` 实测）：
+- 146 项 CLI（31 单元 + 6 基准 + 109 集成：stdlib 导入冒烟、关键字作 def 名回归、软/硬自举管线、c2 链端到端、能力 ABI 与 `call`/多引号/五种容器内引号双链对拍、exe 产物零 Rust 断言、bundle 尾负载）
 - 135 项核心 VM（124 单元 + 7 模糊测试 2500+ 随机程序 + 4 项 opcode 元数据）
 - 139 项 codegen（62 单元 + 65 流水线 + 12 C 后端端到端 gcc）
 - 34 项 parser（含「每个关键字都可作 def 名」参数化回归）

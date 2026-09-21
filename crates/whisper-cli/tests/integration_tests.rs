@@ -1056,11 +1056,11 @@ fn multiple_quotation_literals_compile_on_both_chains() {
 /// `fuse-hof` expands a quotation used as a value into a def/ref pair:
 /// `[9, "__qN", body]` (the definition) plus `[16, "__qN"]` (the reference).
 /// Only the top level reaches `split-defs`, which is what turns a tag-9 token
-/// into a real static function; inside a `[6, ...]` list literal `compile-one`
-/// has no tag-9 branch, so the definition was silently dropped and the
-/// reference pointed at a function that was never emitted — gcc then failed
-/// with `'W___q0' undeclared`. `lift-list` now hoists those definitions out of
-/// the list node before the surrounding token stream is compiled.
+/// into a real static function; inside a container node `compile-one` has no
+/// tag-9 branch, so the definition was silently dropped and the reference
+/// pointed at a function that was never emitted — gcc then failed with
+/// `'W___q0' undeclared`. `hs` / `part` now hoist those definitions out of the
+/// node before the surrounding token stream is compiled.
 #[test]
 fn quotation_in_list_literal_compiles_on_both_chains() {
     if std::process::Command::new("gcc")
@@ -1091,6 +1091,94 @@ fn quotation_in_list_literal_compiles_on_both_chains() {
         ),
         ("deep", "[[{ 1 + }]] 0 @nth 0 @nth 5 swap call .\n", "6\n"),
         ("input", "9 [{ 1 + }] 0 @nth call .\n", "10\n"),
+    ];
+    let norm = |b: &[u8]| String::from_utf8_lossy(b).replace(['\r', '"'], "");
+
+    for (name, source, expected) in cases {
+        let src = dir.join(format!("{name}.ws"));
+        std::fs::write(&src, source).unwrap();
+
+        let vm = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+            .args(["run", "--no-strict-types"])
+            .arg(&src)
+            .output()
+            .unwrap();
+        assert!(
+            vm.status.success(),
+            "[{name}] VM run failed: {}",
+            String::from_utf8_lossy(&vm.stderr)
+        );
+
+        let exe = dir.join(format!("{name}_exe"));
+        let build = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+            .args(["build", "-t", "c2", "-o"])
+            .arg(&exe)
+            .arg(&src)
+            .output()
+            .unwrap();
+        assert!(
+            build.status.success(),
+            "[{name}] c2 build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let artifact = if exe.exists() {
+            exe.clone()
+        } else {
+            exe.with_extension(std::env::consts::EXE_EXTENSION)
+        };
+        let c2 = std::process::Command::new(&artifact).output().unwrap();
+        assert!(c2.status.success(), "[{name}] native run failed");
+
+        assert_eq!(norm(&vm.stdout), expected, "[{name}] VM output");
+        assert_eq!(norm(&c2.stdout), expected, "[{name}] chains diverged");
+    }
+}
+
+/// Campaign O₂ — the same def/ref hoisting, for the *other* four container
+/// kinds. A quotation used as a value can sit inside a list, a conditional
+/// branch, a loop body, a word definition body or a fused higher-order body;
+/// all five are container nodes and all five dropped the synthesised
+/// definition the same way. `hs` dispatches on the node tag range (6..9 and
+/// 249..254) so one code path covers every container.
+#[test]
+fn quotation_in_any_container_compiles_on_both_chains() {
+    if std::process::Command::new("gcc")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        eprintln!("skipping: gcc not available");
+        return;
+    }
+    let dir = std::env::temp_dir().join("whisper_qcont_it");
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let cases = [
+        // Conditional branches (node [7, then, else]).
+        ("cond_then", "#t ?? { 9 } | { 8 } ] call .\n", "9\n"),
+        ("cond_else", "#f ?? { 9 } | { 8 } ] call .\n", "8\n"),
+        (
+            "cond_multi",
+            "#t ?? { 9 } { 10 } | { 8 } ] drop call .\n",
+            "9\n",
+        ),
+        (
+            "cond_word",
+            ": f { 3 } ; #t ?? { f } | { 7 } ] call .\n",
+            "3\n",
+        ),
+        ("cond_plain", "#t ?? 1 | 2 ] .\n", "1\n"),
+        // Loop bodies (node [8, body, cond]).
+        ("loop_body", "2 { { 5 } drop 1 - } { dup 0 > } # .\n", "0\n"),
+        ("loop_plain", "0 { 1 + } { dup 3 < } # .\n", "3\n"),
+        // Word definition bodies (node [9, name, body]). The body is field 2;
+        // field 1 is the name and must be left alone.
+        ("def_body", ": f { { 5 } drop 7 } ; f .\n", "7\n"),
+        ("def_plain", ": f { 7 } ; f .\n", "7\n"),
+        // Quotation inside a quotation, and inside a fused higher-order body
+        // (node [249..254, inner]).
+        ("quote_nest", "{ { 5 } } call call .\n", "5\n"),
+        ("hof_body", "[1 2] { { 7 } drop 1 + } @map .\n", "[2 3]\n"),
     ];
     let norm = |b: &[u8]| String::from_utf8_lossy(b).replace(['\r', '"'], "");
 

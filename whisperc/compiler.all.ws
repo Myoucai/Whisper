@@ -852,45 +852,121 @@ export classify-nested
     ]
 } ;
 
-// ── 引号抬升：把列表字面量里的定义抬到列表节点之外 ────────────────
-// fuse-hof 的"引号作值"分支合成一对 token：定义 [9, "__qN", body] 与引用
-// [16, "__qN"]。定义只有落在**顶层**才会被 split-defs 收走、发射成真正的
-// 静态函数 W___qN；落在 [6, ...] 列表字面量里时 compile-one 只认 tag 16 的
-// 引用（它没有 tag 9 分支），定义被静默丢弃，引用便指向从未发射的函数，
-// gcc 报 `'W___q0' undeclared`。动态分发（引号进列表再取出来 call）正是
-// 引号作为一等值的主要用途，所以这趟抬升是必需的。
+// ── 引号抬升：把容器节点内部的定义抬到顶层 ──────────────────────
+// fuse-hof 的"引号作值"分支会把一个引号展开成一对 token：定义
+// [9, "__qN", body] 与引用 [16, "__qN"]。**只有落在顶层的定义**才会被
+// split-defs 收走、发射成真正的静态函数 W___qN；落在任何容器节点内部的
+// 定义都会走到 compile-one 的兜底分支（它只认 tag 16 的引用，没有 tag 9
+// 分支），变成 `#error whisper-cgen: unknown bare opcode`，而引用就此悬空
+// （gcc 报 `'W___q0' undeclared`）。
 //
-// 输入：列表元素 token 列表（已过 fuse-hof）。
-// 输出：defs… ++ [[6, rest]]——定义置于列表节点之前，列表内只剩引用。
-// 状态 = [tokens, out_acc, defs_acc]（与 split-defs-iter 同构）。
-// `[] [] rot mk3` 只吃栈顶那件（elems），调用者更深的 token 流不受影响。
-: lift-list {
-    [] [] rot mk3
-    lift-list-iter
+// 容器有五种，通路只有一条：
+//   列表 [6,…] · 条件 [7,…] · 循环 [8,…] · 词定义 [9,…] · 高阶融合体 [249..254,…]
+//
+//   part : 一条 token 流 → [defs, rest]
+//          （先在本层 fuse-hof 展开裸引号，再把 [9,…] 定义拣出来）
+//   hs   : 一个容器节点 → defs… ++ [node']
+//          （拆开字段：是列表就当 token 流交给 part，是标量就原样保留
+//            —— [9, name, body] 的 name 正走这条）
+//
+// 「是不是容器」用 tag 区间判（6..9 与 249..254）：新增容器类型只要落进这
+// 两个区间就自动被覆盖，不必再复制一份状态机。
+//
+// 栈纪律（这几段代码的前提，违反即静默错位）：这些循环只能假设「调用者栈
+// 之上恰好压着自己的一件本地值」，靠 `dup`（取 $0）与 `over`（取 $1）访问；
+// 绝不能用 `$N`——它数的是整条栈，会把调用者的东西卷进来。`rot` 只在窗口
+// 三件全属自己时才用。
+
+// 是不是定义节点 [9, name, body]。与 is-quote-tok? 同构：先问 list? 再取头，
+// 免得把标量当列表取下标（`0 @nth` 对标量是类型错）。
+: is-def-tok? {
+    dup list? ??
+        _ 0 @nth 9 = swap drop return ]
+    drop #f
 } ;
-: lift-list-iter {
+
+// 划分。状态 = [tokens, rest_acc, defs_acc]（与 split-defs-iter 同构）。
+// `[] [] rot mk3` 的 rot 窗口是 (fused, [], [])，三件全属自己，安全。
+: part {
+    fuse-hof
+    [] [] rot mk3
+    part-iter
+} ;
+: part-iter {
     dup 0 @nth len 0 = ??
-        // 收尾：把 [6, out] 接到 defs 之后
-        6 over 1 @nth 2 PushList        // state, [6, out]
-        over 2 @nth swap append         // state, defs ++ [[6, out]]
+        // 收尾：返回 [defs, rest]
+        dup 2 @nth over 1 @nth 2 PushList
         swap drop
         return
     ]
-    dup 0 @nth 0 @nth tk-type 9 = ??
-        // 定义：抬进 defs_acc，out_acc 原样
+    dup 0 @nth 0 @nth is-def-tok? ??
+        // 定义：抬进 defs_acc，rest_acc 原样
         dup 0 @nth 0 @nth               // state, elem
         over 2 @nth swap append         // state, defs'
         swap dup 0 @nth tok-advance     // defs', state, tokens'
-        swap 1 @nth swap mk3            // [tokens', out, defs']
-        lift-list-iter
+        swap 1 @nth swap mk3            // [tokens', rest, defs']
+        part-iter
         return
     ]
-    // 普通元素：留在 out_acc，defs_acc 原样
+    // 普通 token：留在 rest_acc，defs_acc 原样
     dup 0 @nth 0 @nth                   // state, elem
-    over 1 @nth swap append             // state, out'
-    swap dup 0 @nth tok-advance         // out', state, tokens'
-    swap 2 @nth rot rot mk3             // [tokens', out', defs_acc]
-    lift-list-iter
+    over 1 @nth swap append             // state, rest'
+    swap dup 0 @nth tok-advance         // rest', state, tokens'
+    swap 2 @nth rot rot mk3             // [tokens', rest', defs_acc]
+    part-iter
+} ;
+
+// 容器节点 → defs… ++ [node']；非容器原样包成单元素 token 流。
+: hs {
+    dup 0 @nth
+    dup 6 = ?? drop hs1 return ]                    // 列表：1 个流字段 @1
+    dup 7 = ?? drop hs2 return ]                    // 条件：2 个流字段 @1,@2
+    dup 8 = ?? drop hs2 return ]                    // 循环：2 个流字段 @1,@2
+    dup 9 = ?? drop hs9 return ]                     // 定义：流字段 @2（@1 是名字）
+    dup 249 >= over 254 <= & ?? drop hs1 return ]   // 高阶融合体：流字段 @1
+    drop 1 PushList
+} ;
+// 单流字段 @1（列表、高阶融合体）
+: hs1 {
+    dup 1 @nth part                     // [node, P]
+    dup 0 @nth rot 0 @nth rot 1 @nth    // [d, kind, r]
+    2 PushList append
+} ;
+// 双流字段 @1,@2（条件、循环）
+//
+// 先把原料归一成一份"料单"，再从料单里逐项取值：每次取值都是「dup … @nth
+// 后 swap」，把料单换回栈顶——料单因此始终可再取，取出的值依次沉到它下面，
+// 最后 drop 掉料单即得到按读取顺序排好的取值序列。反过来指望 `rot` 把料单
+// 捞上来是不行的：rot 只转栈顶三件，四件一组时最底下那件永远上不来。
+// 取值顺序按最终装配顺序挑，装配只用 `2 PushList` 打包 + `concat-bc` 拼接，
+// 同样不依赖四件以上的重排。
+: hs2 {
+    dup 0 @nth 1 PushList               // [node, K]
+    over 1 @nth part                    // [node, K, P1]
+    rot 2 @nth part                     // [K, P1, P2]
+    2 PushList                          // [K, PP]  PP = [P1, P2]
+    dup 0 @nth 1 @nth swap              // [K, r1, PP]   PP[0][1]
+    dup 1 @nth 1 @nth swap              // [K, r1, r2, PP]
+    dup 1 @nth 0 @nth swap              // [K, r1, r2, d2, PP]
+    dup 0 @nth 0 @nth swap              // [K, r1, r2, d2, d1, PP]
+    drop concat-bc                      // [K, r1, r2, A]   A = d1 ++ d2
+    rot rot 2 PushList rot concat-bc append
+} ;
+// 流字段 @2（词定义；@1 是名字，字符串，原样保留）
+: hs9 {
+    dup 0 @nth 1 PushList               // [node, K]
+    over 1 @nth                         // [node, K, name]
+    rot 2 @nth part                     // [K, name, P]
+    dup 0 @nth swap                     // [K, name, d, P]
+    dup 1 @nth swap                     // [K, name, d, r, P]
+    drop                                // [K, name, d, r]
+    4 PushList                          // [SL]  SL = [K, name, d, r]
+    dup 2 @nth swap                     // [d, SL]
+    dup 0 @nth swap                     // [d, K, SL]
+    dup 1 @nth swap                     // [d, K, name, SL]
+    dup 3 @nth swap                     // [d, K, name, r, SL]
+    drop                                // [d, K, name, r]
+    2 PushList swap concat-bc append     // d ++ [[kind, name, r]]
 } ;
 
 : fuse-hof {
@@ -899,8 +975,13 @@ export classify-nested
         next-consumer-op dup 0 > ??
             over 0 @nth 1 @nth
             2 PushList
+            // 新造出来的融合体 [249..254, inner] 也要过一遍 hs：引号体里
+            // 若还有引号，它的定义同样得抬到顶层，否则 op-hof 编译 inner
+            // 时会撞上 compile-one 的 tag 9 兜底。
+            hs
             swap tok-advance tok-advance
-            fuse-hof prepend
+            fuse-hof
+            swap concat-bc
             return
         | drop
           // Build BOTH tokens before recursing, and keep the generated name
@@ -918,21 +999,27 @@ export classify-nested
           [16] $2 append
           rot drop
           ` rot
-          tok-advance fuse-hof prepend prepend
+          tok-advance fuse-hof
+          // 同理：刚合成的定义 [9, "__qN", inner] 可能装着更深的引号
+          // （`{ { 5 } }` 的外层引号体就是内层引号），过一遍 hs 把里层的
+          // 定义一并抬出来。
+          // 拼装用 concat-bc（拼的是"列表的项"），所以引用必须先 1 PushList
+          // 包成单元素列表，否则 [16, "__qN"] 会被摊成两个 token。
+          rot 1 PushList rot hs swap concat-bc concat-bc
           return
         ]
     | ]
-    // 列表字面量：元素流里做同一趟融合（引号在列表内部同样要处理），
-    // 再把合成出来的定义抬到列表节点之前——顶层 split-defs 才收得到。
+    // 容器节点（列表/条件/循环/词定义/高阶融合体）：先在它的字段流里做同一
+    // 趟融合（引号在容器内部同样要处理），再把合成出来的定义抬到容器之外
+    // ——顶层 split-defs 才收得到。非容器时 hs 等价于 [head] 原样返回，
+    // 所以这里不必先判种类。
     dup 0 @nth                       // [tokens, head]
     dup list? ??
-        dup 0 @nth 6 = ??
-            1 @nth fuse-hof lift-list   // [tokens, defs… ++ [[6, rest]]]
-            swap tok-advance            // [spliced, tokens']
-            fuse-hof                    // [spliced, fused_rest]
-            swap concat-bc              // spliced ++ fused_rest
-            return
-        | drop ]
+        hs                          // [tokens, defs… ++ [node']]
+        swap tok-advance            // [spliced, tokens']
+        fuse-hof                    // [spliced, fused_rest]
+        swap concat-bc              // spliced ++ fused_rest
+        return
     | drop ]
     dup 0 @nth swap tok-advance fuse-hof prepend
 } ;
