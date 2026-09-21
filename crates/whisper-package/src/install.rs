@@ -51,8 +51,7 @@ impl Installer {
         } else {
             // 1. Resolve + 2. Download (git / curl / powershell)
             let info = crate::registry::resolve_package(spec)?;
-            let temp_dir =
-                std::env::temp_dir().join(format!("whisper-pkg-{}", info.package_name));
+            let temp_dir = std::env::temp_dir().join(format!("whisper-pkg-{}", info.package_name));
             let _ = std::fs::remove_dir_all(&temp_dir);
             let download_ok = self
                 .try_git_clone(&info.git_url, &temp_dir)

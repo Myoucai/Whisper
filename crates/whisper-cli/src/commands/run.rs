@@ -56,9 +56,12 @@ fn register_core_words(vm: &mut Vm) -> Result<(), String> {
         )
     })?;
     let mut gen = BytecodeGenerator::new();
-    let (_, defs) = gen
-        .compile(&ast)
-        .map_err(|e| format!("Compile error: {}", whisper_codegen::block_ir::contract_errors_to_string(&e)))?;
+    let (_, defs) = gen.compile(&ast).map_err(|e| {
+        format!(
+            "Compile error: {}",
+            whisper_codegen::block_ir::contract_errors_to_string(&e)
+        )
+    })?;
     for (name, code) in defs {
         vm.define_word(name, code);
     }
@@ -70,8 +73,7 @@ fn register_core_words(vm: &mut Vm) -> Result<(), String> {
 pub fn run_wbin(data: &[u8], config: &RunConfig) -> Result<(), String> {
     use whisper_codegen::wbin::WbinReader;
 
-    let unit = WbinReader::decode_unit(data)
-        .map_err(|e| format!("Invalid .wbin: {e}"))?;
+    let unit = WbinReader::decode_unit(data).map_err(|e| format!("Invalid .wbin: {e}"))?;
     let (bytecode, defs) = unit.linearized();
 
     let bytecode = if std::env::var("WHISPER_NO_OPT").is_ok() {
@@ -156,9 +158,12 @@ pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result
 
     // Phase 2: Compile AST to bytecode
     let mut gen = BytecodeGenerator::new();
-    let (bytecode, defs) = gen
-        .compile(&ast)
-        .map_err(|e| format!("Compile error: {}", whisper_codegen::block_ir::contract_errors_to_string(&e)))?;
+    let (bytecode, defs) = gen.compile(&ast).map_err(|e| {
+        format!(
+            "Compile error: {}",
+            whisper_codegen::block_ir::contract_errors_to_string(&e)
+        )
+    })?;
 
     // Phase 2b: Optimize bytecode (WHISPER_NO_OPT=1 skips — debugging aid)
     let bytecode = if std::env::var("WHISPER_NO_OPT").is_ok() {
@@ -215,9 +220,7 @@ pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result
             allowed_hosts: hosts(),
         }));
         // L-06 会话族：共享 cookie 罐与审计日志
-        let jar = std::sync::Arc::new(std::sync::Mutex::new(
-            std::collections::HashMap::new(),
-        ));
+        let jar = std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
         let audit = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
         capability_table.bind(Box::new(whisper_core::http_session::HttpSessionCap {
             id: 6,
@@ -236,17 +239,19 @@ pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result
             tls_override: None,
             raw_body: true,
         }));
-        capability_table.bind(Box::new(whisper_core::http_session::HttpSessionParallelCap {
-            id: 9,
-            inner: whisper_core::http_session::HttpSessionCap {
+        capability_table.bind(Box::new(
+            whisper_core::http_session::HttpSessionParallelCap {
                 id: 9,
-                allowed_hosts: hosts(),
-                jar: jar.clone(),
-                audit: audit.clone(),
-                tls_override: None,
-                raw_body: false,
+                inner: whisper_core::http_session::HttpSessionCap {
+                    id: 9,
+                    allowed_hosts: hosts(),
+                    jar: jar.clone(),
+                    audit: audit.clone(),
+                    tls_override: None,
+                    raw_body: false,
+                },
             },
-        }));
+        ));
         capability_table.bind(Box::new(whisper_core::http_session::HttpAuditCap {
             id: 7,
             audit,

@@ -30,8 +30,9 @@ pub fn stack_effect(op: &Opcode) -> Option<(usize, usize)> {
         Not | BitNot => (1, 1),
 
         // ── Math (f64) ─────────────────────────────────────────
-        I64ToF64 | F64ToI64 | FSqrt | FSin | FCos | FTan | Floor | Ceil | Round
-        | Log | Exp => (1, 1),
+        I64ToF64 | F64ToI64 | FSqrt | FSin | FCos | FTan | Floor | Ceil | Round | Log | Exp => {
+            (1, 1)
+        }
 
         // ── Lists ──────────────────────────────────────────────
         Nth | Append | Prepend | Take | DropN => (2, 1),
@@ -47,8 +48,8 @@ pub fn stack_effect(op: &Opcode) -> Option<(usize, usize)> {
         Times => (2, 0),        // n {body} @times
 
         // ── Strings ────────────────────────────────────────────
-        StrLen | StrUpper | StrLower | StrStrip | StrToI64 | I64ToStr | Ctos
-        | StrChars | CharsStr | StrJoin => (1, 1),
+        StrLen | StrUpper | StrLower | StrStrip | StrToI64 | I64ToStr | Ctos | StrChars
+        | CharsStr | StrJoin => (1, 1),
         StrCat | StrEq | StrLt | StrFind | StrMatch | StrFindRe | StrSplit => (2, 1),
         StrSlice => (3, 1),   // str start len -> substr
         StrNth => (2, 1),     // str i64 -> i64
@@ -65,10 +66,10 @@ pub fn stack_effect(op: &Opcode) -> Option<(usize, usize)> {
 
         // ── Bytes buffers ──────────────────────────────────────
         BytesNew => (0, 1),
-        BytesPush => (2, 1),   // handle byte -> handle
-        BytesLen => (1, 1),    // handle -> i64
+        BytesPush => (2, 1),      // handle byte -> handle
+        BytesLen => (1, 1),       // handle -> i64
         BytesWriteFile => (2, 0), // handle filename ->
-        BytesToHex => (1, 1),    // handle -> hex-str
+        BytesToHex => (1, 1),     // handle -> hex-str
 
         // ── Binary struct pack ─────────────────────────────────
         Pack => (2, 1),   // [values] fmt -> bytes
@@ -78,7 +79,7 @@ pub fn stack_effect(op: &Opcode) -> Option<(usize, usize)> {
         ReadFile => (1, 1),
         WriteFile => (2, 1), // path data -> bytes written
         ListDir => (1, 1),
-        Mkdir => (1, 1),  // path -> 0|-1
+        Mkdir => (1, 1), // path -> 0|-1
         FileExists => (1, 1),
         EnvGet => (1, 1),
         ReadLine => (0, 1),
@@ -109,7 +110,7 @@ pub fn stack_effect(op: &Opcode) -> Option<(usize, usize)> {
         // ── FFI & buffers ──────────────────────────────────────
         FfiOpen => (1, 1),
         FfiSym => (2, 1),
-        FfiCall => (3, 1),  // [args] fmt fnptr -> result
+        FfiCall => (3, 1), // [args] fmt fnptr -> result
         BufAlloc => (1, 1),
         BufFree => (1, 0),
         BufPeek => (1, 1),  // ptr -> i64
@@ -129,11 +130,11 @@ pub fn stack_effect(op: &Opcode) -> Option<(usize, usize)> {
         // ── Formatting / type predicates ───────────────────────
         Fmt => (2, 1), // fmt value -> str
         I64Check | BoolCheck => (1, 1),
-        Args => (0, 1),   // CLI arguments as [str]
-        Range => (2, 1),  // start count -> [start..start+count-1]
+        Args => (0, 1),  // CLI arguments as [str]
+        Range => (2, 1), // start count -> [start..start+count-1]
 
         // ── Control flow ───────────────────────────────────────
-        Return => (0, 0), // pops the frame, not stack values
+        Return => (0, 0),    // pops the frame, not stack values
         SplitCond => (2, 3), // tokens start -> [then, else, next]
 
         // ── Not statically known ───────────────────────────────

@@ -209,9 +209,12 @@ fn parse_definition(line: &str) -> Result<(String, Vec<whisper_core::opcode::Opc
     let ast = Parser::parse_source(body_str)
         .map_err(|e| format!("Parse error in body: {}", e.message))?;
     let mut gen = BytecodeGenerator::new();
-    let (bytecode, _defs) = gen
-        .compile(&ast)
-        .map_err(|e| format!("Compile error: {}", whisper_codegen::block_ir::contract_errors_to_string(&e)))?;
+    let (bytecode, _defs) = gen.compile(&ast).map_err(|e| {
+        format!(
+            "Compile error: {}",
+            whisper_codegen::block_ir::contract_errors_to_string(&e)
+        )
+    })?;
 
     Ok((name, bytecode))
 }
@@ -378,9 +381,12 @@ pub fn start_repl() -> Result<(), String> {
         match Parser::parse_source(&full_line) {
             Ok(ast) => {
                 let mut gen = BytecodeGenerator::new();
-                let (bytecode, defs) = gen
-                    .compile(&ast)
-                    .map_err(|e| format!("Compile error: {}", whisper_codegen::block_ir::contract_errors_to_string(&e)))?;
+                let (bytecode, defs) = gen.compile(&ast).map_err(|e| {
+                    format!(
+                        "Compile error: {}",
+                        whisper_codegen::block_ir::contract_errors_to_string(&e)
+                    )
+                })?;
                 for (name, code) in defs {
                     vm.define_word(name, code);
                 }

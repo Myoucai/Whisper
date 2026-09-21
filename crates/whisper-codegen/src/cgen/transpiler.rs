@@ -157,8 +157,13 @@ fn transpile_opcodes(
         }
         let op = &opcodes[i];
         match op {
-            Opcode::OpEffect | Opcode::QuoteSize | Opcode::WordSize | Opcode::SetSeed
-            | Opcode::Rand | Opcode::ConfOf | Opcode::UnwrapSig => {
+            Opcode::OpEffect
+            | Opcode::QuoteSize
+            | Opcode::WordSize
+            | Opcode::SetSeed
+            | Opcode::Rand
+            | Opcode::ConfOf
+            | Opcode::UnwrapSig => {
                 let _ = writeln!(out, "{pad}#error unsupported: op-effect/size-of/word-size");
             }
             // ── Literals ────────────────────────────────────────
@@ -449,34 +454,64 @@ fn transpile_opcodes(
                 let _ = writeln!(out, "{{ int64_t _n = w_as_i64(w_pop()); double _f = (double)_n; w_push(W_F64(_f)); }}");
             }
             Opcode::F64ToI64 => {
-                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); w_push(W_I64((int64_t)_f)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ double _f = w_as_f64(w_pop()); w_push(W_I64((int64_t)_f)); }}"
+                );
             }
             Opcode::FSqrt => {
-                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); _f = w_fsqrt(_f); w_push(W_F64(_f)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ double _f = w_as_f64(w_pop()); _f = w_fsqrt(_f); w_push(W_F64(_f)); }}"
+                );
             }
             Opcode::FSin => {
-                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); _f = w_fsin(_f); w_push(W_F64(_f)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ double _f = w_as_f64(w_pop()); _f = w_fsin(_f); w_push(W_F64(_f)); }}"
+                );
             }
             Opcode::FCos => {
-                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); _f = w_fcos(_f); w_push(W_F64(_f)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ double _f = w_as_f64(w_pop()); _f = w_fcos(_f); w_push(W_F64(_f)); }}"
+                );
             }
             Opcode::FTan => {
-                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); _f = w_ftan(_f); w_push(W_F64(_f)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ double _f = w_as_f64(w_pop()); _f = w_ftan(_f); w_push(W_F64(_f)); }}"
+                );
             }
             Opcode::Floor => {
-                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); _f = floor(_f); w_push(W_F64(_f)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ double _f = w_as_f64(w_pop()); _f = floor(_f); w_push(W_F64(_f)); }}"
+                );
             }
             Opcode::Ceil => {
-                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); _f = ceil(_f); w_push(W_F64(_f)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ double _f = w_as_f64(w_pop()); _f = ceil(_f); w_push(W_F64(_f)); }}"
+                );
             }
             Opcode::Round => {
-                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); _f = round(_f); w_push(W_F64(_f)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ double _f = w_as_f64(w_pop()); _f = round(_f); w_push(W_F64(_f)); }}"
+                );
             }
             Opcode::Log => {
-                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); _f = w_flog(_f); w_push(W_F64(_f)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ double _f = w_as_f64(w_pop()); _f = w_flog(_f); w_push(W_F64(_f)); }}"
+                );
             }
             Opcode::Exp => {
-                let _ = writeln!(out, "{{ double _f = w_as_f64(w_pop()); _f = w_fexp(_f); w_push(W_F64(_f)); }}");
+                let _ = writeln!(
+                    out,
+                    "{{ double _f = w_as_f64(w_pop()); _f = w_fexp(_f); w_push(W_F64(_f)); }}"
+                );
             }
             Opcode::Atan2 => {
                 let _ = writeln!(out, "{{ double _x = w_as_f64(w_pop()); double _y = w_as_f64(w_pop()); double _r = w_fatan2(_y, _x); w_push(W_F64(_r)); }}");
@@ -562,10 +597,7 @@ fn transpile_opcodes(
                 let _ = writeln!(out, "{{ int64_t _ms = w_as_i64(w_pop()); w_sleep(_ms); }}");
             }
             Opcode::Random => {
-                let _ = writeln!(
-                    out,
-                    "{{ double _f = w_random(); w_push(W_F64(_f)); }}"
-                );
+                let _ = writeln!(out, "{{ double _f = w_random(); w_push(W_F64(_f)); }}");
             }
             Opcode::RandInt => {
                 let _ = writeln!(out, "{{ int64_t _max = w_as_i64(w_pop()); int64_t _min = w_as_i64(w_pop()); w_push(W_I64(w_randint(_min, _max))); }}");

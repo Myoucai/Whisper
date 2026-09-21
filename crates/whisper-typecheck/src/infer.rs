@@ -77,9 +77,12 @@ impl TypeInferer {
             // N-1 数值协变：Bool <: I64 <: F64 两两可合，对齐运行时
             // pop_i64/pop_f64/binary_num_op 的协变（静态检查以消灭假
             // 阳性为先；反向泄漏如 f64 进 i64 位由运行时动态检查兜底）。
-            (Type::Bool, Type::I64) | (Type::I64, Type::Bool)
-            | (Type::Bool, Type::F64) | (Type::F64, Type::Bool)
-            | (Type::I64, Type::F64) | (Type::F64, Type::I64) => Ok(()),
+            (Type::Bool, Type::I64)
+            | (Type::I64, Type::Bool)
+            | (Type::Bool, Type::F64)
+            | (Type::F64, Type::Bool)
+            | (Type::I64, Type::F64)
+            | (Type::F64, Type::I64) => Ok(()),
             // List covariance
             (Type::List(a_inner), Type::List(b_inner)) => self.unify(a_inner, b_inner),
             // Union types

@@ -51,8 +51,11 @@ pub fn tls_connect_with_config(
     // Ok(0) while handshaking, so a later write_all would spin forever.
     while conn.is_handshaking() {
         if std::env::var("WHISPER_TLS_TRACE").is_ok() {
-            eprintln!("[tls] handshake iter: wants_read={} wants_write={}",
-                conn.wants_read(), conn.wants_write());
+            eprintln!(
+                "[tls] handshake iter: wants_read={} wants_write={}",
+                conn.wants_read(),
+                conn.wants_write()
+            );
         }
         conn.complete_io(&mut { &stream })
             .map_err(|e| format!("TLS handshake with '{host}' failed: {e}"))?;

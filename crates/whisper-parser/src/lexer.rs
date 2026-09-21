@@ -591,12 +591,22 @@ mod qualified_word_tests {
 
     #[test]
     fn qualified_word_single_token() {
-        assert_eq!(kinds("mmod.mw"), vec!["Word(\"mmod.mw\")".to_string(), "Eof".to_string()]);
+        assert_eq!(
+            kinds("mmod.mw"),
+            vec!["Word(\"mmod.mw\")".to_string(), "Eof".to_string()]
+        );
     }
 
     #[test]
     fn standalone_dot_still_output() {
-        assert_eq!(kinds("a ."), vec!["Word(\"a\")".to_string(), "Dot".to_string(), "Eof".to_string()]);
+        assert_eq!(
+            kinds("a ."),
+            vec![
+                "Word(\"a\")".to_string(),
+                "Dot".to_string(),
+                "Eof".to_string()
+            ]
+        );
     }
 
     #[test]
@@ -609,17 +619,18 @@ mod qualified_word_tests {
 
     #[test]
     fn dotdot_untouched() {
-        assert_eq!(
-            kinds(".."),
-            vec!["DotDot".to_string(), "Eof".to_string()]
-        );
+        assert_eq!(kinds(".."), vec!["DotDot".to_string(), "Eof".to_string()]);
     }
 
     #[test]
     fn trailing_dot_not_word() {
         assert_eq!(
             kinds("a."),
-            vec!["Word(\"a\")".to_string(), "Dot".to_string(), "Eof".to_string()]
+            vec![
+                "Word(\"a\")".to_string(),
+                "Dot".to_string(),
+                "Eof".to_string()
+            ]
         );
     }
 }

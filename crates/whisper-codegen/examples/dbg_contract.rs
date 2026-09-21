@@ -13,8 +13,7 @@ fn main() {
     let mut effects: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
     for (name, body) in &defs {
         let refs: Vec<&whisper_parser::ast::AstNode> = body.iter().collect();
-        let (program, net, errs) =
-            whisper_codegen::block_gen::compile_def_program(&refs, &effects);
+        let (program, net, errs) = whisper_codegen::block_gen::compile_def_program(&refs, &effects);
         for e in errs {
             println!("{name}: {e}");
         }

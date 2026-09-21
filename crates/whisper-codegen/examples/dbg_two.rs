@@ -11,7 +11,9 @@ fn main() {
             let (code, errs) = whisper_codegen::block_gen::checked_flat(&refs, false, &mut ctx);
             if !errs.is_empty() {
                 println!("VIOLATION '{name}':");
-                for c in errs { println!("  {c}"); }
+                for c in errs {
+                    println!("  {c}");
+                }
             }
             let _ = code;
         }

@@ -345,7 +345,9 @@ fn uri_to_path(uri: &Uri) -> Option<std::path::PathBuf> {
         out.push(bytes[i]);
         i += 1;
     }
-    Some(std::path::PathBuf::from(String::from_utf8_lossy(&out).into_owned()))
+    Some(std::path::PathBuf::from(
+        String::from_utf8_lossy(&out).into_owned(),
+    ))
 }
 
 /// Pure completion list for a document — unit-testable without a server.
@@ -363,163 +365,187 @@ fn completion_items(
     }
     let mut items = Vec::new();
 
-        // Builtin operators with type signatures
-        let builtins: Vec<(&str, &str, Option<&str>)> = vec![
-            // (name, description, optional type signature)
-            ("dup", "_ — duplicate top of stack", Some("a → a a")),
-            ("swap", "` — swap top two elements", Some("a b → b a")),
-            ("drop", "drop — discard top of stack", Some("a →")),
-            (
-                "rot",
-                "@ — rotate top three elements",
-                Some("a b c → b c a"),
-            ),
-            ("+", "Add: a b → a+b", Some("num num → num")),
-            ("-", "Subtract: a b → a−b", Some("num num → num")),
-            ("*", "Multiply: a b → a×b", Some("num num → num")),
-            ("/", "Divide: a b → a÷b", Some("num num → num")),
-            ("mod", "Modulo: a b → a%b", Some("i64 i64 → i64")),
-            ("=", "Equal: a b → a==b", Some("a b → bool")),
-            ("<", "Less than: a b → a<b", Some("num num → bool")),
-            (">", "Greater than: a b → a>b", Some("num num → bool")),
-            ("!=", "Not equal: a b → a!=b", Some("a b → bool")),
-            ("<=", "Less/equal: a b → a≤b", Some("num num → bool")),
-            (">=", "Greater/equal: a b → a≥b", Some("num num → bool")),
-            ("&", "AND: a b → a&&b", Some("bool bool → bool")),
-            ("|", "OR: a b → a||b", Some("bool bool → bool")),
-            ("!", "NOT: a → !a", Some("bool → bool")),
-            ("@nth", "list n → element", Some("[T] i64 → T")),
-            ("append", "list elem → new-list", Some("[T] T → [T]")),
-            ("len", "list → count", Some("[T] → i64")),
-            ("@map", "list quot → new-list", Some("[T] ref → [U]")),
-            ("@each", "list quot →", Some("[T] ref →")),
-            ("@fold", "list init quot → result", Some("[T] T ref → T")),
-            ("@times", "n quot →", Some("i64 ref →")),
-            ("strlen", "str → count", Some("str → i64")),
-            ("strcat", "str1 str2 → str3", Some("str str → str")),
-            (
-                "strslice",
-                "str start len → substr",
-                Some("str i64 i64 → str"),
-            ),
-            ("streq", "str1 str2 → bool", Some("str str → bool")),
-            ("strlt", "str1 str2 → bool", Some("str str → bool")),
-            ("strfind", "str pattern → index", Some("str str → i64")),
-            ("strreplace", "str old new → str", Some("str str str → str")),
-            ("strtoi64", "str → i64", Some("str → i64")),
-            ("i64tostr", "i64 → str", Some("i64 → str")),
-            ("i64tof64", "i64 → f64", Some("i64 → f64")),
-            ("f64toi64", "f64 → i64 (truncate)", Some("f64 → i64")),
-            ("fsqrt", "√: f64 → f64", Some("f64 → f64")),
-            ("fsin", "sin: f64 → f64", Some("f64 → f64")),
-            ("fcos", "cos: f64 → f64", Some("f64 → f64")),
-            ("ftan", "tan: f64 → f64", Some("f64 → f64")),
-            ("json-parse", "Parse JSON: str → value", Some("str → value")),
-            (
-                "json-stringify",
-                "To JSON: value → str",
-                Some("value → str"),
-            ),
-            (".", "Output top of stack", Some("a →")),
-            ("..", "Output entire stack", None),
-            (",", "Read input", Some("→ str")),
-            ("import", "Import module", None),
-            ("export", "Export word", None),
-            // kv / 状态
-            ("kv-set", "key val kv-set — store (kv 字符串键值)", Some("str str →")),
-            ("kv-get", "key kv-get — fetch (missing → empty str)", Some("str → str")),
-            ("kv-del", "key kv-del", Some("str →")),
-            ("kv-keys", "all keys", Some("→ [str]")),
-            // map
-            ("map-new", "empty map", Some("→ map")),
-            ("map-get", "map key → val (missing → 0)", Some("map str → val")),
-            ("map-set", "map key val → map", Some("map str val → map")),
-            ("map-keys", "map → keys", Some("map → [str]")),
-            ("map-has", "map key → bool", Some("map str → bool")),
-            // 字符串/列表补遗
-            ("strsplit", "str delim → parts", Some("str str → [str]")),
-            ("strchars", "str → [i64]", Some("str → [i64]")),
-            ("charsstr", "[i64] → str", Some("[i64] → str")),
-            ("striter", "str → first rest", Some("str → i64 str")),
-            ("strjoin", "[str] → str", Some("[str] → str")),
-            ("ctos", "char-code → 1-char str", Some("i64 → str")),
-            ("prepend", "elem list → list", Some("T [T] → [T]")),
-            ("listfind", "[ [T] ] T → bool T", Some("[[T]] T → bool T")),
-            ("sort", "sort list (bytewise for str)", Some("[T] → [T]")),
-            ("rev", "reverse list", Some("[T] → [T]")),
-            ("dedup", "remove adjacent/identity dups", Some("[T] → [T]")),
-            ("take", "list n → first n", Some("[T] i64 → [T]")),
-            ("drop-n", "list n → rest", Some("[T] i64 → [T]")),
-            ("try", "run quote, catch error → bool result", Some("ref → bool T")),
-            // 数值/时间/随机
-            ("now", "unix ms", Some("→ i64")),
-            ("sleep", "ms", Some("i64 →")),
-            ("bitand", "i64 AND", Some("i64 i64 → i64")),
-            ("bitor", "i64 OR", Some("i64 i64 → i64")),
-            ("bitxor", "i64 XOR", Some("i64 i64 → i64")),
-            ("bitnot", "i64 NOT", Some("i64 → i64")),
-            ("<<", "shift left", Some("i64 i64 → i64")),
-            (">>", "shift right", Some("i64 i64 → i64")),
-            // 置信度（std/conf 定稿原语）
-            ("conf-of", "peek confidence of top (plain → 1.0)", Some("x → x f64")),
-            ("unwrap", "strip Signal wrapper", Some("sig → val")),
-            ("seed!", "seed the RNG", Some("i64 →")),
-            ("rand", "random f64 ∈ [0,1)", Some("→ f64")),
-            ("randint", "lo hi → random i64", Some("i64 i64 → i64")),
-            // 能力（需 --allow-* 标志）
-            ("http-req", "method url headers body → status headers body (需 --allow-http)", Some("str str str str → i64 str str")),
-        ];
+    // Builtin operators with type signatures
+    let builtins: Vec<(&str, &str, Option<&str>)> = vec![
+        // (name, description, optional type signature)
+        ("dup", "_ — duplicate top of stack", Some("a → a a")),
+        ("swap", "` — swap top two elements", Some("a b → b a")),
+        ("drop", "drop — discard top of stack", Some("a →")),
+        (
+            "rot",
+            "@ — rotate top three elements",
+            Some("a b c → b c a"),
+        ),
+        ("+", "Add: a b → a+b", Some("num num → num")),
+        ("-", "Subtract: a b → a−b", Some("num num → num")),
+        ("*", "Multiply: a b → a×b", Some("num num → num")),
+        ("/", "Divide: a b → a÷b", Some("num num → num")),
+        ("mod", "Modulo: a b → a%b", Some("i64 i64 → i64")),
+        ("=", "Equal: a b → a==b", Some("a b → bool")),
+        ("<", "Less than: a b → a<b", Some("num num → bool")),
+        (">", "Greater than: a b → a>b", Some("num num → bool")),
+        ("!=", "Not equal: a b → a!=b", Some("a b → bool")),
+        ("<=", "Less/equal: a b → a≤b", Some("num num → bool")),
+        (">=", "Greater/equal: a b → a≥b", Some("num num → bool")),
+        ("&", "AND: a b → a&&b", Some("bool bool → bool")),
+        ("|", "OR: a b → a||b", Some("bool bool → bool")),
+        ("!", "NOT: a → !a", Some("bool → bool")),
+        ("@nth", "list n → element", Some("[T] i64 → T")),
+        ("append", "list elem → new-list", Some("[T] T → [T]")),
+        ("len", "list → count", Some("[T] → i64")),
+        ("@map", "list quot → new-list", Some("[T] ref → [U]")),
+        ("@each", "list quot →", Some("[T] ref →")),
+        ("@fold", "list init quot → result", Some("[T] T ref → T")),
+        ("@times", "n quot →", Some("i64 ref →")),
+        ("strlen", "str → count", Some("str → i64")),
+        ("strcat", "str1 str2 → str3", Some("str str → str")),
+        (
+            "strslice",
+            "str start len → substr",
+            Some("str i64 i64 → str"),
+        ),
+        ("streq", "str1 str2 → bool", Some("str str → bool")),
+        ("strlt", "str1 str2 → bool", Some("str str → bool")),
+        ("strfind", "str pattern → index", Some("str str → i64")),
+        ("strreplace", "str old new → str", Some("str str str → str")),
+        ("strtoi64", "str → i64", Some("str → i64")),
+        ("i64tostr", "i64 → str", Some("i64 → str")),
+        ("i64tof64", "i64 → f64", Some("i64 → f64")),
+        ("f64toi64", "f64 → i64 (truncate)", Some("f64 → i64")),
+        ("fsqrt", "√: f64 → f64", Some("f64 → f64")),
+        ("fsin", "sin: f64 → f64", Some("f64 → f64")),
+        ("fcos", "cos: f64 → f64", Some("f64 → f64")),
+        ("ftan", "tan: f64 → f64", Some("f64 → f64")),
+        ("json-parse", "Parse JSON: str → value", Some("str → value")),
+        (
+            "json-stringify",
+            "To JSON: value → str",
+            Some("value → str"),
+        ),
+        (".", "Output top of stack", Some("a →")),
+        ("..", "Output entire stack", None),
+        (",", "Read input", Some("→ str")),
+        ("import", "Import module", None),
+        ("export", "Export word", None),
+        // kv / 状态
+        (
+            "kv-set",
+            "key val kv-set — store (kv 字符串键值)",
+            Some("str str →"),
+        ),
+        (
+            "kv-get",
+            "key kv-get — fetch (missing → empty str)",
+            Some("str → str"),
+        ),
+        ("kv-del", "key kv-del", Some("str →")),
+        ("kv-keys", "all keys", Some("→ [str]")),
+        // map
+        ("map-new", "empty map", Some("→ map")),
+        (
+            "map-get",
+            "map key → val (missing → 0)",
+            Some("map str → val"),
+        ),
+        ("map-set", "map key val → map", Some("map str val → map")),
+        ("map-keys", "map → keys", Some("map → [str]")),
+        ("map-has", "map key → bool", Some("map str → bool")),
+        // 字符串/列表补遗
+        ("strsplit", "str delim → parts", Some("str str → [str]")),
+        ("strchars", "str → [i64]", Some("str → [i64]")),
+        ("charsstr", "[i64] → str", Some("[i64] → str")),
+        ("striter", "str → first rest", Some("str → i64 str")),
+        ("strjoin", "[str] → str", Some("[str] → str")),
+        ("ctos", "char-code → 1-char str", Some("i64 → str")),
+        ("prepend", "elem list → list", Some("T [T] → [T]")),
+        ("listfind", "[ [T] ] T → bool T", Some("[[T]] T → bool T")),
+        ("sort", "sort list (bytewise for str)", Some("[T] → [T]")),
+        ("rev", "reverse list", Some("[T] → [T]")),
+        ("dedup", "remove adjacent/identity dups", Some("[T] → [T]")),
+        ("take", "list n → first n", Some("[T] i64 → [T]")),
+        ("drop-n", "list n → rest", Some("[T] i64 → [T]")),
+        (
+            "try",
+            "run quote, catch error → bool result",
+            Some("ref → bool T"),
+        ),
+        // 数值/时间/随机
+        ("now", "unix ms", Some("→ i64")),
+        ("sleep", "ms", Some("i64 →")),
+        ("bitand", "i64 AND", Some("i64 i64 → i64")),
+        ("bitor", "i64 OR", Some("i64 i64 → i64")),
+        ("bitxor", "i64 XOR", Some("i64 i64 → i64")),
+        ("bitnot", "i64 NOT", Some("i64 → i64")),
+        ("<<", "shift left", Some("i64 i64 → i64")),
+        (">>", "shift right", Some("i64 i64 → i64")),
+        // 置信度（std/conf 定稿原语）
+        (
+            "conf-of",
+            "peek confidence of top (plain → 1.0)",
+            Some("x → x f64"),
+        ),
+        ("unwrap", "strip Signal wrapper", Some("sig → val")),
+        ("seed!", "seed the RNG", Some("i64 →")),
+        ("rand", "random f64 ∈ [0,1)", Some("→ f64")),
+        ("randint", "lo hi → random i64", Some("i64 i64 → i64")),
+        // 能力（需 --allow-* 标志）
+        (
+            "http-req",
+            "method url headers body → status headers body (需 --allow-http)",
+            Some("str str str str → i64 str str"),
+        ),
+    ];
 
-        for (name, desc, type_sig) in &builtins {
-            let detail = if let Some(sig) = type_sig {
-                format!("{desc}  |  {sig}")
+    for (name, desc, type_sig) in &builtins {
+        let detail = if let Some(sig) = type_sig {
+            format!("{desc}  |  {sig}")
+        } else {
+            desc.to_string()
+        };
+        items.push(CompletionItem {
+            label: name.to_string(),
+            detail: Some(detail),
+            kind: Some(if name.starts_with('@') {
+                CompletionItemKind::METHOD
+            } else if name.chars().all(|c| c.is_ascii_punctuation()) {
+                CompletionItemKind::OPERATOR
             } else {
-                desc.to_string()
-            };
-            items.push(CompletionItem {
-                label: name.to_string(),
-                detail: Some(detail),
-                kind: Some(if name.starts_with('@') {
-                    CompletionItemKind::METHOD
-                } else if name.chars().all(|c| c.is_ascii_punctuation()) {
-                    CompletionItemKind::OPERATOR
-                } else {
-                    CompletionItemKind::KEYWORD
-                }),
-                ..Default::default()
-            });
-        }
+                CompletionItemKind::KEYWORD
+            }),
+            ..Default::default()
+        });
+    }
 
-        // User-defined words with inferred type signatures
-        if let Ok(ast) = Parser::parse_source(text) {
-            let mut tc = whisper_typecheck::TypeChecker::new();
-            let _ = tc.check(&ast);
-            for node in &ast {
-                if let AstNode::Def { name, body } = node {
-                    let type_info = if let Some(sig) = tc.word_sigs.get(name) {
-                        let in_str: Vec<String> = sig
-                            .inputs
-                            .iter()
-                            .map(|t| format!("{}", tc.inferer.resolve(t)))
-                            .collect();
-                        let out_str: Vec<String> = sig
-                            .outputs
-                            .iter()
-                            .map(|t| format!("{}", tc.inferer.resolve(t)))
-                            .collect();
-                        format!(" | [{}] → [{}]", in_str.join(" "), out_str.join(" "))
-                    } else {
-                        format!(" | ({} nodes)", body.len())
-                    };
-                    items.push(CompletionItem {
-                        label: name.clone(),
-                        detail: Some(type_info),
-                        kind: Some(CompletionItemKind::FUNCTION),
-                        ..Default::default()
-                    });
-                }
+    // User-defined words with inferred type signatures
+    if let Ok(ast) = Parser::parse_source(text) {
+        let mut tc = whisper_typecheck::TypeChecker::new();
+        let _ = tc.check(&ast);
+        for node in &ast {
+            if let AstNode::Def { name, body } = node {
+                let type_info = if let Some(sig) = tc.word_sigs.get(name) {
+                    let in_str: Vec<String> = sig
+                        .inputs
+                        .iter()
+                        .map(|t| format!("{}", tc.inferer.resolve(t)))
+                        .collect();
+                    let out_str: Vec<String> = sig
+                        .outputs
+                        .iter()
+                        .map(|t| format!("{}", tc.inferer.resolve(t)))
+                        .collect();
+                    format!(" | [{}] → [{}]", in_str.join(" "), out_str.join(" "))
+                } else {
+                    format!(" | ({} nodes)", body.len())
+                };
+                items.push(CompletionItem {
+                    label: name.clone(),
+                    detail: Some(type_info),
+                    kind: Some(CompletionItemKind::FUNCTION),
+                    ..Default::default()
+                });
             }
         }
+    }
 
     // Imported stdlib modules: offer their exported words
     for module in imported_std_modules(text) {
@@ -820,7 +846,10 @@ mod completion_tests {
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
         // std/str exports (spot-check a few from its export list)
         for expect in ["strsplit", "str-rev", "upper"] {
-            assert!(labels.contains(&expect), "missing std/str export {expect}: {labels:?}");
+            assert!(
+                labels.contains(&expect),
+                "missing std/str export {expect}: {labels:?}"
+            );
         }
         // builtin still present alongside
         assert!(labels.contains(&"dup"));
@@ -830,7 +859,10 @@ mod completion_tests {
     fn no_stdlib_words_without_import() {
         let items = completion_items("1 2 + .", None, Some(Position::new(0, 3)));
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
-        assert!(!labels.contains(&"str-rev"), "std word leaked without import");
+        assert!(
+            !labels.contains(&"str-rev"),
+            "std word leaked without import"
+        );
     }
 
     #[test]
@@ -840,7 +872,10 @@ mod completion_tests {
         let items = completion_items(text, None, Some(Position::new(0, text.len() as u32)));
         let labels: Vec<&str> = items.iter().map(|i| i.label.as_str()).collect();
         assert!(labels.contains(&"std/str"), "expected std/str: {labels:?}");
-        assert!(labels.contains(&"std/list"), "expected std/list: {labels:?}");
+        assert!(
+            labels.contains(&"std/list"),
+            "expected std/list: {labels:?}"
+        );
         assert!(
             labels.iter().all(|l| l.starts_with("std/")),
             "non-std entries leaked into import completion: {labels:?}"

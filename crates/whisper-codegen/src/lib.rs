@@ -1,12 +1,12 @@
 // Whisper Codegen — code generation from AST to bytecode, .wbin and C
 
-pub mod bytecode_gen;
-pub mod block_ir;
-pub mod stack_effect;
 pub mod block_gen;
+pub mod block_ir;
+pub mod bytecode_gen;
 pub mod cgen;
 pub mod formatter;
 pub mod optimizer;
+pub mod stack_effect;
 pub mod wbin;
 
 pub use bytecode_gen::BytecodeGenerator;
