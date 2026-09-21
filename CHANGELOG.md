@@ -1,6 +1,79 @@
 # Changelog
 
-## Unreleased (2026-09-21g) — 战役 O（部分达成）：三处自举编译器缺陷 + 一个门禁盲点
+## Unreleased (2026-09-21h) — 战役 O / O′ 收口：引号成为真正的一等值
+
+目标："让自举链支持引号作为一等值"，使 `call` 的动态分发两链一致。
+**已达成**——判据见 `tests/o_preregistered.md`（J1–J5）。上一节（2026-09-21g）
+登记的三处修复只覆盖了"≥2 个引号字面量"；本节补上"引号出现在列表字面量里"
+以及一条被中途掩盖的双链语义分歧，动态分发由此两链同值。
+
+### 修复 —— `try-def-colon` / `try-loop-inner` 的裸 `streq`（VM/C 链真实分歧）
+
+`str-eq?` 本就是为「参数可能是列表」写的带守卫版本
+（`over str? ?? streq | drop drop #f ]`），`gp-loop` 一直在用；但这两处直接对
+「引号体之后的那个 token」调裸 `streq`——而它可能是另一个引号节点：
+
+- **Rust VM**：`streq` 拿到列表 → `Type mismatch: expected str, got [T]`
+- **C 链**：`w_str_eq` 拿列表指针去比 → **静默返回 false**，于是侥幸通过
+
+两个引号时看不出来（`try-loop` 的长度守卫 `len 1 <` 先返回），**三个引号
+才走到那一行**。改用 `str-eq?`，两链行为一致。
+
+> 上一节曾据此写下"门禁的 c2 腿与用户路径不等价（门禁盲点）"——那句话
+> **不成立**，本节撤回（`tests/o_preregistered.md` 中保留了撤回记录）：
+> NSC 那次并没有真正成功，它吐出了 C 但**链接失败**（手工脚本漏了
+> `-lws2_32`）。两条路径其实都失败。门禁的 c2 腿与用户路径在"是否内联
+> `std/core`"上确有差异（属实），但那不是本例的原因。
+
+### 修复 —— 列表字面量里的引号（战役 O′）
+
+`fuse-hof` 把"引号作值"展开成一对 token：定义 `[9, "__qN", body]` 与引用
+`[16, "__qN"]`。只有**顶层**的定义会被 `split-defs` 收走、发射成真正的静态
+函数 `W___qN`；落在 `[6, …]` 列表里时 `compile-one` 只认 tag 16 的引用
+（它没有 tag 9 分支），定义被静默丢弃，引用便指向从未发射的函数
+—— gcc 报 `'W___q0' undeclared`。
+
+新增 `lift-list` / `lift-list-iter`（`whisperc/compiler.all.ws`）：把元素流里
+tag 9 的定义抬到 `[6, rest]` 节点**之前**，列表内只留引用；`fuse-hof` 尾部
+增加 `head 是 [6, …]` 的分支，递归处理元素流后 splice 回本层结果。列表可任意
+嵌套——每层各自把自己的定义抬出一层，顶层自然收齐。
+
+修后的中间态（`[{ 1 + }] len .`）：
+
+    classify   → [[6 [[5 [[0 1] [3 16]]]]] [3 66] [3 144]]
+    fuse-hof   → [[9 "__q0" [[0 1] [3 16]]] [6 [[16 "__q0"]]] [3 66] [3 144]]
+    split-defs → [[[57 "__q0"] [48 1] 52 66 144] [["__q0" [[48 1] 16]]]]
+
+**未采用另一条候选（cgen 支持 opcode 53 内联引号）**：内联引号只能借 gcc
+嵌套函数，而嵌套函数的 trampoline 在外层函数返回后失效——引号一旦被存进
+列表再传出去就是悬空指针。抬升成顶层静态函数没有这个生命周期问题。
+
+### 新增 —— 两链契约测试 + 覆盖门禁 8 例
+
+- `crates/whisper-cli/tests/integration_tests.rs`：
+  `multiple_quotation_literals_compile_on_both_chains` 扩到 2/3/4 个引号；
+  新增 `quotation_in_list_literal_compiles_on_both_chains`（9 例：纯列表回归
+  + 列表内引号 + 取出来 `call` 的动态分发 + 嵌套列表）。
+- `tools/opcode_coverage.sh`：新增 `quote-pair/triple/quad` 与
+  `qlist-len/-len2/-plain/-nest/-call/-disp/-deep/-arity`，共 11 例。
+
+### 验证
+
+    cargo test --workspace        475 / 0
+    cargo clippy -D warnings      0
+    cargo fmt --all --check       0
+    syntax / stdlib               26 / 0 · 58 / 0
+    typecheck-gate                FP=0 PASS
+    opcode_coverage               70 / 0 / 0
+    net-gate / app-gate           PASS / PASS (13 routes)
+    verify-fixedpoint             gen2 == gen3
+
+**未重生种子**：种子自 2026-09-03 冻结以来 `compiler.all.ws` 已改动多次而
+固定点始终成立——种子是链的起点、不是编译器的副本，改 `.ws` 不需要重生它
+（`runtime.c` 由 `#include` 现场取用，同理）。本次新增代码不含"列表里放
+引号"的构造，旧种子能原样编译新源码。
+
+## Unreleased (2026-09-21g) — 战役 O（部分达成）：三处自举编译器缺陷
 
 目标原本是"让自举链支持引号作为一等值"，使 `call` 的动态分发两链一致。
 **未完全达成**——但过程里修掉三处真实的编译器缺陷，并按预注册纪律
@@ -39,7 +112,12 @@
   没有 tag 9 分支** → 定义被丢弃、引用留着 → `'W___q0' undeclared`。
   转入 `docs/language-backlog.md` **战役 O′**（含两条修法方向与预注册判据）。
 
-### 顺带发现：门禁的 c2 腿与用户路径不等价（门禁盲点）
+### 顺带发现：门禁的 c2 腿与用户路径不等价（**结论已撤回，见 2026-09-21h**）
+
+> **撤回**：本节结论错误。NSC 那次并没有真正成功——它吐出了 C 但**链接
+> 失败**（手工脚本漏了 `-lws2_32`，门禁里有），两条路径其实都失败。
+> 真正的原因是 `try-def-colon`/`try-loop-inner` 的裸 `streq` 在
+> VM 与 C 链上行为分歧，详见 2026-09-21h。原文保留以存档。
 
 `tools/opcode_coverage.sh` 的 c2 腿走 **NSC**（先把 `compiler.all.ws` 编成
 原生二进制、再 `NSC -c < src`），而用户执行的 `whisper build -t c2` 会
@@ -48,6 +126,7 @@
 
 据此**拒绝**把 `quote-triple` 登记进门禁：它会在门禁里显示绿色，而对用户
 是红色的。门禁本身改为以用户路径为准（本次只登记 2 引号一例）。
+（该拒绝在 2026-09-21h 被推翻：`quote-triple` 现在是绿色的，因为缺陷已修。）
 
 ### 验证
 

@@ -151,24 +151,40 @@ t cap-exec-err '"echo oops 1>&2" @5 2 @nth .'
 # 但 `!` 被逻辑非占用（spec §3.2 冻结），TokenKind::Bang 从此不再被词法
 # 产出，opcode 就此悬空。现以 `call` 词暴露。
 #
-# 只选两链都能编的形态——单个引号字面量。自举链对「引号作为值」的支持
-# 有限（程序中 ≥2 个引号字面量、或引号出现在列表里 → whisperc
-# compile-full 报 Type mismatch），那是先前就存在的限制、与本词无关，
-# 已登记在 docs/language-backlog.md。
+# 引号作为值一度只在"单个引号字面量"形态下两链一致：≥2 个引号、或引号
+# 出现在列表字面量里都会让 whisperc compile-full 失败（战役 O / O′，
+# 现已修复，见下方 quote-* 与 qlist-* 用例）。
 t call-basic   '{ 42 } call .'
 t call-input   '10 { 2 * } call .'
 t call-in-def  ': ap { call } ; 5 { 1 + } ap .'
 
-# ── 战役 O：多个引号字面量（自举链的 genq-name 残留修复）───────────
-# 非首个引号会让 genq-name 在栈上留一份计数器字符串，把操作数挤出可达
-# 范围；单引号看不出来，两个就报 Type mismatch。
+# ── 战役 O：多个引号字面量 ────────────────────────────────────────
+# 两个不同的缺陷曾让这里失守：
+#   1. genq-name 在非首次调用时把计数器字符串留在栈上（每多一个引号多一份
+#      垃圾），两个引号即报 Type mismatch。
+#   2. try-def-colon / try-loop-inner 对「体的后一个 token」直接调裸 streq，
+#      而它可能是另一个引号节点（列表）。VM 报 expected str, got [T]；
+#      C 链的 w_str_eq 拿列表指针比较、静默返回 false —— **两个执行引擎
+#      在此分歧**，三个引号起才暴露。
+#      这是 VM 与 C 链的真实语义分歧，已改用带类型守卫的 str-eq?。
 #
-# 只登记**两个**引号：三个及以上经 `whisper build -t c2` 仍失败。注意
-# 本门禁的 c2 腿走 NSC（直喂源码），而用户路径的 c2 会先内联 std/core——
-# 两者不等价，所以这里以用户路径为准，不拿 NSC 的通过当证据。
-# 未达成项（≥3 引号、列表内的引号）见 tests/o_preregistered.md 与
-# docs/language-backlog.md 战役 O′。
+# 列表字面量里的引号：fuse-hof 为"引号作值"合成的 [9,name,body] 定义只有
+# 落在顶层才会被 split-defs 收走并发射成静态函数；落在 [6,...] 里就会在
+# compile-one 处被丢弃（它只认 tag 16 的引用），引用悬空 → gcc 报
+# `'W___q0' undeclared`。lift-list 现在把定义抬到列表节点之外。
 t quote-pair   '{ 1 + } { 2 * } drop drop 7 .'
+t quote-triple '{ 1 + } { 2 * } { 3 * } drop drop drop 7 .'
+t quote-quad   '{ 1 + } { 2 * } { 3 * } { 4 * } drop drop drop drop 9 .'
+
+# ── 战役 O′：列表字面量里的引号 + 动态分发 ────────────────────────
+t qlist-len    '[{ 1 + }] len .'
+t qlist-len2   '[{ 1 + } { 2 * }] len .'
+t qlist-plain  '[1 2 3] len .'
+t qlist-nest   '[[1] [2]] len .'
+t qlist-call   '[{ 1 + }] 0 @nth 5 swap call .'
+t qlist-disp   '[{ 1 + } { 2 * } { 3 * }] 1 @nth 5 swap call .'
+t qlist-deep   '[[{ 1 + }]] 0 @nth 0 @nth 5 swap call .'
+t qlist-arity  '9 [{ 1 + }] 0 @nth call .'
 
 echo "coverage: $PASS pass, $FAIL fail, $GAP known-gap"
 echo "$GAPS" | tr '|' '\n' | grep -v '^$' | sed 's/^/  GAP /'

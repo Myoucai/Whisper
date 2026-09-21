@@ -283,7 +283,13 @@ export ctos
 : try-def-colon {
     // Stack: [acc, tokens]. tokens[0]=":", tokens[2] is tag-5 list
     // is-tag-5? consumed tokens[2], so stack is [acc, tokens]
-    dup 3 @nth ";" streq ??
+    // str-eq? (not bare streq): tokens[3] is whatever follows the body, which
+    // for `{ a } { b } { c }` is another tag-5 LIST, not a string. The VM
+    // raises "expected str, got [T]" on that; the C chain's w_str_eq happily
+    // compares a list pointer and returns false — so this only ever blew up
+    // on the Rust VM, and only from the third quotation onwards (with two the
+    // length guard below returns first).
+    dup 3 @nth ";" str-eq? ??
         // Full match! Stack: [acc, tokens]
         dup 1 @nth                  // acc, tokens, name
         over 2 @nth 1 @nth         // acc, tokens, name, body_inner
@@ -309,7 +315,10 @@ export ctos
 : try-loop-inner {
     // Stack: [acc, tokens]. tokens[0] is tag-5, checked by caller
     dup 1 @nth is-tag-5? ??
-        dup 2 @nth "#" streq ??
+        // str-eq? for the same reason as try-def-colon: tokens[2] can be a
+        // LIST (a third quotation), and bare streq on a list is a VM type
+        // error while the C chain silently returns false.
+        dup 2 @nth "#" str-eq? ??
             // Full match! Stack: [acc, tokens]
             dup 0 @nth 1 @nth structify   // acc, tokens, body_s
             over 1 @nth 1 @nth structify  // acc, tokens, body_s, cond_s
@@ -843,6 +852,47 @@ export classify-nested
     ]
 } ;
 
+// ── 引号抬升：把列表字面量里的定义抬到列表节点之外 ────────────────
+// fuse-hof 的"引号作值"分支合成一对 token：定义 [9, "__qN", body] 与引用
+// [16, "__qN"]。定义只有落在**顶层**才会被 split-defs 收走、发射成真正的
+// 静态函数 W___qN；落在 [6, ...] 列表字面量里时 compile-one 只认 tag 16 的
+// 引用（它没有 tag 9 分支），定义被静默丢弃，引用便指向从未发射的函数，
+// gcc 报 `'W___q0' undeclared`。动态分发（引号进列表再取出来 call）正是
+// 引号作为一等值的主要用途，所以这趟抬升是必需的。
+//
+// 输入：列表元素 token 列表（已过 fuse-hof）。
+// 输出：defs… ++ [[6, rest]]——定义置于列表节点之前，列表内只剩引用。
+// 状态 = [tokens, out_acc, defs_acc]（与 split-defs-iter 同构）。
+// `[] [] rot mk3` 只吃栈顶那件（elems），调用者更深的 token 流不受影响。
+: lift-list {
+    [] [] rot mk3
+    lift-list-iter
+} ;
+: lift-list-iter {
+    dup 0 @nth len 0 = ??
+        // 收尾：把 [6, out] 接到 defs 之后
+        6 over 1 @nth 2 PushList        // state, [6, out]
+        over 2 @nth swap append         // state, defs ++ [[6, out]]
+        swap drop
+        return
+    ]
+    dup 0 @nth 0 @nth tk-type 9 = ??
+        // 定义：抬进 defs_acc，out_acc 原样
+        dup 0 @nth 0 @nth               // state, elem
+        over 2 @nth swap append         // state, defs'
+        swap dup 0 @nth tok-advance     // defs', state, tokens'
+        swap 1 @nth swap mk3            // [tokens', out, defs']
+        lift-list-iter
+        return
+    ]
+    // 普通元素：留在 out_acc，defs_acc 原样
+    dup 0 @nth 0 @nth                   // state, elem
+    over 1 @nth swap append             // state, out'
+    swap dup 0 @nth tok-advance         // out', state, tokens'
+    swap 2 @nth rot rot mk3             // [tokens', out', defs_acc]
+    lift-list-iter
+} ;
+
 : fuse-hof {
     dup len 1 < ?? return ]
     tok-head-quote? ??
@@ -872,6 +922,18 @@ export classify-nested
           return
         ]
     | ]
+    // 列表字面量：元素流里做同一趟融合（引号在列表内部同样要处理），
+    // 再把合成出来的定义抬到列表节点之前——顶层 split-defs 才收得到。
+    dup 0 @nth                       // [tokens, head]
+    dup list? ??
+        dup 0 @nth 6 = ??
+            1 @nth fuse-hof lift-list   // [tokens, defs… ++ [[6, rest]]]
+            swap tok-advance            // [spliced, tokens']
+            fuse-hof                    // [spliced, fused_rest]
+            swap concat-bc              // spliced ++ fused_rest
+            return
+        | drop ]
+    | drop ]
     dup 0 @nth swap tok-advance fuse-hof prepend
 } ;
 : compile { fuse-hof [] swap compile-loop } ;
