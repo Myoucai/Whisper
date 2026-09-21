@@ -1855,6 +1855,32 @@ static wval *w_filter_over(wval *list, wfn f) {
     return result;
 }
 
+// `call` (opcode CapExec): invoke the quotation on top of the stack.
+//
+// A quotation literal is emitted as a raw function pointer — cgen writes
+// `w_push(W_PTR((void*)W_qN))`, and the generated body is an ordinary
+// `void(void)` function, which is exactly the `wfn` shape the higher-order
+// helpers above already consume. So a value that is WT_PTR but NOT inside
+// the arena is a code pointer; a string or list lives in the arena and is
+// rejected. That heap test is the same heuristic the type predicates use.
+//
+// The Rust VM reaches the identical behaviour through `Opcode::CapExec`'s
+// `Value::Ref(code)` arm. Failure goes through w_fail so that
+// `{ ... call } try` catches it, matching the VM's catchable TypeMismatch.
+//
+// (cgen has always emitted `W_call()` for this — it classifies `call` as a
+// word reference — but nothing ever defined the symbol, so `call` compiled
+// to a gcc error on the C chain while working on the VM. Defining it here
+// keeps compiler.all.ws frozen, exactly as with the `@n` capability ABI.)
+static void W_call(void) {
+    wval v = w_pop();
+    if (v.t == WT_SIG) v = w_sig_inner(v);
+    if (v.t != WT_PTR || wval_is_heap(v)) {
+        w_fail("call: expected quotation");
+    }
+    ((wfn)(uintptr_t)v.v)();
+}
+
 // ── Full-input read (multi-line source) ─────────────────────────────
 
 static char *w_read_all(void) {

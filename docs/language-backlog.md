@@ -104,6 +104,44 @@ std/encoding 255-ctos 向量链 0 错误——两语料反向拉扯是战败根�
 Phase 3 视 Phase 1/2 战果伸缩；Phase 0.5 日。每阶段独立提交，
 预注册判据未动。
 
+## 战役 O：自举链的「引号作为值」限制（一等引号）
+
+**事实（2026-09-21 实测）**：自举链能编"引号被高阶词消费"的程序
+（`@map`/`@fold` 等，编译期已知 → 融合成嵌套函数），也能编**单个**
+引号字面量作为值（`{ 42 } call .` 两链一致）。但下列形态会让
+`whisperc compile-full` 直接报错，连 C 都产不出来：
+
+| 程序 | VM | c2 |
+|------|----|----|
+| `{ 42 } call .` | 42 | ✅ 42 |
+| `10 { 2 * } call .` | 20 | ✅ 20 |
+| `: ap { call } ; 5 { 1 + } ap .` | 6 | ✅ 6 |
+| `[{ 1 + }] len .` | 1 | ❌ `Type mismatch: expected [T], got str` |
+| `{ 1 + } { 2 * } drop drop 7 .` | 7 | ❌ 同上 |
+| `[{ 1 + } { 2 * }] 1 @nth 5 swap call .` | 10 | ❌ 同上 |
+
+判定规则：**程序中 ≥2 个引号字面量，或引号出现在列表字面量里**。
+
+**重要**：这与 `call`（战役见 spec §16）无关——`[{ 1 + }] len .` 不含
+任何新语法，在引入 `call` 之前就编不过（已用 stash 对照在 HEAD 上复现）。
+`call` 只是让这个先前的洞变得可见：动态分发（把引号放进列表/map 再取出来
+调用）正是引号作为一等值的主要用途，而自举链目前做不到。
+
+**根因方向**：`compiler.all.ws` 的 classify/compile 在处理引号字面量时，
+似乎只覆盖了"被高阶词消费"与"单个裸引号"两种形状，多处出现即触发其自身
+的类型错。**这是固定点基准文件**，改它必须连带重生
+`seed/compiler_seed.c` 并重跑整条自举链（`scripts/bootstrap.sh` +
+`verify-fixedpoint.sh`，约 25 分钟），因此需要独立立项而非顺手改。
+
+**判据要求（预注册）**：修完后，上表三行失败形态在两链输出一致；
+`opcode_coverage.sh` 增补这三例；固定点 gen2==gen3 复验通过。
+
+**附带**：同一批工作还应该把 `@n` 在 classify 阶段正名为能力令牌
+（现在靠 runtime.c 实现 cgen 误发的 `W__<n>()` 兜着，见
+`docs/independence-design.md` Step 2a），以及 `-t c`（Rust 转译器）
+对 `CapExec` 发射空操作的问题（`transpiler.rs` 里写的
+`// cap_exec: no-op in native mode`）。
+
 ## 附：已关闭项（勿重复立项）
 
 - map 遍历顺序非确定 → M-1 已修（VM BTreeMap + C 链排序插入，

@@ -129,6 +129,7 @@ impl TokenKind {
             Self::BytesWriteFile => "bytes-write",
             Self::BytesToHex => "bytes->hex",
             Self::Try => "try",
+            Self::CapExec => "call",
             Self::I64ToF64 => "i64tof64",
             Self::F64ToI64 => "f64toi64",
             Self::FSqrt => "fsqrt",
@@ -230,7 +231,15 @@ pub enum TokenKind {
 
     // Capability
     CapCall(u16), // @n (n is a number)
-    Bang,         // !
+    /// `call` — invoke the quotation (or capability token) on top of the
+    /// stack. Backs `Operator::CapExec`.
+    ///
+    /// This variant used to be `Bang`, i.e. the design intended `!` to exec a
+    /// quotation. The lexer then gave `!` to logical not (spec §3.2, frozen
+    /// syntax) and never produced `Bang` again — so the opcode stayed fully
+    /// implemented in the VM while being unreachable from source. A word is
+    /// the only spelling left, and `call` is what concatenative languages use.
+    CapExec,
 
     // Confidence
     ConfLabel(f64), // :0.xx

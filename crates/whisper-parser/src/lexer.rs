@@ -509,6 +509,10 @@ impl Lexer {
             "bytes-write" => TokenKind::BytesWriteFile,
             "bytes->hex" => TokenKind::BytesToHex,
             "try" => TokenKind::Try,
+            // `call`: invoke the quotation on top of the stack. The opcode
+            // (CapExec) has existed since the beginning but had no reachable
+            // spelling — `!` went to logical not (spec §3.2, frozen).
+            "call" => TokenKind::CapExec,
             "i64tof64" => TokenKind::I64ToF64,
             "f64toi64" => TokenKind::F64ToI64,
             "fsqrt" => TokenKind::FSqrt,

@@ -146,6 +146,19 @@ t cap-exec-out '"echo hi" @5 1 @nth .'
 t cap-exec-st  '"exit 7" @5 0 @nth .'
 t cap-exec-err '"echo oops 1>&2" @5 2 @nth .'
 
+# ── call（CapExec：动态调用栈顶引号）──────────────────────────────
+# 该 opcode 自始就在 VM 里实现，却一直没有可达的拼写：设计原意是 `!`，
+# 但 `!` 被逻辑非占用（spec §3.2 冻结），TokenKind::Bang 从此不再被词法
+# 产出，opcode 就此悬空。现以 `call` 词暴露。
+#
+# 只选两链都能编的形态——单个引号字面量。自举链对「引号作为值」的支持
+# 有限（程序中 ≥2 个引号字面量、或引号出现在列表里 → whisperc
+# compile-full 报 Type mismatch），那是先前就存在的限制、与本词无关，
+# 已登记在 docs/language-backlog.md。
+t call-basic   '{ 42 } call .'
+t call-input   '10 { 2 * } call .'
+t call-in-def  ': ap { call } ; 5 { 1 + } ap .'
+
 echo "coverage: $PASS pass, $FAIL fail, $GAP known-gap"
 echo "$GAPS" | tr '|' '\n' | grep -v '^$' | sed 's/^/  GAP /'
 echo "$FAILED" | tr '|' '\n' | grep -v '^$' | sed 's/^/  DIVERGE /'

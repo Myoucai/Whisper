@@ -885,6 +885,86 @@ fn capability_abi_matches_across_chains() {
     let _ = std::fs::remove_file(&probe);
 }
 
+// ── `call`: dynamic quotation invocation ───────────────────────────
+
+/// `call` exposes `Opcode::CapExec`, which the VM has always implemented but
+/// which had no reachable spelling: the design intended `!`, and `!` went to
+/// logical not (spec §3.2, frozen), so `TokenKind::Bang` stopped being
+/// produced by the lexer and the opcode was left orphaned.
+///
+/// Only the single-quotation-literal forms are asserted here, because the
+/// self-hosted chain cannot yet compile quotations as first-class values
+/// (two or more quote literals, or a quote inside a list literal) — a
+/// pre-existing limitation unrelated to `call`, tracked in
+/// docs/language-backlog.md as campaign O.
+#[test]
+fn call_invokes_quotation_on_both_chains() {
+    if std::process::Command::new("gcc")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        eprintln!("skipping: gcc not available");
+        return;
+    }
+    let dir = std::env::temp_dir().join("whisper_call_it");
+    std::fs::create_dir_all(&dir).unwrap();
+
+    // One quote literal per program on purpose: the self-hosted chain bails
+    // out on two or more (see the limitation note above), so a single source
+    // file exercising all three forms would assert the wrong thing.
+    let cases = [
+        ("basic", "{ 42 } call .\n", "42\n"),
+        ("input", "10 { 2 * } call .\n", "20\n"),
+        ("in-def", ": ap { call } ; 5 { 1 + } ap .\n", "6\n"),
+    ];
+
+    let norm = |b: &[u8]| String::from_utf8_lossy(b).replace(['\r', '"'], "");
+
+    for (name, source, expected) in cases {
+        let src = dir.join(format!("{name}.ws"));
+        std::fs::write(&src, source).unwrap();
+
+        let vm = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+            .args(["run", "--no-strict-types"])
+            .arg(&src)
+            .output()
+            .unwrap();
+        assert!(
+            vm.status.success(),
+            "[{name}] VM run failed: {}",
+            String::from_utf8_lossy(&vm.stderr)
+        );
+
+        let exe = dir.join(format!("{name}_exe"));
+        let build = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+            .args(["build", "-t", "c2", "-o"])
+            .arg(&exe)
+            .arg(&src)
+            .output()
+            .unwrap();
+        assert!(
+            build.status.success(),
+            "[{name}] c2 build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let artifact = if exe.exists() {
+            exe.clone()
+        } else {
+            exe.with_extension(std::env::consts::EXE_EXTENSION)
+        };
+        let c2 = std::process::Command::new(&artifact).output().unwrap();
+        assert!(c2.status.success(), "[{name}] native run failed");
+
+        assert_eq!(norm(&vm.stdout), expected, "[{name}] VM output");
+        assert_eq!(
+            norm(&c2.stdout),
+            expected,
+            "[{name}] `call` diverged between chains"
+        );
+    }
+}
+
 // Wrapper so the test binary can reach the c2 module (bin crate: tests
 // link against the crate root via `commands` path below).
 fn commands_c2_compile(src: &str) -> Result<String, String> {

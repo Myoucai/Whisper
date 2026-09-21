@@ -990,7 +990,7 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::CapCall(id))))
             }
-            TokenKind::Bang => {
+            TokenKind::CapExec => {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::CapExec)))
             }

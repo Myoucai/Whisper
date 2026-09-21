@@ -117,8 +117,30 @@ pub struct FileReadCap {
 /// resolve *inside* one of the allowed roots after normalization. Plain
 /// prefix matching is not enough: it admits `..` traversal and,
 /// case-insensitively on Windows, sibling directories sharing a prefix.
+///
+/// Relative paths are first resolved against the process CWD, because the
+/// whitelist roots are absolute and the filesystem does exactly that when
+/// opening the file. Without this step a normalized relative path could
+/// never `starts_with` an absolute root, so every relative path was denied —
+/// `--allow-file-write` plus `write-file "x.txt"` could not work at all
+/// (fail-closed, so not a hole, but unusable). `..` is still resolved
+/// lexically *after* the join, so an escaping relative path is rejected by
+/// the containment check exactly like an absolute one.
 fn path_is_allowed(path: &std::path::Path, allowed_paths: &[std::path::PathBuf]) -> bool {
-    let normalized = normalize_path(path);
+    // `has_root()` rather than `is_absolute()`: on Windows the latter is false
+    // for a drive-relative path like "/allowed/dir/file.txt" (no drive
+    // prefix), which would wrongly send it down the CWD-join branch. What we
+    // actually mean is "already anchored, don't prepend anything".
+    let absolute = if path.has_root() {
+        path.to_path_buf()
+    } else {
+        match std::env::current_dir() {
+            Ok(cwd) => cwd.join(path),
+            // No CWD to resolve against: keep the old fail-closed behaviour.
+            Err(_) => return false,
+        }
+    };
+    let normalized = normalize_path(&absolute);
     allowed_paths.iter().any(|root| {
         let normalized_root = normalize_path(root);
         normalized.starts_with(&normalized_root)
@@ -575,6 +597,35 @@ mod tests {
         assert!(path_is_allowed(
             std::path::Path::new("/allowed/dir/file.txt"),
             &read_cap().allowed_paths
+        ));
+    }
+
+    #[test]
+    fn relative_path_resolves_against_cwd() {
+        // Production binds the file capabilities to `current_dir()`, so a
+        // relative path has to land inside it. Before the CWD join it never
+        // could — `write-file "x.txt"` was denied under --allow-file-write.
+        let cwd = std::env::current_dir().unwrap();
+        let roots = std::slice::from_ref(&cwd);
+        assert!(path_is_allowed(
+            std::path::Path::new("some_file.txt"),
+            roots
+        ));
+        assert!(path_is_allowed(
+            std::path::Path::new("./sub/../some_file.txt"),
+            roots
+        ));
+    }
+
+    #[test]
+    fn relative_path_escaping_the_root_is_denied() {
+        // `..` is resolved lexically *after* the join, so an escaping
+        // relative path is caught by the containment check just like an
+        // absolute one.
+        let cwd = std::env::current_dir().unwrap();
+        assert!(!path_is_allowed(
+            std::path::Path::new("../../etc/passwd"),
+            std::slice::from_ref(&cwd)
         ));
     }
 

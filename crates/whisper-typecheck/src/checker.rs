@@ -695,9 +695,43 @@ impl TypeChecker {
                 self.expect(stack, &Type::I64, errors, ctx, "bytes-write handle");
             }
             Operator::Try => {
-                self.expect_ref(stack, errors, ctx, "try quot");
+                // `try` CAPTURES its body's output, so the body may leave any
+                // number of values — the VM pops one (or defaults to 0) and
+                // returns it as the second element of `[flag, value]`.
+                // Requiring the net-zero `[T] → [T]` consumer shape
+                // (expect_ref) rejected exactly that: under the strict
+                // default `{ 1 0 / } try drop ... ` failed with
+                // "try quot: expected [T7] → [T7], got [T6] → [T5 i64|f64]"
+                // even though the VM runs it fine. Any-output is the same
+                // contract @each already uses.
+                self.expect_ref_shape(stack, 0, None, errors, ctx, "try quot");
                 stack.push(Type::Bool);
                 stack.push(self.inferer.fresh_var());
+            }
+
+            Operator::CapExec => {
+                // `call`: invoke whatever is on top of the stack. The VM
+                // re-enters a `Value::Ref` against the caller's data stack, so
+                // the quotation's declared outputs land on the enclosing
+                // stack — model exactly that.
+                let popped = stack.pop();
+                match popped.as_ref().map(|t| self.inferer.resolve(t)) {
+                    Some(Type::Ref(_, outs)) => stack.extend(outs),
+                    // Capability tokens (`@n call`) and unresolved vars: the
+                    // result shape is not modelled (the HTTP family is still
+                    // unmodelled; @0/@1/@4/@5 are normally written directly).
+                    Some(Type::Cap(_)) | Some(Type::TypeVar(_)) => {
+                        stack.push(self.inferer.fresh_var());
+                    }
+                    Some(other) => errors.push(TypeError {
+                        message: format!("call: expected quotation, got {}", other.name()),
+                        context: ctx.into(),
+                    }),
+                    None => errors.push(TypeError {
+                        message: "Stack underflow: call needs a quotation".into(),
+                        context: ctx.into(),
+                    }),
+                }
             }
 
             // Float ops
