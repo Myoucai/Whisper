@@ -9,6 +9,10 @@ use std::rc::Rc;
 use whisper_core::opcode::Opcode;
 use whisper_parser::ast::{AstNode, Operator};
 
+/// Compiled bytecode: the main program plus every named word definition.
+/// Named because the inline spelling trips clippy's `type_complexity`.
+pub type CompiledBytecode = (Vec<Opcode>, HashMap<String, Vec<Opcode>>);
+
 /// The bytecode generator.
 pub struct BytecodeGenerator {
     /// Accumulated bytecode for main program
@@ -42,8 +46,7 @@ impl BytecodeGenerator {
     pub fn compile(
         &mut self,
         nodes: &[AstNode],
-    ) -> Result<(Vec<Opcode>, HashMap<String, Vec<Opcode>>), Vec<crate::block_ir::ContractError>>
-    {
+    ) -> Result<CompiledBytecode, Vec<crate::block_ir::ContractError>> {
         let unit = crate::block_gen::compile_unit(nodes);
 
         // Contract policy: the corpus (notably the self-hosted whisperc
@@ -92,7 +95,10 @@ impl BytecodeGenerator {
     }
 
     /// Compile and return only the main bytecode (convenience method).
-    pub fn compile_main(&mut self, nodes: &[AstNode]) -> Result<Vec<Opcode>, Vec<crate::block_ir::ContractError>> {
+    pub fn compile_main(
+        &mut self,
+        nodes: &[AstNode],
+    ) -> Result<Vec<Opcode>, Vec<crate::block_ir::ContractError>> {
         Ok(self.compile(nodes)?.0)
     }
 

@@ -27,7 +27,8 @@ fn cache_dir() -> PathBuf {
 fn fingerprint(parts: &[&[u8]]) -> String {
     use std::hash::{Hash, Hasher};
     let mut out = String::new();
-    for seed in [0x7714550e_11d_u64, 0x9e3779b97f4a7c15] {
+    // Grouped in fours from the right (same value as 0x7714550e_11d).
+    for seed in [0x0771_4550_E11D_u64, 0x9e37_79b9_7f4a_7c15] {
         let mut h = std::collections::hash_map::DefaultHasher::new();
         seed.hash(&mut h);
         for p in parts {
@@ -41,11 +42,7 @@ fn fingerprint(parts: &[&[u8]]) -> String {
 
 /// Compile `source` to a host-specialized native executable, via the
 /// self-hosted chain, with a content-addressed build cache.
-pub fn build_native(
-    source: &str,
-    source_dir: &Path,
-    output: &str,
-) -> Result<(), String> {
+pub fn build_native(source: &str, source_dir: &Path, output: &str) -> Result<(), String> {
     // 1. Inline imports (auto std/core, same policy as the c2 target).
     let with_core = if source.contains("std/core") {
         source.to_string()
@@ -68,7 +65,10 @@ pub fn build_native(
         &runtime_c,
         cc.as_bytes(),
         march.as_bytes(),
-        b"-O3-flto-fno-strict-aliasing-v1",
+        // Cache-key version. Bump whenever the flags below change: entries
+        // built with the old flags must not be reused. v2 dropped
+        // -fno-strict-aliasing (see docs/independence-design.md, Step 6).
+        b"-O3-flto-v2",
     ]);
 
     let dir = cache_dir();
@@ -77,24 +77,19 @@ pub fn build_native(
     let cached_c = dir.join(format!("{key}.c"));
 
     if cached_exe.exists() {
-        std::fs::copy(&cached_exe, output)
-            .map_err(|e| format!("cache copy -> {output}: {e}"))?;
-        println!(
-            "cache hit ({key:.12}…): host-specialized binary -> {output}"
-        );
+        std::fs::copy(&cached_exe, output).map_err(|e| format!("cache copy -> {output}: {e}"))?;
+        println!("cache hit ({key:.12}…): host-specialized binary -> {output}");
         return Ok(());
     }
 
     // 3. Miss: run the self-hosted compiler, emit C, compile specialized.
     let c_code = super::c2::compile_via_whisperc_vm(&expanded)?;
-    std::fs::write(&cached_c, &c_code)
-        .map_err(|e| format!("write {}: {e}", cached_c.display()))?;
+    std::fs::write(&cached_c, &c_code).map_err(|e| format!("write {}: {e}", cached_c.display()))?;
 
     let status = std::process::Command::new(&cc)
         .arg("-O3")
         .arg("-flto")
         .arg(format!("-march={march}"))
-        .arg("-fno-strict-aliasing")
         .arg("-w")
         .arg("-o")
         .arg(&cached_exe)
@@ -117,8 +112,7 @@ pub fn build_native(
         ));
     }
 
-    std::fs::copy(&cached_exe, output)
-        .map_err(|e| format!("copy -> {output}: {e}"))?;
+    std::fs::copy(&cached_exe, output).map_err(|e| format!("copy -> {output}: {e}"))?;
     println!(
         "host-specialized (-O3 -march={march} -flto) via self-hosted chain -> {output} \
          (cached as {key:.12}…)"

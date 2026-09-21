@@ -1,5 +1,264 @@
 # Changelog
 
+## Unreleased (2026-09-21e) — 整体回顾：CI 从未运转 + 一个被它掩盖的字节冲突
+
+对独立性工作做整体复核时发现的问题。第一条是根因，后面几条都是它掩盖的。
+
+### 修复（P0）—— CI 工作流文件是非法 YAML，**从未运行过**
+
+`.github/workflows/ci.yml` 里 `name: App gate (Whisper web backend:
+JSON/static/404 routes)` 的冒号未加引号，YAML 解析直接失败
+（`mapping values are not allowed here`）。GitHub Actions **无法加载该
+工作流**，所以 `test`/`selfhost`/`c-backend`/`lint` 全部从未执行。
+CHANGELOG 里历次"四 CI 门全绿"的说法来自本地手工跑，不是 CI 的实际结论。
+
+修复：该 name 加引号。校验后 6 个 job 全部可解析
+（`test` / `c-backend` / `c-backend-clang` / `selfhost` / `lint` / `release`）。
+
+**这条解释了本轮的另外两个回归为何能存活**：递归守卫 P0（2026-09-21b）
+与下述字节冲突，都会被 `test`/`selfhost`/`lint` 任一条腿拦住。
+
+### 修复（正确性）—— `.wbin` 指令字节冲突：`Try` 与 `BytesToHex` 共用 0xC1
+
+`BytesToHex`（2026-09-18，L-12 新增）被分配了 `0xC1`，而 `Try` 自
+2026-06-07 起就占着该字节。冲突被复制到**四处**：
+
+| 位置 | 角色 |
+|------|------|
+| `opcode.rs` `to_byte` | 编码 |
+| `wbin.rs` `from_byte` | `.wbin` 解码 |
+| `bootstrap.rs`（编码侧） | 自举管线 |
+| `bootstrap.rs`（解码侧） | 自举管线 |
+
+三张解码表都是 `0xC1 => BytesToHex` 在前，于是**每一段 `try` 写进 `.wbin`
+再读回来都变成 `bytes->hex`**，运行时炸在 "expected i64, got ref"。
+实测复现：同一程序直接 `run` 正常，经 `.wbin` 往返后报错。
+
+修法：新来者让位 —— `BytesToHex` 迁到空闲字节 `0xCE`，`Try` 保留
+`0xC1`。`.wbin` 里含 `try` 的程序自此恢复正常。
+
+**防回归**：`opcode.rs` 新增 `to_byte_is_injective` —— 158 个变体逐个取
+字节，断言两两不同（`from_byte(to_byte(op)) == op` 那类往返断言**抓不到**
+编码侧冲突，必须直接查重）。已反向验证：把字节改回 0xC1，测试立即报
+`0xC1 shared by BytesToHex and Try`。
+
+### 清理 —— `lint` 作业的既存债（CI 复活后会立刻变红）
+
+- **rustfmt**：132 处差异 / 34 文件（含大量本轮未触碰的文件）→
+  `cargo fmt --all`，现 `--check` 干净。
+- **clippy**：39 warning → **0**，`cargo clippy --workspace -- -D warnings`
+  通过。其中数条是真问题而非风格：
+  - `xorshift64_next` 自由函数是死代码（VM 用的是同名方法，逻辑重复）→ 删。
+  - `parser.rs` 的 `mod tests` 缺 `#[cfg(test)]`，导致测试模块被编进
+    lib 目标（clippy 因此报 `use super::*` 未使用）→ 补门控。
+  - `vm.rs` 一个函数上叠了两个 `#[test]`（前一个测试函数被删后留下悬空
+    文档注释与属性）——**这让 libtest 多注册了一个幻影测试**，所以历史
+    计数 471 里的 1 是虚的，真实基数是 **470**。
+  - `builtins.rs` 的 `rot` / `@filter` 各重复一条（签名相同，无害），
+    `vm.rs` 的 `"list?"` 重复一条 → 删冗余。
+  - 其余为 `type_complexity`（加别名）、`is_multiple_of`、
+    `eq_ignore_ascii_case`、`while let`、`Default`、十六进制分组等。
+
+### 未修（如实记录，各自独立）
+
+- `try` 接一个"有净产出"的引号时，strict 类型检查会拒（`expected [T]→[T],
+  got [T]→[T i64|f64]`）。**HEAD 上同样如此**（已用 stash 对照验证），
+  属检查器对 `try` 签名的建模问题，不在本轮范围。
+- `path_is_allowed` 拿相对路径与绝对白名单比较，故 `--allow-file-write`
+  下相对路径永远被拒（失败关闭，非安全洞）。在安全边界上且已有 6 个
+  加固单测，应单独评估。
+- HTTP 能力（`@2/@3/@6`-`@9`）仅 VM 侧可用 —— Step 2b。
+- 仓库根目录三个历史调试残留（`out_fire_stage.txt` / `out_l2.txt`，
+  1–3 字节，非任何脚本产出）未动。
+
+## Unreleased (2026-09-21d) — Step 6：C 降级为可替换接口
+
+把 C 从"依赖"变成"接口"。核心不是删掉 C，而是**让任何一个 C 编译器
+都能当后端**——这恰好是当初选 C 的理由，之前却因为两个隐含假设没兑现。
+
+- **`W_TLS` 条件宏**：原来无条件 `__thread`，等于把运行时悄悄钉在
+  GCC/Clang 上。现按 MSVC → `__declspec(thread)`、C11 → `_Thread_local`、
+  其余回退 `__thread`。
+- **移除 `-fno-strict-aliasing`（先证明再删）**：
+  - 静态审计：无类型双关（`*(double*)&x` 类 0 处、无 union），位模式
+    转换全部走 `memcpy`；`w_str_new` 的 `*(uint32_t*)p` 合法（arena
+    存储无声明类型，首次写入确定有效类型）。
+  - 动态验证：取最重工作量（`compiler.all.ws` 65 KB → 205 KB C），
+    带/不带该标志各编一个自举编译器，编译同一程序输出**逐字节一致**
+    （SHA256 相同）。
+  - 从 **9 个构建路径**移除（CLI 的 c2/native、bootstrap、fixedpoint、
+    覆盖门禁、run_core、两个测试、README 示例），并 bump `-t native`
+    内容寻址缓存键（`-O3-flto-v2`）以免复用旧标志下构建的条目。
+  - **决定性理由不是性能**：MSVC 根本没有这个标志，它就是"C 可替换"
+    的直接阻碍。
+- **规范锁定**：`docs/spec.md` 新增 §15「C 发射契约」——C99 + POSIX/Win32、
+  禁止编译器扩展、不得要求非默认标志、不得依赖 UB、编译器矩阵至少
+  gcc + clang 两条腿。违反即为**规范级缺陷**。
+- **CI 新增 `c-backend-clang` 腿**：`WHISPER_CC=clang` + `GCC=clang`，
+  跑 C 后端测试 + stdlib 门禁 + 覆盖门禁。这是 clang 的唯一验证途径
+  （本机无 clang，gcc 腿为本地实测）。
+- **残留风险（如实记录）**：删标志的依据是"静态审计干净 + 最重工作量
+  逐字节一致"，但**通过测试不等于证明无 UB**。若将来在某编译器/优化
+  级别上出现异常，正确反应是把标志加回来并记录触发条件。
+- **未纳入**：tcc / msvc 腿。MSVC 需要的不止是标志（`unistd.h`、`popen`
+  命名等），属另立项。
+
+## Unreleased (2026-09-21c) — Step 2a：C 链能力 ABI 接线（`@n` 令牌）
+
+### 背景：`exec` 早就存在，缺的是整条能力 ABI
+
+`exec` 不是缺词——它是能力令牌 `@5`（`stdlib/os.ws`），VM 侧一直可用。
+真正的洞是 **C 链不支持 `@n` 令牌**：cgen 把 `@n` 当普通词引用，一律发射
+`W__<n>()`（`compiler.all.ws:1293`），而这些函数从不生成，gcc 直接报
+`implicit declaration of function 'W__4'`。后果远超"缺 exec"：
+`import "std/os"` 经 c2 **根本编不过**。
+
+之所以长期未发现：**c2 的六道门禁没有任何一个用例碰过能力令牌**——
+stdlib-gate 测 math/list/str，net/app 走原生 socket 操作码。覆盖盲区，
+不是偶发疏漏。
+
+### 新增：runtime.c 实现 cgen 既成的能力 ABI
+
+`@0`（file read）、`@1`（file write）、`@4`（env）、`@5`（exec）四个
+shim，语义逐条镜像 `capability.rs`。**不动 `compiler.all.ws`**——那是
+固定点基准，改它必须连带重生种子并重跑整条自举链；ABI 是 cgen 既成的
+契约，实现它比修改它便宜得多。
+
+- `@5` exec 用 popen + stderr 重定向到临时文件（popen 只能捕获单流），
+  命令包在 `( ... )` 组里让重定向覆盖整条命令，stdin 接空设备以对齐
+  Rust `Command::output()`——否则读 stdin 的命令会永久挂住 VM。
+  状态码走 `WEXITSTATUS`，两流按 VM 的 `String::trim()` 修剪。
+- 未覆盖 **2/3/6/7/8/9（HTTP 家族）**：需要 C 侧 HTTP+TLS 客户端，
+  是独立中等工程（Step 2b）。用到它们的程序仍然编不过——这是诚实的
+  结果，好过产出错误的二进制。
+
+### 修复：VM 侧两处能力缺陷（双链对拍时暴露）
+
+- **`Opcode::CapCall` 恒弹一个操作数**，而 `FileWriteCap`/`HttpPostCap`
+  需要两个（`path content`）——所以 **`@1` 在 VM 里从来不可用**，而 C 链
+  （按 shim 实际需要弹）与它分歧。新增 `Capability::arity()`（默认 1，
+  `FileWriteCap` 覆写为 2），`CapCall` 按其弹取并反序成声明序。
+  HTTP 能力的 arity 保持默认，行为不变（属 Step 2b）。
+- **`FileWriteCap` 写完不压任何结果**：既静默丢弃失败，又与原生
+  `write-file` opcode、C 链 `w_write_file`、以及类型模型三者都不一致。
+  现返回字节数。`@1` 此前完全不可用，无兼容负担。
+
+### 修复：`@n` 令牌缺类型签名（strict 默认下误拒合法代码）
+
+`checker.rs` 把 `CapCall` 归入 `_ => {}`（既不吃操作数也不产结果），
+于是 `"cmd" exec 1 @nth .` 在**默认 strict 模式**下被拒
+（"@nth list: expected [T0], got str"）。现为 0/1/4/5 四个 id 建模栈效应
+（`@5` 的异构结果用语言既有的 `Type::Union`）。与 J-3 修过的 `http-*`
+内建签名缺失同属一类。HTTP 家族保持不建模（Step 2b）。
+
+### 验证
+
+- **双链对拍**：`@0/@1/@4/@5` 五组用例 VM 与 c2 输出逐行一致
+  （含非零退出码 7、独立 stderr 捕获）。新增 Rust 集成测试
+  `capability_abi_matches_across_chains`（覆盖文件对，因 VM 的文件能力
+  白名单锚定 CWD，shell 里构造跨平台绝对路径过于脆弱）。
+- `tools/opcode_coverage.sh` 新增 4 例（cap-env / cap-exec-out /
+  cap-exec-st / cap-exec-err）；VM 侧运行行补上能力绑定标志。
+- 回归：cargo workspace **470/0**；typecheck 棘轮 FP=0 / TP=23 不变。
+
+## Unreleased (2026-09-21b) — P0 回归修复（递归守卫阈值）+ Step 1：`-t exe` 去 Rust 化
+
+### 修复（P0 —— 上一提交自带的回归）
+
+- **词调用深度守卫阈值过低，c2 链对真实程序全面不可用**。上一提交
+  （eec695f）为 `: f { f } ; f` 的 30 GB 分配问题加了 2048 帧上限，
+  但**自举编译器是"用递归代替循环"遍历 token 的**，所需深度 ≈ token
+  数，随输入规模线性增长。实测：
+
+  | 输入 | 体积 | 所需帧数 |
+  |------|------|---------|
+  | `stdlib/math.ws` | 1.9 KB | 2 049 – 4 096 |
+  | `whisperc/compiler.all.ws` | 65 KB | 16 385 – 32 768 |
+
+  后果：`whisper build -t c2` 对**任何 import stdlib 模块的程序**直接报
+  `RecursionLimit`，连 `compiler.all.ws` 自己都编不过——而
+  `tools/opcode_coverage.sh` 正是这样构建自举编译器的。`stdlib-gate` /
+  `syntax-gate` / `app-gate` / `net-gate` / 覆盖门禁**全部受影响**。
+  上一提交的回归记录只写了 cargo 与固定点（固定点走 C 种子链，绕开了
+  Rust VM 的守卫），所以未被发现。
+- **修法**：默认上限 2048 → **262 144**。对已知最大工作量（32 768 帧）
+  留 8× 余量；按 48 字节/帧计最坏约 25 MB，而原始 bug 是 30 GB。
+  另新增 `WHISPER_MAX_CALL_DEPTH` 运行时逃生口（诊断手段，非安全边界——
+  内存已由数据栈守卫约束）。
+- **回归测试 4 项**：`c2_chain_compiles_stdlib_imports`（std/math 经
+  c2 链编译并运行，端到端复现原故障）、`deep_user_recursion_beyond_old_ceiling_runs`
+  （5000 帧用户递归可运行）、`test_deep_but_legitimate_recursion_is_allowed`
+  （上限不变量：>32768 且 ≤1M）、`test_word_recursion_depth_guard`
+  （改为断言当前阈值而非硬编码 2048）。
+- **复验**：std/math 0.8s、webapp server 2.0s、compiler.all.ws 31.2s
+  全部恢复可编译；syntax 26/0、stdlib 58/0、typecheck FP=0 全绿；
+  cargo workspace **469/0**。
+
+### 变更（Step 1：`-t exe` 去 Rust 化）
+
+- **`-t exe` 改为自举链原生产物**。此前它把 **Rust CLI 二进制本身**复制
+  一份再追加 wbin 负载（`build.rs` 的 `current_exe()` + `WSHPEXE1`
+  trailer），于是"自包含可执行文件"里装的其实是整个 Rust VM（还捎带
+  LSP/REPL/类型检查器/包管理器）。现改走 c2 链产出普通机器码，
+  **产物零 Rust**。
+- **`-t bundle` 保留旧行为**（解释器打包：构建期不需要任何工具链），
+  帮助文本与文档如实标注 `embeds the Rust VM`。两种分发模型不再共用
+  一个名字。选择保留而非删除，是因为"没有 C 编译器也能出单文件"这条
+  工作流是真实的，只是它必然带 Rust，应该按名字说清楚。
+- **产物路径回显修复**：mingw gcc 会把 `-o app` 自作主张变成 `app.exe`，
+  而 CLI 此前回显的是**请求路径**而非真实产物路径。现解析实际存在的
+  文件再报告（影响 c2 / native / exe 三个目标）。
+- **测试**：新增 `exe_target_is_native_and_carries_no_rust`——断言产物
+  可运行、**不含** `WSHPEXE1` trailer、且确实经过 C 链（同级 `.c` 存在）；
+  原 `bundled_exe_*` 两个测试迁移到 `-t bundle` 并更名 `bundle_target_*`。
+
+### 环境发现
+
+- 本机 gcc 一直存在于 `C:\msys64\mingw64\bin`（未入 PATH），因此此前
+  "无 C 编译器即跳过"的 c2/C 后端测试**从未在本机真正执行过**。纳入
+  PATH 后 12 项 c_backend 与全部 c2 链门禁首次在本机跑通——上述 P0
+  回归正是这样暴露的。
+
+## Unreleased (2026-09-21) — 版本号与文档口径对齐（纯文档，零行为变更）
+
+- **版本号统一为 1.0.8**：`docs/spec.md` §13/§14 的词汇附录已在
+  v1.0.8 / v1.0.8b（FFI + 字节语义补全），`ffi.rs` 与 `runtime.c` 亦以
+  v1.0.8 标注；而 `Cargo.toml`、CLI `VERSION`、`package.ws` 仍停在
+  1.0.0，README 徽章写 1.0.7——四处口径互不一致，本次统一到 1.0.8。
+  已核：无任何测试断言版本字符串（`--version` 用例仅断言退出码）。
+- **README 失真修正**（逐条实测后重写）：
+  - 徽章：version 1.0.7→**1.0.8**、tests 451+5 gates→**465+7 gates**、
+    stdlib 14→**20 modules**；
+  - "手写 C 种子"→**冻结 C 种子**：`seed/compiler_seed.c` 头部自述
+    2026-09-03 起为"100% generated C"（由自举链自身产出，旧手写种子
+    在 git 历史），自举章节文字与流程图同步修正；
+  - 功能表：`137 opcodes`→**154**（`opcode.rs` 枚举逐行实测，
+    154 个变体全部出现在 `to_byte`/`from_byte`）；"静态类型推导
+    （当前仅警告）⚠️"→**strict 默认 ✅**（N-2 已翻转，README 落后于
+    代码）；"标准库 13 模块, 60+ 函数"→**20 模块**（20 个 `stdlib/*.ws`
+    逐个 `import` 实测通过）；
+  - c2 段：`v1.0.3-1.0.7`→**v1.0.3-1.0.8**（FFI 已在该链上跑通，
+    stdlib-gate 含 p8-ffi 用例）；值标签 3 个→**5 个**
+    （WT_I64/WT_F64/WT_PTR/WT_SIG/WT_BOOL，`runtime.c:32`）；
+    残留分歧两条经复核**仍成立**（C 链串打印不带引号；
+    `w_val_eq` 仅比标签+位，非深比较），保留并补注出处；
+  - 测试章节：451→**465**、54→**58** 双链断言，补 opcode 覆盖门禁与
+    typecheck 棘轮两道（门禁计数 5→7）；覆盖清单按 crate 实测重写
+    （CLI 139 / core 132 / codegen 138 / parser 34 / typecheck 15 /
+    LSP 5 / package 2 = 465）；
+  - 项目结构：补 `apps/wheels`、`adapters`、`tests/conformance`、`tools`。
+- **docs/stdlib.md**：模块计数 14→**20**（本文详列 15 个，其余
+  `std/core`、`std/net`、`std/random`、`std/time` 点名，`std/ffi`
+  指向 spec §13/§14）。
+- **明确未动**：`registry.json`（包注册表 schema 版本与 std 包自身
+  版本，语义不同）、`vscode-extension/package.json` 0.2.0（插件独立
+  版本线）、`docs/spec.md` 头部 "v1.0 (FROZEN)"（语法合同版本）。
+- **遗留待办（非本次范围）**：仓库内仍有与权威文件漂移的历史快照
+  （`whisperc/compiler.ws` 手工合并版、顶层 `whisperc/*.ws` 与
+  `whisperc/src/*.ws` 日期错位），以及 `-t c`（Rust 转译器）与
+  `-t c2`（自举链）两条通往同一目的的 C 生成路径——清理需单独评估
+  影响面，未纳入本轮零风险对齐。
+
 ## Unreleased (2026-09-18) — 六阶段计划 Phase 4 收尾：VM 递归防护 + 死字段清除
 
 - **词调用深度守卫（P4.3）**：`Opcode::Call` 在 call_stack 深度

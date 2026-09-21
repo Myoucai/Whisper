@@ -18,10 +18,12 @@ pub struct BlockCtx<'a> {
     pub quote_errors: Vec<crate::block_ir::ContractError>,
 }
 
+/// Linearized flat bytecode plus the word definitions it references.
+/// Named because the inline spelling trips clippy's `type_complexity`.
+pub type CompiledProgram = (Vec<Opcode>, Vec<(String, Vec<Opcode>)>);
+
 /// Compiles source → Block-IR → linearized flat bytecode + defs.
-pub fn compile_block(
-    source: &str,
-) -> Result<(Vec<Opcode>, Vec<(String, Vec<Opcode>)>), String> {
+pub fn compile_block(source: &str) -> Result<CompiledProgram, String> {
     let (ast, errors) = Parser::parse_source_recovering(source);
     if !errors.is_empty() {
         return Err(format!("parse: {:?}", errors[0]));
@@ -37,7 +39,10 @@ pub fn compile_block(
     }
 
     let empty: HashMap<String, i64> = HashMap::new();
-    let mut ctx = BlockCtx { def_effects: &empty, quote_errors: Vec::new() };
+    let mut ctx = BlockCtx {
+        def_effects: &empty,
+        quote_errors: Vec::new(),
+    };
     let (flat, errors) = checked_flat(&main_nodes, true, &mut ctx);
     if !errors.is_empty() {
         return Err(errors
@@ -64,7 +69,7 @@ pub fn compile_block(
     Ok((flat, flat_defs))
 }
 
-fn build_program<'a>(nodes: &[&'a AstNode], ctx: &mut BlockCtx) -> crate::block_ir::BlockProgram {
+fn build_program(nodes: &[&AstNode], ctx: &mut BlockCtx) -> crate::block_ir::BlockProgram {
     let mut builder = BlockBuilder::new();
     let entry = builder.current_block();
     builder.set_entry(entry);
@@ -82,7 +87,10 @@ fn build_program<'a>(nodes: &[&'a AstNode], ctx: &mut BlockCtx) -> crate::block_
 /// All control flow (cond/loop/leave/?->) goes through blocks.
 pub fn compile_nodes_flat(nodes: &[&AstNode]) -> Vec<Opcode> {
     let empty: HashMap<String, i64> = HashMap::new();
-    let mut ctx = BlockCtx { def_effects: &empty, quote_errors: Vec::new() };
+    let mut ctx = BlockCtx {
+        def_effects: &empty,
+        quote_errors: Vec::new(),
+    };
     let program = build_program(nodes, &mut ctx);
     crate::block_ir::linearize(&program)
 }
@@ -134,7 +142,10 @@ pub fn compile_unit(nodes: &[AstNode]) -> CompileUnit {
         }
     }
 
-    let mut ctx = BlockCtx { def_effects: &def_effects, quote_errors: Vec::new() };
+    let mut ctx = BlockCtx {
+        def_effects: &def_effects,
+        quote_errors: Vec::new(),
+    };
     let main = build_program(&main_nodes, &mut ctx);
     warnings.extend(crate::block_ir::validate(
         &main,
@@ -143,7 +154,11 @@ pub fn compile_unit(nodes: &[AstNode]) -> CompileUnit {
     ));
     warnings.extend(ctx.quote_errors);
 
-    CompileUnit { main, defs: defs_out, warnings }
+    CompileUnit {
+        main,
+        defs: defs_out,
+        warnings,
+    }
 }
 
 /// Compiles a word body to its Block-IR program plus net effect and
@@ -156,7 +171,10 @@ pub fn compile_def_program(
     Option<i64>,
     Vec<crate::block_ir::ContractError>,
 ) {
-    let mut ctx = BlockCtx { def_effects, quote_errors: Vec::new() };
+    let mut ctx = BlockCtx {
+        def_effects,
+        quote_errors: Vec::new(),
+    };
     let program = build_program(nodes, &mut ctx);
     let mut errs = crate::block_ir::validate(&program, false, def_effects);
     errs.extend(ctx.quote_errors);
@@ -168,7 +186,11 @@ pub fn compile_def_program(
 pub fn compile_def_body(
     nodes: &[&AstNode],
     def_effects: &HashMap<String, i64>,
-) -> (Vec<Opcode>, Option<i64>, Vec<crate::block_ir::ContractError>) {
+) -> (
+    Vec<Opcode>,
+    Option<i64>,
+    Vec<crate::block_ir::ContractError>,
+) {
     let (program, net, errs) = compile_def_program(nodes, def_effects);
     (crate::block_ir::linearize(&program), net, errs)
 }
@@ -186,8 +208,7 @@ fn ast_to_value(node: &AstNode, ctx: &mut BlockCtx) -> Value {
         AstNode::Quote(body) => {
             let refs: Vec<&AstNode> = body.iter().collect();
             let program = build_program(&refs, ctx);
-            let errors =
-                crate::block_ir::validate(&program, false, ctx.def_effects);
+            let errors = crate::block_ir::validate(&program, false, ctx.def_effects);
             ctx.quote_errors.extend(errors);
             let code = crate::block_ir::linearize(&program);
             Value::Ref(std::rc::Rc::from(code.into_boxed_slice()))
@@ -221,7 +242,11 @@ fn emit_value(builder: &mut BlockBuilder, val: &Value) {
 
 fn compile_node_block(builder: &mut BlockBuilder, node: &AstNode, ctx: &mut BlockCtx) {
     match node {
-        AstNode::Cond { then_branch, else_branch, .. } => {
+        AstNode::Cond {
+            then_branch,
+            else_branch,
+            ..
+        } => {
             // cond is implicit: it's already compiled into the current block
             // by the parser (Cond node has no cond field — the cond expr
             // is the node BEFORE the ?? in the AST). But actually in the
@@ -232,8 +257,10 @@ fn compile_node_block(builder: &mut BlockBuilder, node: &AstNode, ctx: &mut Bloc
             let then_b = builder.new_block();
             let else_b = builder.new_block();
             let join_b = builder.new_block();
-            builder.program.blocks[cond_b].terminator =
-                Terminator::Branch { then: then_b, els: else_b };
+            builder.program.blocks[cond_b].terminator = Terminator::Branch {
+                then: then_b,
+                els: else_b,
+            };
             builder.current = None;
 
             // then
@@ -269,8 +296,7 @@ fn compile_node_block(builder: &mut BlockBuilder, node: &AstNode, ctx: &mut Bloc
             let top_b = builder.new_block();
             let body_b = builder.new_block();
             let exit_b = builder.new_block();
-            builder.program.blocks[entry_b].terminator =
-                Terminator::Jump(top_b);
+            builder.program.blocks[entry_b].terminator = Terminator::Jump(top_b);
             builder.current = None;
 
             builder.loop_stack.push((top_b, exit_b));
@@ -280,8 +306,10 @@ fn compile_node_block(builder: &mut BlockBuilder, node: &AstNode, ctx: &mut Bloc
                 compile_node_block(builder, n, ctx);
             }
             let te = builder.current_block();
-            builder.program.blocks[te].terminator =
-                Terminator::Branch { then: body_b, els: exit_b };
+            builder.program.blocks[te].terminator = Terminator::Branch {
+                then: body_b,
+                els: exit_b,
+            };
             builder.current = None;
 
             builder.switch_to(body_b);
@@ -301,7 +329,6 @@ fn compile_node_block(builder: &mut BlockBuilder, node: &AstNode, ctx: &mut Bloc
 
         // Leave comes through as Op(Operator::Leave) — handled in the flat path
         // which we intercept below
-
         AstNode::CondArrow { then_branch } => {
             // `?->`: if the value on stack is true, run the brace body.
             // Same shape as Cond with an empty else: true → then_b,
@@ -309,8 +336,10 @@ fn compile_node_block(builder: &mut BlockBuilder, node: &AstNode, ctx: &mut Bloc
             let cur = builder.current_block();
             let then_b = builder.new_block();
             let fall_b = builder.new_block();
-            builder.program.blocks[cur].terminator =
-                Terminator::Branch { then: then_b, els: fall_b };
+            builder.program.blocks[cur].terminator = Terminator::Branch {
+                then: then_b,
+                els: fall_b,
+            };
             builder.current = None;
 
             builder.switch_to(then_b);
@@ -410,7 +439,8 @@ mod tests {
     #[test]
     fn fib() {
         let r = exec(": fib { _ 1 > ?? _ 1 - fib ` 2 - fib + | ] } ; 10 fib")
-            .unwrap().unwrap();
+            .unwrap()
+            .unwrap();
         assert_eq!(r, whisper_core::value::Value::I64(55));
     }
 
@@ -421,24 +451,18 @@ mod tests {
 
     #[test]
     fn nested_loops() {
-        exec(
-            "0 0 { _ . 1 + } { _ 2 < } # drop { _ . 1 + } { _ 3 < } #",
-        ).unwrap();
+        exec("0 0 { _ . 1 + } { _ 2 < } # drop { _ . 1 + } { _ 3 < } #").unwrap();
     }
 
     #[test]
     fn cond_in_loop_body() {
         // The shape that broke the flat codegen (png-decode walk-r)
-        exec(
-            ": helper { } ; 0 { _ 2 = ?? helper | ] _ . 1 + } { _ 4 < } #",
-        ).unwrap();
+        exec(": helper { } ; 0 { _ 2 = ?? helper | ] _ . 1 + } { _ 4 < } #").unwrap();
     }
 
     #[test]
     fn word_call_in_loop_cond() {
-        let r = exec(
-            ": lt3 { 3 < } ; 0 { _ . 1 + } { _ lt3 } #",
-        );
+        let r = exec(": lt3 { 3 < } ; 0 { _ . 1 + } { _ lt3 } #");
         assert!(r.is_ok());
     }
 
@@ -538,7 +562,11 @@ mod tests {
             !flat.iter().any(|op| matches!(op, Opcode::Cond(_))),
             "constant-false branch should be folded: {flat:?}"
         );
-        assert_eq!(flat.len(), 3, "empty-else hop should be threaded away: {flat:?}");
+        assert_eq!(
+            flat.len(),
+            3,
+            "empty-else hop should be threaded away: {flat:?}"
+        );
         let r = exec("1 #f ?? 99 | ] drop").unwrap();
         assert_eq!(r, None);
     }
@@ -562,8 +590,7 @@ mod tests {
         // elsewhere and true-path falls into the else code: leave
         // silently stops firing and the loop runs to completion.
         // Expected: prints 0 1 2, leaves at 3, drops the counter.
-        let (flat, _) = compile_block("0 { _ 3 = ?? leave | ] _ . 1 + } { _ 9 < } # drop")
-            .unwrap();
+        let (flat, _) = compile_block("0 { _ 3 = ?? leave | ] _ . 1 + } { _ 9 < } # drop").unwrap();
         assert!(flat.iter().any(|op| matches!(op, Opcode::Cond(_))));
         let r = exec("0 { _ 3 = ?? leave | ] _ . 1 + } { _ 9 < } # drop");
         assert_eq!(r.unwrap(), None);

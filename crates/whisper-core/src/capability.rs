@@ -7,9 +7,8 @@
 /// 3. Runtime: Capabilities run in restricted context (path/host whitelists)
 use crate::value::Value;
 use crate::VmError;
-/// Capability-based security model.
-///
-use std::io::{Read, Write};
+
+use std::io::Read;
 use std::rc::Rc;
 
 /// Trait for capabilities that can be called by Whisper programs.
@@ -29,6 +28,18 @@ pub trait Capability: Send + Sync {
     /// Execute the capability with the given arguments from the VM stack.
     /// The capability can push results back onto the VM's data stack.
     fn call(&self, data_stack: &mut Vec<Value>, args: &[Value]) -> Result<(), VmError>;
+
+    /// How many operands this capability consumes from the data stack.
+    ///
+    /// `Opcode::CapCall` used to pop exactly one operand regardless of the
+    /// capability, so a two-operand capability could never work: `@1`
+    /// (file write: `path content`) always failed with "expected path and
+    /// content arguments", and the C chain — which pops what the emitted
+    /// shim actually needs — disagreed with the VM. Defaults to 1, which is
+    /// correct for every capability whose body reads only `args[0]`.
+    fn arity(&self) -> usize {
+        1
+    }
 }
 
 /// A table of capabilities indexed by their numeric ID.
@@ -66,6 +77,12 @@ impl CapabilityTable {
     /// Check if a capability is bound.
     pub fn is_bound(&self, id: u16) -> bool {
         self.get(id).is_some()
+    }
+
+    /// Operand count for a capability. Unbound ids report 1 so the caller
+    /// still surfaces `CapabilityNotBound` rather than a stack underflow.
+    pub fn arity(&self, id: u16) -> usize {
+        self.get(id).map(|c| c.arity()).unwrap_or(1)
     }
 
     /// Call a capability by ID, forwarding arguments.
@@ -185,7 +202,11 @@ impl Capability for FileWriteCap {
     fn description(&self) -> &str {
         "Write files to allowed paths"
     }
-    fn call(&self, _data_stack: &mut Vec<Value>, args: &[Value]) -> Result<(), VmError> {
+    /// `path content @1` — two operands (see the trait's `arity` docs).
+    fn arity(&self) -> usize {
+        2
+    }
+    fn call(&self, data_stack: &mut Vec<Value>, args: &[Value]) -> Result<(), VmError> {
         if args.len() < 2 {
             return Err(VmError::ProgramError(
                 "file_write: expected path and content arguments".into(),
@@ -218,7 +239,17 @@ impl Capability for FileWriteCap {
             )));
         }
 
-        std::fs::write(path, content).map_err(|e| VmError::IoError(e.to_string()))
+        // Report the byte count, matching the native `write-file` opcode and
+        // the C chain's w_write_file. Pushing nothing (the old behaviour) made
+        // `@1` silently discard failures and disagree with both.
+        let written = content.len() as i64;
+        match std::fs::write(path, content) {
+            Ok(()) => {
+                data_stack.push(Value::I64(written));
+                Ok(())
+            }
+            Err(e) => Err(VmError::IoError(e.to_string())),
+        }
     }
 }
 

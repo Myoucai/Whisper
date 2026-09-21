@@ -30,7 +30,11 @@ impl Capability for HttpSessionCap {
         self.id
     }
     fn name(&self) -> &str {
-        if self.raw_body { "http_session_raw" } else { "http_session" }
+        if self.raw_body {
+            "http_session_raw"
+        } else {
+            "http_session"
+        }
     }
     fn description(&self) -> &str {
         "HTTP with cookie jar, status/headers, audit log"
@@ -38,9 +42,10 @@ impl Capability for HttpSessionCap {
 
     fn call(&self, data_stack: &mut Vec<Value>, args: &[Value]) -> Result<(), VmError> {
         let pop_str = |ds: &mut Vec<Value>, what: &str| -> Result<String, VmError> {
-            let v = ds
-                .pop()
-                .ok_or_else(|| VmError::StackUnderflow { expected: 1, actual: 0 })?;
+            let v = ds.pop().ok_or(VmError::StackUnderflow {
+                expected: 1,
+                actual: 0,
+            })?;
             match v {
                 Value::Str(s) => Ok(s.as_ref().clone()),
                 other => Err(VmError::TypeMismatch {
@@ -81,9 +86,8 @@ impl HttpSessionCap {
         headers_json: String,
         body: String,
     ) -> Result<(i64, String, String), VmError> {
-
-        let parsed = parse_url(&url)
-            .ok_or_else(|| VmError::ProgramError(format!("Invalid URL: {url}")))?;
+        let parsed =
+            parse_url(&url).ok_or_else(|| VmError::ProgramError(format!("Invalid URL: {url}")))?;
         if !host_allowed(&parsed.host, &self.allowed_hosts) {
             return Err(VmError::CapabilityDenied(format!(
                 "Host '{}' not in allowed hosts: {:?}",
@@ -103,8 +107,7 @@ impl HttpSessionCap {
         {
             let jar = self.jar.lock().unwrap();
             if !jar.is_empty() {
-                let cookies: Vec<String> =
-                    jar.iter().map(|(k, v)| format!("{k}={v}")).collect();
+                let cookies: Vec<String> = jar.iter().map(|(k, v)| format!("{k}={v}")).collect();
                 req_headers.push_str(&format!("Cookie: {}\r\n", cookies.join("; ")));
             }
         }
@@ -123,8 +126,8 @@ impl HttpSessionCap {
             ("", String::new())
         } else {
             // raw 载荷（multipart 等）必带用户 Content-Type，不注入默认值
-            let has_ct = self.raw_body
-                || headers_json.to_ascii_lowercase().contains("content-type");
+            let has_ct =
+                self.raw_body || headers_json.to_ascii_lowercase().contains("content-type");
             (
                 if has_ct {
                     ""
@@ -182,11 +185,9 @@ impl HttpSessionCap {
                     let _ = s.set_write_timeout(Some(IO_TIMEOUT));
                     if parsed.use_tls {
                         let tls = match &self.tls_override {
-                            Some(cfg) => crate::tls::tls_connect_with_config(
-                                s,
-                                &parsed.host,
-                                cfg.clone(),
-                            ),
+                            Some(cfg) => {
+                                crate::tls::tls_connect_with_config(s, &parsed.host, cfg.clone())
+                            }
                             None => crate::tls::tls_connect(s, &parsed.host),
                         };
                         match tls {
@@ -199,18 +200,20 @@ impl HttpSessionCap {
                 }
                 Err(_) => no_resp!("TIMEOUT-CONNECT"),
             };
-        let write_res = stream.write_all(request.as_bytes()).and_then(|_| {
-            match &raw_bytes {
+        let write_res = stream
+            .write_all(request.as_bytes())
+            .and_then(|_| match &raw_bytes {
                 Some(bytes) => stream.write_all(bytes),
                 None => Ok(()),
-            }
-        });
+            });
         if write_res.is_err() {
             no_resp!("IOERR-WRITE");
         }
         // TLS 路径：Write 实现只进 rustls 缓冲，必须显式 flush 落 socket
         let _ = stream.flush();
-        let mut response = String::new();
+        // Assigned unconditionally below; a `= String::new()` initialiser
+        // would just be dead.
+        let response;
         {
             // 手写读循环：read_to_string 不容忍 (a) 对端缺 close_notify 的
             // UnexpectedEof（Connection: close 下常见）与 (b) 中途分块的
@@ -224,9 +227,7 @@ impl HttpSessionCap {
                     Err(e)
                         if matches!(
                             e.kind(),
-                            ErrorKind::WouldBlock
-                                | ErrorKind::TimedOut
-                                | ErrorKind::UnexpectedEof
+                            ErrorKind::WouldBlock | ErrorKind::TimedOut | ErrorKind::UnexpectedEof
                         ) =>
                     {
                         if e.kind() == ErrorKind::UnexpectedEof {
@@ -245,7 +246,10 @@ impl HttpSessionCap {
             None => (response.as_str(), String::new()),
         };
         // Transfer-Encoding: chunked — decode before the unit sees the body
-        let resp_body = if head.to_ascii_lowercase().contains("transfer-encoding: chunked") {
+        let resp_body = if head
+            .to_ascii_lowercase()
+            .contains("transfer-encoding: chunked")
+        {
             decode_chunked(&resp_body)
         } else {
             resp_body
@@ -319,9 +323,10 @@ impl Capability for HttpSessionParallelCap {
 
     fn call(&self, data_stack: &mut Vec<Value>, args: &[Value]) -> Result<(), VmError> {
         let pop_str = |ds: &mut Vec<Value>, what: &str| -> Result<String, VmError> {
-            let v = ds
-                .pop()
-                .ok_or_else(|| VmError::StackUnderflow { expected: 1, actual: 0 })?;
+            let v = ds.pop().ok_or(VmError::StackUnderflow {
+                expected: 1,
+                actual: 0,
+            })?;
             match v {
                 Value::Str(s) => Ok(s.as_ref().clone()),
                 other => Err(VmError::TypeMismatch {
@@ -351,36 +356,39 @@ impl Capability for HttpSessionParallelCap {
                     actual: other.type_name().into(),
                 })
             }
-            None => return Err(VmError::StackUnderflow { expected: 1, actual: 0 }),
+            None => {
+                return Err(VmError::StackUnderflow {
+                    expected: 1,
+                    actual: 0,
+                })
+            }
         };
 
         // 并发扇出；scoped threads 借用 &self.inner（字段全 Sync）。
         // 结果按线程序（= 请求序）聚合——确定性；线程 panic 视为无响应。
-        let joined: Vec<Result<(i64, String, String), VmError>> =
-            std::thread::scope(|scope| {
-                let mut handles = Vec::with_capacity(count);
-                for _ in 0..count {
-                    handles.push(scope.spawn(|| {
-                        self.inner.request_once(
-                            method.clone(),
-                            url.clone(),
-                            headers_json.clone(),
-                            body.clone(),
-                        )
-                    }));
-                }
-                handles
-                    .into_iter()
-                    .map(|h| match h.join() {
-                        Ok(r) => r,
-                        Err(_) => Ok((0, "{}".to_string(), String::new())),
-                    })
-                    .collect()
-            });
+        let joined: Vec<Result<(i64, String, String), VmError>> = std::thread::scope(|scope| {
+            let mut handles = Vec::with_capacity(count);
+            for _ in 0..count {
+                handles.push(scope.spawn(|| {
+                    self.inner.request_once(
+                        method.clone(),
+                        url.clone(),
+                        headers_json.clone(),
+                        body.clone(),
+                    )
+                }));
+            }
+            handles
+                .into_iter()
+                .map(|h| match h.join() {
+                    Ok(r) => r,
+                    Err(_) => Ok((0, "{}".to_string(), String::new())),
+                })
+                .collect()
+        });
         // 零出域 denial 等错误必须传播（不被并发聚合吞掉）
-        let results: Vec<(i64, String, String)> = joined
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()?;
+        let results: Vec<(i64, String, String)> =
+            joined.into_iter().collect::<Result<Vec<_>, _>>()?;
 
         let items: Vec<String> = results
             .iter()
@@ -390,8 +398,8 @@ impl Capability for HttpSessionParallelCap {
         Ok(())
     }
 }
-/// 审计导出能力（id 7）：-- 审计行（\n 连接）
 
+/// 审计导出能力（id 7）：-- 审计行（\n 连接）
 pub struct HttpAuditCap {
     pub id: u16,
     pub audit: Arc<Mutex<Vec<String>>>,
@@ -417,14 +425,13 @@ impl Capability for HttpAuditCap {
 /// hex 串 → 原始字节（L-12 raw body 通道；空白容忍，长度须偶数）
 fn decode_hex(s: &str) -> Result<Vec<u8>, String> {
     let t: String = s.chars().filter(|c| !c.is_whitespace()).collect();
-    if t.len() % 2 != 0 {
+    if !t.len().is_multiple_of(2) {
         return Err(format!("http-req-raw: odd hex length {}", t.len()));
     }
     (0..t.len())
         .step_by(2)
         .map(|i| {
-            u8::from_str_radix(&t[i..i + 2], 16)
-                .map_err(|e| format!("http-req-raw: bad hex '{e}'"))
+            u8::from_str_radix(&t[i..i + 2], 16).map_err(|e| format!("http-req-raw: bad hex '{e}'"))
         })
         .collect()
 }
@@ -475,17 +482,17 @@ fn parse_kv(s: &str) -> Option<(String, String)> {
     }
 }
 
-
 /// Decode an HTTP/1.1 chunked body (best-effort: malformed or truncated
 /// input yields whatever was decoded so far).
 pub fn decode_chunked(body: &str) -> String {
     let mut out: Vec<u8> = Vec::new();
     let mut rest = body.as_bytes();
-    loop {
-        let Some(pos) = find_subslice(rest, b"\r\n") else { break };
+    while let Some(pos) = find_subslice(rest, b"\r\n") {
         let size_line = String::from_utf8_lossy(&rest[..pos]).to_string();
         let size_str = size_line.split(';').next().unwrap_or("").trim();
-        let Ok(size) = usize::from_str_radix(size_str, 16) else { break };
+        let Ok(size) = usize::from_str_radix(size_str, 16) else {
+            break;
+        };
         rest = &rest[pos + 2..];
         if size == 0 {
             break; // terminal chunk (trailers, if any, are dropped)
@@ -509,8 +516,14 @@ fn find_subslice(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 
 #[test]
 fn test_decode_hex() {
-    assert_eq!(decode_hex("504b0304").unwrap(), vec![0x50, 0x4b, 0x03, 0x04]);
-    assert_eq!(decode_hex("P").unwrap_err(), "http-req-raw: odd hex length 1");
+    assert_eq!(
+        decode_hex("504b0304").unwrap(),
+        vec![0x50, 0x4b, 0x03, 0x04]
+    );
+    assert_eq!(
+        decode_hex("P").unwrap_err(),
+        "http-req-raw: odd hex length 1"
+    );
     assert!(decode_hex("zz").is_err());
     // 空白容忍
     assert_eq!(decode_hex("50 4b").unwrap(), vec![0x50, 0x4b]);

@@ -32,14 +32,18 @@ t() {  # t <name> <source>
   local name="$1" src="$2"
   printf '%s\n' "$src" > "$TMP/$name.ws"
   local vm_out c_out
-  # 行为对拍门禁：类型检查降级警告（用例含刻意的栈残留 drop）
-  vm_out=$(timeout 20 "$W" run --no-strict-types "$TMP/$name.ws" 2>/dev/null)
+  # 行为对拍门禁：类型检查降级警告（用例含刻意的栈残留 drop）。
+  # 能力门禁用例（@4/@5）需要对应的 capability 绑定，故一并打开；
+  # 对不涉及能力的用例无影响（绑定不改变语义）。
+  vm_out=$(timeout 20 "$W" run --no-strict-types \
+    --allow-env --allow-exec --allow-file-read --allow-file-write \
+    "$TMP/$name.ws" 2>/dev/null)
   gap() { GAP=$((GAP+1)); GAPS="$GAPS|$name:$1"; return 0; }
   if ! "$NSC" -c < "$TMP/$name.ws" > "$TMP/$name.c" 2>"$TMP/$name.err"; then
     case " $KNOWN_GAPS " in *" $name "*) gap bootstrap-compile-failed; return ;; esac
     FAIL=$((FAIL+1)); FAILED="$FAILED|$name:bootstrap-compile-failed"; return
   fi
-  if ! $GCC -O2 -fno-strict-aliasing -w -o "$TMP/$name.exe" "$TMP/$name.c" -I "$ROOT/whisperc" -lm $WS2 2>"$TMP/$name.gcc"; then
+  if ! $GCC -O2 -w -o "$TMP/$name.exe" "$TMP/$name.c" -I "$ROOT/whisperc" -lm $WS2 2>"$TMP/$name.gcc"; then
     # 白名单债务通常长这样：C 里 #error（K-3 硬失败）或引用不存在的运行时助手（如 W_json_parse）
     case " $KNOWN_GAPS " in *" $name "*) gap gcc-failed; return ;; esac
     FAIL=$((FAIL+1)); FAILED="$FAILED|$name:gcc-failed"; return
@@ -128,6 +132,19 @@ t bool-arith '#t 1 + . #f 5 - . #t #f + .'
 t bool-atan2 '0 1 atan2 f64toi64 .'
 t bool-bit   '#t bitnot .'
 t bool-f64   '#t 0.5 + .'
+
+# ── 能力 ABI（Step 2a：@n 令牌在 C 链的接线）──────────────────────
+# cgen 把 `@n` 发射成 `W__<n>()`；runtime.c 现实现 0/1/4/5 四个 id。
+# 这四组用例是那条 ABI 的双链契约——在它们之前，六道 c2 门禁里
+# 没有任何一个碰过能力令牌，`import "std/os"` 编不过却无人发现。
+# 文件能力（@0/@1）不在此处覆盖：VM 侧的能力白名单是 CWD，
+# 而 shell 里构造跨平台绝对路径过于脆弱——由 Rust 集成测试
+# `capability_abi_matches_across_chains` 负责。
+export WHISPER_GATE_VAR=gateval
+t cap-env      '"WHISPER_GATE_VAR" @4 .'
+t cap-exec-out '"echo hi" @5 1 @nth .'
+t cap-exec-st  '"exit 7" @5 0 @nth .'
+t cap-exec-err '"echo oops 1>&2" @5 2 @nth .'
 
 echo "coverage: $PASS pass, $FAIL fail, $GAP known-gap"
 echo "$GAPS" | tr '|' '\n' | grep -v '^$' | sed 's/^/  GAP /'

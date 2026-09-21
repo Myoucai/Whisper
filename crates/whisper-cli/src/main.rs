@@ -2,7 +2,7 @@
 
 mod commands;
 
-const VERSION: &str = "1.0.0";
+const VERSION: &str = "1.0.8";
 
 fn help() {
     println!("Whisper {VERSION} — AI-native, stack-based programming language");
@@ -23,9 +23,11 @@ fn help() {
     println!();
     println!("OPTIONS:");
     println!(
-        "  --target wbin|c|c2|native|exe Build target (default: wbin; c2 = self-hosted chain + gcc;
+        "  --target wbin|c|c2|native|exe|bundle
+                                Build target (default: wbin; c2 = self-hosted chain + gcc;
                                 native = c2 + -O3 -march=native -flto, content-cached;
-                                exe = self-contained single-file executable)"
+                                exe = native executable via the self-hosted chain (zero Rust);
+                                bundle = single file embedding the Rust VM, no toolchain needed)"
     );
     println!("  -o <file>                   Output file path");
     println!("  --allow-http                Enable HTTP capabilities");
@@ -35,7 +37,9 @@ fn help() {
     println!("  --allow-exec                Enable command execution capability");
     println!("  --trace                     Enable VM execution tracing");
     println!("  --no-strict-types           Downgrade type errors to warnings (default: fatal)");
-println!("                              (N-2 Phase 4: strict is now the default — FP=0 across)");
+    println!(
+        "                              (N-2 Phase 4: strict is now the default — FP=0 across)"
+    );
     println!("  --help, -h                  Show this help");
     println!("  --version, -V               Show version");
 }
@@ -60,10 +64,11 @@ fn main() {
 }
 
 fn run_cli(args: Vec<String>) -> Result<(), String> {
-    // Self-contained app mode (`whisper build -t exe`): if this binary has a
+    // Bundled app mode (`whisper build -t bundle`): if this binary has a
     // wbin payload appended after its own image (trailer: payload_len u64 LE +
     // "WSHPEXE1"), it IS the app — run the embedded payload, ignore CLI args
     // except capability flags. The original whisper.exe carries no trailer.
+    // (`-t exe` no longer produces such an artifact: it emits native code.)
     if let Some(payload) = embedded_app_payload() {
         let config = commands::run::RunConfig {
             allow_file_read: get_flag(&args, "--allow-file-read"),
@@ -116,7 +121,7 @@ fn get_flag(args: &[String], flag: &str) -> bool {
     args.iter().any(|a| a == flag)
 }
 
-/// Trailer layout appended by `whisper build -t exe`:
+/// Trailer layout appended by `whisper build -t bundle`:
 ///   [ wbin payload bytes ][ payload_len: u64 LE ][ b"WSHPEXE1" ]
 /// Returns the payload slice when this executable carries one.
 fn embedded_app_payload() -> Option<Vec<u8>> {

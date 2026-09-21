@@ -15,6 +15,10 @@ use whisper_parser::Parser;
 /// The self-hosted compiler source (frozen fixed-point artifact's source).
 const WHISPERC_ALL: &str = include_str!("../../../../whisperc/compiler.all.ws");
 
+/// Platform executable suffix, for resolving what the C compiler actually
+/// wrote when it appends one of its own accord.
+const EXE_SUFFIX: &str = if cfg!(windows) { "exe" } else { "" };
+
 /// Recursively inline `import "path"` statements into one flat source.
 /// An import may sit on its own line or lead a line with trailing code
 /// (`import "std/core" 5 sq .`); the whisperc parser drops the import
@@ -153,9 +157,12 @@ pub fn compile_via_whisperc_vm(source: &str) -> Result<String, String> {
     let ast = Parser::parse_source(WHISPERC_ALL)
         .map_err(|e| format!("whisperc parse: {} at {}", e.message, e.token.span.line))?;
     let mut gen = BytecodeGenerator::new();
-    let (_main_bc, defs) = gen
-        .compile(&ast)
-        .map_err(|e| format!("whisperc compile: {}", whisper_codegen::block_ir::contract_errors_to_string(&e)))?;
+    let (_main_bc, defs) = gen.compile(&ast).map_err(|e| {
+        format!(
+            "whisperc compile: {}",
+            whisper_codegen::block_ir::contract_errors_to_string(&e)
+        )
+    })?;
     let mut vm = Vm::new();
     vm.trace = std::env::var("WHISPER_C2_TRACE").is_ok();
     super::bootstrap::register_host_helpers(&mut vm);
@@ -218,7 +225,6 @@ pub fn build_c2(
     let whisperc_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../whisperc");
     let status = std::process::Command::new(&cc)
         .arg("-O2")
-        .arg("-fno-strict-aliasing")
         .arg("-w")
         .arg("-o")
         .arg(output)
@@ -239,6 +245,17 @@ pub fn build_c2(
             c_path.display()
         ));
     }
-    println!("Compiled native executable via self-hosted chain -> {output}");
+    // Some compilers append the platform suffix themselves (mingw gcc turns
+    // `-o app` into `app.exe`), so report the path that actually exists
+    // rather than the one we asked for.
+    let actual = if Path::new(output).exists() {
+        Path::new(output).to_path_buf()
+    } else {
+        Path::new(output).with_extension(EXE_SUFFIX)
+    };
+    println!(
+        "Compiled native executable via self-hosted chain -> {}",
+        actual.display()
+    );
     Ok(())
 }

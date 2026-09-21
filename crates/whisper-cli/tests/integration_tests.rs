@@ -725,7 +725,6 @@ fn c2_compiles_and_runs_via_self_hosted_chain() {
     let manifest = env!("CARGO_MANIFEST_DIR");
     let out = std::process::Command::new("gcc")
         .arg("-O2")
-        .arg("-fno-strict-aliasing")
         .arg("-w")
         .arg("-o")
         .arg(&bin)
@@ -754,6 +753,136 @@ fn c2_compiles_and_runs_via_self_hosted_chain() {
         "25\n7\n100",
         "c2 self-hosted chain output mismatch"
     );
+}
+
+/// Regression (2026-09-21): a 2048-frame word-call ceiling made every
+/// `-t c2` build that imports a stdlib module fail with RecursionLimit — the
+/// self-hosted compiler recurses roughly once per token, so std/math (1.9 KB)
+/// already needs >2048 frames. The c2 chain was unusable for real programs
+/// (stdlib-gate, app-gate, net-gate and opcode_coverage all build this way).
+#[test]
+fn c2_chain_compiles_stdlib_imports() {
+    if std::process::Command::new("gcc")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        eprintln!("skipping: gcc not available");
+        return;
+    }
+    let ws = std::env::temp_dir().join("whisper_c2_stdlib_it");
+    std::fs::create_dir_all(&ws).unwrap();
+    let src = ws.join("m.ws");
+    std::fs::write(&src, "import \"std/math\"\n5 sq .\npi floor f64toi64 .\n").unwrap();
+    let exe = ws.join("m_exe");
+
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .args(["build", "-t", "c2", "-o"])
+        .arg(&exe)
+        .arg(&src)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "c2 build with a stdlib import failed: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+
+    let artifact = if exe.exists() {
+        exe.clone()
+    } else {
+        exe.with_extension(std::env::consts::EXE_EXTENSION)
+    };
+    let run = std::process::Command::new(&artifact).output().unwrap();
+    assert!(run.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&run.stdout).replace('\r', ""),
+        "25\n3\n"
+    );
+}
+
+/// The `@n` capability ABI must behave identically on both chains. Before
+/// Step 2a the C chain emitted calls to undefined `W__<n>` functions, so
+/// `import "std/os"` — whose `exec`/`getenv` are capability wrappers — could
+/// not be compiled at all, and no c2 gate used a capability token, so the gap
+/// went unnoticed. The shell coverage gate covers @4/@5; this adds the file
+/// pair (@0/@1), which needs a CWD-anchored absolute path because the VM
+/// whitelists file capabilities to the process CWD.
+#[test]
+fn capability_abi_matches_across_chains() {
+    if std::process::Command::new("gcc")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        eprintln!("skipping: gcc not available");
+        return;
+    }
+    let cwd = std::env::current_dir().unwrap();
+    let probe = cwd.join("whisper_cap_abi_probe.txt");
+    let probe_s = probe.to_string_lossy().replace('\\', "/");
+    let src_text = format!(
+        "\"{probe_s}\" \"abcdef\" @1 .\n\
+         \"{probe_s}\" @0 .\n\
+         \"WHISPER_CAP_ABI_ENV\" @4 .\n\
+         \"echo hi\" @5 1 @nth .\n\
+         \"exit 7\" @5 0 @nth .\n"
+    );
+    let dir = std::env::temp_dir().join("whisper_cap_abi_it");
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = dir.join("cap.ws");
+    std::fs::write(&src, &src_text).unwrap();
+
+    let vm = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .args([
+            "run",
+            "--no-strict-types",
+            "--allow-file-read",
+            "--allow-file-write",
+            "--allow-env",
+            "--allow-exec",
+        ])
+        .arg(&src)
+        .env("WHISPER_CAP_ABI_ENV", "envval")
+        .output()
+        .unwrap();
+    assert!(
+        vm.status.success(),
+        "VM run failed: {}",
+        String::from_utf8_lossy(&vm.stderr)
+    );
+
+    let exe = dir.join("cap_exe");
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .args(["build", "-t", "c2", "-o"])
+        .arg(&exe)
+        .arg(&src)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "c2 build failed: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let artifact = if exe.exists() {
+        exe.clone()
+    } else {
+        exe.with_extension(std::env::consts::EXE_EXTENSION)
+    };
+    let c2 = std::process::Command::new(&artifact)
+        .env("WHISPER_CAP_ABI_ENV", "envval")
+        .output()
+        .unwrap();
+    assert!(c2.status.success());
+
+    // The VM prints strings quoted, the C chain prints them raw — the one
+    // documented display divergence, so compare quote-stripped.
+    let norm = |b: &[u8]| String::from_utf8_lossy(b).replace(['\r', '"'], "");
+    let (a, b) = (norm(&vm.stdout), norm(&c2.stdout));
+    assert_eq!(a, b, "capability ABI diverged between chains");
+    assert_eq!(a, "6\nabcdef\nenvval\nhi\n7\n");
+
+    let _ = std::fs::remove_file(&probe);
 }
 
 // Wrapper so the test binary can reach the c2 module (bin crate: tests
@@ -806,10 +935,12 @@ mod whisper_c2 {
     }
 }
 
-// ── -t exe: self-contained single-file executables ─────────────────
+// ── -t bundle: interpreter-bundled single-file executables ─────────
+// NOTE: these embed the Rust VM by design. `-t exe` is the zero-Rust
+// native target and is covered separately below.
 
 #[test]
-fn bundled_exe_runs_and_matches_vm() {
+fn bundle_target_runs_and_matches_vm() {
     let ws = std::env::temp_dir().join("whisper_bundle_test");
     std::fs::create_dir_all(&ws).unwrap();
     let src = ws.join("app.ws");
@@ -821,14 +952,14 @@ fn bundled_exe_runs_and_matches_vm() {
     let exe = ws.join("app_bin");
 
     let build = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
-        .args(["build", "-t", "exe", "-o"])
+        .args(["build", "-t", "bundle", "-o"])
         .arg(&exe)
         .arg(&src)
         .output()
         .unwrap();
     assert!(
         build.status.success(),
-        "build -t exe failed: {}",
+        "build -t bundle failed: {}",
         String::from_utf8_lossy(&build.stderr)
     );
 
@@ -851,7 +982,7 @@ fn bundled_exe_runs_and_matches_vm() {
 }
 
 #[test]
-fn bundled_exe_trailer_layout() {
+fn bundle_target_trailer_layout() {
     // Trailer = [payload][u64 len LE][b"WSHPEXE1"]; a plain whisper binary
     // has none, a bundled one does, and the payload decodes as a wbin unit.
     let ws = std::env::temp_dir().join("whisper_bundle_layout");
@@ -860,7 +991,7 @@ fn bundled_exe_trailer_layout() {
     std::fs::write(&src, "1 .\n").unwrap();
     let exe = ws.join("a_bin");
     std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
-        .args(["build", "-t", "exe", "-o"])
+        .args(["build", "-t", "bundle", "-o"])
         .arg(&exe)
         .arg(&src)
         .output()
@@ -877,11 +1008,91 @@ fn bundled_exe_trailer_layout() {
     assert_eq!(&data[n - 16 - plen..n - 16][..4], b"WHSP");
 }
 
+// ── -t exe: native executable, zero Rust in the artifact ───────────
+
+/// The independence pass moved `-t exe` off the interpreter-bundling path
+/// (now `-t bundle`) onto the self-hosted C chain. This test pins the three
+/// properties that make the artifact "zero Rust":
+///   1. it runs the program directly,
+///   2. it carries no bundle trailer (so it is not a copy of the whisper CLI),
+///   3. the C chain actually ran (a sibling `.c` was emitted).
+#[test]
+fn exe_target_is_native_and_carries_no_rust() {
+    if std::process::Command::new("gcc")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        eprintln!("skipping: gcc not available");
+        return;
+    }
+    let ws = std::env::temp_dir().join("whisper_exe_native_it");
+    std::fs::create_dir_all(&ws).unwrap();
+    let src = ws.join("app.ws");
+    std::fs::write(&src, "\"native\" .\n1.5 2.5 + f64toi64 .\n").unwrap();
+    let exe = ws.join("app_exe");
+
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .args(["build", "-t", "exe", "-o"])
+        .arg(&exe)
+        .arg(&src)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "build -t exe failed: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+
+    // 1. Runs directly. (A bundled CLI would need the payload's own entry
+    //    path and would not accept the program's argv semantics.)
+    let run = std::process::Command::new(&exe).output().unwrap();
+    assert!(run.status.success(), "exe run failed");
+    assert_eq!(
+        String::from_utf8_lossy(&run.stdout).replace('\r', ""),
+        "native\n4\n"
+    );
+
+    // Some compilers append the platform suffix themselves (mingw gcc turns
+    // `-o app_exe` into `app_exe.exe`).
+    let artifact = if exe.exists() {
+        exe.clone()
+    } else {
+        exe.with_extension(std::env::consts::EXE_EXTENSION)
+    };
+    assert!(
+        artifact.exists(),
+        "-t exe produced no artifact at {} nor {}",
+        exe.display(),
+        artifact.display()
+    );
+
+    // 2. No bundle trailer anywhere in the image.
+    let data = std::fs::read(&artifact).unwrap();
+    let has_trailer = data.windows(8).any(|w| w == b"WSHPEXE1");
+    assert!(
+        !has_trailer,
+        "-t exe artifact must not embed the Rust VM bundle trailer"
+    );
+
+    // 3. The self-hosted C chain produced it (sibling .c emitted by build_c2).
+    let c_path = exe.with_extension("c");
+    assert!(
+        c_path.exists(),
+        "-t exe should go through the C chain; {} missing",
+        c_path.display()
+    );
+}
+
 // ── -t native: install-time specialization with content cache ──────
 
 #[test]
 fn native_target_specializes_and_caches() {
-    if std::process::Command::new("gcc").arg("--version").output().is_err() {
+    if std::process::Command::new("gcc")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
         eprintln!("skipping: gcc not available");
         return;
     }
@@ -924,7 +1135,10 @@ fn native_target_specializes_and_caches() {
     let run = std::process::Command::new(&exe).output().unwrap();
     assert!(run.status.success());
     // Windows pipes CRLF; compare newline-agnostically.
-    assert_eq!(String::from_utf8_lossy(&run.stdout).replace('\r', ""), "4\n9\n");
+    assert_eq!(
+        String::from_utf8_lossy(&run.stdout).replace('\r', ""),
+        "4\n9\n"
+    );
 }
 
 // ── std/conf: finalized confidence surface ─────────────────────────
@@ -990,7 +1204,11 @@ fn encoding_stdlib_vectors() {
         .arg(&src)
         .output()
         .unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let s = String::from_utf8_lossy(&out.stdout);
     assert_eq!(
         s.lines().filter(|l| !l.is_empty()).collect::<Vec<_>>(),
@@ -1036,7 +1254,11 @@ fn md5_stdlib_vectors() {
         .arg(&src)
         .output()
         .unwrap();
-    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let s = String::from_utf8_lossy(&out.stdout);
     assert_eq!(
         s.lines().filter(|l| !l.is_empty()).collect::<Vec<_>>(),
@@ -1057,11 +1279,7 @@ fn md5_stdlib_vectors() {
 fn namespace_qualified_words() {
     let dir = std::env::temp_dir().join("whisper_ns_it");
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(
-        dir.join("mymod.ws"),
-        ": find { \"MINE\" } ;\nexport find\n",
-    )
-    .unwrap();
+    std::fs::write(dir.join("mymod.ws"), ": find { \"MINE\" } ;\nexport find\n").unwrap();
     let src = dir.join("ns.ws");
     std::fs::write(
         &src,

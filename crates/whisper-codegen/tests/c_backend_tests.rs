@@ -84,7 +84,6 @@ fn compile_and_run_c(source: &str, tag: &str) -> String {
     let bin = dir.join("prog.exe");
     let out = Command::new(&cc)
         .arg("-O2")
-        .arg("-fno-strict-aliasing")
         .arg("-w")
         .arg("-o")
         .arg(&bin)

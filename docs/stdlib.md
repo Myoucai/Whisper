@@ -1,6 +1,8 @@
 # Whisper Standard Library v1.0
 
-14 modules（新增 std/conf、std/encoding、std/hash、std/jwt、std/html、std/csv）。
+`stdlib/` 下共 **20 个可导入模块**（`import "std/<name>"` 全部实测通过）。
+本文档详列其中 15 个；`std/core`、`std/net`、`std/random`、`std/time`
+未在此详列，`std/ffi` 见 `docs/spec.md` §13/§14。
 
 All modules are loaded via `import "std/<name>"`.
 

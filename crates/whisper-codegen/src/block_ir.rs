@@ -122,6 +122,12 @@ pub struct BlockBuilder {
     pub loop_stack: Vec<(BlockId, BlockId)>,
 }
 
+impl Default for BlockBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BlockBuilder {
     pub fn new() -> Self {
         Self {
@@ -205,8 +211,10 @@ impl BlockBuilder {
         let then_b = self.new_block();
         let else_b = self.new_block();
         let join_b = self.new_block();
-        self.program.blocks[cond_b].terminator =
-            Terminator::Branch { then: then_b, els: else_b };
+        self.program.blocks[cond_b].terminator = Terminator::Branch {
+            then: then_b,
+            els: else_b,
+        };
         self.current = None;
         (then_b, else_b, join_b)
     }
@@ -243,8 +251,10 @@ impl BlockBuilder {
 
     /// After compiling cond into the top block: branch to body/exit
     pub fn end_loop_cond(&mut self, top_b: BlockId, body_b: BlockId, exit_b: BlockId) {
-        self.program.blocks[top_b].terminator =
-            Terminator::Branch { then: body_b, els: exit_b };
+        self.program.blocks[top_b].terminator = Terminator::Branch {
+            then: body_b,
+            els: exit_b,
+        };
         self.current = None;
         self.switch_to(body_b);
     }
@@ -373,20 +383,17 @@ pub fn optimize_blocks(program: &mut BlockProgram) -> usize {
 
         // Constant branch folding + same-target collapse.
         for block in &mut program.blocks {
-            match &block.terminator {
-                Terminator::Branch { then, els } => {
-                    if let Some(Opcode::PushBool(c)) = block.instructions.last() {
-                        let target = if *c { *then } else { *els };
-                        block.instructions.pop();
-                        block.terminator = Terminator::Jump(target);
-                        round += 1;
-                    } else if then == els {
-                        block.instructions.push(Opcode::Drop);
-                        block.terminator = Terminator::Jump(*then);
-                        round += 1;
-                    }
+            if let Terminator::Branch { then, els } = &block.terminator {
+                if let Some(Opcode::PushBool(c)) = block.instructions.last() {
+                    let target = if *c { *then } else { *els };
+                    block.instructions.pop();
+                    block.terminator = Terminator::Jump(target);
+                    round += 1;
+                } else if then == els {
+                    block.instructions.push(Opcode::Drop);
+                    block.terminator = Terminator::Jump(*then);
+                    round += 1;
                 }
-                _ => {}
             }
         }
 

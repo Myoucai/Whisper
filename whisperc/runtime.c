@@ -61,7 +61,19 @@ static inline int w_val_eq(wval a, wval b) {
 // Thread-local interpreter state: worker threads (serve-concurrent)
 // each get a fresh stack; the heap stays per-thread too so arena
 // pointers never cross threads.
-#define W_TLS __thread
+//
+// `__thread` is the GCC/Clang spelling. The C11 keyword `_Thread_local` is
+// the portable one, and MSVC needs `__declspec(thread)` — spelled out here
+// so the runtime is not silently GCC-only (see docs/independence-design.md,
+// Step 6: C is meant to be a *substitutable* portable assembly, which means
+// no compiler-specific extension may be load-bearing).
+#if defined(_MSC_VER)
+#  define W_TLS __declspec(thread)
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+#  define W_TLS _Thread_local
+#else
+#  define W_TLS __thread
+#endif
 static W_TLS wval *w_stack = NULL;   // allocated per thread
 static W_TLS int  w_sp = 0;
 
@@ -2029,6 +2041,160 @@ static wval w_env_get(const char *name) {
     const char *v = getenv(name);
     if (!v) return W_PTR(w_str_new("", 0));
     return W_PTR(w_str_new(v, (uint32_t)strlen(v)));
+}
+
+// ── Capability ABI for the c2 chain (Step 2a: independence pass) ─────
+// `@n` capability tokens compile to `W__<n>()` calls. The self-hosted cgen
+// emits "W_" + name + "()" for every word-shaped token, and classify hands
+// it `_4` for `@4` — so the emitted call is `W__4()`. That name is a
+// classify artifact (ideally `@n` would be a capability token, not a word
+// reference), but it IS the ABI the generated C uses, so the runtime
+// implements it here rather than editing compiler.all.ws: that file is the
+// frozen fixed-point artifact, and changing it would force a seed
+// regeneration plus a full bootstrap re-verification.
+//
+// Operands live on the Whisper stack — these shims take no C arguments,
+// exactly like the VM's `Opcode::CapCall(id)`. Semantics mirror
+// crates/whisper-core/src/capability.rs so the two chains stay bit-identical.
+//
+//   @0  file read   path -> contents        (FileReadCap)
+//   @1  file write  path data -> bytes      (FileWriteCap)
+//   @4  env         name -> value           (EnvCap)
+//   @5  exec        cmd -> [status out err] (ExecCap)
+//
+// NOT covered: 2/3/6/7/8/9 (the HTTP family). Those need an HTTP + TLS
+// client written in C — a separate, much larger project. A program using
+// them still fails to build, which is the honest outcome until that lands.
+// See docs/independence-design.md, Step 2b.
+
+static void W__0(void) {                        // @0 file read
+    const char *path = (const char *)w_as_ptr(w_pop());
+    w_push(w_read_file(path));
+}
+
+static void W__1(void) {                        // @1 file write
+    const char *data = (const char *)w_as_ptr(w_pop());
+    const char *path = (const char *)w_as_ptr(w_pop());
+    w_push(w_write_file(path, data));
+}
+
+static void W__4(void) {                        // @4 env
+    const char *name = (const char *)w_as_ptr(w_pop());
+    w_push(w_env_get(name));
+}
+
+// exec (@5). popen() captures one stream only, so stderr is redirected to a
+// temp file and read back. The command is wrapped in a group — `( cmd )`
+// groups in both POSIX sh and cmd.exe — so the redirection covers the whole
+// command rather than just its last clause. stdin is fed from the null
+// device to match Rust's `Command::output()`, which is what stops a command
+// that reads stdin from hanging the VM forever.
+#ifdef _WIN32
+#  define W_GETPID _getpid
+#  define W_POPEN  _popen
+#  define W_PCLOSE _pclose
+#else
+#  include <unistd.h>
+#  include <sys/wait.h>
+#  define W_GETPID getpid
+#  define W_POPEN  popen
+#  define W_PCLOSE pclose
+#endif
+
+static char *w_capture(FILE *f, size_t *out_len) {
+    size_t cap = 8192, len = 0;
+    char *buf = (char *)malloc(cap);
+    *out_len = 0;
+    if (!buf) return NULL;
+    for (;;) {
+        size_t rd = fread(buf + len, 1, cap - len - 1, f);
+        len += rd;
+        if (len + 1 >= cap) {
+            char *nb = (char *)realloc(buf, cap * 2);
+            if (!nb) break;
+            buf = nb;
+            cap *= 2;
+        }
+        if (rd == 0) break;
+    }
+    buf[len] = 0;
+    *out_len = len;
+    return buf;
+}
+
+static char *w_slurp_file(const char *path) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return NULL;
+    size_t len = 0;
+    char *buf = w_capture(f, &len);
+    fclose(f);
+    return buf;
+}
+
+// VM applies String::trim() to both streams; mirror it.
+static void w_trim_inplace(char *s) {
+    size_t n;
+    if (!s) return;
+    n = strlen(s);
+    while (n > 0) {
+        char c = s[n - 1];
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f') s[--n] = 0;
+        else break;
+    }
+}
+
+static void W__5(void) {                        // @5 exec
+    const char *cmd = (const char *)w_as_ptr(w_pop());
+    char errfile[512];
+    char *wrapped, *out, *err;
+    size_t outlen = 0;
+    int64_t status = -1;
+    FILE *p;
+    wval *lst;
+    const char *tmpd;
+#ifdef _WIN32
+    tmpd = getenv("TEMP");
+    if (!tmpd) tmpd = ".";
+    snprintf(errfile, sizeof errfile, "%s\\whisper_exec_%ld.err", tmpd, (long)W_GETPID());
+#else
+    tmpd = getenv("TMPDIR");
+    if (!tmpd) tmpd = "/tmp";
+    snprintf(errfile, sizeof errfile, "%s/whisper_exec_%ld.err", tmpd, (long)W_GETPID());
+#endif
+    wrapped = (char *)w_alloc(strlen(cmd) + strlen(errfile) + 48);
+#ifdef _WIN32
+    sprintf(wrapped, "( %s ) < NUL 2>\"%s\"", cmd, errfile);
+#else
+    sprintf(wrapped, "( %s ) < /dev/null 2>\"%s\"", cmd, errfile);
+#endif
+    p = W_POPEN(wrapped, "r");
+    if (p) {
+        int rc;
+        out = w_capture(p, &outlen);
+        rc = W_PCLOSE(p);
+#ifdef _WIN32
+        status = (int64_t)rc;
+#else
+        status = (rc >= 0 && WIFEXITED(rc)) ? (int64_t)WEXITSTATUS(rc) : -1;
+#endif
+    } else {
+        out = NULL;
+    }
+    err = w_slurp_file(errfile);
+    remove(errfile);
+    // Both fallbacks must stay malloc'd — they are freed below, and arena
+    // memory must never be handed to free().
+    if (!out) { out = (char *)malloc(1); if (out) out[0] = 0; }
+    if (!err) { err = (char *)malloc(1); if (err) err[0] = 0; }
+    if (out) w_trim_inplace(out);
+    if (err) w_trim_inplace(err);
+    lst = w_list_new(3);
+    lst[1] = W_I64(status);
+    lst[2] = W_PTR(w_str_from_cstr(out ? out : ""));
+    lst[3] = W_PTR(w_str_from_cstr(err ? err : ""));
+    w_push(W_PTR(lst));
+    free(out);
+    free(err);
 }
 
 // ── Shared KV store (v1.0.2 vocabulary) ──────────────────────────────

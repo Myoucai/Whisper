@@ -41,7 +41,7 @@ fn is_word(b: u8) -> bool {
 
 /// Case-insensitive literal compare (ASCII).
 fn eq_ci(a: u8, b: u8) -> bool {
-    a == b || a.to_ascii_lowercase() == b.to_ascii_lowercase()
+    a.eq_ignore_ascii_case(&b)
 }
 
 fn class_match(spec: &[u8], b: u8, ci: bool) -> bool {
@@ -343,7 +343,10 @@ mod tests {
         assert_eq!(str_find(b"all fine here", b"(?i)unrecognized token"), -1);
         assert_eq!(str_find(b"near \"1\": syntax error", b"(?i)near \""), 0);
         assert_eq!(
-            str_find(b"DB error: Column hello not found!", b"(?i)column .* not found"),
+            str_find(
+                b"DB error: Column hello not found!",
+                b"(?i)column .* not found"
+            ),
             10
         );
         // \b word boundary + alternation + \d
@@ -359,7 +362,10 @@ mod tests {
             4
         );
         // \b must not match inside a word
-        assert_eq!(str_find(b"fish: 1: not found", b"(?i)\\bsh: .*: not found"), -1);
+        assert_eq!(
+            str_find(b"fish: 1: not found", b"(?i)\\bsh: .*: not found"),
+            -1
+        );
         // (?m) multiline anchors
         assert_eq!(
             str_find(b"root:x:0:0\n/bin/sh:\n/bin/dash:", b"(?m)^/bin/(sh|bash):"),
@@ -371,15 +377,24 @@ mod tests {
         assert_eq!(str_find(b"a\n/dev/null", b"^/dev/"), -1);
         // \b at end + \s+
         assert_eq!(
-            str_find(b"Found. Redirecting to http://evil", b"(?i)\\bfound\\.\\s+redirecting\\s+to\\b"),
+            str_find(
+                b"Found. Redirecting to http://evil",
+                b"(?i)\\bfound\\.\\s+redirecting\\s+to\\b"
+            ),
             0
         );
         assert_eq!(
-            str_find(b"found.. redirecting too", b"(?i)\\bfound\\.\\s+redirecting\\s+to\\b"),
+            str_find(
+                b"found.. redirecting too",
+                b"(?i)\\bfound\\.\\s+redirecting\\s+to\\b"
+            ),
             -1
         );
         // passwd-shaped class pattern
-        assert_eq!(str_find(b"root:x:0:0:root:/root:", b"root:[^:]*:[0-9]+:[0-9]+:"), 0);
+        assert_eq!(
+            str_find(b"root:x:0:0:root:/root:", b"root:[^:]*:[0-9]+:[0-9]+:"),
+            0
+        );
         // (?im) combined
         assert_eq!(str_find(b"X\nSQL Error here", b"(?im)^sql error"), 2);
         // unknown flag group is not flags: it falls back to group

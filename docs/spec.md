@@ -353,3 +353,27 @@ runtime.c，链接适配不涉编译器逻辑）。
 - 验收：自制 8×5 PNG + 系统 WLive48x48.png，与 Python 基线逐位一致，
   双链（VM + c2）一致
 - package.ws 声明包元数据
+
+## 15. C 发射契约（可替换后端）
+
+Whisper 的 C 后端（`-t c` / `-t c2` / `-t exe` / `-t native`）把 **C 当作
+可移植汇编**，而不是把某个编译器当作依赖。为此锁定以下契约——它是
+**对发射产物与运行时（`whisperc/runtime.c`）的要求**，不是对用户程序的要求：
+
+1. **语言子集：C99 + POSIX/Win32**。允许标准库头、posix 头（`unistd.h`/
+   `pthread.h`/`sys/socket.h`）与 Win32 头（`winsock2.h`/`windows.h`/
+   `process.h`），二者按平台 `#ifdef` 二选一。
+2. **禁止编译器特有扩展**。`__attribute__`、`typeof`、`__builtin_*`、
+   语句表达式 `({...})`、内联汇编、`#pragma`、`__int128` 一律不得依赖。
+   线程局部存储用条件宏落到 C11 `_Thread_local`（MSVC 走
+   `__declspec(thread)`），不使用裸 `__thread`。
+3. **不得要求非默认编译标志**。特别地 `-fno-strict-aliasing` 已移除
+   （2026-09-21）：运行时对位模式的转换全部走 `memcpy`，静态审计无类型
+   双关；实测同一份 `compiler.all.ws` 产出的 C 在带/不带该标志下编译，
+   编译同一程序的结果**逐字节一致**。
+4. **不得依赖未定义行为来「碰巧工作」**。位模式转换一律 `memcpy`；
+   新的此类需求出现时，先证明再写，不留「加个标志就行」的债。
+5. **编译器矩阵**：至少 gcc 与 clang 两条腿（CI `c-backend-clang`），
+   可用 `WHISPER_CC` 指定任意 C 编译器。
+
+违反上述任一条即为规范级缺陷——因为它把"C 可替换"这一前提悄悄撤销了。

@@ -17,11 +17,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.0.7-7cffc4" alt="version">
-  <img src="https://img.shields.io/badge/tests-451%20passed%20%2B%205%20gates-brightgreen" alt="tests">
+  <img src="https://img.shields.io/badge/version-1.0.8-7cffc4" alt="version">
+  <img src="https://img.shields.io/badge/tests-465%20passed%20%2B%207%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
-  <img src="https://img.shields.io/badge/stdlib-14%20modules-blue" alt="stdlib">
+  <img src="https://img.shields.io/badge/stdlib-20%20modules-blue" alt="stdlib">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
 </p>
 
@@ -29,7 +29,7 @@
 
 Whisper 是一门**栈式、后置表示法**的编程语言，专为 **AI 生成和阅读**而设计。极简符号、零信任安全、原生置信度系统。
 
-**核心亮点**：编译器（lexer + parser + classifier + cgen）完全用 Whisper 自身编写，生成 C 源码后经 gcc 编译为独立原生可执行文件；从手写 C 种子出发已达**自举固定点**（whisper2 重新编译自身，输出与来源逐字节一致，`scripts/verify-fixedpoint.sh` 可随时复验）。
+**核心亮点**：编译器（lexer + parser + classifier + cgen）完全用 Whisper 自身编写，生成 C 源码后经 gcc 编译为独立原生可执行文件；从冻结 C 种子（由自举链自身生成，非手写）出发已达**自举固定点**（whisper2 重新编译自身，输出与来源逐字节一致，`scripts/verify-fixedpoint.sh` 可随时复验）。
 
 ## 设计哲学
 
@@ -52,7 +52,7 @@ cd Whisper
 bash scripts/bootstrap.sh
 # seed(C) -> whisper1 -> whisper2，固定点自检 + stdlib 冒烟
 ./target/bootstrap/whisper2 -c < hello.ws > hello.c
-gcc -O2 -fno-strict-aliasing -o hello hello.c -I whisperc -lm && ./hello
+gcc -O2 -o hello hello.c -I whisperc -lm && ./hello
 ```
 
 ### 安装（Rust 工具链，含 REPL/LSP/c2 一键编译）
@@ -151,10 +151,10 @@ whisper run hello.ws
 
 ## 自举
 
-Whisper 实现了**硬自举**——编译器完全由自身编写，Rust 仅提供最小化 VM 执行字节码。
+Whisper 实现了**硬自举**——编译器完全由自身编写。Rust 只是开发宿主（承载 VM 以运行自举编译器、提供 REPL/LSP）；引导只需 gcc，不需要 Rust。
 
 ```
-手写 C 种子 (seed/compiler_seed.c, 冻结)
+冻结 C 种子 (seed/compiler_seed.c，由自举链自身生成，仅作引导件)
     │  编译 whisperc/compiler.all.ws (用 Whisper 写的完整编译器)
     ▼
 gen1.c → gcc → whisper1 ──再编译自身──▶ gen2.c → gcc → whisper2
@@ -192,7 +192,8 @@ whisper bootstrap --hard hello.ws
 | C 源码 | `whisper build file.ws -t c -o prog.c` | C 源码 | gcc 编译为原生可执行文件 |
 | **c2 自举链** | `whisper build file.ws -t c2 -o prog` | 原生可执行文件 | gcc |
 | **native 特化** | `whisper build file.ws -t native -o prog` | 按主机 CPU 特化的原生可执行文件（内容寻址缓存） | gcc |
-| **exe 自包含** | `whisper build file.ws -t exe -o app` | 单文件可执行（运行时+wbin 尾部打包） | 无 |
+| **exe 原生** | `whisper build file.ws -t exe -o app` | 原生可执行文件（**产物零 Rust**） | gcc（构建期） |
+| bundle 打包 | `whisper build file.ws -t bundle -o app` | 单文件可执行（**内含 Rust VM**，构建期无需工具链） | 无 |
 | 固定点复验 | `scripts/verify-fixedpoint.sh` | 自举链验证 | gcc |
 
 ```bash
@@ -205,12 +206,16 @@ whisper build hello.ws -t c2 -o hello && ./hello
 # native：c2 + -O3 -march=native -flto，内容寻址缓存（同机重建 = 一次拷贝）
 whisper build hello.ws -t native -o hello && ./hello
 
-# exe：单文件自包含可执行（SBCL 式尾部负载，无需任何工具链）
+# exe：原生可执行文件，产物不含任何 Rust（构建期需 gcc，运行期什么都不需要）
 whisper build hello.ws -t exe -o app && ./app
+
+# bundle：把 Rust VM 与字节码打包成单文件，构建期连 gcc 都不需要
+whisper build hello.ws -t bundle -o app && ./app
 ```
 
 - **`-t c`（Rust 转译器）**：覆盖字符串/列表/Map/浮点/高阶函数（`@map`/`@fold`/`@times` 等），12 个端到端 gcc 测试把关。
-- **`-t c2`（自举链）**：编译器完全由 Whisper 自身编写（`whisperc/compiler.all.ws`），在 Rust VM 上运行并生成 C；支持 import 内联（含 `std/*`）、浮点字面量、循环/条件/递归、高阶函数融合（`@map`/`@each`/`@fold`/`@filter`/`@times` 编译为嵌套函数 + 循环）、v1.0.3-1.0.7 全部新词汇（regex/struct/目录/时间/leave 等）。C 运行时值带类型标签（WT_I64/WT_F64/WT_PTR），多态算术（任一侧 f64 即提升）与 VM 逐位一致——`1.5 2.5 +` 原生输出 4，与 VM 相同。已知残留分歧：字符串打印不带引号（VM 带）、`=`/去重按值位等同而非深度相等。
+- **`-t c2`（自举链）**：编译器完全由 Whisper 自身编写（`whisperc/compiler.all.ws`），在 Rust VM 上运行并生成 C；支持 import 内联（含 `std/*`）、浮点字面量、循环/条件/递归、高阶函数融合（`@map`/`@each`/`@fold`/`@filter`/`@times` 编译为嵌套函数 + 循环）、v1.0.3-1.0.8 全部新词汇（regex/struct/目录/时间/leave/FFI 等）。C 运行时值带 5 种类型标签（WT_I64/WT_F64/WT_PTR/WT_SIG/WT_BOOL），多态算术（任一侧 f64 即提升）与 VM 逐位一致——`1.5 2.5 +` 原生输出 4，与 VM 相同。已知残留分歧：字符串打印不带引号（VM 带）、`=`/去重按值位等同而非深度相等（`runtime.c` 的 `w_val_eq` 仅比标签+位）。
+- **`-t exe` 与 `-t bundle` 的区别**：两者都产出单文件，但分发模型相反。`exe` 走自举链出机器码——**产物零 Rust**，代价是构建期需要 C 编译器；`bundle` 把 Rust VM 与字节码尾部打包——构建期不需要任何工具链，代价是**产物内含整个 Rust VM**（含 LSP/REPL/类型检查器/包管理器）。追求"产物零 Rust"就用 `exe`。
 - 固定点（whisper2 编译自身输出逐字节一致）可随时用脚本复验，已纳入 CI。
 
 ## 置信度与不确定性（std/conf，已定稿）
@@ -233,6 +238,12 @@ whisper build hello.ws -t exe -o app && ./app
 ALPN http/1.1）、`Transfer-Encoding: chunked` 自动解码、cookie 罐、每请求审计行、
 host 白名单（零出域）、连接 10s/读写 15s 超时（挂死端点化为 status 0 无证据响应）。
 
+> **c2 链限定**：HTTP 能力（`@2`/`@3`/`@6`-`@9`）目前**仅在 Rust VM 上可用**。
+> C 链尚未实现 HTTP/TLS 客户端，用到这些令牌的程序经 `-t c2`/`exe`/`native`
+> 编译会失败（gcc 报 `W__<n>` 未定义）。其余能力——`@0` 文件读、`@1` 文件写、
+> `@4` 环境变量、`@5` 执行命令——**两条链均已实现并逐行对拍一致**。
+> 详见 `docs/independence-design.md` 的 Step 2a / 2b。
+
 ## 性能
 
 c2 原生输出的实测（journal 工具，10,000 条记录 538KB，输出重定向）：
@@ -250,14 +261,14 @@ append 模式已消除（`range-to` 10 万元素 83s → 19ms）。
 
 | 功能 | 状态 |
 |------|------|
-| 栈式虚拟机 (137 opcodes) | ✅ |
+| 栈式虚拟机 (158 opcodes) | ✅ |
 | 硬自举编译器 (纯 Whisper + C 种子，固定点已验证) | ✅ |
 | C 转译后端 (gcc 编译为原生可执行) | ✅ |
 | 正则子集 (strmatch/strfind-re，双链手写匹配器) | ✅ |
 | struct 二进制打包 (pack/unpack，小端) | ✅ |
 | 共享 KV 存储 + 并发 Web 服务器 (serve-concurrent) | ✅ |
 | 循环控制 (leave，编译期跳转回填) | ✅ |
-| 静态类型推导（当前仅警告） | ⚠️ |
+| 静态类型推导（strict 默认：类型错误致命，`--no-strict-types` 降级） | ✅ |
 | 能力安全沙箱 (6 caps) | ✅ |
 | 置信度系统 + 概率选择 | ✅ |
 | .wbin 二进制格式 | ✅ |
@@ -271,7 +282,7 @@ append 模式已消除（`range-to` 10 万元素 83s → 19ms）。
 | JSON 解析/序列化 | ✅ |
 | 浮点数学 (三角函数) | ✅ |
 | 字符串操作 (20+ ops，含正则/大小写/格式化) | ✅ |
-| 标准库 (13 模块, 60+ 函数) | ✅ |
+| 标准库 (20 模块) | ✅ |
 | 真实工具 (apps/journal 命令行日记) | ✅ |
 
 ## CLI 命令
@@ -305,12 +316,16 @@ Whisper/
 ├── whisperc/              # 自举编译器 (纯 Whisper 实现)
 │   ├── compiler.all.ws    #   编译器全源码（权威文件，固定点基准）
 │   ├── runtime.c          #   C 运行时（seed 与 c2 共享）
-│   └── seed/              #   冻结的手写 C 种子
-├── stdlib/                # 标准库 (13 模块 .ws)
+│   └── seed/              #   冻结 C 种子（由自举链自身生成，非手写）
+├── stdlib/                # 标准库 (20 个可导入模块 .ws)
 ├── apps/
 │   ├── journal/           #   命令行日记（第一个真实工具）
-│   └── webapp/            #   v3 并发 Web 后端
+│   ├── webapp/            #   并发 Web 后端
+│   └── wheels/            #   实验场（PNG 解码/尺寸解析等，未纳入 CI）
+├── adapters/              #   LoRA 微调产物（qwen30b v4/v5/v6）
 ├── paper/                 #   论文 + 微调实验数据/脚本
+├── tests/conformance/     #   双实现一致性语料（syntax-gate 的输入）
+├── tools/                 #   opcode 覆盖门禁
 ├── vscode-extension/      # VS Code 插件
 ├── docs/                  # 文档和示例
 └── .github/workflows/     # CI/CD
@@ -326,20 +341,24 @@ Whisper/
 ## 测试
 
 ```bash
-cargo test --workspace                           # 451 tests: all passed
-bash scripts/syntax-gate.sh                      # 26 语法断言
-bash scripts/stdlib-gate.sh                      # 54 双链 stdlib 断言（VM+c2 输出一致）
+cargo test --workspace                           # 470 tests: all passed
+bash scripts/syntax-gate.sh                      # 26 语法断言（conformance 语料，VM 与 c2 双侧）
+bash scripts/stdlib-gate.sh                      # 58 双链 stdlib 断言（VM+c2 输出一致）
 bash scripts/net-gate.sh                         # 真实 HTTP 服务 + curl
 bash scripts/app-gate.sh                         # 13 路由 Web 应用断言
+bash tools/opcode_coverage.sh                    # 56 项逐特性双跑（VM vs 自举链）
+bash scripts/typecheck-gate.sh                   # 类型检查假阳性棘轮（三语料 FP=0）
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验
 ```
 
-测试覆盖：
-- 34 个自举/自举验证测试（软/硬自举管线、双 VM 输出对比）
-- 92 个 CLI 集成测试（含 stdlib 导入冒烟、关键字作 def 名回归）
-- 87+ 个核心 VM 测试 + 模糊测试（2500+ 随机程序）
+测试覆盖（470 项，`cargo test --workspace` 实测）：
+- 142 项 CLI（31 单元 + 6 基准 + 105 集成：stdlib 导入冒烟、关键字作 def 名回归、软/硬自举管线、c2 链端到端、能力 ABI 双链对拍、exe 产物零 Rust 断言、bundle 尾负载）
+- 133 项核心 VM（122 单元 + 7 模糊测试 2500+ 随机程序 + 4 项 opcode 元数据）
+- 139 项 codegen（62 单元 + 65 流水线 + 12 C 后端端到端 gcc）
+- 34 项 parser（含「每个关键字都可作 def 名」参数化回归）
+- 15 项 typecheck + 5 项 LSP + 2 项包管理器
 - 优化器语义保持测试（优化前后执行结果必须一致）
-- CI 含 selfhost job：种子编译 → 22 核心用例双模式 → 固定点验证
+- CI 含 selfhost job：种子编译 → 22 核心用例双模式 → 7 道门禁（固定点 + stdlib/覆盖/类型/语法/网络/应用）
 
 ## License
 

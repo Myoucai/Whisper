@@ -189,7 +189,6 @@ fn resolve_imports_inner(
                     }
                 }
             }
-            let q_count = qualified.len();
             imported_defs.extend(qualified);
 
             loaded.extend(sub.loaded);

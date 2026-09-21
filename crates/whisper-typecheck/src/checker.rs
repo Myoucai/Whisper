@@ -76,8 +76,10 @@ impl TypeChecker {
             }
             self.check_node(node, &mut stack, &mut errors, "<main>");
             if trace {
-                let rendered: Vec<String> =
-                    stack.iter().map(|t| self.inferer.resolve(t).name()).collect();
+                let rendered: Vec<String> = stack
+                    .iter()
+                    .map(|t| self.inferer.resolve(t).name())
+                    .collect();
                 eprintln!("[tc-trace] {:?} => {:?}", node_brief(node), rendered);
             }
         }
@@ -103,7 +105,9 @@ impl TypeChecker {
         let mut input_types: Vec<Type> = Vec::new();
 
         for node in body {
-            if self.terminated { break; }
+            if self.terminated {
+                break;
+            }
             let _depth_before = stack.len() as isize;
             self.check_node(node, &mut stack, &mut errors, "<word>");
             if self.terminated {
@@ -209,10 +213,14 @@ impl TypeChecker {
                         // FP 的根源）。
                         let mut mapping: std::collections::HashMap<u64, Type> =
                             std::collections::HashMap::new();
-                        let i2: Vec<Type> =
-                            inputs.iter().map(|t| self.freshen(t, &mut mapping)).collect();
-                        let o2: Vec<Type> =
-                            outputs.iter().map(|t| self.freshen(t, &mut mapping)).collect();
+                        let i2: Vec<Type> = inputs
+                            .iter()
+                            .map(|t| self.freshen(t, &mut mapping))
+                            .collect();
+                        let o2: Vec<Type> = outputs
+                            .iter()
+                            .map(|t| self.freshen(t, &mut mapping))
+                            .collect();
                         Some((i2, o2))
                     } else {
                         None
@@ -285,8 +293,7 @@ impl TypeChecker {
                 //   out = slots above the entry boundary at the end
                 let final_len = quote_stack.len();
                 let in_arity = std::cmp::max(1, entry.saturating_sub(low_water));
-                let inputs: Vec<Type> =
-                    (0..in_arity).map(|_| self.inferer.fresh_var()).collect();
+                let inputs: Vec<Type> = (0..in_arity).map(|_| self.inferer.fresh_var()).collect();
                 let keep_from = entry - in_arity;
                 let outputs: Vec<Type> = if final_len > keep_from {
                     quote_stack[keep_from..].to_vec()
@@ -1053,7 +1060,47 @@ impl TypeChecker {
                 stack.push(Type::Bool);
             }
 
-            _ => {} // CapCall, CapExec, Cond, etc. unchecked
+            // Capability tokens (`@n`) used to fall through to the catch-all
+            // below, which models nothing: neither consuming the operand nor
+            // producing a result. Under the strict default that rejected
+            // perfectly good code — `"cmd" exec 1 @nth .` reported
+            // "@nth list: expected [T0], got str" because the checker still
+            // believed the command string was on top. Same class of gap as
+            // the http-* builtin signatures fixed in J-3.
+            //
+            // Only the ids the C chain can also compile are modelled here;
+            // the HTTP family (2/3/6/7/8/9) stays unmodelled until Step 2b
+            // gives it a C-side implementation (docs/independence-design.md).
+            Operator::CapCall(id) => match id {
+                0 => {
+                    // @file_read: path -> contents
+                    self.expect_n(stack, 1, errors, ctx, "@0 file-read");
+                    stack.push(Type::Str);
+                }
+                1 => {
+                    // @file_write: path data -> bytes written
+                    self.expect_n(stack, 2, errors, ctx, "@1 file-write");
+                    stack.push(Type::I64);
+                }
+                4 => {
+                    // @env: name -> value
+                    self.expect_n(stack, 1, errors, ctx, "@4 env");
+                    stack.push(Type::Str);
+                }
+                5 => {
+                    // @exec: cmd -> [status stdout stderr] — heterogeneous,
+                    // so the element type is the union the language already
+                    // uses for mixed lists.
+                    self.expect_n(stack, 1, errors, ctx, "@5 exec");
+                    stack.push(Type::List(Box::new(Type::Union(
+                        Box::new(Type::I64),
+                        Box::new(Type::Str),
+                    ))));
+                }
+                _ => {}
+            },
+
+            _ => {} // CapExec, Cond, etc. unchecked
         }
     }
 
@@ -1096,11 +1143,7 @@ impl TypeChecker {
 
     /// N-2 Phase 2: structural deep-copy replacing TypeVar ids with fresh
     /// vars (consistent within one instantiation).
-    fn freshen(
-        &mut self,
-        t: &Type,
-        mapping: &mut std::collections::HashMap<u64, Type>,
-    ) -> Type {
+    fn freshen(&mut self, t: &Type, mapping: &mut std::collections::HashMap<u64, Type>) -> Type {
         match t {
             Type::TypeVar(id) => {
                 if let Some(f) = mapping.get(id) {
@@ -1149,9 +1192,7 @@ impl TypeChecker {
                         errors.push(TypeError {
                             message: format!(
                                 "{}: quote produces {} value(s), consumer needs at least {}",
-                                desc,
-                                out_eff,
-                                n
+                                desc, out_eff, n
                             ),
                             context: ctx.into(),
                         });

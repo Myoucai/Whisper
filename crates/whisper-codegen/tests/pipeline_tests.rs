@@ -861,3 +861,17 @@ fn opt_actually_folds_inside_loop() {
         "3 4 + should be folded: {opt:?}"
     );
 }
+
+#[test]
+fn deep_user_recursion_beyond_old_ceiling_runs() {
+    // Regression (2026-09-21): the word-call depth ceiling used to be 2048,
+    // which is below what ordinary programs need — the self-hosted compiler
+    // alone recurses ~once per token (std/math needs >2048, compiler.all.ws
+    // >16384). Nothing about the language documents a ~2000-frame limit, so
+    // 5000 frames of *user* recursion must simply work.
+    let r = eval(": down { _ 0 > ?? _ 1 - down | drop ] } ; 5000 down");
+    assert!(
+        r.is_ok(),
+        "5000-deep user recursion must not trip the guard: {r:?}"
+    );
+}

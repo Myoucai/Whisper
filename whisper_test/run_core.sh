@@ -17,7 +17,7 @@ t() {
     local out
     if [ "$MODE" = "c" ]; then
         echo "$input" | "$BIN" -c > "$TMP/t$num.c" 2>/dev/null
-        ( cd "$TMP" && "$GCC" -O2 -fno-strict-aliasing -o "t$num" "t$num.c" \
+        ( cd "$TMP" && "$GCC" -O2 -o "t$num" "t$num.c" \
             -I "$RT_INC" -lm 2>/dev/null && "./t$num" ) > "$TMP/t$num.out" 2>/dev/null
         out=$(cat "$TMP/t$num.out")
     else

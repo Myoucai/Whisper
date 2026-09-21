@@ -219,17 +219,7 @@ pub fn get_builtin_signature(name: &str) -> Option<(Vec<Type>, Vec<Type>)> {
             ],
             vec![tv2()],
         )),
-        "@filter" => Some((
-            vec![
-                Type::List(Box::new(tv())),
-                Type::Ref(vec![tv()], vec![Type::Bool]),
-            ],
-            vec![Type::List(Box::new(tv()))],
-        )),
-        "@times" => Some((
-            vec![Type::I64, Type::Ref(vec![], vec![])],
-            vec![],
-        )),
+        "@times" => Some((vec![Type::I64, Type::Ref(vec![], vec![])], vec![])),
 
         // 文件/正则杂项
         "read-file" => Some((vec![Type::Str], vec![Type::Str])),
@@ -239,10 +229,6 @@ pub fn get_builtin_signature(name: &str) -> Option<(Vec<Type>, Vec<Type>)> {
         "range" => Some((
             vec![Type::I64, Type::I64],
             vec![Type::List(Box::new(Type::I64))],
-        )),
-        "rot" => Some((
-            vec![tv(), tv2(), Type::TypeVar(2)],
-            vec![tv2(), Type::TypeVar(2), tv()],
         )),
         "i64?" => Some((vec![tv()], vec![Type::Bool])),
         "str?" => Some((vec![tv()], vec![Type::Bool])),

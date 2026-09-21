@@ -14,17 +14,6 @@ use crate::opcode::Opcode;
 use crate::value::Value;
 use crate::VmError;
 
-/// Simple xorshift64* PRNG for probabilistic choice (`?|`).
-/// Returns a random f64 in [0.0, 1.0).
-fn xorshift64_next(state: &mut u64) -> f64 {
-    *state ^= *state >> 12;
-    *state ^= *state << 25;
-    *state ^= *state >> 27;
-    // Use the upper 53 bits to get a uniformly distributed f64 in [0, 1)
-    let bits = state.wrapping_mul(0x2545F4914F6CDD1D) >> 11;
-    bits as f64 / (1u64 << 53) as f64
-}
-
 /// A call frame representing an active word/block invocation.
 #[derive(Debug, Clone)]
 pub struct CallFrame {
@@ -76,6 +65,31 @@ fn generate_rng_seed() -> u64 {
         .wrapping_mul(0x2545F4914F6CDD1D)
 }
 
+/// Word-call depth ceiling. See the `Opcode::Call` arm for rationale.
+/// `WHISPER_MAX_CALL_DEPTH` overrides it at runtime.
+///
+/// Sizing: the self-hosted compiler recurses roughly once per token, so the
+/// required depth scales with *input size*, not with source nesting. Measured
+/// on the frozen compiler (2026-09-21):
+///   std/math.ws          1.9 KB -> needs 2 049..4 096 frames
+///   whisperc/compiler.all.ws 65 KB -> needs 16 385..32 768 frames
+/// A ceiling of 2048 therefore made `-t c2` unusable for anything importing a
+/// stdlib module, and for the compiler itself (which tools/opcode_coverage.sh
+/// builds). 262 144 keeps ~8x headroom over the largest known workload while
+/// still bounding the runaway case: at 48 bytes/frame that is ~25 MB instead of
+/// the 30 GB the allocator previously reached before aborting.
+const DEFAULT_MAX_CALL_DEPTH: usize = 262_144;
+static MAX_CALL_DEPTH: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+
+/// Resolved word-call depth ceiling (env override applied once).
+pub fn max_call_depth() -> usize {
+    *MAX_CALL_DEPTH.get_or_init(|| {
+        std::env::var("WHISPER_MAX_CALL_DEPTH")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(DEFAULT_MAX_CALL_DEPTH)
+    })
+}
 
 /// 内建词栈效应（名字键）：归纳枚举用的可扩展核心集（L-01）。
 /// 与 codegen stack_effect.rs 的 opcode 表同口径；Call/网络/FFI 等基础设施不列。
@@ -83,7 +97,7 @@ pub fn builtin_effect_by_name(name: &str) -> Option<(i64, i64)> {
     Some(match name {
         // 栈
         "dup" => (1, 2),
-        "swap" => (2, 0 + 2),
+        "swap" => (2, 2),
         "drop" => (1, 0),
         "rot" => (3, 3),
         "over" => (2, 3),
@@ -94,7 +108,7 @@ pub fn builtin_effect_by_name(name: &str) -> Option<(i64, i64)> {
         "!" => (1, 1),
         // i64/f64
         "i64tostr" | "strtoi64" | "i64tof64" | "f64toi64" | "i64?" | "str?" | "bool?" | "list?"
-            | "ctos" | "streq" | "strlt" => (1, 1),
+        | "ctos" | "streq" | "strlt" => (1, 1),
         "fsqrt" | "fsin" | "fcos" | "ftan" | "floor" | "ceil" | "round" | "log" | "exp" => (1, 1),
         "atan2" => (2, 1),
         // 字符串
@@ -107,7 +121,7 @@ pub fn builtin_effect_by_name(name: &str) -> Option<(i64, i64)> {
         "strnth" => (2, 1),
         // 列表
         "@nth" | "append" | "prepend" | "@nth-ref" => (2, 1),
-        "len" | "rev" | "sort" | "dedup" | "take" | "drop-n" | "list?" => (1, 1),
+        "len" | "rev" | "sort" | "dedup" | "take" | "drop-n" => (1, 1),
         "list-slice" => (3, 1),
         "range" => (2, 1),
         // map
@@ -1506,9 +1520,17 @@ impl Vm {
                 // (frames, not native recursion) so unbounded word recursion
                 // otherwise grows call_stack until the allocator aborts the
                 // whole process (observed: 30 GB allocation on `: f { f } ; f`).
-                const MAX_CALL_DEPTH: usize = 2048;
-                if self.call_stack.len() >= MAX_CALL_DEPTH {
-                    return Err(VmError::RecursionLimit(MAX_CALL_DEPTH));
+                //
+                // The default must accommodate legitimate deep callers: the
+                // self-hosted compiler (compiler.all.ws) recurses well past
+                // 2048 frames when compiling a stdlib-sized unit, so
+                // `standard library import => c2` used to fail outright.
+                // WHISPER_MAX_CALL_DEPTH raises the ceiling for such workloads
+                // without recompiling; it is a diagnostic escape hatch, not a
+                // security boundary (the data stack guard already bounds memory).
+                let max_depth = max_call_depth();
+                if self.call_stack.len() >= max_depth {
+                    return Err(VmError::RecursionLimit(max_depth));
                 }
                 // Check 4-slot cache first (Rc::clone is just a refcount bump)
                 let word_code = if let Some(code) = self.word_cache_lookup(name) {
@@ -1526,7 +1548,7 @@ impl Vm {
                     word_name: Some(name.clone()),
                     code: word_code,
                     ip: 0,
-                        };
+                };
                 self.call_stack.push(frame);
             }
             Opcode::Return => {
@@ -1537,8 +1559,19 @@ impl Vm {
             // === Capability ===
             Opcode::CapCall(id) => {
                 let cap_id = *id;
-                // Collect args - convention: args are on stack
-                let args: Vec<Value> = vec![self.pop()?];
+                // Collect operands. They sit on the stack with the last one
+                // on top, so pop in reverse to hand the capability its
+                // arguments in declaration order: `path content @1` yields
+                // args = [path, content]. Popping a fixed single operand
+                // (the old behaviour) made every two-operand capability
+                // unusable — `@1` always failed, and the C chain, which pops
+                // what its shim needs, disagreed with the VM.
+                let n = self.capability_table.arity(cap_id);
+                let mut args: Vec<Value> = Vec::with_capacity(n);
+                for _ in 0..n {
+                    args.push(self.pop()?);
+                }
+                args.reverse();
                 self.capability_table
                     .call(cap_id, &mut self.data_stack, &args)?;
             }
@@ -1620,7 +1653,11 @@ impl Vm {
             }
             // L-04 定稿：conf-of 读置信度（Signal→c，其余 1.0）；unwrap 剥壳
             Opcode::ConfOf => {
-                let c = self.data_stack.last().map(|v| v.confidence()).unwrap_or(1.0);
+                let c = self
+                    .data_stack
+                    .last()
+                    .map(|v| v.confidence())
+                    .unwrap_or(1.0);
                 self.data_stack.push(Value::F64(c));
             }
             Opcode::UnwrapSig => {
@@ -2218,7 +2255,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn test_word_recursion_depth_guard() {
         // `: f { f } ; f` — iterative frames would otherwise grow until the
@@ -2226,7 +2262,31 @@ mod tests {
         let mut vm = Vm::new();
         vm.define_word("f".to_string(), vec![Opcode::Call("f".to_string())]);
         let err = vm.execute(&[Opcode::Call("f".to_string())]).unwrap_err();
-        assert!(matches!(err, VmError::RecursionLimit(2048)), "got {err:?}");
+        let limit = max_call_depth();
+        assert!(
+            matches!(err, VmError::RecursionLimit(n) if n == limit),
+            "got {err:?}"
+        );
+    }
+
+    #[test]
+    fn test_deep_but_legitimate_recursion_is_allowed() {
+        // Regression (2026-09-21): the ceiling must clear what the self-hosted
+        // compiler actually needs. `-t c2` on std/math (1.9 KB) requires >2048
+        // frames and on compiler.all.ws (65 KB) >16384, because the
+        // Whisper-written compiler recurses about once per token. A ceiling
+        // below that makes the whole c2 chain unusable for anything importing
+        // the stdlib — which is what a 2048 default did.
+        //
+        // The end-to-end proof (compiling std/math through the chain) lives in
+        // the CLI integration tests; this pins the invariant that made it fail.
+        let limit = max_call_depth();
+        assert!(
+            limit > 32_768,
+            "ceiling {limit} too low for the self-hosted compiler (needs >32768)"
+        );
+        // Still bounded: the runaway case must not reach allocator death.
+        assert!(limit <= 1_048_576, "ceiling {limit} is too permissive");
     }
 
     #[test]
@@ -2385,7 +2445,11 @@ mod tests {
         vm.data_stack.push(alt1);
         vm.data_stack.push(alt2);
         let r = vm.execute(&[Opcode::ProbChoice]).unwrap();
-        assert_eq!(r, Some(Value::I64(30)), "Signal conf 0.0 → alt2, x unwrapped");
+        assert_eq!(
+            r,
+            Some(Value::I64(30)),
+            "Signal conf 0.0 → alt2, x unwrapped"
+        );
     }
 
     /// 非法概率源（无 f64/Signal 在引号下方）→ 显式报错。
@@ -2418,12 +2482,22 @@ mod tests {
     fn test_seed_determinism() {
         let mut a = Vm::new();
         let a_top = a
-            .execute(&[Opcode::PushI64(42), Opcode::SetSeed, Opcode::Rand, Opcode::Rand])
+            .execute(&[
+                Opcode::PushI64(42),
+                Opcode::SetSeed,
+                Opcode::Rand,
+                Opcode::Rand,
+            ])
             .unwrap();
         let a_second = a.pop().unwrap();
         let mut b = Vm::new();
         let b_top = b
-            .execute(&[Opcode::PushI64(42), Opcode::SetSeed, Opcode::Rand, Opcode::Rand])
+            .execute(&[
+                Opcode::PushI64(42),
+                Opcode::SetSeed,
+                Opcode::Rand,
+                Opcode::Rand,
+            ])
             .unwrap();
         let b_second = b.pop().unwrap();
         assert_eq!(a_top, b_top);
@@ -2463,10 +2537,7 @@ mod tests {
         );
     }
 
-    /// Non-Signal values have implicit confidence 1.0 → always alt1.
-    #[test]
     // === String operation tests ===
-
     #[test]
     fn test_strlen() {
         let mut vm = Vm::new();
@@ -3310,11 +3381,7 @@ mod try_recovery_tests {
     fn try_success_path_untouched() {
         let mut vm = Vm::new();
         let prog = vec![
-            Opcode::PushRef(vec![
-                Opcode::PushI64(3),
-                Opcode::PushI64(4),
-                Opcode::Add,
-            ]),
+            Opcode::PushRef(vec![Opcode::PushI64(3), Opcode::PushI64(4), Opcode::Add]),
             Opcode::Try,
             Opcode::PushI64(0),
         ];
