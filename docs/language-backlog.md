@@ -142,8 +142,47 @@ Phase 3 视 Phase 1/2 战果伸缩；Phase 0.5 日。每阶段独立提交，
 对 `CapExec` 发射空操作的问题（`transpiler.rs` 里写的
 `// cap_exec: no-op in native mode`）。
 
-## 附：已关闭项（勿重复立项）
+## 战役 O′：引号在列表字面量内（战役 O 的未达成项）
 
+**事实（2026-09-21 实测）**：战役 O 修掉了三处编译器缺陷后，**两个**引号
+字面量已两链一致，但**三个及以上**、以及**列表字面量里的引号**仍未达成：
+
+| 程序 | VM | c2（用户路径） | NSC 路径 |
+|------|----|----|----|
+| `{ 1 + } { 2 * } drop drop 7 .` | 7 | ✅ 7 | ✅ |
+| `{ 1 + } { 2 * } { 3 * } drop drop drop 7 .` | 7 | ❌ `Type mismatch: expected str, got [T]` | ✅（**不等价！**） |
+| `[{ 1 + }] len .` | 1 | ❌ `'W___q0' undeclared` | ❌ |
+| `[{ 1 + }] 0 @nth 5 swap call .` | 6 | ❌ 同上 | ❌ |
+
+**注意第三列与第四列**：`opcode_coverage.sh` 的 c2 腿走 NSC（先编出原生
+编译器再喂源码），而用户执行的 `whisper build -t c2` 会先内联 `std/core`。
+**NSC 通过 ≠ 用户能过**——这是门禁本身的盲点，修门禁属独立事项。
+
+**根因（已定位到行）**：
+
+1. `op-quote` 发射 `[53, inner_bc]`，但 **`53` 在整个 `compiler.all.ws`
+   里只出现在 `op-quote` 自己那两行**——cgen 没有 53 分支，只会走到
+   `#error whisper-cgen: unknown bare opcode`。即 `op-quote` 是**死代码**：
+   引号能工作完全依赖 `fuse-hof` 提升成 `[57, name]` + `[9, name, body]`。
+2. `op-list6` 用 `compile`（含 `fuse-hof`）编译列表元素，于是元素里的引号
+   确实被提升出 `[16 "__q0"]` + `[9 "__q0" body]`；
+3. 但 `compile-one` **有 tag 16 分支、没有 tag 9 分支**（`dup 16 = ?? drop
+   op-qref return ]` 之后直接是 249-254 与兜底），嵌套定义被丢弃、引用留着
+   → `w_push(W_PTR((void*)W___q0))` 指向从未发射的函数。
+
+**判据要求（预注册）**：上表后两行两链输出一致；`opcode_coverage.sh` 增补
+这两例且 `FAIL=0`；`tests/o_preregistered.md` 的 J1/J2 由"部分"转为"达成"；
+固定点 gen2==gen3 复验通过。**不允许加 `KNOWN_GAPS` 白名单。**
+
+**修法方向（择一，均需独立设计注）**：
+
+- **甲**：`fuse-hof` 遇到列表节点时下潜，把其中提升出的 Def 抬到顶层，
+  使 `split-defs` 能收到。改动集中，但触及最热的函数（已有三处 bug 出在它
+  身上）。
+- **乙**：`compile-one` 支持 tag 9（嵌套定义汇入 defs 累积器）+ cgen 补
+  opcode 53 的发射。内联引号要合成函数名，是两遍式改动。
+
+## 附：已关闭项（勿重复立项）
 - map 遍历顺序非确定 → M-1 已修（VM BTreeMap + C 链排序插入，
   2026-09-10）。
 - `]` then-臂列表贴近闭合括号两实现分歧 → spec §2 已标注已知限制

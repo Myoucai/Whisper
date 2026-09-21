@@ -567,7 +567,13 @@ export group-paired-rec
     swap drop [5] swap append
 } ;
 : cl-list {
-    dup 1 @nth classify-nested
+    // Mirror cl-quote: the collector leaves a bracket's inner tokens RAW
+    // (cbr-loop only groups nested brackets, not braces), so an element like
+    // `{ 1 + }` inside `[ ... ]` is still the four strings "{" "1" "+" "}".
+    // Without this structify pass classify-nested sees a bare "{" and
+    // classifies it as a WORD token — a list of quotations was therefore
+    // unusable, which is exactly what dynamic dispatch needs.
+    dup 1 @nth structify classify-nested
     swap drop [6] swap append
 } ;
 : cl-cond {
@@ -813,13 +819,27 @@ export classify-nested
     | drop 0
     ]
 } ;
-: next-consumer-op { dup 1 @nth consumer-op } ;
+// next-consumer-op: is the token AFTER the head a higher-order consumer?
+// The length guard matters: when the head quote is also the LAST token there
+// is no element 1, and an unguarded `1 @nth` aborts the compiler with
+// "Index out of bounds" (a program ending in a bare quotation — e.g. `{ 1 + }`
+// on its own — was enough to trigger it).
+: next-consumer-op {
+    dup len 2 < ?? 0 return ]
+    dup 1 @nth consumer-op
+} ;
 // 非融合引号（引号作参数：`{ 1 + } map`）提升为顶层合成词 __qN。
 // kv 计数器产生全局唯一名（kv 只存字符串铁律）。
 : genq-name {
+    // The counter string fetched below is already the branch's input, so the
+    // FALSE path must consume it. It used to re-read "__QN" and leave the
+    // original copy on the stack — invisible with a single quote (the TRUE
+    // path drops it), but every extra quote left a stray counter string that
+    // pushed the real operands out of reach and broke fuse-hof with
+    // "Type mismatch: expected [T], got str".
     "__QN" kv-get dup strlen 0 = ??
         drop "__q0" "0" "__QN" ` kv-set
-    |   "__QN" kv-get strtoi64 1 + i64tostr dup "__QN" ` kv-set "__q" swap strcat
+    |   strtoi64 1 + i64tostr dup "__QN" ` kv-set "__q" swap strcat
     ]
 } ;
 
@@ -833,12 +853,22 @@ export classify-nested
             fuse-hof prepend
             return
         | drop
-          genq-name "__FH-N" ` kv-set
-          _ 0 @nth 1 @nth
-          "__FH-N" kv-get
-          9 mk3
-          swap tok-advance fuse-hof prepend
-          [16] "__FH-N" kv-get append swap prepend
+          // Build BOTH tokens before recursing, and keep the generated name
+          // on the stack instead of in a shared KV scratch key.
+          //
+          // The old form parked the name under "__FH-N", recursed, then read
+          // the key back. A nested fuse-hof (i.e. a second non-fused quote)
+          // overwrote that key, so the outer reference was emitted with the
+          // INNER quote's name and pointed at the wrong def. One quote never
+          // recursed and so never showed it; two quotes broke with
+          // "Type mismatch: expected [T], got str".
+          genq-name
+          over 0 @nth 1 @nth
+          over 9 mk3
+          [16] $2 append
+          rot drop
+          ` rot
+          tok-advance fuse-hof prepend prepend
           return
         ]
     | ]

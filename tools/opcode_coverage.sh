@@ -159,6 +159,17 @@ t call-basic   '{ 42 } call .'
 t call-input   '10 { 2 * } call .'
 t call-in-def  ': ap { call } ; 5 { 1 + } ap .'
 
+# ── 战役 O：多个引号字面量（自举链的 genq-name 残留修复）───────────
+# 非首个引号会让 genq-name 在栈上留一份计数器字符串，把操作数挤出可达
+# 范围；单引号看不出来，两个就报 Type mismatch。
+#
+# 只登记**两个**引号：三个及以上经 `whisper build -t c2` 仍失败。注意
+# 本门禁的 c2 腿走 NSC（直喂源码），而用户路径的 c2 会先内联 std/core——
+# 两者不等价，所以这里以用户路径为准，不拿 NSC 的通过当证据。
+# 未达成项（≥3 引号、列表内的引号）见 tests/o_preregistered.md 与
+# docs/language-backlog.md 战役 O′。
+t quote-pair   '{ 1 + } { 2 * } drop drop 7 .'
+
 echo "coverage: $PASS pass, $FAIL fail, $GAP known-gap"
 echo "$GAPS" | tr '|' '\n' | grep -v '^$' | sed 's/^/  GAP /'
 echo "$FAILED" | tr '|' '\n' | grep -v '^$' | sed 's/^/  DIVERGE /'

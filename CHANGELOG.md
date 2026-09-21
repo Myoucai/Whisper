@@ -1,5 +1,69 @@
 # Changelog
 
+## Unreleased (2026-09-21g) — 战役 O（部分达成）：三处自举编译器缺陷 + 一个门禁盲点
+
+目标原本是"让自举链支持引号作为一等值"，使 `call` 的动态分发两链一致。
+**未完全达成**——但过程里修掉三处真实的编译器缺陷，并按预注册纪律
+（`tests/o_preregistered.md`）只落地**真实用户路径验证过**的部分。
+
+### 修复：自举编译器三处缺陷
+
+1. **`cl-list` 缺一趟 `structify`**（`classify-nested`）。`cl-quote` 是
+   `dup 1 @nth structify classify-nested`，`cl-list` 却只有
+   `dup 1 @nth classify-nested`。收集器把方括号内的 token 留成裸串
+   （`cbr-loop` 只归组嵌套方括号、不认花括号），少了这趟 `structify`，
+   列表元素里的 `{` 就被分类成**普通词**而非引号节点——实测分类树
+   `[4 "{"]`。修复后为 `[6 [[5 [[0 1] [3 16]]]]]`。
+2. **`next-consumer-op` 越界**：`dup 1 @nth` 未查长度，引号恰好是最后一个
+   token 时（`{ 1 + }` 单独成程序即可触发）整个编译器崩在
+   `Index out of bounds`。加长度守卫。
+   （附带修掉第一版守卫里多余的 `drop`——`??` 已消费条件，那个 `drop`
+   吃掉的是 token 列表本身；由 `--trace` 定位。）
+3. **`genq-name` 残留计数器**：非首次调用时，计数器字符串既已被消费也不再
+   需要，却被多读一次 `"__QN"` 留在栈上。单引号看不出来（真分支有 `drop`），
+   **每多一个引号就多一份垃圾**，把真正的操作数挤出可达范围 →
+   `Type mismatch: expected [T], got str`。修复：直接用栈上那个值。
+
+另外去掉 `fuse-hof` 的 `__FH-N` **共享 KV 临时键**（递归调用会覆盖它，
+名字改为全程留在栈上）——与第 3 条同属"用全局暂存传值"的隐患。
+
+### 未达成（如实登记，未加白名单）
+
+- **≥3 个引号**：用户路径（`whisper build -t c2`）仍报
+  `Type mismatch: expected str, got [T]`。**2 个引号已两链一致（7）。**
+- **列表字面量里的引号**（原判据 O-1/O-3）：根因已定位到行 —— `op-quote`
+  发射 `[53, inner_bc]`，而 `53` 在整个 `compiler.all.ws` 里**只出现在
+  `op-quote` 自己那两行**，cgen 没有 53 分支（`op-quote` 实为死代码）；
+  `op-list6` 用含 `fuse-hof` 的 `compile` 编译元素，提升出的
+  `[9, name, body]` 落在列表节点内部，而 `compile-one` **有 tag 16 分支、
+  没有 tag 9 分支** → 定义被丢弃、引用留着 → `'W___q0' undeclared`。
+  转入 `docs/language-backlog.md` **战役 O′**（含两条修法方向与预注册判据）。
+
+### 顺带发现：门禁的 c2 腿与用户路径不等价（门禁盲点）
+
+`tools/opcode_coverage.sh` 的 c2 腿走 **NSC**（先把 `compiler.all.ws` 编成
+原生二进制、再 `NSC -c < src`），而用户执行的 `whisper build -t c2` 会
+**先内联 `std/core`**。三个引号的程序在 NSC 下成功、在用户路径下失败——
+**NSC 通过 ≠ 用户能过**。
+
+据此**拒绝**把 `quote-triple` 登记进门禁：它会在门禁里显示绿色，而对用户
+是红色的。门禁本身改为以用户路径为准（本次只登记 2 引号一例）。
+
+### 验证
+
+    cargo test --workspace        474 / 0
+    cargo clippy -D warnings      0
+    cargo fmt --all --check       0
+    syntax / stdlib               26 / 0 · 58 / 0
+    typecheck-gate                FP=0 PASS
+    opcode_coverage               60 / 0 / 0
+    net-gate / app-gate           PASS / PASS (13 routes)
+    verify-fixedpoint             gen2 == gen3
+
+**未重生种子**：种子自 2026-09-03 冻结以来 `compiler.all.ws` 已改动多次而
+固定点始终成立——种子是链的起点、不是编译器的副本，改 `.ws` 不需要重生它
+（`runtime.c` 由 `#include` 现场取用，同理）。
+
 ## Unreleased (2026-09-21f) — 语言侧：`call` 补上缺失的拼写 + 两处修复
 
 ### 新增 —— `call`：动态调用引号（把一个悬空的 opcode 变得可达）

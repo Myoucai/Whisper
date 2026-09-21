@@ -965,6 +965,73 @@ fn call_invokes_quotation_on_both_chains() {
     }
 }
 
+// ── Campaign O: multiple quotation literals ────────────────────────
+
+/// Two or more non-fused quotation literals used to break the self-hosted
+/// compiler. `genq-name` re-read its counter from the KV store and left the
+/// original copy on the stack — invisible with one quote (the true branch
+/// drops it), but every extra quote piled up another stray string and pushed
+/// the real operands out of reach ("Type mismatch: expected [T], got str").
+///
+/// Quotations nested in a *list literal* are still not supported by the c2
+/// chain (root cause recorded in docs/language-backlog.md, campaign O');
+/// this test therefore only pins the bare-multi-quote forms.
+#[test]
+fn multiple_quotation_literals_compile_on_both_chains() {
+    if std::process::Command::new("gcc")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        eprintln!("skipping: gcc not available");
+        return;
+    }
+    let dir = std::env::temp_dir().join("whisper_quotes_it");
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let cases = [("pair", "{ 1 + } { 2 * } drop drop 7 .\n", "7\n")];
+    let norm = |b: &[u8]| String::from_utf8_lossy(b).replace(['\r', '"'], "");
+
+    for (name, source, expected) in cases {
+        let src = dir.join(format!("{name}.ws"));
+        std::fs::write(&src, source).unwrap();
+
+        let vm = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+            .args(["run", "--no-strict-types"])
+            .arg(&src)
+            .output()
+            .unwrap();
+        assert!(
+            vm.status.success(),
+            "[{name}] VM run failed: {}",
+            String::from_utf8_lossy(&vm.stderr)
+        );
+
+        let exe = dir.join(format!("{name}_exe"));
+        let build = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+            .args(["build", "-t", "c2", "-o"])
+            .arg(&exe)
+            .arg(&src)
+            .output()
+            .unwrap();
+        assert!(
+            build.status.success(),
+            "[{name}] c2 build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let artifact = if exe.exists() {
+            exe.clone()
+        } else {
+            exe.with_extension(std::env::consts::EXE_EXTENSION)
+        };
+        let c2 = std::process::Command::new(&artifact).output().unwrap();
+        assert!(c2.status.success(), "[{name}] native run failed");
+
+        assert_eq!(norm(&vm.stdout), expected, "[{name}] VM output");
+        assert_eq!(norm(&c2.stdout), expected, "[{name}] chains diverged");
+    }
+}
+
 // Wrapper so the test binary can reach the c2 module (bin crate: tests
 // link against the crate root via `commands` path below).
 fn commands_c2_compile(src: &str) -> Result<String, String> {
