@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased (2026-09-21m) — `bootstrap.sh` 一条命令走到 `wd`
+
+`scripts/bootstrap.sh` 从 5 步扩到 7 步：固定点自检之后，用刚造出来的
+`whisper2` 编出 `whisperc/wd.ws`（纯 Whisper 写的驱动），再冒烟验证
+`wd run 1 2 + .` → `3`。于是「干净机器 → 种子 → 能编能跑任何程序」是一条
+命令，全程只用 gcc。
+
+产物路径：`$OUT/wd`（默认 `target/bootstrap/wd`）。
+
+    bash scripts/bootstrap.sh
+    ./target/bootstrap/wd run hello.ws hello
+
+**验证范围（如实说明）**：新增的两步与 `scripts/build-wd.sh` 的第 3 步同构，
+而 `build-wd.sh` 已端到端验证通过（EXIT=0，并用其产物跑通了四条 import 用例）；
+本次只对 `bootstrap.sh` 做了 `bash -n` 语法校验，**未在本轮重跑整条链**
+（约 25 分钟）。
+
+### 本轮未落地的一项（回退了）
+
+尝试收掉 A3 的 3 字节残差（`strsplit` 尾部空段）并补多行定义的限定名克隆，
+两处改动都引入了新回归且未在预算内定位，已 `git checkout` 回退到
+`7fd1a74` 的验证状态——**不留半成品**。残差与多行克隆仍是已知缺口，
+记录在 `tests/step3_preregistered.md`。
+
 ## Unreleased (2026-09-21l) — Step 3 里程碑 B：`wd` 的 import 展开（真凶是两处栈语义误用）
 
 上一节留下的缺口是「`wd` 只能编自包含程序」：缺 import 展开，它的 `.c` 与

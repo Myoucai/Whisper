@@ -50,10 +50,14 @@ Whisper 是一门**栈式、后置表示法**的编程语言，专为 **AI 生�
 git clone https://github.com/Myoucai/Whisper.git
 cd Whisper
 bash scripts/bootstrap.sh
-# seed(C) -> whisper1 -> whisper2，固定点自检 + stdlib 冒烟
+# seed(C) -> whisper1 -> whisper2 -> wd，固定点自检 + 两次冒烟
+./target/bootstrap/wd run hello.ws hello    # 驱动自带 import 内联，零 Rust
 ./target/bootstrap/whisper2 -c < hello.ws > hello.c
 gcc -O2 -o hello hello.c -I whisperc -lm && ./hello
 ```
+
+`bootstrap.sh` 最后两步会用刚造出来的 `whisper2` 编出 **`wd`**（见下），所以
+一条命令就能从冻结种子走到「能编能跑任何程序」，全程只用 gcc。
 
 ### 零 Rust 驱动 `wd`（进行中）
 
