@@ -66,10 +66,11 @@ bash scripts/build-wd.sh              # 全程无 cargo
 ./target/wd/wd run   hello.ws hello   # 编译并跑起来
 ```
 
-**当前范围（如实说明）**：只能编**自包含**程序——`import` 展开（含自动
-`std/core`）还没实现，那是下一个里程碑。另外 C 链程序没有退出码（cgen 固定
-`return 0;`），所以 `wd` 出错时 shell 看到的仍是 0。详见
-`tests/step3_preregistered.md` 与 `docs/independence-design.md` Step 3。
+**当前范围（如实说明）**：能编含 `import` 的程序（`std/core` 自动补、命名
+空间限定名按 `math.sq` 形式可用），与 `-t c2` 的 C 输出**接近但未逐字节一致**
+（自包含程序差 3 字节；差异来自多行定义不做限定名克隆）。另外 C 链程序没有
+退出码（cgen 固定 `return 0;`），所以 `wd` 出错时 shell 看到的仍是 0。
+详见 `tests/step3_preregistered.md` 与 `docs/independence-design.md` Step 3。
 
 ### 安装（Rust 工具链，含 REPL/LSP/c2 一键编译）
 

@@ -43,6 +43,133 @@
     drop ""
 } ;
 
+// ── 限定名克隆（里程碑 B）────────────────────────────────────────────
+// 把模块里每个**单行**定义 `: name { … } ;` 再发一行 `: ns.name { … } ;`，
+// 使 `std.math.sq` 这类限定引用在文本内联路径上也能解析（对齐 c2.rs 的
+// append_qualified_clones）。多行定义不克隆——见文件末尾的已知缺口。
+//
+// 用「索引状态机」而不是 @fold：本文件其余循环也是这个形状，栈纪律只需
+// 一条——本地状态永远只有一件，读它一律 `dup N @nth`。
+: wd-clones {                          // [src ns] → text
+    "wd.ns" swap kv-set                // ns 存 KV，本函数只折叠输出串
+    "\n" strsplit                      // lines
+    "" 0 swap                          // lines 0 ""
+    3 PushList                         // [lines, 0, ""]
+    wd-clone-loop
+} ;
+: wd-clone-loop {                      // [state] → text
+    dup 0 @nth len over 1 @nth swap >= ??
+        2 @nth return ]
+    dup 0 @nth over 1 @nth @nth        // state line
+    wd-clone-piece                     // state piece
+    over 2 @nth swap strcat            // state out'
+    swap dup 0 @nth swap 1 @nth 1 + rot 3 PushList
+    wd-clone-loop
+} ;
+: wd-clone-piece {                     // [line] → 克隆行（不是单行定义则 ""）
+    dup wd-def-name                    // line name
+    dup "" str-eq? ??
+        drop drop "" return ]          // 不是定义行
+    dup "." wd-contains? ??
+        drop drop "" return ]          // 已带限定名
+    over wd-code wd-last 59 = ! ??
+        drop drop "" return ]          // 多行定义（未以 ';' 收尾）
+    drop                               // line
+    str-strip 2 9999 strslice          // rest = name + after
+    "wd.ns" kv-get "." strcat swap strcat    // ns.rest
+    ": " swap strcat "\n" strcat       // ": ns.rest\n"
+} ;
+
+// ── import 展开（里程碑 B）─────────────────────────────────────────
+// [line] → 这一行里的模块名；不是 import 行则为 ""
+: wd-import-spec {
+    str-strip
+    dup "import " wd-prefix? ! ??
+        drop "" return ]
+    7 9999 strslice                    // rest
+    dup "\"" strfind dup 0 < ??
+        drop drop "" return ]
+    1 + 9999 strslice                  // after first quote
+    dup "\"" strfind dup 0 < ??
+        drop drop "" return ]
+    0 swap strslice
+} ;
+
+// [line] → import 之后（引号之外）的尾巴，已 trim；不是标准形态则 ""
+: wd-import-tail {
+    str-strip
+    dup "import \"" wd-prefix? ! ?? drop "" return ]
+    8 9999 strslice                    // 跳过 `import "`
+    dup "\"" strfind dup 0 < ??
+        drop drop "" return ]
+    1 + 9999 strslice str-strip
+} ;
+
+// 已访问集合放 KV（一次性驱动进程，无需可重入）
+: wd-seen { "wd.seen" kv-get } ;
+: wd-seen? { "\n" strcat "\n" strcat wd-seen swap wd-contains? } ;
+: wd-seen-add { "\n" strcat "\n" strcat wd-seen swap strcat "wd.seen" swap kv-set } ;
+
+// 尾巴 + 换行；尾巴为空则空串
+: wd-tail-nl { "wd.tail" kv-get dup strlen 0 = ?? drop "" return ] "\n" strcat } ;
+
+// [line] → 这一行展开成什么文本
+: wd-expand-piece {
+    dup wd-import-spec                 // line spec
+    dup "" str-eq? ??
+        drop "\n" strcat return ]      // 非 import 行：原样 + 换行
+    // 尾巴先存 KV，省得后面在栈上搬
+    over wd-import-tail "wd.tail" swap kv-set
+    dup wd-ns                          // line spec ns
+    over wd-path                       // line spec ns path
+    dup wd-seen? ??
+        drop drop drop drop            // 已展开过：只留尾巴
+        wd-tail-nl return ]
+    dup wd-seen-add                    // line spec ns path
+    dup read-file                      // line spec ns path sub1
+    rot                                // line spec path sub1 ns
+    wd-clones                          // line spec path clones
+    over read-file                     // line spec path clones sub2
+    wd-expand                          // line spec path clones body
+    swap strcat                        // line spec path (body ++ clones)
+    wd-tail-nl                         // ... tail'
+    strcat                             // ... (body ++ clones ++ tail')
+    rot drop rot drop swap drop        // 只留结果
+} ;
+
+// [src] → 展开后的源码：逐行把 import 换成「模块全文 + 限定名克隆」。
+// 与 c2.rs::expand_imports 同构；递归由 wd-expand-piece 里的 wd-expand 完成。
+: wd-expand {
+    "\n" strsplit                      // lines
+    "" 0 swap                          // lines 0 ""
+    3 PushList                         // [lines, 0, ""]
+    wd-exp-loop
+} ;
+: wd-exp-loop {                        // [state] → text
+    dup 0 @nth len over 1 @nth swap >= ??
+        2 @nth return ]
+    dup 0 @nth over 1 @nth @nth        // state line
+    wd-expand-piece                    // state piece
+    over 2 @nth swap strcat            // state out'
+    swap dup 0 @nth swap 1 @nth 1 + rot 3 PushList
+    wd-exp-loop
+} ;
+
+// [src] → 完整源码：与 c2.rs 一致，未提及 std/core 时先前置一行
+// `import "std/core"`，再统一走展开——于是 std/core 的正文与限定名克隆都由
+// 上面同一条通路产生，没有特例分支。
+: wd-source {
+    "wd.seen" "" swap kv-set           // 清空已访问集合
+    dup "std/core" wd-contains? ??
+        wd-expand return ]
+    "import \"std/core\"\n" swap strcat
+    wd-expand
+} ;
+
+// [spec] → 命名空间（最后一段）："std/math" → "math"
+// （import 的写法都不带 .ws——wd-path 才补后缀，所以这里不必剥）
+: wd-ns { "/" strsplit dup len 1 - @nth } ;
+
 // ── 路径解析 ────────────────────────────────────────────────────────
 // 与 c2.rs 的 resolve_module 对齐：std/X → <root>/stdlib/X.ws，
 // 其它 → <root>/<spec>.ws。（"相对引用它的文件"那一层见文件末尾的已知缺口）
@@ -142,6 +269,7 @@
 
     dup 1 @nth                        // S src
     read-file                         // S text
+    wd-source                         // S expanded   （std/core + import 展开）
     compile-full                      // S main_bc defs
     cgen                              // S csrc
     header swap strcat                // S full_c

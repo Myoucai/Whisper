@@ -1,5 +1,61 @@
 # Changelog
 
+## Unreleased (2026-09-21l) — Step 3 里程碑 B：`wd` 的 import 展开（真凶是两处栈语义误用）
+
+上一节留下的缺口是「`wd` 只能编自包含程序」：缺 import 展开，它的 `.c` 与
+`-t c2` 差 1329 字节。本节把它补上——判据见 `tests/step3_preregistered.md`。
+
+### 新增 —— `wd` 的 import 展开（与 `c2.rs::expand_imports` 同构）
+
+源码未提及 `std/core` 时**先补一行 `import "std/core"`**，再统一逐行展开；
+于是 std/core 的正文与限定名克隆都由同一条通路产生，**没有特例分支**。
+递归在 `wd-expand-piece` 内完成，已访问集合放 KV 防环。
+
+实测（`wd run`）：
+
+    l1 2 + .                                   → 3
+    import "std/math"  + 5 sq .                → 25
+    import "std/list"  + [1 2 3] len .         → 3
+    import "std/math"  + 5 math.sq .（限定名） → 25
+
+### 定位到并修掉的两个真 bug（这才是上一轮卡住的原因）
+
+1. **`over N @nth` 不是「取第 N 项」**，而是「复制 `$1`，再对这个副本取
+   下标」。`wd-def-name` 之后 `over` 已经拿到了行文本，多写的 `1 @nth` 是
+   **在对字符串取下标** → 垃圾指针 → `type error: expected ptr`。四处同样
+   写法，全改。上一轮没定位到，是因为把它当成了一个原子取值操作。
+2. **`>=` 的参数顺序**：`a b >=` 算 `a >= b`（`a` 在栈下方）。循环终止条件
+   写成 `len ... idx >=`，实际算的是 `n >= idx`——**idx=0 时立即判定完成**，
+   展开结果恒为空串（`.c` 只剩 185 字节）。这个 bug 一开始被第一个 bug 掩盖
+   （先报类型错），修掉 `over` 之后才浮出来。
+
+另外把 `@fold` 换成该文件其余循环同款的「索引状态机」：栈纪律只剩一条——
+本地状态永远一件，读它一律 `dup N @nth`。
+
+### 顺带纠正一处测试用例错误
+
+我一度用 `5 std.math.sq .` 当限定名用例，但它**在 VM 上也是
+`Undefined word: std.math.sq`**——限定名是 `math.sq`（`std/` 不进命名空间）。
+`wd` 与 `c2` 在这个名字上的行为一致 ✓，是用例错了。
+
+### A3（与 `-t c2` 逐字节一致）现状
+
+自包含程序从差 1329 字节缩到 **1601 vs 1604（差 3 字节）**；带 import 的
+17451 vs 17878。残差主要来自**多行定义不做限定名克隆**（c2 会做）。行级比较
+查不出差异行，剩 3 字节在尾部空白，未定位。
+
+### 验证
+
+    cargo test --workspace        480 / 0
+    cargo clippy -D warnings      0
+    cargo fmt --all --check       0
+    syntax / stdlib               26 / 0 · 58 / 0
+    typecheck-gate                FP=0 PASS
+    opcode_coverage               80 / 0 / 0
+    net-gate / app-gate           PASS / PASS (13 routes)
+
+固定点未重跑：本轮仍未改 `compiler.all.ws` / `runtime.c`。
+
 ## Unreleased (2026-09-21k) — Step 3 里程碑 A：Whisper 写的驱动 `wd`（零 Rust）
 
 判据见 `tests/step3_preregistered.md`。设计文档把 Step 3 定为"摆脱 Rust 的
