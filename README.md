@@ -55,6 +55,22 @@ bash scripts/bootstrap.sh
 gcc -O2 -o hello hello.c -I whisperc -lm && ./hello
 ```
 
+### 零 Rust 驱动 `wd`（进行中）
+
+`whisperc/wd.ws` 是一个**用 Whisper 自己写的驱动**，把上面那三行手工胶水
+（内联 import、调 gcc、跑产物）收进一条命令。它同样只需 gcc + 冻结种子：
+
+```bash
+bash scripts/build-wd.sh              # 全程无 cargo
+./target/wd/wd build hello.ws hello   # 编译，留下 hello.c
+./target/wd/wd run   hello.ws hello   # 编译并跑起来
+```
+
+**当前范围（如实说明）**：只能编**自包含**程序——`import` 展开（含自动
+`std/core`）还没实现，那是下一个里程碑。另外 C 链程序没有退出码（cgen 固定
+`return 0;`），所以 `wd` 出错时 shell 看到的仍是 0。详见
+`tests/step3_preregistered.md` 与 `docs/independence-design.md` Step 3。
+
 ### 安装（Rust 工具链，含 REPL/LSP/c2 一键编译）
 
 ```bash

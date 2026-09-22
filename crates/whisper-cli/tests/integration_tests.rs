@@ -1548,6 +1548,111 @@ fn unimplemented_capabilities_fail_loudly_not_at_compile_time() {
     }
 }
 
+// ── Step 3: the Whisper-written driver `wd` ────────────────────────
+
+/// `wd` is built by `scripts/build-wd.sh`, which takes the *frozen seed* through
+/// two self-hosted generations (~15-20 min) — far too slow to run inside a unit
+/// test. So this test is conditional: when the artifact is present (a developer
+/// or CI job ran the script), exercise it; otherwise skip with a note.
+///
+/// What it pins (tests/step3_preregistered.md, milestone A):
+///   A2 — `wd build` produces an executable, `wd run` forwards its output;
+///   A4 — a missing source file is named, not compiled as empty.
+///
+/// It deliberately does NOT assert A3 (byte-parity with `-t c2`): that needs
+/// the import expansion of milestone B, which is not implemented yet.
+#[test]
+fn wd_driver_compiles_and_runs_when_present() {
+    if std::process::Command::new("gcc")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        eprintln!("skipping: gcc not available");
+        return;
+    }
+    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let plain = repo.join("target/wd/wd");
+    let wd = if plain.exists() {
+        plain
+    } else {
+        plain.with_extension(std::env::consts::EXE_EXTENSION)
+    };
+    if !wd.exists() {
+        eprintln!("skipping: build target/wd/wd first (bash scripts/build-wd.sh)");
+        return;
+    }
+
+    let dir = std::env::temp_dir().join("whisper_wd_it");
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = dir.join("a.ws");
+    std::fs::write(&src, "1 2 + .\n").unwrap();
+    let out = dir.join("a");
+    let norm = |b: &[u8]| String::from_utf8_lossy(b).replace(['\r', '"'], "");
+
+    // A2: build
+    let build = std::process::Command::new(&wd)
+        .arg("build")
+        .arg(&src)
+        .arg(&out)
+        .current_dir(&repo)
+        .env("WHISPER_ROOT", &repo)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "wd build failed: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let artifact = if out.exists() {
+        out.clone()
+    } else {
+        out.with_extension(std::env::consts::EXE_EXTENSION)
+    };
+    assert!(
+        artifact.exists(),
+        "wd build reported success but {artifact:?} does not exist"
+    );
+    let ran = std::process::Command::new(&artifact).output().unwrap();
+    assert_eq!(norm(&ran.stdout), "3\n", "wd-built artifact output");
+
+    // A2: run (the driver forwards the artifact's output)
+    let out2 = dir.join("b");
+    let run = std::process::Command::new(&wd)
+        .arg("run")
+        .arg(&src)
+        .arg(&out2)
+        .current_dir(&repo)
+        .env("WHISPER_ROOT", &repo)
+        .output()
+        .unwrap();
+    assert!(
+        run.status.success(),
+        "wd run failed: {}",
+        String::from_utf8_lossy(&run.stderr)
+    );
+    assert!(
+        norm(&run.stdout).contains('3'),
+        "wd run should forward the artifact's output, got {:?}",
+        norm(&run.stdout)
+    );
+
+    // A4: a missing source is named
+    let bad = std::process::Command::new(&wd)
+        .arg("build")
+        .arg(dir.join("nope.ws"))
+        .arg(dir.join("nope"))
+        .current_dir(&repo)
+        .env("WHISPER_ROOT", &repo)
+        .output()
+        .unwrap();
+    let msg = norm(&bad.stdout);
+    assert!(
+        msg.contains("cannot read source") && msg.contains("nope.ws"),
+        "wd should name the missing file, got {msg:?}"
+    );
+}
+
 // Wrapper so the test binary can reach the c2 module (bin crate: tests
 // link against the crate root via `commands` path below).
 fn commands_c2_compile(src: &str) -> Result<String, String> {

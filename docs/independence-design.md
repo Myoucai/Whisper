@@ -288,7 +288,12 @@ TLS 缺口是两链**共同的**现状，不是 C 链独有的。
 `@0/@1/@5` 本来也没有白名单。本轮**不引入半套沙箱**——要么整套做，要么不做，
 避免"看起来安全"。
 
-### Step 3 —— Whisper 写驱动 `wd`（主体工程）
+### Step 3 —— Whisper 写驱动 `wd`（**里程碑 A 完成 2026-09-21**）
+
+> **状态**：`whisperc/wd.ws` + `scripts/build-wd.sh` 已落地，判据见
+> `tests/step3_preregistered.md`。**零 Rust 构建**（gcc + 冻结种子 → `wd`）
+> 与**编译+运行自包含程序**已通过；**import 展开（里程碑 B）未完成**，
+> 所以用到 stdlib 的程序暂时还编不了。
 
 目标：**gcc → whisper2 → wd → 跑任何 Whisper 程序，全链路零 Rust。**
 
@@ -299,13 +304,22 @@ TLS 缺口是两链**共同的**现状，不是 C 链独有的。
         → run-cmd 调 $WHISPER_CC → 执行产物（缓存命中则直接 exec）
 ```
 
-可行性的关键：**驱动不需要新语言特性**
-- 编译逻辑：`compiler.all.ws` 已有 `compile-full` / `cgen` 两个词
-- 文件 IO：`read-file` / `write-file` / `listdir` / `mkdir` 已有
-- 环境变量：`env-get` 已有（读 `WHISPER_CC`）
-- 缓存键：`std/hash` 的 MD5（RFC 1321，已实现）够用
-- 起进程：**Step 2 补上后即具备**
-- 唯一的缺口就是 Step 2 —— 这就是为什么它必须排在前面
+**已实现**：读源文件 → `compile-full` → `cgen` → 写 `.c` → `@5` 调 C 编译器
+→ 可选执行产物并转发输出。`WHISPER_CC` / `WHISPER_ROOT` 两个环境变量。
+
+**未实现**：`内联 import`（含自动 `std/core` 与限定名克隆）——这是 `wd` 与
+`-t c2` 之间**唯一**的行为差异（实测同一份源码两者的 `.c` 是 275 vs 1604
+字节，差的就是 `std/core` 及其克隆）。零件已写好并逐个实测，但克隆折叠
+还有一处 `expected ptr` 没定位，未接入。**缓存**同样未做。
+
+**顺带发现的两个语言侧缺口**（`wd` 的体验因此打折，另立）：**C 链程序没有
+退出码**（cgen 固定 `return 0;`，Whisper 层没有 `exit`/`quit` 词）；
+**没有裸打印词**（打印只有自带换行的 `.`，而 `striter` 是迭代器）。
+
+**验收**：仅装 gcc 的干净机器上，`bootstrap.sh` → `whisper2` → 编出 `wd`
+→ `wd run hello.ws` 输出 `"Hello, World!"`。全程无 Rust。
+（当前 `bootstrap.sh` 与 `build-wd.sh` 各自走一遍种子链；把后者接进前者
+的最后一步尚未做。）
 
 缓存策略照抄 `-t native` 的**内容寻址模型**（`native.rs:2` 自述 "the CUDA-PTX
 model"）：键 = 展开后源码 + compiler.all.ws + runtime.c + cc 名 + march 标志
@@ -314,9 +328,6 @@ model"）：键 = 展开后源码 + compiler.all.ws + runtime.c + cc 名 + march
 **注意性能现实**：`run` 从"解释"变成"编译+缓存"后，首次调用有编译器
 延迟（数百 ms 量级），缓存命中后才回到 ms 级。REPL 交互会有感知，
 因此**保留快速路径选项**（见 Step 5）。
-
-**验收**：仅装 gcc 的干净机器上，`bootstrap.sh` → `whisper2` → 编出 `wd`
-→ `wd run hello.ws` 输出 `"Hello, World!"`。全程无 Rust。
 
 ### Step 4 —— 工具链迁移（机械工程）
 

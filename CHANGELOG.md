@@ -1,5 +1,61 @@
 # Changelog
 
+## Unreleased (2026-09-21k) — Step 3 里程碑 A：Whisper 写的驱动 `wd`（零 Rust）
+
+判据见 `tests/step3_preregistered.md`。设计文档把 Step 3 定为"摆脱 Rust 的
+分水岭"，其前置（C 链能用 `@5` 起进程）已在 Step 2a 解锁——本轮复核成立。
+
+### 新增 —— `whisperc/wd.ws` + `scripts/build-wd.sh`
+
+`wd` 是纯 Whisper 程序，与 `compiler.all.ws` 一起被自举链编译；`build-wd.sh`
+只用 **gcc + 冻结种子**，脚本里没有 `cargo`：
+
+    wd build <src.ws> <out>     编译到 <out>，留下 <out>.c
+    wd run   <src.ws> <out>     同上，再把产物跑起来并转发其输出
+
+`WHISPER_CC` 选 C 编译器（默认 gcc），`WHISPER_ROOT` 指仓库根（默认 `.`，
+用于找 `runtime.c` 与将来的 stdlib）。
+
+### 已达成 / 未达成（如实登记）
+
+✅ 零 Rust 构建；✅ 编译+运行自包含程序（`1 2 + .` → `3`）；✅ 错误可定位
+（源文件不存在会点名是哪个文件，而不是空文件编译后由 gcc 报错；C 编译器
+失败会转出 gcc 的 stderr）。
+
+❌ **`wd` 产的 C 与 `-t c2` 不逐字节一致**（275 vs 1604 字节）。差异全部来自
+**缺失的 import 展开**：c2 会前置并内联 `std/core` 及其限定名克隆，`wd` 不做。
+这是里程碑 B 的范围。**`wd` 目前只能编自包含程序**——用到 stdlib 的程序
+在 c2 上要 `import`，在 `wd` 上还没有。
+
+里程碑 B 的零件写了并逐个实测了大半（路径解析、定义行识别、注释剥离、
+尾字符判定、import 行识别、KV 往返），但**限定名克隆的折叠没调通**
+（`wd-clone-line` 仍抛 `type error: expected ptr`）。这块代码**没有接进
+`wd-build`**，只作为注释留在文件里并标注未完成——半成品接进去会把已经能用
+的部分一起带坏。
+
+### 本轮踩到并修掉的坑（已写进代码注释）
+
+1. `over`（= $1）在"本地值只有一件"时越界读调用者的栈 → `expected ptr`。
+2. `strcat(a,b)` 是 a 在前，拼命令行时按 b 在前写导致整条命令错位。
+3. `striter` 是字符串**迭代器**（推 `[字符码, 余串]`），不是打印词。
+4. `file-exists` 极性写反 → 永远返回不存在的产物路径。
+5. `@5` 执行不存在的路径只得到 popen 失败，报错离根因很远 → 执行前先探测
+   产物路径（原名 → `.exe` → 明确报错）。
+
+### 顺带发现的两个语言侧缺口（另立）
+
+- **C 链程序没有退出码**：cgen 固定发射 `return 0;`，Whisper 层没有
+  `exit`/`quit` 词，所以 `wd` 的错误路径无法让 shell 看到非零退出码。
+- **没有裸打印词**：打印只有 `.`（自带换行），`striter` 是迭代器。`wd run`
+  转发的输出末尾因此会多一个换行，不是逐字节转发。
+
+### 验证
+
+    cargo test --workspace        480 / 0（新增 wd 条件式集成测试；无 target/wd/wd 时跳过）
+    cargo clippy -D warnings      0
+    cargo fmt --all --check       0
+    verify-fixedpoint             gen2 == gen3（本轮未改 compiler.all.ws）
+
 ## Unreleased (2026-09-21j) — Step 2b：`@2`/`@3` 上 C 链 + HTTP 家族改为显式失败
 
 判据见 `tests/step2b_preregistered.md`（S1–S5）。原估为"中等工程"，本轮核实
