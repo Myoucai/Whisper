@@ -345,6 +345,15 @@ impl Capability for HttpPostCap {
         "HTTP POST requests to allowed hosts"
     }
 
+    /// `url body @3` — two operands. Without this override the default arity
+    /// of 1 meant `CapCall` handed `call()` a single argument, so every
+    /// `http-post` failed with "expected URL and body" no matter how it was
+    /// written. The C chain's `W__3` pops two, so this also restores the
+    /// cross-chain contract.
+    fn arity(&self) -> usize {
+        2
+    }
+
     fn call(&self, data_stack: &mut Vec<Value>, args: &[Value]) -> Result<(), VmError> {
         if args.len() < 2 {
             return Err(VmError::ProgramError(
@@ -443,8 +452,9 @@ pub(crate) fn parse_url(url: &str) -> Option<ParsedUrl> {
 fn http_request(method: &str, parsed: &ParsedUrl, body: &str) -> Result<String, String> {
     if parsed.use_tls {
         return Err(
-            "HTTPS is not yet supported. Use http:// URLs or enable the 'native-tls' feature. \
-             Plain TCP to port 443 cannot carry TLS traffic."
+            "HTTPS is not yet supported by @2/@3 (http-get/http-post). Use an http:// URL, \
+             or @6 (http-req), which does speak TLS. Plain TCP to port 443 cannot carry TLS \
+             traffic, so refusing is the only safe answer."
                 .into(),
         );
     }

@@ -22,6 +22,7 @@
 #include <process.h>
 #else
 #include <sys/mman.h>
+#include <netdb.h>      // getaddrinfo / freeaddrinfo for the HTTP client
 #endif
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -2039,6 +2040,233 @@ static void w_sock_close(wval h) {
     w_closesock((w_socket_t)w_as_i64(h));
 }
 
+// ── HTTP client (@2 http-get / @3 http-post) ────────────────────────
+// Mirrors whisper-core/src/capability.rs (parse_url / http_request /
+// extract_body) so both chains put the same bytes on the wire and return the
+// same body:
+//
+//   METHOD <path> HTTP/1.1\r\nHost: <host>\r\nConnection: close\r\n
+//   [Content-Type: application/json\r\nContent-Length: <n>\r\n]\r\n<body>
+//
+// and the returned value is everything after the first "\r\n\r\n" (the whole
+// response when the terminator is missing).
+//
+// TLS is NOT implemented here — and it is not implemented in the VM either:
+// capability.rs refuses https:// outright rather than sending plaintext to
+// 443. We refuse it the same way, with the same reasoning. Writing a TLS
+// client is a separate project (docs/independence-design.md, Step 2b).
+
+typedef struct {
+    int use_tls;
+    char *host;
+    int port;
+    char *path;
+} w_url;
+
+static char *w_dup_range(const char *s, size_t n) {
+    char *p = (char *)malloc(n + 1);
+    if (!p) return NULL;
+    memcpy(p, s, n);
+    p[n] = 0;
+    return p;
+}
+
+// "http://host[:port][/path]" → w_url. Returns 0 on success, -1 on a
+// malformed URL. The path always starts with '/', matching the VM's
+// `format!("/{path}")`.
+static int w_url_parse(const char *url, w_url *out) {
+    const char *rest, *slash, *colon = NULL;
+    size_t hplen, i;
+    out->use_tls = 0;
+    out->host = NULL;
+    out->path = NULL;
+    out->port = 80;
+    if (strncmp(url, "https://", 8) == 0) {
+        out->use_tls = 1;
+        out->port = 443;
+        rest = url + 8;
+    } else if (strncmp(url, "http://", 7) == 0) {
+        rest = url + 7;
+    } else {
+        return -1;
+    }
+    slash = strchr(rest, '/');
+    hplen = slash ? (size_t)(slash - rest) : strlen(rest);
+    if (hplen == 0) return -1;
+    // Port is split from the right, same as `host_port.rsplit_once(':')`.
+    for (i = 0; i < hplen; i++)
+        if (rest[i] == ':') colon = rest + i;
+    if (colon) {
+        long p = strtol(colon + 1, NULL, 10);
+        if (p <= 0 || p > 65535) return -1;
+        out->port = (int)p;
+        out->host = w_dup_range(rest, (size_t)(colon - rest));
+    } else {
+        out->host = w_dup_range(rest, hplen);
+    }
+    if (!out->host) return -1;
+    if (slash) {
+        out->path = w_dup_range(slash, strlen(slash));
+    } else {
+        out->path = w_dup_range("/", 1);
+    }
+    if (!out->path) {
+        free(out->host);
+        out->host = NULL;
+        return -1;
+    }
+    return 0;
+}
+
+static void w_url_free(w_url *u) {
+    free(u->host);
+    free(u->path);
+    u->host = NULL;
+    u->path = NULL;
+}
+
+static w_socket_t w_tcp_connect(const char *host, int port) {
+    struct addrinfo hints, *res = NULL, *p;
+    char portstr[16];
+    w_socket_t fd = W_BAD_SOCKET;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    snprintf(portstr, sizeof(portstr), "%d", port);
+    if (getaddrinfo(host, portstr, &hints, &res) != 0) return W_BAD_SOCKET;
+    for (p = res; p; p = p->ai_next) {
+        fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if (fd == W_BAD_SOCKET) continue;
+        if (connect(fd, p->ai_addr, (int)p->ai_addrlen) == 0) break;
+        w_closesock(fd);
+        fd = W_BAD_SOCKET;
+    }
+    freeaddrinfo(res);
+    return fd;
+}
+
+// Read until the peer closes (the request asks for `Connection: close`, and
+// the VM's read_to_string behaves the same). Returns a malloc'd NUL-terminated
+// buffer, or NULL with `err` filled in.
+static char *w_http_read_all(w_socket_t s, char *err, size_t errlen) {
+    size_t cap = 65536, len = 0;
+    char *buf = (char *)malloc(cap);
+    if (!buf) {
+        snprintf(err, errlen, "out of memory");
+        return NULL;
+    }
+    for (;;) {
+        int n;
+        if (len + 1 >= cap) {
+            char *nb;
+            if (cap >= (size_t)16 * 1024 * 1024) {
+                snprintf(err, errlen, "response larger than 16MB");
+                free(buf);
+                return NULL;
+            }
+            cap *= 2;
+            nb = (char *)realloc(buf, cap);
+            if (!nb) {
+                snprintf(err, errlen, "out of memory");
+                free(buf);
+                return NULL;
+            }
+            buf = nb;
+        }
+        n = (int)recv(s, buf + len, (int)(cap - 1 - len), 0);
+        if (n <= 0) break;
+        len += (size_t)n;
+    }
+    buf[len] = 0;
+    return buf;
+}
+
+// GET/POST → response body. Returns a malloc'd string, or NULL with `err`
+// filled in.
+static char *w_http_request(const char *method, const char *url, const char *body,
+                            char *err, size_t errlen) {
+    w_url u;
+    w_socket_t s;
+    char *req = NULL, *resp = NULL, *out = NULL;
+    size_t need, bodylen = strlen(body);
+    int sent = 0, off = 0;
+    if (w_url_parse(url, &u) != 0) {
+        snprintf(err, errlen, "Invalid URL: %s", url);
+        return NULL;
+    }
+    if (u.use_tls) {
+        snprintf(err, errlen,
+                 "HTTPS is not yet supported by @2/@3 (http-get/http-post). Use an http:// URL, "
+                 "or @6 (http-req), which does speak TLS. Plain TCP to port 443 cannot carry TLS "
+                 "traffic, so refusing is the only safe answer.");
+        w_url_free(&u);
+        return NULL;
+    }
+    s = w_tcp_connect(u.host, u.port);
+    if (s == W_BAD_SOCKET) {
+        snprintf(err, errlen, "Connect to %s:%d failed", u.host, u.port);
+        w_url_free(&u);
+        return NULL;
+    }
+    need = strlen(method) + strlen(u.path) + strlen(u.host) + bodylen + 256;
+    req = (char *)malloc(need);
+    if (!req) {
+        snprintf(err, errlen, "out of memory");
+        w_closesock(s);
+        w_url_free(&u);
+        return NULL;
+    }
+    if (bodylen == 0) {
+        snprintf(req, need, "%s %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n",
+                 method, u.path, u.host);
+    } else {
+        snprintf(req, need,
+                 "%s %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n"
+                 "Content-Type: application/json\r\nContent-Length: %lu\r\n\r\n%s",
+                 method, u.path, u.host, (unsigned long)bodylen, body);
+    }
+    w_url_free(&u);
+    {
+        size_t reqlen = strlen(req);
+        while (off < (int)reqlen) {
+            sent = (int)send(s, req + off, (int)(reqlen - (size_t)off), 0);
+            if (sent <= 0) break;
+            off += sent;
+        }
+        if (off < (int)reqlen) {
+            snprintf(err, errlen, "send failed");
+            free(req);
+            w_closesock(s);
+            return NULL;
+        }
+    }
+    free(req);
+    resp = w_http_read_all(s, err, errlen);
+    w_closesock(s);
+    if (!resp) return NULL;
+    {
+        char *sep = strstr(resp, "\r\n\r\n");
+        out = w_dup_range(sep ? sep + 4 : resp, strlen(sep ? sep + 4 : resp));
+    }
+    free(resp);
+    if (!out) snprintf(err, errlen, "out of memory");
+    return out;
+}
+
+// Capabilities the C chain does not implement. Defined (so the build succeeds
+// for programs that merely *import* std/http) but fatal with a message that
+// names the root cause the moment one is actually called — instead of the
+// `implicit declaration of function 'W__6'` gcc used to report.
+static void w_cap_unimplemented(int id, const char *name) {
+    char msg[256];
+    snprintf(msg, sizeof(msg),
+             "capability @%d (%s) is not implemented on the C chain; it is "
+             "VM-only for now. See docs/independence-design.md Step 2b and "
+             "tests/step2b_preregistered.md.",
+             id, name);
+    w_fail(msg);
+}
+
 // read-file(path) -> contents | "" on error
 static wval w_read_file(const char *path) {
     FILE *f = fopen(path, "rb");
@@ -2085,13 +2313,19 @@ static wval w_env_get(const char *name) {
 //
 //   @0  file read   path -> contents        (FileReadCap)
 //   @1  file write  path data -> bytes      (FileWriteCap)
+//   @2  http get    url -> body             (HttpGetCap)
+//   @3  http post   url body -> body        (HttpPostCap)
 //   @4  env         name -> value           (EnvCap)
 //   @5  exec        cmd -> [status out err] (ExecCap)
 //
-// NOT covered: 2/3/6/7/8/9 (the HTTP family). Those need an HTTP + TLS
-// client written in C — a separate, much larger project. A program using
-// them still fails to build, which is the honest outcome until that lands.
-// See docs/independence-design.md, Step 2b.
+// NOT implemented: 6/7/8/9 (the HTTP *session* family — cookie jar, audit log,
+// raw channel, parallel sessions). They are defined below as functions that
+// fail loudly when called, so a program that merely imports std/http still
+// builds and runs as long as it only touches the implemented ids.
+//
+// HTTPS is refused by @2/@3 (as it is by the VM) rather than silently sent as
+// plaintext to port 443. See docs/independence-design.md, Step 2b, and the
+// pre-registered criteria in tests/step2b_preregistered.md.
 
 static void W__0(void) {                        // @0 file read
     const char *path = (const char *)w_as_ptr(w_pop());
@@ -2104,10 +2338,34 @@ static void W__1(void) {                        // @1 file write
     w_push(w_write_file(path, data));
 }
 
+static void W__2(void) {                        // @2 http get
+    const char *url = (const char *)w_as_ptr(w_pop());
+    char err[512];
+    char *body = w_http_request("GET", url, "", err, sizeof(err));
+    if (!body) w_fail(err);
+    w_push(W_PTR(w_str_new(body, (uint32_t)strlen(body))));
+    free(body);
+}
+
+static void W__3(void) {                        // @3 http post
+    const char *body_arg = (const char *)w_as_ptr(w_pop());
+    const char *url = (const char *)w_as_ptr(w_pop());
+    char err[512];
+    char *body = w_http_request("POST", url, body_arg, err, sizeof(err));
+    if (!body) w_fail(err);
+    w_push(W_PTR(w_str_new(body, (uint32_t)strlen(body))));
+    free(body);
+}
+
 static void W__4(void) {                        // @4 env
     const char *name = (const char *)w_as_ptr(w_pop());
     w_push(w_env_get(name));
 }
+
+static void W__6(void) { w_cap_unimplemented(6, "http-req (session)"); }
+static void W__7(void) { w_cap_unimplemented(7, "http-audit"); }
+static void W__8(void) { w_cap_unimplemented(8, "http-req-raw"); }
+static void W__9(void) { w_cap_unimplemented(9, "http-req-parallel"); }
 
 // exec (@5). popen() captures one stream only, so stderr is redirected to a
 // temp file and read back. The command is wrapped in a group — `( cmd )`

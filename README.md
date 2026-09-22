@@ -37,7 +37,7 @@ Whisper 是一门**栈式、后置表示法**的编程语言，专为 **AI 生�
 |------|------|
 | **Token 极简** | 同样逻辑的 Token 消耗仅为 Python 的 30-60% |
 | **栈式执行** | 后缀表示法，无需括号和优先级规则 |
-| **能力沙箱** | 默认无 IO，所有副作用必须显式授权；HTTPS（rustls）+ host 白名单 + 审计 |
+| **能力沙箱** | 默认无 IO，所有副作用必须显式授权；`@6` 走 HTTPS（rustls）+ host 白名单 + 审计 |
 | **置信度原生** | 每个值携带置信度：`:c` 标注 / `conf-of` 窥视 / `unwrap` 剥壳 / `p {a} {b} ?|` 概率分支（std/conf 已定稿） |
 | **双模态** | 文本 `.ws` 和二进制 `.wbin` 等价 |
 | **硬自举** | 编译器自身用 Whisper 编写，输出原生代码 |
@@ -235,15 +235,30 @@ whisper build hello.ws -t bundle -o app && ./app
 
 ## HTTP 能力（--allow-http）
 
-`http-req`（@6）与 `http-get/post`（@2/@3）支持 `https://`（rustls + webpki 根，
-ALPN http/1.1）、`Transfer-Encoding: chunked` 自动解码、cookie 罐、每请求审计行、
+按能力令牌分两档，**两条链的可用范围不同**：
+
+| 令牌 | 词 | 协议 | Rust VM | C 链（`-t c2`/`exe`/`native`） |
+|------|----|------|---------|------------------------------|
+| `@2` | `http-get` | 仅 `http://` | ✅ | ✅（2026-09-21 起，逐行对拍一致） |
+| `@3` | `http-post` | 仅 `http://` | ✅ | ✅（同上） |
+| `@6` | `http-req` | `http://` + **`https://`**（rustls + webpki 根，ALPN http/1.1） | ✅ | ❌ 未实现，调用时显式报错 |
+| `@7` | `http-audit` | — | ✅ | ❌ 同上 |
+| `@8` | `http-req-raw` | 同 `@6` | ✅ | ❌ 同上 |
+| `@9` | `http-req-parallel` | 同 `@6` | ✅ | ❌ 同上 |
+
+`@6` 家族另有 cookie 罐、每请求审计行、`Transfer-Encoding: chunked` 自动解码、
 host 白名单（零出域）、连接 10s/读写 15s 超时（挂死端点化为 status 0 无证据响应）。
 
-> **c2 链限定**：HTTP 能力（`@2`/`@3`/`@6`-`@9`）目前**仅在 Rust VM 上可用**。
-> C 链尚未实现 HTTP/TLS 客户端，用到这些令牌的程序经 `-t c2`/`exe`/`native`
-> 编译会失败（gcc 报 `W__<n>` 未定义）。其余能力——`@0` 文件读、`@1` 文件写、
-> `@4` 环境变量、`@5` 执行命令——**两条链均已实现并逐行对拍一致**。
-> 详见 `docs/independence-design.md` 的 Step 2a / 2b。
+> **`@2`/`@3` 不支持 HTTPS**——不是 C 链的缺口，VM 侧同样拒绝（`https://` 会
+> 直接报错，而不是把明文发到 443）。需要 HTTPS 请用 `@6`，但它目前只有 VM 有。
+> 两条链的拒绝语义一致，并有测试断言**拒绝发生在建连之前**（不会静默降级）。
+
+> **c2 链未实现的 `@6`-`@9` 会显式失败**：程序照常构建（只 `import "std/http"`
+> 而只用 `@2` 的程序不受影响），调用到未实现的 id 时打印
+> `capability @6 (http-req (session)) is not implemented on the C chain` 并退出。
+> 其余能力——`@0` 文件读、`@1` 文件写、`@4` 环境变量、`@5` 执行命令——两条链
+> 均已实现并逐行对拍一致。详见 `docs/independence-design.md` Step 2a/2b 与
+> `tests/step2b_preregistered.md`。
 
 ## 性能
 

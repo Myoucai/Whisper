@@ -1222,6 +1222,332 @@ fn quotation_in_any_container_compiles_on_both_chains() {
     }
 }
 
+// ── Step 2b: HTTP capabilities on the C chain ──────────────────────
+
+/// Read one whole HTTP request (headers + `Content-Length` body) off `sock`.
+fn read_http_request(sock: &mut impl std::io::Read) -> Option<Vec<u8>> {
+    let mut buf = Vec::new();
+    let mut tmp = [0u8; 4096];
+    let mut want = 0usize; // total bytes once the header terminator shows up
+    loop {
+        if want > 0 && buf.len() >= want {
+            return Some(buf);
+        }
+        match sock.read(&mut tmp) {
+            Ok(0) => return if buf.is_empty() { None } else { Some(buf) },
+            Ok(k) => buf.extend_from_slice(&tmp[..k]),
+            Err(_) => return if buf.is_empty() { None } else { Some(buf) },
+        }
+        if want == 0 {
+            if let Some(p) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+                let head = String::from_utf8_lossy(&buf[..p]).to_lowercase();
+                let clen: usize = head
+                    .lines()
+                    .find_map(|l| l.strip_prefix("content-length:"))
+                    .and_then(|v| v.trim().parse().ok())
+                    .unwrap_or(0);
+                want = p + 4 + clen;
+            }
+        }
+    }
+}
+
+/// `@2` (http-get) and `@3` (http-post) must put the same bytes on the wire and
+/// return the same body on both chains. The server here is an in-process
+/// `TcpListener`, so the test needs no external service; it records every
+/// request so the two chains can be compared at the protocol level too.
+///
+/// HTTPS is deliberately *not* exercised: neither chain implements TLS, and the
+/// pre-registered criterion (tests/step2b_preregistered.md, S2) only requires
+/// that both refuse it rather than sending plaintext to port 443.
+#[test]
+fn http_capabilities_match_across_chains() {
+    use std::io::Write as _;
+    use std::net::TcpListener;
+    use std::sync::{Arc, Mutex};
+
+    if std::process::Command::new("gcc")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        eprintln!("skipping: gcc not available");
+        return;
+    }
+
+    // (name, program template — {url} is substituted, expected stdout)
+    let cases: [(&str, &str, &str); 4] = [
+        ("get", "\"{url}/hi\" @2 .\n", "resp:/hi\n"),
+        ("get_nested", "\"{url}/a/b?c=d\" @2 .\n", "resp:/a/b?c=d\n"),
+        (
+            "post",
+            "\"{url}/echo\" \"{\\\"a\\\":1}\" @3 .\n",
+            "resp:/echo\n",
+        ),
+        ("get_again", "\"{url}/zz\" @2 .\n", "resp:/zz\n"),
+    ];
+
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let seen: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+    let seen_srv = Arc::clone(&seen);
+    let expected_requests = cases.len() * 2; // one per chain per case
+
+    let server = std::thread::spawn(move || {
+        for _ in 0..expected_requests {
+            let (mut sock, _) = match listener.accept() {
+                Ok(x) => x,
+                Err(_) => return,
+            };
+            let req = match read_http_request(&mut sock) {
+                Some(r) => r,
+                None => continue,
+            };
+            let text = String::from_utf8_lossy(&req).to_string();
+            // Body = "resp:" + request path, so the reply identifies the path
+            // the server actually saw.
+            let path = text
+                .lines()
+                .next()
+                .and_then(|l| l.split(' ').nth(1))
+                .unwrap_or("/")
+                .to_string();
+            seen_srv.lock().unwrap().push(text);
+            let body = format!("resp:{path}");
+            let _ = write!(
+                sock,
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            let _ = sock.flush();
+        }
+    });
+
+    let dir = std::env::temp_dir().join("whisper_http_it");
+    std::fs::create_dir_all(&dir).unwrap();
+    let norm = |b: &[u8]| String::from_utf8_lossy(b).replace(['\r', '"'], "");
+
+    for (name, template, expected) in cases {
+        let source = template.replace("{url}", &format!("http://127.0.0.1:{port}"));
+        let src = dir.join(format!("{name}.ws"));
+        std::fs::write(&src, &source).unwrap();
+
+        let vm = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+            .args(["run", "--no-strict-types", "--allow-http"])
+            .arg(&src)
+            .output()
+            .unwrap();
+        assert!(
+            vm.status.success(),
+            "[{name}] VM run failed: {}",
+            String::from_utf8_lossy(&vm.stderr)
+        );
+
+        let exe = dir.join(format!("{name}_exe"));
+        let build = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+            .args(["build", "-t", "c2", "-o"])
+            .arg(&exe)
+            .arg(&src)
+            .output()
+            .unwrap();
+        assert!(
+            build.status.success(),
+            "[{name}] c2 build failed: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let artifact = if exe.exists() {
+            exe.clone()
+        } else {
+            exe.with_extension(std::env::consts::EXE_EXTENSION)
+        };
+        let c2 = std::process::Command::new(&artifact).output().unwrap();
+        assert!(
+            c2.status.success(),
+            "[{name}] native run failed: {}",
+            String::from_utf8_lossy(&c2.stderr)
+        );
+
+        assert_eq!(norm(&vm.stdout), expected, "[{name}] VM output");
+        assert_eq!(norm(&c2.stdout), expected, "[{name}] c2 output");
+    }
+
+    let _ = server.join();
+    let seen = seen.lock().unwrap();
+    assert_eq!(
+        seen.len(),
+        expected_requests,
+        "server saw {} requests, expected {expected_requests}",
+        seen.len()
+    );
+    // Requests arrive in pairs, VM first. Compare each pair byte-for-byte:
+    // same request line, same Host, same Connection, same POST headers.
+    for (i, (name, _, _)) in cases.iter().enumerate() {
+        let vm_req = &seen[i * 2];
+        let c2_req = &seen[i * 2 + 1];
+        assert_eq!(vm_req, c2_req, "[{name}] requests differ across chains");
+        assert!(
+            vm_req.starts_with(if *name == "post" { "POST " } else { "GET " }),
+            "[{name}] unexpected method: {vm_req:?}"
+        );
+        assert!(
+            vm_req.contains("Connection: close\r\n"),
+            "[{name}] missing Connection: close: {vm_req:?}"
+        );
+        if *name == "post" {
+            assert!(
+                vm_req.contains("Content-Type: application/json\r\n"),
+                "[{name}] missing content type: {vm_req:?}"
+            );
+            assert!(
+                vm_req.contains("Content-Length: 7\r\n") && vm_req.ends_with("{\"a\":1}"),
+                "[{name}] bad POST body/length: {vm_req:?}"
+            );
+        }
+    }
+}
+
+/// Step 2b, criterion S2 (a security criterion, not a convenience one): an
+/// `https://` URL must be refused by *both* chains — never silently downgraded
+/// to plaintext on port 443. The listener here proves the refusal happens
+/// before any connection is attempted: if either chain opened a socket, the
+/// accept below would find it.
+#[test]
+fn https_is_refused_and_never_sent_as_plaintext() {
+    use std::net::TcpListener;
+
+    if std::process::Command::new("gcc")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        eprintln!("skipping: gcc not available");
+        return;
+    }
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let port = listener.local_addr().unwrap().port();
+
+    let dir = std::env::temp_dir().join("whisper_https_it");
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = dir.join("tls.ws");
+    std::fs::write(&src, format!("\"https://127.0.0.1:{port}/x\" @2 .\n")).unwrap();
+
+    let vm = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .args(["run", "--no-strict-types", "--allow-http"])
+        .arg(&src)
+        .output()
+        .unwrap();
+    assert!(!vm.status.success(), "VM must refuse https://");
+    assert!(
+        String::from_utf8_lossy(&vm.stderr).contains("HTTPS is not yet supported"),
+        "VM error should name the cause: {}",
+        String::from_utf8_lossy(&vm.stderr)
+    );
+
+    let exe = dir.join("tls_exe");
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .args(["build", "-t", "c2", "-o"])
+        .arg(&exe)
+        .arg(&src)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "c2 build failed: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let artifact = if exe.exists() {
+        exe.clone()
+    } else {
+        exe.with_extension(std::env::consts::EXE_EXTENSION)
+    };
+    let c2 = std::process::Command::new(&artifact).output().unwrap();
+    assert!(!c2.status.success(), "C chain must refuse https://");
+    assert!(
+        String::from_utf8_lossy(&c2.stderr).contains("HTTPS is not yet supported"),
+        "C chain error should name the cause: {}",
+        String::from_utf8_lossy(&c2.stderr)
+    );
+
+    match listener.accept() {
+        Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+        Ok(_) => panic!("a chain opened a plaintext connection to an https:// URL"),
+        Err(e) => panic!("accept failed unexpectedly: {e}"),
+    }
+}
+
+/// Step 2b, criterion S3: the HTTP *session* ids (6/7/8/9) are not implemented
+/// on the C chain, but a program that merely imports `std/http` must still
+/// build and run — so they cannot be rejected at compile time. They are
+/// defined as functions that fail loudly with the root cause when called.
+#[test]
+fn unimplemented_capabilities_fail_loudly_not_at_compile_time() {
+    if std::process::Command::new("gcc")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        eprintln!("skipping: gcc not available");
+        return;
+    }
+    let dir = std::env::temp_dir().join("whisper_cap_it");
+    std::fs::create_dir_all(&dir).unwrap();
+
+    // Merely importing the module must build and run.
+    let import_only = "import \"std/http\"\n\"http://127.0.0.1:1/x\" @2 drop 7 .\n";
+    let src = dir.join("import_only.ws");
+    std::fs::write(&src, import_only).unwrap();
+    let exe = dir.join("import_only_exe");
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .args(["build", "-t", "c2", "-o"])
+        .arg(&exe)
+        .arg(&src)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "importing std/http must still build: {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+
+    // Calling an unimplemented id must report the root cause, not a gcc
+    // `implicit declaration`.
+    for (name, source, needle) in [
+        ("sess", "\"http://127.0.0.1:1/x\" @6 drop\n", "@6"),
+        ("audit", "\"\" @7 drop\n", "@7"),
+        ("raw", "\"http://127.0.0.1:1/x\" @8 drop\n", "@8"),
+        ("par", "\"http://127.0.0.1:1/x\" @9 drop\n", "@9"),
+    ] {
+        let src = dir.join(format!("{name}.ws"));
+        std::fs::write(&src, source).unwrap();
+        let exe = dir.join(format!("{name}_exe"));
+        let build = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+            .args(["build", "-t", "c2", "-o"])
+            .arg(&exe)
+            .arg(&src)
+            .output()
+            .unwrap();
+        assert!(
+            build.status.success(),
+            "[{name}] must build (only the call fails): {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let artifact = if exe.exists() {
+            exe.clone()
+        } else {
+            exe.with_extension(std::env::consts::EXE_EXTENSION)
+        };
+        let run = std::process::Command::new(&artifact).output().unwrap();
+        assert!(!run.status.success(), "[{name}] should fail at run time");
+        let stderr = String::from_utf8_lossy(&run.stderr);
+        assert!(
+            stderr.contains(needle) && stderr.contains("not implemented on the C chain"),
+            "[{name}] unhelpful error: {stderr}"
+        );
+    }
+}
+
 // Wrapper so the test binary can reach the c2 module (bin crate: tests
 // link against the crate root via `commands` path below).
 fn commands_c2_compile(src: &str) -> Result<String, String> {

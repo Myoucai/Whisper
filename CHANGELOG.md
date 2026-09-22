@@ -1,5 +1,77 @@
 # Changelog
 
+## Unreleased (2026-09-21j) — Step 2b：`@2`/`@3` 上 C 链 + HTTP 家族改为显式失败
+
+判据见 `tests/step2b_preregistered.md`（S1–S5）。原估为"中等工程"，本轮核实
+发现该估算的前提不成立——**VM 侧的 `@2/@3` 本身就不支持 HTTPS**
+（`capability.rs` 直接拒绝 `https://`，整个实现约 80 行），真正走 rustls 的是
+`@6` 家族（`http_session.rs`）。因此"与 VM 对齐"的实现**不含 TLS**，量级降到
+补一个 HTTP/1.1 最小客户端。
+
+### 新增 —— C 链的 HTTP 客户端（`@2` http-get / `@3` http-post）
+
+`whisperc/runtime.c` 新增约 190 行，语义与 `capability.rs::http_request` 逐项
+对齐：URL 解析规则（端口从右切、path 恒以 `/` 开头）、请求行 / `Host` /
+`Connection: close` / POST 的 `Content-Type` 与 `Content-Length`、以及"首个
+`\r\n\r\n` 之后即 body"的提取规则。运行时原本只有服务端 listen/accept，
+本轮补上了客户端 `connect`（`getaddrinfo` + `connect`）。
+
+`tests/integration_tests.rs` 新增 `http_capabilities_match_across_chains`：
+进程内起 `TcpListener` 当 HTTP/1.1 服务器，4 例 GET/POST 两链输出一致，
+且**服务器侧记录的请求逐字节相同**。
+
+### 安全 —— HTTPS 两链同样拒绝，且拒绝发生在建连之前
+
+`@2`/`@3` 不支持 HTTPS（VM 也不支持）。新增测试
+`https_is_refused_and_never_sent_as_plaintext`：两链都以
+`HTTPS is not yet supported…` 失败，**监听套接字全程没收到任何连接**——
+不存在"静默降级成明文发到 443"的路径。
+
+同时修掉原有拒绝信息里的误导：它写着 "or enable the 'native-tls' feature"，
+而这个 cargo feature **不存在**。新文案指明改用 `http://`，或改用确实支持
+TLS 的 `@6`。
+
+### 修复 —— `@6`-`@9` 从 gcc 报错改为显式失败
+
+原来用这些 id 的程序经 c2 构建时，gcc 报
+`implicit declaration of function 'W__6'`——能挡住错误二进制，但错误信息离
+根因很远。现在它们在 `runtime.c` 里定义为 `w_cap_unimplemented()` →
+`w_fail()`：程序**照常构建**，调用到未实现的 id 时打印
+`capability @6 (http-req (session)) is not implemented on the C chain; it is
+VM-only for now. See docs/independence-design.md Step 2b…` 并退出。
+
+**没有采用编译期 `#error`**：c2 会文本内联 `std/http.ws`，编译期报错会把
+"只 import 但只用 `@2`"的程序一起打死。测试同时钉住这一条。
+
+### 修复 —— `@3` 在 VM 上根本用不了（既有 bug）
+
+写 POST 用例时 VM 直接报 `http_post: expected URL and body`。根因：
+`HttpPostCap` 没有覆写 `Capability::arity()`，默认 1，而 `call()` 要求 2 个
+参数——`CapCall` 只弹 1 个，于是 `@3` **怎么写都失败**。`FileWriteCap`
+（`path content @1`）早就覆写成 2，HTTP POST 这处漏了。修法与之一致，顺带
+恢复双链契约（C 侧 `W__3` 本来就弹 2 个）。
+
+### 文档 —— 修掉 README 的 HTTP 失真
+
+README 原文把 `@2/@3` 与 `@6` 并列写成"支持 `https://`（rustls + webpki 根）"，
+与代码不符。已按令牌分档重写为可用性表格（哪个 id 支持什么协议、两链各自
+是否可用），并说明 `@2/@3` 的 HTTPS 缺口是**两链共同的**现状。
+
+### 验证
+
+    cargo test --workspace        479 / 0
+    cargo clippy -D warnings      0
+    cargo fmt --all --check       0
+    syntax / stdlib               26 / 0 · 58 / 0
+    typecheck-gate                FP=0 PASS
+    opcode_coverage               80 / 0 / 0
+    net-gate / app-gate           PASS / PASS (13 routes)
+    verify-fixedpoint             gen2 == gen3
+
+**仍未做（如实登记）**：`@6`/`@7`/`@8`/`@9` 的 C 侧实现（会话 cookie 罐、
+审计日志、raw 通道、并行会话）；TLS（两链共同缺口）。C 链的宿主白名单**未
+引入**——`@0/@1/@5` 本来也没有，不在本轮做半套沙箱。
+
 ## Unreleased (2026-09-21i) — 战役 O₂：另外四种容器里的引号（引号至此真正处处可用）
 
 上一节（2026-09-21h）修掉了"顶层"与"列表字面量"两种容器，但同一根因在

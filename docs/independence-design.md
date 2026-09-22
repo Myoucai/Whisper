@@ -243,31 +243,50 @@ strict 默认下 `"cmd" exec 1 @nth .` 被误拒。现为 0/1/4/5 建模栈效�
 - 全门禁：cargo **470/0**、syntax 26/0、stdlib 58/0、typecheck FP=0、
   覆盖 56/0/0、net PASS、app PASS(13)、固定点 gen2==gen3。
 
-**遗留（Step 2b）**：`@2/@3/@6/@7/@8/@9`（HTTP 家族）需要 C 侧 HTTP+TLS
-客户端。在此之前，用它们的程序仍然编不过——这是诚实的结果，好过产出
-错误的二进制。另有一处**既有可用性 bug** 未动：`path_is_allowed` 拿相对
-路径与绝对白名单比较，因此 `--allow-file-write` 下相对路径**永远被拒**
-（失败关闭，非安全洞）；它在安全边界上且已有 6 个加固单测，应单独评估。
+**遗留（Step 2b）**：`@2`/`@3` 于 2026-09-21 补上 C 侧实现（见下节），
+`@6`/`@7`/`@8`/`@9` 仍未实现但会**显式报错**。另有一处**既有可用性 bug**
+未动：`path_is_allowed` 拿相对路径与绝对白名单比较，因此
+`--allow-file-write` 下相对路径**永远被拒**（失败关闭，非安全洞）；它在安全
+边界上且已有 6 个加固单测，应单独评估。
 
-### Step 2b —— HTTP 能力上 C 链（独立中等工程，未开工）
+### Step 2b —— HTTP 能力上 C 链（**部分完成 2026-09-21**）
 
-Step 2a 之后仍缺的只有 **HTTP 家族**：`@2`（http-get）、`@3`（http-post）、
-`@6`（http-req）、`@7`（audit）、`@8`（raw）、`@9`（parallel）。它们的
-C 侧实现需要一个 **HTTP + TLS 客户端**——对应 `http_session.rs`（约 20 KB）
-与 `tls.rs` 里的那一整套，用 C 重写是独立的中等工程，不属于"补 ABI"的量级。
+> **状态**：`@2`（http-get）与 `@3`（http-post）**已在 C 链实现并双链对拍**
+> （body 与线上请求字节两个层面），判据见 `tests/step2b_preregistered.md`。
+> `@6`/`@7`/`@8`/`@9`（会话/审计/raw/并行）仍未实现，但**调用时显式报错**，
+> 不再把失败推迟到 gcc 的 `implicit declaration`。
 
-在此之前应做到两件事（**都还没做**）：
+**量级修正**：原文把 Step 2b 估为"需要一个 HTTP + TLS 客户端……中等工程"。
+本轮核实发现该估算基于一个未核实的前提——**VM 侧的 `@2/@3` 本身就不支持
+HTTPS**（`capability.rs::http_request` 直接拒绝 `https://`），实现只有约 80 行。
+真正走 TLS 的是 `http_session.rs`（`@6` 家族），`tls.rs` 里的 rustls 只服务它。
+因此"与 VM 对齐"的 `@2/@3` 实现**不含 TLS**，量级降到"补一个 HTTP/1.1 最小
+客户端"（`runtime.c` 约 190 行，含此前缺失的客户端 `connect`）。
 
-1. **如实记录**"HTTP 能力仅 VM 侧可用"——README 的 HTTP 章节目前没有任何
-   c2 限定语，读者会以为两条链都能用。
-2. **让 c2 对用到这些 id 的程序显式报错**，而不是像现在这样产出一份引用
-   未定义函数的 C，把失败推迟到 gcc 的 `implicit declaration` 上。后者
-   虽然是硬失败（不会静默产出错误二进制），但错误信息离根因很远。
+**已做**：
 
-另有一个待核实项：VM 侧的 HTTP 能力**自己从 `data_stack` 弹参数、
-完全忽略 `CapCall` 传入的 `args`**（`http_session.rs:39`、`:320`）——
-于是 `CapCall` 按 arity 弹掉的那个操作数是被丢弃的。它的 arity 与
-`HttpSessionCap` 的真实需求是否一致，需要单独核实。属 Step 2b 范围。
+1. `runtime.c`：`w_url_parse` / `w_tcp_connect` / `w_http_request` /
+   `w_http_read_all` + `W__2` / `W__3`，请求行、`Host`、`Connection: close`、
+   POST 头与 body 提取规则与 VM 逐字节一致。
+2. `W__6`-`W__9`：定义为 `w_cap_unimplemented()` → `w_fail()`，调用时打印
+   `capability @N (…) is not implemented on the C chain; it is VM-only for now`
+   并退出（可被 `try` 捕获）。**不用编译期 `#error`**：c2 会文本内联
+   `std/http.ws`，编译期报错会把只用 `@2` 的程序一起打死。
+3. HTTPS 拒绝语义两链一致，且有测试断言**拒绝发生在建连之前**。
+4. 顺带修掉既有 bug：`HttpPostCap` 漏覆写 `arity()`（默认 1，实际要 2），
+   导致 `@3` 在 VM 上怎么用都失败。
+
+**仍未做**：`@6`/`@7`/`@8`/`@9` 的 C 侧实现（会话 cookie 罐、审计日志、raw
+通道、并行会话）。它们共用同一套 HTTP 核心，补实现时只需在其上加状态。
+TLS 缺口是两链**共同的**现状，不是 C 链独有的。
+
+**另一处既有可用性 bug（仍未动）**：`path_is_allowed` 拿相对路径与绝对白名单
+比较，因此 `--allow-file-write` 下相对路径**永远被拒**（失败关闭，非安全洞）；
+它在安全边界上且已有 6 个加固单测，应单独评估。
+
+**C 链的宿主白名单**：VM 侧 `--allow-http` 有 `allowed_hosts`，C 链对
+`@0/@1/@5` 本来也没有白名单。本轮**不引入半套沙箱**——要么整套做，要么不做，
+避免"看起来安全"。
 
 ### Step 3 —— Whisper 写驱动 `wd`（主体工程）
 
@@ -399,7 +418,8 @@ Whisper VM 只在两个场景有独立价值：
 Step 1   (exe 修正)     半天      ✅ 已完成 2026-09-21
 Step 1.5 (P0 递归守卫)  半天      ✅ 已完成 2026-09-21（意外发现，计划外）
 Step 2a  (能力 ABI)     1 天      ✅ 已完成 2026-09-21（范围比原估大：不是"加一个词"）
-Step 2b  (HTTP 上 C 链) 中等工程   ← 未开工，独立立项
+Step 2b  (@2/@3 上 C 链) 半天      ✅ 已完成 2026-09-21（量级修正：不含 TLS，见该节）
+                                  ⏳ @6/@7/@8/@9 仍未实现，但已改为显式报错
 Step 3   (驱动 wd)      3-5 天    ← 前置已解锁（exec 可用）；L3 的主体
 Step 4   (工具迁移)     1-2 周    ← fmt/包管理/REPL 快，check/LSP 慢
 Step 5   (Whisper VM)   ?         ← 可选，前置是 call + 可变数组两个原语
