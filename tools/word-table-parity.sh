@@ -15,25 +15,40 @@ LEX="$ROOT/crates/whisper-parser/src/lexer.rs"
 TBL="$ROOT/whisperc/compiler.all.ws"
 
 # 棘轮基线。数字只能往下调：每收掉一个就把它改小，别在没修的情况下调大。
-# 2026-09-21 建立时 = 12。
 #   ⚠️ 初版写成 18 是**在错测量上建的棘轮**：提取时把 lexer.rs 里
 #   `read_at_word` 的名字表也扫了进来，而那张表的键只在 `@` **之后**生效
 #   （`@nth` / `@map` …），不是裸词关键字。于是 nth/map/each/fold/filter/times
 #   六个被误报成"只在 Rust 侧"。已把提取限定在第一个名字表（见下面的 awk）。
-# 可用 PARITY_CEIL 覆盖——用于自测"这门禁真的会拦"。
-CEIL="${PARITY_CEIL:-12}"
+#   2026-09-21 收敛到 0：`chr`/`listslice` 补进词表；其余 10 个是 **VM-only
+#   功能**（见白名单），不是拼写缺口。
+CEIL="${PARITY_CEIL:-0}"
 
 # ── 白名单：确认良性，不算缺陷 ──────────────────────────────────────
-#   over     自举前端在 compiler.all.ws 里用**代码路径**处理它
-#            （`| _ "over" streq ?? drop [15] 1 append`），不在 [n "word"] 列表里，
-#            两链都好用。
-#   import   结构关键字，自举前端有意丢弃（不产生运行时行为）。
-#   export   同上。
-#   call     cgen 发 `W_call()`，而 `runtime.c` 定义了该符号——另有通路。
+# 三类：
+#   (1) 拼写之外的等价通路
+#   (2) 结构性关键字，自举前端有意丢弃
+#   (3) **VM-only 功能**：opcode 在 `emit-bare` 里**没有分支**，C 链发射不了。
+#       这与 `@6`-`@9` 同类——是"功能只有 VM 有"，不是"拼写只有一侧认"。
+#       逐条核实过（`grep 'dup NN =' compiler.all.ws` 全部无命中）：
+#         op-effect(42) size-of(43) word-size(44) seed!(45) rand(46)
+#         bytes-new(189) bytes-push(190) bytes-len(191)
+#         bytes-write(192) bytes->hex(206)
+#       其中 bytes-* 另有 Rust 转译器自述佐证：
+#         "#error bytes-* opcodes are not supported by the C backend".
 ALLOW="over
 import
 export
-call"
+call
+op-effect
+size-of
+word-size
+seed!
+rand
+bytes-new
+bytes-push
+bytes-len
+bytes-write
+bytes->hex"
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT

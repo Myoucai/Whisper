@@ -458,7 +458,7 @@ export group-paired-rec
     [70 "strlen"] [71 "strcat"] [72 "strslice"] [73 "streq"]
     [74 "strlt"] [75 "strfind"] [76 "strreplace"]
     [77 "strtoi64"] [78 "i64tostr"] [79 "strnth"]
-    [6 "strsplit"] [7 "ctos"] [8 "list-slice"]
+    [6 "strsplit"] [7 "ctos"] [7 "chr"] [8 "list-slice"] [8 "listslice"]
     [184 "strchars"] [185 "charsstr"] [186 "striter"]
     [187 "listfind"] [188 "strjoin"]
     [176 "i64tof64"] [177 "f64toi64"]
