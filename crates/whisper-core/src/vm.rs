@@ -1139,30 +1139,51 @@ impl Vm {
                     }));
             }
             Opcode::StrChars => {
+                // Byte semantics (§3.5), matching runtime.c's w_strchars and
+                // what stdlib/encoding.ws and hash.ws were written against.
+                // This used to hand out `chars()` — i.e. code points — which
+                // made `strchars`/`charsstr` disagree with the C chain and,
+                // worse, broke the self-hosted lexer (see StrIter below).
                 let s = self.pop_str()?;
-                let chars: Vec<Value> = s.chars().map(|c| Value::I64(c as i64)).collect();
-                self.data_stack.push(Value::List(Rc::new(chars)));
+                let bytes: Vec<Value> =
+                    s.as_bytes().iter().map(|b| Value::I64(*b as i64)).collect();
+                self.data_stack.push(Value::List(Rc::new(bytes)));
             }
             Opcode::CharsStr => {
+                // Inverse of StrChars: each element is a *byte*. Values above
+                // 255 are truncated to their low byte, exactly like runtime.c's
+                // w_charsstr (`buf[i] = (char)value`).
                 let list = self.pop_list()?;
-                let s: String = list
+                let bytes: Vec<u8> = list
                     .iter()
                     .filter_map(|v| match v.unwrap_signal_ref() {
-                        Value::I64(n) => std::char::from_u32(*n as u32),
+                        Value::I64(n) => Some(*n as u8),
                         _ => None,
                     })
                     .collect();
+                // from_utf8_unchecked: an intermediate list may spell out half
+                // of a multibyte sequence; the completed string is UTF-8. Same
+                // contract as Ctos above.
+                let s = unsafe { String::from_utf8_unchecked(bytes) };
                 self.data_stack.push(Value::Str(Rc::new(s)));
             }
             Opcode::StrIter => {
+                // Byte semantics (§3.5): push (first *byte*, rest as raw
+                // bytes). The self-hosted lexer's `read-str-acc` advances with
+                // `striter` and reads with `strnth`+`ctos`, so a char-based
+                // iterator here silently dropped every UTF-8 continuation byte
+                // — `"你好"` compiled to the two bytes E4 E5 instead of six.
                 let s = self.pop_str()?;
                 if s.is_empty() {
                     self.data_stack.push(Value::I64(-1));
                     self.data_stack.push(Value::Str(Rc::new(String::new())));
                 } else {
-                    let mut chars = s.chars();
-                    let first = chars.next().unwrap() as i64;
-                    let rest: String = chars.collect();
+                    let b = s.as_bytes();
+                    let first = b[0] as i64;
+                    // from_utf8_unchecked: `rest` may start mid-sequence by
+                    // construction; it is only ever fed back into byte-level
+                    // operations or reassembled.
+                    let rest = unsafe { String::from_utf8_unchecked(b[1..].to_vec()) };
                     self.data_stack.push(Value::I64(first));
                     self.data_stack.push(Value::Str(Rc::new(rest)));
                 }

@@ -2596,3 +2596,96 @@ fn bootstrap_hard_flag_is_a_legacy_alias() {
         "--hard must not change behaviour"
     );
 }
+
+/// S-1 — 非 ASCII 的**字节语义**（`tests/s1_preregistered.md`）。
+///
+/// spec §3.5 与 `stdlib/encoding.ws`/`hash.ws` 的注释都写着字节语义，C 链也
+/// 一直是字节的；只有 VM 的 `strchars`/`charsstr`/`striter` 按**码点**。
+/// 后果不止是"两链不一致"：自举 lexer 的 `read-str-acc` 用 `striter` 前进、
+/// 用 `strnth`+`ctos` 取字节，于是 `-t c2` 把 `"你好"` 在**编译期**削成两个
+/// 字节 `E4 E5`——含非 ASCII 字面量的程序被静默写坏。
+///
+/// 这里比的是**内容**：字符串结果一律经 `strchars` 转成数字列表，绕开
+/// "VM 打印字符串带引号、且对非法 UTF-8 做 lossy"这条既有显示约定。
+#[test]
+fn s1_non_ascii_uses_byte_semantics_on_both_chains() {
+    if !gcc_available() {
+        eprintln!("skipping: gcc not available");
+        return;
+    }
+    let dir = std::env::temp_dir().join("whisper_s1_bytes");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+
+    // 每条都产出**同一种形状**（数字或数字列表），两链应当逐字节相同。
+    let cases: &[(&str, &str)] = &[
+        ("strlen", "\"你好ab\" strlen .\n"),
+        ("nth", "\"你好ab\" 1 strnth .\n"),
+        ("chars", "\"你好ab\" strchars .\n"),
+        ("slice", "\"你好ab\" 0 2 strslice strchars .\n"),
+        ("slice-mid", "\"你好ab\" 2 2 strslice strchars .\n"),
+        ("iter-rest", "\"你好ab\" striter swap drop strchars .\n"),
+        ("roundtrip", "\"你好ab\" strchars charsstr strchars .\n"),
+        ("find", "\"你好ab\" \"好\" strfind .\n"),
+        ("concat", "\"你\" \"好ab\" strcat strchars .\n"),
+        ("emoji", "\"a🎉b\" strchars .\n"),
+        ("emoji-len", "\"a🎉b\" strlen .\n"),
+    ];
+
+    for (name, source) in cases {
+        let src = dir.join(format!("{name}.ws"));
+        std::fs::write(&src, source).unwrap();
+        let (vm, c2) = both_chains_stdout(&dir, name, source);
+        assert_eq!(
+            vm,
+            c2,
+            "[{name}] chains disagree on {source:?}\n  VM={:?}\n  C ={:?}",
+            String::from_utf8_lossy(&vm),
+            String::from_utf8_lossy(&c2)
+        );
+    }
+
+    // 字面量本身必须活下来：`"你好"` 是 **6** 字节，不是 2。
+    let (vm, c2) = both_chains_stdout(&dir, "lit", "\"你好\" strlen .\n");
+    assert_eq!(String::from_utf8_lossy(&vm).trim(), "6");
+    assert_eq!(String::from_utf8_lossy(&c2).trim(), "6");
+}
+
+/// S-1（S1-d）—— stdlib 的**字节管线**两链同值。这些词直接建在
+/// `strchars`/`charsstr` 上，是这次分叉影响面最广的地方。
+#[test]
+fn s1_stdlib_byte_pipeline_matches_across_chains() {
+    if !gcc_available() {
+        eprintln!("skipping: gcc not available");
+        return;
+    }
+    let dir = std::env::temp_dir().join("whisper_s1_stdlib");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let cases: &[(&str, &str)] = &[
+        ("rev", "import \"std/str\"\n\"你好ab\" str-rev strchars .\n"),
+        ("upper", "import \"std/str\"\n\"a你b\" upper strchars .\n"),
+        ("lower", "import \"std/str\"\n\"A你B\" lower strchars .\n"),
+        (
+            "urldecode",
+            "import \"std/net\"\n\"%E4%BD%A0\" url-decode strchars .\n",
+        ),
+        // 这里**故意不放** `import "std/hash"` + `md5`：它正被 S-3 挡着
+        // （hash.ws 用了 std/list 的 range-to 却没 import 它，C 链编不出）。
+        // 按项目规矩不往通过的测试里塞已知失败的用例；S-3 修好后再补回来。
+    ];
+
+    for (name, source) in cases {
+        let src = dir.join(format!("{name}.ws"));
+        std::fs::write(&src, source).unwrap();
+        let (vm, c2) = both_chains_stdout(&dir, name, source);
+        assert_eq!(
+            vm,
+            c2,
+            "[{name}] chains disagree on {source:?}\n  VM={:?}\n  C ={:?}",
+            String::from_utf8_lossy(&vm),
+            String::from_utf8_lossy(&c2)
+        );
+    }
+}

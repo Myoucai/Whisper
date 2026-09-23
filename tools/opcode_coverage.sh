@@ -222,6 +222,26 @@ t execraw-len    '"echo x" @10 1 @nth strlen . "echo x" @5 1 @nth strlen .'
 t execraw-status '"echo x" @10 0 @nth .'
 t execraw-fwd    '"echo x" @10 1 @nth print 7 .'
 
+# ── S-1：非 ASCII 字节语义（2026-09-21）────────────────────────────
+# 这里长期**全是 ASCII 用例**，正是"VM 的 strchars/striter 按字符、C 链按
+# 字节"这条分叉能潜伏这么久的原因。字符串结果一律经 strchars 转成数字列表
+# 再打印：绕开"VM 打印字符串带引号、且对非法 UTF-8 做 lossy"这条既有显示
+# 约定，只比内容。
+# 注意：本函数的 NSC 那侧不处理 import，所以这里只用核心原语；带 stdlib
+# 的字节管线（str-rev/upper/url-decode/md5）放在 Rust 集成测试
+# `s1_stdlib_byte_pipeline_matches_across_chains` 里。
+t cjk-strlen     '"你好ab" strlen .'
+t cjk-nth1       '"你好ab" 1 strnth .'
+t cjk-nth7       '"你好ab" 7 strnth .'
+t cjk-chars      '"你好ab" strchars .'
+t cjk-slice      '"你好ab" 0 2 strslice strchars .'
+t cjk-slice2     '"你好ab" 2 2 strslice strchars .'
+t cjk-iter       '"你好ab" striter swap drop strchars .'
+t cjk-round      '"你好ab" strchars charsstr strchars .'
+t cjk-find       '"你好ab" "好" strfind .'
+t cjk-emoji      '"a🎉b" strchars .'
+t cjk-emoji-len  '"a🎉b" strlen .'
+
 echo "coverage: $PASS pass, $FAIL fail, $GAP known-gap"
 echo "$GAPS" | tr '|' '\n' | grep -v '^$' | sed 's/^/  GAP /'
 echo "$FAILED" | tr '|' '\n' | grep -v '^$' | sed 's/^/  DIVERGE /'

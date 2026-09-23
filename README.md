@@ -18,7 +18,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.0.8-7cffc4" alt="version">
-  <img src="https://img.shields.io/badge/tests-465%20passed%20%2B%207%20gates-brightgreen" alt="tests">
+  <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%207%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
   <img src="https://img.shields.io/badge/stdlib-20%20modules-blue" alt="stdlib">
@@ -384,13 +384,13 @@ bash scripts/syntax-gate.sh                      # 26 语法断言（conformance
 bash scripts/stdlib-gate.sh                      # 58 双链 stdlib 断言（VM+c2 输出一致）
 bash scripts/net-gate.sh                         # 真实 HTTP 服务 + curl
 bash scripts/app-gate.sh                         # 13 路由 Web 应用断言
-bash tools/opcode_coverage.sh                    # 90 项逐特性双跑（VM vs 自举链）
+bash tools/opcode_coverage.sh                    # 101 项逐特性双跑（VM vs 自举链）
 bash scripts/typecheck-gate.sh                   # 类型检查假阳性棘轮（三语料 FP=0）
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验
 ```
 
-测试覆盖（465 项，`cargo test --workspace` 实测）：
-- 131 项 CLI（4 单元 + 6 基准 + 121 集成：stdlib 导入冒烟、关键字作 def 名回归、软/硬自举管线、c2 链端到端、能力 ABI 与 `call`/多引号/五种容器内引号双链对拍、`print` 逐字节与 `exit` 真退出码、CRLF 归一化、`-t c` 的能力 opcode、`@10` exec-raw、`wd` 与 `-t c2` 的 C 输出逐字节相同、`whisper bootstrap` 与 `-t c2` 逐字节相同、exe 产物零 Rust 断言、bundle 尾负载）
+测试覆盖（467 项，`cargo test --workspace` 实测）：
+- 133 项 CLI（4 单元 + 6 基准 + 123 集成：stdlib 导入冒烟、关键字作 def 名回归、软/硬自举管线、c2 链端到端、能力 ABI 与 `call`/多引号/五种容器内引号双链对拍、`print` 逐字节与 `exit` 真退出码、CRLF 归一化、**非 ASCII 字节语义与 stdlib 字节管线**、`-t c` 的能力 opcode、`@10` exec-raw、`wd` 与 `-t c2` 的 C 输出逐字节相同、`whisper bootstrap` 与 `-t c2` 逐字节相同、exe 产物零 Rust 断言、bundle 尾负载）
 - 135 项核心 VM（124 单元 + 7 模糊测试 2500+ 随机程序 + 4 项 opcode 元数据）
 - 139 项 codegen（62 单元 + 65 流水线 + 12 C 后端端到端 gcc）
 - 38 项 parser（含「每个关键字都可作 def 名」参数化回归、CRLF 归一化四条）

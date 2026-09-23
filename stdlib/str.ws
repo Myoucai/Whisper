@@ -15,8 +15,11 @@
 : starts-with? { 0 ` strlen strslice ` streq } ;
 : ends-with? { _ strlen over strlen - ` strslice ` streq } ;
 : str-rev    { strchars rev charsstr } ;
-: upper-char { _ 96 > _ 123 < & ?? _ 32 - ` drop | ] } ;
-: lower-char { _ 64 > _ 91 < & ?? _ 32 + ` drop | ] } ;
+// 范围判定用 dup/over 取回原值。原写法 `_ 96 > _ 123 < &` 里第二个 `_` 复制的
+// 是**上一步的布尔**而不是字符，于是条件退化成 `c > 96`——所有 >96 的字节都被
+// 减 32，非 ASCII 一律被改坏（S-1 验证时发现；两链一致地错）。
+: upper-char { dup 96 > over 123 < & ?? 32 - ] } ;
+: lower-char { dup 64 > over 91 < & ?? 32 + ] } ;
 : upper      { strchars { upper-char } @map charsstr } ;
 : lower      { strchars { lower-char } @map charsstr } ;
 : capitalize { _ strlen 0 = ?? drop "" | _ 0 strnth upper-char ctos ` 1 9999 strslice strcat ] } ;
