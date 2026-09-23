@@ -47,7 +47,52 @@ Step 3 节）早就写了要做内容寻址缓存，一直没做。
 - 命中后不产出调用者要的 `<out>` → **失败**：那是偷偷改契约。
   `wd run <src> <out>` 仍必须留下 `<out>`。
 
-## 执行记录（2026-09-21，第 7 轮：**`wd-hash` 验证通过**）
+## 执行记录（2026-09-21，第 8 轮：接线做完了，键计算段挂在首个输出之前）
+
+**结果**：整条流水线按文档接完（`wd-hash` + `wd-cache-dir/path` + `wd-q` + `wd-cp`
++ `wd-build` 里的探缓存/回填），但**首次调用**就挂，仍整文件回退。
+
+### 事实
+
+- 失败形态：`whisper: type error: expected ptr`，**stdout / stderr 都是空**，
+  exit 1 —— 即挂在任何 `wd: …` 消息之前。
+- 缓存目录一直是空的（`C-2a` 到 `C-4` 全红）；`C-6`（失败不写缓存）仍然通过。
+- 挂点在**键计算段**（`wd-build` 里 gcc 之前的六步）：
+  `read-file(.c)` → `read-file(runtime.c)` → `strcat` → `+wd-cc` → `strcat`
+  → `wd-hash` → `kv-set` → `kv-get` → `wd-cache-path` → `wd-real` → 分支。
+  我对每一步都手工走过栈，形态是对的；但**其中至少一步在真实上下文里不对**。
+
+### 下一轮：不要再手工走栈（这是第五次了）
+
+前四轮 + 本轮，我每次都"手工走栈认为对"，然后失败。第 11 轮证明了唯一有效的
+做法：**在被测代码内部逐行打印、一次构建**。下一轮就照做，**在 `wd-build` 的
+缓存块里插打印**：
+
+```
+dup 2 @nth ".c" strcat read-file "|1" .        // 读回 .c
+wd-root "/whisperc/runtime.c" strcat read-file "|2" .   // 读 runtime.c
+strcat "|3" . dup strlen .                     // 拼接 + 长度
+wd-cc strcat "|4" . dup strlen .               // 加 cc 名 + 长度
+wd-hash "|5" . dup .                           // 算键
+"wd.key" swap kv-set "wd.key" kv-get "|6" . dup .   // KV 往返
+wd-cache-path "|7" . dup .                     // 路径
+wd-real "|8" . dup .                           // 命中探测
+```
+每插一处构建一次（约 40 秒），或者一次全插、看打印停在哪一步。**一次全插更快**，
+打印的顺序会直接指出挂点。
+
+### 已确认无罪的（不要再怀疑）
+
+- `wd-hash`（第 11 轮端到端验过：`97000680001266-3`）
+- 折叠 + 乘法（第 4、5、11 轮三次验过）
+- 尾部的 `i64tostr swap i64tostr "-" swap strcat strcat`（第 11 轮验过）
+- 未命中分支的原 gcc 块（改动前后逐字相同）
+
+### 反向判据自查
+
+三项仍然通过：键是内容哈希不是 mtime；失败不写缓存（`C-6` 通过）；没有改
+`wd run` 的契约（回退后冒烟四条 + 多行限定名两条全过）。
+
 
 **结果**：`wd-hash` 跑通了，但本轮预算只够验它，**缓存接线仍未做**，所以整文件回退。
 
