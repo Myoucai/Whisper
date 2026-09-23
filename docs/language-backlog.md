@@ -29,11 +29,47 @@
 经 `-t c2` 能编出；③ 覆盖门禁补 `mod` 用例（现在只有 `%`）；④ 固定点仍成立
 （改了 `compiler.all.ws`）。
 
-## 战役 S-3：若干 stdlib 模块用了 `std/list` 的 `range-to` 却没 import（**2026-09-21 发现，待修**）
+## 战役 S-3：若干 stdlib 模块用了 `std/list` 的 `range-to` 却没 import（**2026-09-21 已关闭**）
+
+**状态**：已达成。`std/encoding` 与 `std/hash` 现在两链都能编能跑，且值正确
+（`b64-enc "abc"` → `YWJj`；`md5 "abc"` → `900150983cd24fb0d6963f7d28e17f72`；
+`md5 "你好"` → `7eca689f0d3389d9dea66ae112e5cfd7`）。stdlib 门禁 59 → **63/0**。
+
+**修法（与初版登记的"补一行 import"不同）**：把三处 `range-to` 就地展开成它
+的定义式 `1 \` range`（`range` 是内建 opcode），从而**不引入 `std/list`**。
+
+> **为什么不是补 import**：试过了，不行。`std/str` 与 `std/list` **都定义了
+> `nth`**（前者 `{ strnth }`、后者 `{ @nth }`），两条内联路径各发一个 `W_nth`，
+> gcc 报 `redefinition of 'W_nth'`。补 import 会把一个"缺依赖"换成一个
+> "同名冲突"，都不是好结果。真正的病根另记 S-4。
+
+（原登记内容保留在下面，供对照。）
 
 **事实**：`import "std/hash"` + `md5`，以及 `import "std/encoding"` + `b64-enc`，
 在 `whisper run` 下都能跑，但 `-t c2` **都编不出**：
 `implicit declaration of function 'W_range_to'`。
+
+## 战役 S-4：`std/str` 与 `std/list` 导出同名不同义的 `nth`（**2026-09-21 发现，待修**）
+
+**事实**：
+- `stdlib/str.ws:11` `: nth { strnth } ;`
+- `stdlib/list.ws:3` `: nth { @nth } ;`
+
+两个模块**都没有 import 对方**，各自独立成立；但任何同时内联两者的程序
+（例如 `import "std/hash"` 之后再 `import "std/list"`）都会生成两个
+`W_nth` 定义，gcc 报 `redefinition of 'W_nth'`。S-3 就是撞上它才改用展开式的。
+
+**为什么值得单独修**：这是**静默的命名冲突**——两个都"对"的模块，组合起来
+不可用，而且报错出现在 gcc 层（"redefinition of W_nth"），离根因很远。
+
+**修法与判据（未定，需先查用途）**：候选 ① 把其中一个改名（`str.nth` /
+`list.nth` 的限定形式已经可用，裸名二选一）；② 让 c2 的 import 内联**按词名
+去重**——但这会把"两个语义不同的 nth"变成"看谁先内联"，是掩盖不是修复。
+倾向 ①。**动手前必须先查全仓库谁在用裸 `nth`**（S-2 的教训：先查用途再定方向）。
+
+**判据**：① 同时 import `std/str` 与 `std/list` 的程序两链都能编能跑；
+② 既有 stdlib 门禁与六闸不回归；③ 若改名，文档与 `^export` 同步。
+
 
 **根因**：`range-to` 定义在 `stdlib/list.ws:25`，而
 - `stdlib/hash.ws` 只 `import "std/str"`（第 151、164 行用 `range-to`）

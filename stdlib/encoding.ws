@@ -146,7 +146,7 @@ export sat
   "E-A" ` kv-set
   "E-S" ` kv-set
   "E-B" "" kv-set
-  "E-S" kv-get strlen 4 / range-to
+  "E-S" kv-get strlen 4 / 1 ` range   // = range-to；见 hash.ws 末尾的说明
   { dec-group } @each
   // 无填充余组（b64url 常见）：len%4 ∈ {2,3} → 1~2 字节
   "E-S" kv-get strlen 4 mod

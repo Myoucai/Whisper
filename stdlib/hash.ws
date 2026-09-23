@@ -148,7 +148,7 @@ import "std/str"
   "M-D0" "M-D" kv-get kv-set
   "M-NR" kv-get strlen 0 =
   ?? "64" | "M-NR" kv-get ]
-  strtoi64 range-to
+  strtoi64 1 ` range            // = range-to；见文件末尾"为什么不用 range-to"
   { 1 - i64tostr "M-R" ` kv-set md5-round } @each
   "M-A" kv-get strtoi64 "M-A0" kv-get strtoi64 + m32 i64tostr "M-A" ` kv-set
   "M-B" kv-get strtoi64 "M-B0" kv-get strtoi64 + m32 i64tostr "M-B" ` kv-set
@@ -161,7 +161,7 @@ import "std/str"
 {
   i64tostr "M-X" ` kv-set
   "M-H" "" kv-set
-  4 range-to
+  4 1 ` range                   // = range-to
   { 1 - 8 * "M-X" kv-get strtoi64 swap >> 255 bitand hex-b "M-H" kv-get swap strcat "M-H" ` kv-set }
   @each
   "M-H" kv-get
@@ -201,3 +201,15 @@ export md5-pad
 export bw
 export md5-block
 export md5-word-hex
+
+// ── 为什么不用 range-to（2026-09-21，S-3）────────────────────────────
+// `range-to` 定义在 std/list.ws，本模块没有 import 它，于是 `-t c2` 编出的 C
+// 里出现未定义的 `W_range_to()`（VM 那条路径能跑，所以一直没被发现）。
+//
+// 试过给本文件补 `import "std/list"`，**不行**：std/str 与 std/list **都定义
+// 了 `nth`**（前者 `{ strnth }`、后者 `{ @nth }`），两条内联路径各发一个
+// `W_nth`，gcc 报 `redefinition of 'W_nth'`。
+//
+// 所以这里直接用它的展开式 `1 ` range`（range 是内建 opcode）。三处调用点
+// 都这样处理；真正的病根（两个 stdlib 模块导出同名不同义的词）另记 S-4。
+

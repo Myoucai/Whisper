@@ -381,7 +381,7 @@ Whisper/
 ```bash
 cargo test --workspace                           # 476 tests: all passed
 bash scripts/syntax-gate.sh                      # 26 语法断言（conformance 语料，VM 与 c2 双侧）
-bash scripts/stdlib-gate.sh                      # 58 双链 stdlib 断言（VM+c2 输出一致）
+bash scripts/stdlib-gate.sh                      # 63 双链 stdlib 断言（VM+c2 输出一致）
 bash scripts/net-gate.sh                         # 真实 HTTP 服务 + curl
 bash scripts/app-gate.sh                         # 13 路由 Web 应用断言
 bash tools/opcode_coverage.sh                    # 101 项逐特性双跑（VM vs 自举链）

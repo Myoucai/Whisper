@@ -92,10 +92,14 @@ t core-range   'import "std/list" 5 range-to len .' 5
 #    算术用例一直用 `%`，从未盖到。词名一律以 `^export` 行为准，不靠猜。
 t mod-spelling '7 3 mod .' 1
 
-# S-3（`std/encoding`、`std/hash` 用了 `std/list` 的 range-to 却没 import）
-# 的用例**暂不在此登记**：那不是"补一行 import"能修的——补进 hash 后会与
-# 另一处 `nth` 定义冲突（redefinition of 'W_nth'）。facts 见
-# docs/language-backlog.md 的 S-3。按项目规矩不往门禁里塞已知失败的用例。
+# S-3（2026-09-21）：`std/encoding` 与 `std/hash` 此前用了 std/list 的
+# `range-to` 却没 import 它，C 链一律编不出，而门禁里**一个用例都没有**。
+# 修法是就地展开成 `1 ` range`（补 import 会撞上 std/str 与 std/list 的
+# `nth` 同名冲突，见 hash.ws 末尾说明）。这几条用例就是当初该有的。
+t enc-b64      'import "std/encoding" "abc" b64-enc .' YWJj
+t enc-b64-dec  'import "std/encoding" "YWJj" b64-dec .' abc
+t hash-md5     'import "std/hash" "abc" md5 .' 900150983cd24fb0d6963f7d28e17f72
+t hash-md5-cjk 'import "std/hash" "你好" md5 .' 7eca689f0d3389d9dea66ae112e5cfd7
 
 echo "=== stdlib gate: PASS=$pass FAIL=$fail ==="
 [ "$fail" -eq 0 ]
