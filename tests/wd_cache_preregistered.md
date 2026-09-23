@@ -47,7 +47,64 @@ Step 3 节）早就写了要做内容寻址缓存，一直没做。
 - 命中后不产出调用者要的 `<out>` → **失败**：那是偷偷改契约。
   `wd run <src> <out>` 仍必须留下 `<out>`。
 
-## 执行记录（2026-09-21，第 9 轮：**抓到并修掉一个真 bug；存储仍未落盘**）
+## 执行记录（2026-09-21，第 10 轮：**`wd-cp` 单独收掉了**）
+
+**做法**：这一轮**完全不碰 `wd-build`**，加临时动词 `wd cp <src> <dst>`，把 `wd-cp`
+单拎出来验（插打印法，一次构建。这是第 11/13 轮证明有效的那套）。
+
+### 结果：`wd-cp` 验证通过
+
+```
+|CMD= copy /Y "target\l1\cp\src.txt" "target\l1\cp\dst.txt" > NUL
+|ST= 0        ← shell 真实状态
+|rc= 0
+目录: dst.txt  src.txt      ← 目标文件真的生成了
+```
+
+### 已验证可用的表达式（下一轮直接抄）
+
+```whisper
+: wd-q { "\"" swap strcat "\"" strcat } ;
+
+// [src dst] → status。**不用 KV**：照 wd-cc-cmd 那套「累加器停在栈顶」的写法。
+: wd-cp {
+    swap                           // dst src
+    "OS" "" wd-env "Windows_NT" str-eq? ?? "/" "\\" strreplace ]
+    swap                           // src' dst
+    "OS" "" wd-env "Windows_NT" str-eq? ?? "/" "\\" strreplace ]
+    swap                           // dst' src'
+    wd-q                           // dst' "src'"
+    "OS" "" wd-env "Windows_NT" str-eq? ?? "copy /Y " | "cp " ]
+    swap strcat " " strcat         // dst' cmd'
+    swap wd-q strcat               // cmd''
+    "OS" "" wd-env "Windows_NT" str-eq? ?? " > NUL" strcat ]
+    @10 dup 0 @nth swap drop       // 返回真实 status（原来无条件返回 0，失败不可见）
+} ;
+```
+（`??` 的写法在真文件里是 `?? … ]` 的多行形式；上面压成一行只为好读。）
+
+### 两条根因（都值得记）
+
+1. **KV 往返把两个路径搞成了同一个值**。上一版把 `src`/`dst` 分别存进
+   `"wd.src"`/`"wd.dst"` 再取回，实测**取回的两个都是 dst**：
+   ```
+   |CMD= copy /Y "target\l1\cp\dst.txt" "target\l1\cp\dst.txt" > NUL
+   ```
+   我没有再去查 KV 到底哪里不对（可能是连续两次 `kv-set` 的用法问题，也可能是
+   `kv-get` 的匹配问题）——**改成不依赖 KV 就直接好了**。**这条留作待查**：
+   如果 KV 真有这个毛病，影响的就不止 `wd-cp`。
+2. **cmd 的 `copy` 不认正斜杠**（会当开关），而 wd 内部路径全是 `D:/…`，
+   所以 Windows 下必须先换成反斜杠。
+
+（另外还有一个纯粹属于我的错，记下来：调试动词写成 `1 @nth 2 @nth` ——
+`@nth` **会消费列表**，第二次索引拿到的是字符串。要按 `wd-argv` 的惯用法
+每次 `dup N @nth` 之后 `swap` 把 S 换回栈顶。**这是本项目第 6 次"观测工具出错"**。）
+
+### 下一步
+
+`wd-cp` 与 `wd-hash` 都已单独验过 → 剩下的就是**把缓存接线做一遍**（键 + 探 +
+回填），预计一轮内可完成；然后 `④ Step 4`。
+
 
 **结果**：仍回退，但这一轮有实质收获——**`wd-real` 的一个潜在 bug 被定位并验证修复**。
 
