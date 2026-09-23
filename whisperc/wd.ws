@@ -306,12 +306,18 @@
 } ;
 
 // [out] → 实际产物路径，先试原名再试 +".exe"（不同 gcc 落盘策略不同），
-// 都没有则返回空串
+// 都没有则返回空串。
+//
+// ⚠️ 必须**恰好返回一个值**。原写法在"要试 .exe"的两条路径上都会把原名留在
+// 栈上（`dup ".exe" strcat` 之后是 [原名, 原名.exe]，`??` 的 true 分支直接
+// `return`、false 分支只 `drop` 一个），于是返回两个值。旧调用处只按**栈顶**
+// 判断、不按深度取槽，所以这个泄漏一直没暴露；一旦调用方用 `dup 2 @nth` 取
+// 自己的槽就会取错对象（收口 ③ 接线时撞上：`type error: expected ptr`）。
 : wd-real {
     dup file-exists ?? return ]
     dup ".exe" strcat
-    dup file-exists ?? return ]
-    drop ""
+    dup file-exists ?? swap drop return ]
+    drop drop ""
 } ;
 
 // [s] → 转发子进程输出。用 `print`（opcode 147）：它把字符串**逐字节**写
