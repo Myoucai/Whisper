@@ -1143,6 +1143,14 @@ impl TypeChecker {
                         Box::new(Type::Str),
                     ))));
                 }
+                10 => {
+                    // @exec-raw (W-6): same shape as @5, streams untrimmed.
+                    self.expect_n(stack, 1, errors, ctx, "@10 exec-raw");
+                    stack.push(Type::List(Box::new(Type::Union(
+                        Box::new(Type::I64),
+                        Box::new(Type::Str),
+                    ))));
+                }
                 _ => {}
             },
 

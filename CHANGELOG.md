@@ -1,5 +1,84 @@
 # Changelog
 
+## Unreleased (2026-09-21o) — 收口战役：把登记在案的缺口逐条清掉
+
+上一轮结束时还挂着一串"未做/残留"。本轮逐条核对，**先查再改**——侦察阶段就
+推翻了三条既有描述：
+
+| 登记的说法 | 实况 |
+|---|---|
+| `path_is_allowed` 下相对路径**永远被拒** | **代码早修了**（`capability.rs:129` 把相对路径 join CWD 再归一化），是文档没跟上 |
+| `whisperc/compiler.ws` 等与权威文件漂移 | 属实，但其中一部分**是活的**（`whisper bootstrap` 用 `include_str!` 拼的模块化编译器），另一部分零引用 |
+| `-t c` 对 `CapExec` 发射空操作 | 属实，且 `CapCall` 也一样——**两个都静默发射一行注释** |
+
+### W1 —— 源码行尾归一化（CRLF）
+
+同一个 CRLF 源文件里的跨行字符串 `"a\r\nb" strlen .`，三条路径给三个结果：
+`whisper run` 给 **4**、`-t c2` 给 3、`wd run` 给 3。不是外观问题——那个 `\r`
+直接变成了程序数据。而且 `include_str!("compiler.all.ws")` 在
+`core.autocrlf` 工作树上带 CRLF，于是**同一份源码在 LF 检出与 CRLF 检出上
+产出不同的 C**（3 个杂散 `\r`），这正是 `wd` 与 `-t c2` 的 3 字节残差的来源。
+
+修法：Rust 侧在 `Lexer::new` 里折叠 CRLF（只折叠这一对，单独的 `\r` 是数据，
+保留）；Whisper 侧在编译入口 `compile-full` 加一条 `normalize-eol`。两边对称。
+
+### W2 —— `wd` 的多行定义限定名克隆（A3 收口）
+
+`wd` 只克隆"以 `;` 收尾"的单行定义，于是 `stdlib/math.ws` 的 `clamp` 这类
+多行定义没有 `math.clamp` 克隆，生成的 C 少了整个 `W_math_clamp`。
+重写克隆循环（状态 `[lines, idx, out, copying]`）。**实测四个程序——自包含 /
+`std/math` / `std/list` / `std/str`——`wd` 与 `-t c2` 的 C 输出逐字节相同**
+（1601/1601、17875/17875、17228/17228、22569/22569）。里程碑 A 留下的 A3
+残差就此清零。
+
+过程中踩到并记录了两个真实教训：
+- **`over` 会读到调用者的栈**：闭合判定一度排在 `line` 已被消耗之后，
+  `over` 拿到的是 state 列表，`strfind` 拿列表当字符串 → `expected ptr`。
+- **KV 只存字符串**：cgen 对键和值都做 `w_as_ptr`，把布尔存进去就是
+  `expected ptr`。标志位一律走 `"1"`/`"0"`。
+
+### W3 —— `bootstrap.sh` 在缺 `cmp` 的机器上假报固定点破裂
+
+`if ! cmp -s a b` 在 `cmp` 不存在时得到 127，取反为**真** → 打印
+`FIXED POINT BROKEN` 并退出。本机（msys2）实测 `cmp` 与 `diff` 都不存在，
+**这条脚本因此从来没跑到过第 5 步**。比较逻辑抽到 `scripts/lib/same-bytes.sh`，
+`bootstrap.sh` 与 `verify-fixedpoint.sh` 共用。
+
+### W4 —— `-t c` 的能力 opcode 不再静默空操作
+
+`CapExec` → `W_call();`，`CapCall(n)` → `W__<n>();`（runtime.c 两者本就都有，
+自举链的 cgen 一直这么发）。实测 `-t c` 产物：`{ 42 } call .` → 42、
+`10 { 2 * } call .` → 20、`"PATH" @4 .` 与 VM 同值。
+
+### W5 —— 历史快照与文档漂移
+
+机械清点全仓库的两种引用方式（`include_str!` 与模块间 `import`）后，删掉四个
+**零引用**的历史快照：`whisperc/compiler.ws`（早期手工合并版）、
+`src/cgen.ws`、`src/classify.ws`、`src/lexer.ws`。新增 `whisperc/README.md`
+写清"谁是权威、谁是软自举链的模块"——顶层 `lexer/classify/parser/main.ws`
+与 `src/compile.ws` **是活的**（`whisper bootstrap` 用），不是副本，但两者会
+漂移，这一点现在明写在文档里而不是留给下一个人猜。文档里 `path_is_allowed`
+的过期描述一并改正。
+
+### W6 —— `@10` = `exec-raw`：逐字节转发，且不改 `@5` 的语义
+
+`@5` 的 `trim` 是命令替换惯用法依赖的行为，取消它会把"修一个洞"变成"改一批
+调用方"。改为新增**兄弟能力** `@10`：同一份实现、同一份授权（CLI 绑 `@5` 时
+一起绑 `@10`），只是两个流原样返回。未授权时 `@10` 一样被拒。
+
+**L-1 唯一未达标的 E4-c 就此收口**：`wd run` 的转发段与直接运行产物逐字节
+相同。顺带把 `@10` 照出来的两处 C 链缺陷也修了——`( cmd )` 的外层空格被
+`cmd.exe` 的 echo 吞进输出（`78 20 0A` vs VM 的 `78 0D 0A`），以及 `_popen`
+读端是文本模式会把子进程 CRLF 折叠成 LF。
+
+### 本轮明确不做（附理由，不是漏掉）
+
+- **TLS / `@6`-`@9` 的 C 侧**：与 TLS 强耦合；在"C 只当可移植汇编、零第三方
+  依赖"的前提下要独立设计。
+- **C 链 host 白名单**：独立二进制没有命令行，白名单只能靠环境变量——那是
+  一种看起来安全的假象。保持"要么整套做、要么不做"。
+- **Step 4（工具链迁移）**：独立战役。
+
 ## Unreleased (2026-09-21n) — 战役 L-1：`print` 与 `exit` 两个原语
 
 语言缺了两个原语，不是某个程序缺功能：C 链程序恒以 `return 0;` 结束（任何

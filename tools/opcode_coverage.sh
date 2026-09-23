@@ -214,6 +214,14 @@ t exit-zero    '0 exit'
 t exit-code    '3 exit'
 t exit-in-word ': f { 7 exit } ; f 1 .'
 
+# ── W6：@10 exec-raw（与 @5 同授权，但两个流不 trim）──────────────
+# t() 用 $( ) 取值会吃掉尾换行，所以这里只钉"两链都认 @10 且与 @5 行为不同"；
+# 逐字节与"未授权同样被拒"由 Rust 集成测试
+# w6_exec_raw_is_verbatim_and_needs_the_same_grant 负责。
+t execraw-len    '"echo x" @10 1 @nth strlen . "echo x" @5 1 @nth strlen .'
+t execraw-status '"echo x" @10 0 @nth .'
+t execraw-fwd    '"echo x" @10 1 @nth print 7 .'
+
 echo "coverage: $PASS pass, $FAIL fail, $GAP known-gap"
 echo "$GAPS" | tr '|' '\n' | grep -v '^$' | sed 's/^/  GAP /'
 echo "$FAILED" | tr '|' '\n' | grep -v '^$' | sed 's/^/  DIVERGE /'

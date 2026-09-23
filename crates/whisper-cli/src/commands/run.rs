@@ -261,7 +261,16 @@ pub fn run_source(source: &str, source_dir: &Path, config: &RunConfig) -> Result
         capability_table.bind(Box::new(whisper_core::capability::EnvCap { id: 4 }));
     }
     if config.allow_exec {
-        capability_table.bind(Box::new(whisper_core::capability::ExecCap { id: 5 }));
+        capability_table.bind(Box::new(whisper_core::capability::ExecCap {
+            id: 5,
+            trim: true,
+        }));
+        // W-6: same authority, verbatim streams. Bound together on purpose —
+        // see the doc comment on ExecCap.
+        capability_table.bind(Box::new(whisper_core::capability::ExecCap {
+            id: 10,
+            trim: false,
+        }));
     }
 
     let mut vm = Vm::with_capabilities(capability_table);

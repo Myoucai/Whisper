@@ -534,8 +534,17 @@ impl Capability for EnvCap {
 }
 
 /// Shell command execution capability.
+///
+/// `trim` (W-6): `@5` trims both captured streams, which is what
+/// command-substitution idioms want. `@10` is the same capability with
+/// `trim: false`, so a caller that must forward the child's bytes verbatim
+/// (the `wd` driver) can do so without changing `@5`'s contract. Both ids are
+/// bound together — raw output is not a broader *permission*, only a
+/// different result shape, so binding one without the other would be a
+/// sandbox hole.
 pub struct ExecCap {
     pub id: u16,
+    pub trim: bool,
 }
 
 impl Capability for ExecCap {
@@ -543,10 +552,18 @@ impl Capability for ExecCap {
         self.id
     }
     fn name(&self) -> &str {
-        "exec"
+        if self.trim {
+            "exec"
+        } else {
+            "exec-raw"
+        }
     }
     fn description(&self) -> &str {
-        "Execute shell commands"
+        if self.trim {
+            "Execute shell commands"
+        } else {
+            "Execute shell commands, returning both streams verbatim"
+        }
     }
 
     fn call(&self, data_stack: &mut Vec<Value>, args: &[Value]) -> Result<(), VmError> {
@@ -574,8 +591,16 @@ impl Capability for ExecCap {
 
         match output {
             Ok(out) => {
-                let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                let stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
+                let raw = |b: &[u8]| -> String {
+                    let s = String::from_utf8_lossy(b);
+                    if self.trim {
+                        s.trim().to_string()
+                    } else {
+                        s.into_owned()
+                    }
+                };
+                let stdout = raw(&out.stdout);
+                let stderr = raw(&out.stderr);
                 let status = out.status.code().unwrap_or(-1) as i64;
                 // Push [status, stdout, stderr]
                 use std::rc::Rc;

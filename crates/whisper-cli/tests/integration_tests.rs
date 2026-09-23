@@ -2246,3 +2246,262 @@ fn l1_exit_sets_a_real_exit_code() {
         );
     }
 }
+
+// ── 收口战役 W1/W2/W4/W6 ────────────────────────────────────────────
+// tests/closeout_preregistered.md.
+
+fn gcc_available() -> bool {
+    std::process::Command::new("gcc")
+        .arg("--version")
+        .output()
+        .is_ok()
+}
+
+/// W1 — a CRLF source must not behave differently from an LF one, and must
+/// not behave differently depending on which path compiled it. Before the
+/// fix, `"a\r\nb" strlen .` printed 4 under `whisper run` but 3 under
+/// `-t c2` (whose import expansion goes through `str::lines()`) and 3 under
+/// `wd run` — the `\r` leaked into the program's *data*, not just its layout.
+#[test]
+fn w1_crlf_source_is_normalized_on_both_paths() {
+    if !gcc_available() {
+        eprintln!("skipping: gcc not available");
+        return;
+    }
+    let dir = std::env::temp_dir().join("whisper_w1_crlf");
+    std::fs::create_dir_all(&dir).unwrap();
+    // `"a<CRLF>b" strlen .` — written with explicit bytes, not a Rust literal.
+    let src = dir.join("crlf.ws");
+    std::fs::write(&src, b"\"a\r\nb\" strlen .\r\n").unwrap();
+
+    let vm = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .args(["run", "--no-strict-types"])
+        .arg(&src)
+        .output()
+        .unwrap();
+    assert!(
+        vm.status.success(),
+        "{}",
+        String::from_utf8_lossy(&vm.stderr)
+    );
+    assert_eq!(
+        String::from_utf8_lossy(&vm.stdout).trim(),
+        "3",
+        "VM must collapse the CRLF inside the literal"
+    );
+
+    let out = dir.join("crlf");
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .args(["build", "-t", "c2", "-o"])
+        .arg(&out)
+        .arg(&src)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "{}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let artifact = if out.exists() {
+        out.clone()
+    } else {
+        out.with_extension(std::env::consts::EXE_EXTENSION)
+    };
+    let c2 = std::process::Command::new(&artifact).output().unwrap();
+    assert_eq!(
+        String::from_utf8_lossy(&c2.stdout).trim(),
+        "3",
+        "the C chain must agree with the VM"
+    );
+}
+
+/// W4 — `-t c` used to emit `// cap_exec: no-op in native mode` for both
+/// capability opcodes, so a generated program silently did *less* than its
+/// source said. The runtime already had `W_call` and the `W__<n>` ABI.
+#[test]
+fn w4_c_transpiler_executes_call_and_capabilities() {
+    if !gcc_available() {
+        eprintln!("skipping: gcc not available");
+        return;
+    }
+    let dir = std::env::temp_dir().join("whisper_w4_native_caps");
+    std::fs::create_dir_all(&dir).unwrap();
+
+    for (name, source, want) in [
+        ("q", "{ 42 } call .\n", "42"),
+        ("qi", "10 { 2 * } call .\n", "20"),
+    ] {
+        let src = dir.join(format!("{name}.ws"));
+        std::fs::write(&src, source).unwrap();
+        let cfile = dir.join(format!("{name}.c"));
+        let build = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+            .args(["build", "-t", "c", "-o"])
+            .arg(&cfile)
+            .arg(&src)
+            .output()
+            .unwrap();
+        assert!(
+            build.status.success(),
+            "{}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let text = std::fs::read_to_string(&cfile).unwrap();
+        assert!(
+            !text.contains("no-op in native mode"),
+            "-t c must not drop capability opcodes: {text}"
+        );
+
+        let exe = dir.join(format!("{name}.exe"));
+        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let cc = std::process::Command::new("gcc")
+            .args(["-O2", "-w", "-o"])
+            .arg(&exe)
+            .arg(&cfile)
+            .arg("-I")
+            .arg(repo.join("whisperc"))
+            .args(["-lm", "-lws2_32"])
+            .output()
+            .unwrap();
+        assert!(
+            cc.status.success(),
+            "{}",
+            String::from_utf8_lossy(&cc.stderr)
+        );
+        let artifact = if exe.exists() {
+            exe.clone()
+        } else {
+            exe.with_extension(std::env::consts::EXE_EXTENSION)
+        };
+        let run = std::process::Command::new(&artifact).output().unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&run.stdout).trim(),
+            want,
+            "-t c output for {source:?}"
+        );
+    }
+}
+
+/// W6 — `@10` (exec-raw) is `@5` without the trim, so byte-exact forwarding
+/// is possible without changing what `@5` means. Both ids are granted
+/// together: raw output is a different *shape*, not a broader permission.
+#[test]
+fn w6_exec_raw_is_verbatim_and_needs_the_same_grant() {
+    let dir = std::env::temp_dir().join("whisper_w6_execraw");
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = dir.join("len.ws");
+    // `echo x` yields "x\r\n" on Windows and "x\n" elsewhere — one byte of
+    // trailing newline either way, which is exactly what `@5` removes.
+    std::fs::write(
+        &src,
+        "\"echo x\" @10 1 @nth strlen .\n\"echo x\" @5 1 @nth strlen .\n",
+    )
+    .unwrap();
+
+    let run = |args: &[&str]| {
+        std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+            .args(args)
+            .arg(&src)
+            .output()
+            .unwrap()
+    };
+
+    let denied = run(&["run", "--no-strict-types"]);
+    assert!(
+        !denied.status.success(),
+        "@10 must not work without a grant"
+    );
+    assert!(
+        String::from_utf8_lossy(&denied.stderr).contains("Capability not bound"),
+        "denial should name the missing binding: {}",
+        String::from_utf8_lossy(&denied.stderr)
+    );
+
+    let allowed = run(&["run", "--no-strict-types", "--allow-exec"]);
+    assert!(
+        allowed.status.success(),
+        "{}",
+        String::from_utf8_lossy(&allowed.stderr)
+    );
+    let out = String::from_utf8_lossy(&allowed.stdout);
+    let vals: Vec<&str> = out.split_whitespace().collect();
+    assert_eq!(vals.len(), 2, "expected two lengths, got {out:?}");
+    let raw: usize = vals[0].parse().unwrap();
+    let trimmed: usize = vals[1].parse().unwrap();
+    assert_eq!(
+        raw, 3,
+        "@10 should keep the child's trailing newline: {out:?}"
+    );
+    assert_eq!(trimmed, 1, "@5 must keep trimming: {out:?}");
+}
+
+/// W2 — the driver's generated C must be byte-identical to `-t c2`'s, for
+/// self-contained *and* importing programs. The last gap was multi-line
+/// definitions: only single-line ones were getting qualified clones, so
+/// `math.clamp` (whose body spans lines) had no `W_math_clamp`.
+#[test]
+fn w2_wd_output_matches_c2_byte_for_byte() {
+    if !gcc_available() {
+        eprintln!("skipping: gcc not available");
+        return;
+    }
+    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let plain = repo.join("target/wd/wd");
+    let wd = if plain.exists() {
+        plain
+    } else {
+        plain.with_extension(std::env::consts::EXE_EXTENSION)
+    };
+    if !wd.exists() {
+        eprintln!("skipping: build target/wd/wd first (bash scripts/build-wd.sh)");
+        return;
+    }
+
+    let dir = std::env::temp_dir().join("whisper_w2_parity");
+    std::fs::create_dir_all(&dir).unwrap();
+    for (name, source) in [
+        ("self", "1 2 + .\n"),
+        ("imp", "import \"std/math\"\n5 sq .\n"),
+        ("multi", "import \"std/math\"\n5 0 10 math.clamp .\n"),
+        ("list", "import \"std/list\"\n[1 2 3] len .\n"),
+    ] {
+        let src = dir.join(format!("{name}.ws"));
+        std::fs::write(&src, source).unwrap();
+
+        let wd_out = dir.join(format!("wd_{name}"));
+        let b = std::process::Command::new(&wd)
+            .arg("build")
+            .arg(&src)
+            .arg(&wd_out)
+            .current_dir(&repo)
+            .env("WHISPER_ROOT", &repo)
+            .output()
+            .unwrap();
+        assert!(
+            b.status.success(),
+            "wd build {name}: {}",
+            String::from_utf8_lossy(&b.stderr)
+        );
+
+        let c2_out = dir.join(format!("c2_{name}"));
+        let b2 = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+            .args(["build", "-t", "c2", "-o"])
+            .arg(&c2_out)
+            .arg(&src)
+            .output()
+            .unwrap();
+        assert!(
+            b2.status.success(),
+            "c2 build {name}: {}",
+            String::from_utf8_lossy(&b2.stderr)
+        );
+
+        let a = std::fs::read(dir.join(format!("wd_{name}.c"))).unwrap();
+        let b = std::fs::read(dir.join(format!("c2_{name}.c"))).unwrap();
+        assert_eq!(
+            a.len(),
+            b.len(),
+            "[{name}] wd and -t c2 produced different C sizes"
+        );
+        assert!(a == b, "[{name}] wd and -t c2 C output differs");
+    }
+}

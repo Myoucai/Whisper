@@ -97,7 +97,7 @@
 |------|------|------|
 | **A1** 零 Rust 构建 | ✅ | `bash scripts/build-wd.sh` 只用 gcc + 冻结种子产出 `target/wd/wd`；脚本内无 `cargo` |
 | **A2** 编+跑自包含程序 | ✅ | `wd build a.ws a` 产出 `a.exe`/`a.c`；`wd run a.ws b` 编译并转发产物输出（`1 2 + .` → `3`） |
-| **A3** 与 `-t c2` 的 C 逐字节一致 | ⚠️ **几乎达成（差 3 字节 / 1604）** | 里程碑 B 落地后，自包含程序从差 1329 字节缩到 **1601 vs 1604**；带 import 的程序 17451 vs 17878（差的是克隆覆盖面）。行级比较查不出差异行，残差在尾部空白，未定位 |
+| **A3** 与 `-t c2` 的 C 逐字节一致 | ✅ **已达成（收口战役 W1+W2，2026-09-21o）** | 里程碑 B 后残差为自包含 1601 vs 1604、带 import 17451 vs 17878。收口时定位到**两个独立根因**：① Rust lexer 不折叠 CRLF，`include_str!` 进来的编译器源码在工作树是 CRLF，于是 `-t c2` 的 C 里混进 3 个杂散 `\r`；② `wd` 只克隆单行定义，多行定义（如 `math.clamp`）没有限定名克隆。两者都修掉后，四个程序（自包含 / `std/math` / `std/list` / 多行限定名）**逐字节相同**。常驻断言：集成测试 `w2_wd_output_matches_c2_byte_for_byte` |
 | **A4** 错误可定位 | ✅ | 源文件不存在 → `wd: cannot read source: <路径>`；C 编译器失败 → 转出 gcc 的 stderr |
 | **A5** 既有门禁零回归 | ✅ | 见 CHANGELOG |
 | **A6** 固定点不受影响 | ✅ | 未改 `compiler.all.ws`；`gen2 == gen3` |

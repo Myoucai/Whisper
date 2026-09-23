@@ -2437,7 +2437,12 @@ static void w_trim_inplace(char *s) {
     }
 }
 
-static void W__5(void) {                        // @5 exec
+// L-1/W-6: `@10` = exec-raw. Identical to `@5` except that the two streams are
+// returned **verbatim** instead of trimmed. `@5` keeps its trim on purpose —
+// command-substitution idioms (`"cmd" @5 1 @nth strtoi64`) rely on it — so
+// byte-exact forwarding gets its own id rather than changing an existing
+// contract. Same authority: the CLI binds @10 wherever it binds @5.
+static void w_exec_impl(int trim) {
     const char *cmd = (const char *)w_as_ptr(w_pop());
     char errfile[512];
     char *wrapped, *out, *err;
@@ -2456,14 +2461,24 @@ static void W__5(void) {                        // @5 exec
     snprintf(errfile, sizeof errfile, "%s/whisper_exec_%ld.err", tmpd, (long)W_GETPID());
 #endif
     wrapped = (char *)w_alloc(strlen(cmd) + strlen(errfile) + 48);
+    // The grouping parentheses must not be space-separated from the command:
+    // cmd.exe's `echo` swallows the rest of the line, so `( echo x )` prints
+    // "x " — a stray trailing space that `@5`'s trim used to hide and that
+    // `@10` (verbatim) exposes. `(cmd)` groups identically without it.
 #ifdef _WIN32
-    sprintf(wrapped, "( %s ) < NUL 2>\"%s\"", cmd, errfile);
+    sprintf(wrapped, "(%s) < NUL 2>\"%s\"", cmd, errfile);
 #else
     sprintf(wrapped, "( %s ) < /dev/null 2>\"%s\"", cmd, errfile);
 #endif
     p = W_POPEN(wrapped, "r");
     if (p) {
         int rc;
+#ifdef _WIN32
+        // The pipe read end is opened in text mode by _popen, which would
+        // collapse the child's CRLF to LF and make `@10` (verbatim) diverge
+        // from the VM, whose Command::output() captures raw bytes.
+        _setmode(_fileno(p), _O_BINARY);
+#endif
         out = w_capture(p, &outlen);
         rc = W_PCLOSE(p);
 #ifdef _WIN32
@@ -2480,8 +2495,10 @@ static void W__5(void) {                        // @5 exec
     // memory must never be handed to free().
     if (!out) { out = (char *)malloc(1); if (out) out[0] = 0; }
     if (!err) { err = (char *)malloc(1); if (err) err[0] = 0; }
-    if (out) w_trim_inplace(out);
-    if (err) w_trim_inplace(err);
+    if (trim) {
+        if (out) w_trim_inplace(out);
+        if (err) w_trim_inplace(err);
+    }
     lst = w_list_new(3);
     lst[1] = W_I64(status);
     lst[2] = W_PTR(w_str_from_cstr(out ? out : ""));
@@ -2490,6 +2507,9 @@ static void W__5(void) {                        // @5 exec
     free(out);
     free(err);
 }
+
+static void W__5(void)  { w_exec_impl(1); }     // @5  exec（两流 trim）
+static void W__10(void) { w_exec_impl(0); }     // @10 exec-raw（两流原样）
 
 // ── Shared KV store (v1.0.2 vocabulary) ──────────────────────────────
 // Process-global string→string map with a mutex; survives across the

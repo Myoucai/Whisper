@@ -10,6 +10,34 @@ pub struct LexerError {
     pub span: Span,
 }
 
+/// Collapse CRLF into LF, keeping a lone `\r` (that one is a real character,
+/// not a line terminator).
+///
+/// This runs for *every* source the Rust front end lexes, which is the point:
+/// the three ways a program reaches the compiler used to disagree about a
+/// `\r` sitting inside a multi-line string literal. `c2.rs::expand_imports`
+/// splits on `str::lines()` (which drops the `\r`) and the self-hosted lexer
+/// drops it too, but `Lexer::new` took the raw text — so
+/// `"a\r\nb" strlen .` printed 4 under `whisper run` and 3 under `-t c2` and
+/// `wd run`. Worse, the compiler's *own* source arrives here through
+/// `include_str!`, so on a `core.autocrlf` checkout the same commit emitted
+/// different C (three stray `\r` bytes) than on an LF one — the last piece of
+/// the `wd`-vs-`-t c2` byte gap.
+fn normalize_newlines(source: &str) -> Vec<char> {
+    let chars: Vec<char> = source.chars().collect();
+    let mut out = Vec::with_capacity(chars.len());
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '\r' && chars.get(i + 1) == Some(&'\n') {
+            i += 1; // drop the CR, keep the LF that follows
+            continue;
+        }
+        out.push(chars[i]);
+        i += 1;
+    }
+    out
+}
+
 /// The lexer converts Whisper source text into a token stream.
 pub struct Lexer {
     source: Vec<char>,
@@ -21,7 +49,7 @@ pub struct Lexer {
 impl Lexer {
     pub fn new(source: &str) -> Self {
         Lexer {
-            source: source.chars().collect(),
+            source: normalize_newlines(source),
             pos: 0,
             line: 1,
             column: 1,
@@ -641,5 +669,52 @@ mod qualified_word_tests {
                 "Eof".to_string()
             ]
         );
+    }
+}
+
+/// W1: line-ending normalization. These pin the rule that all three ways a
+/// program reaches the compiler now agree on — and that a lone `\r` is left
+/// alone, because that one is data, not a line terminator.
+#[cfg(test)]
+mod newline_normalization_tests {
+    use super::*;
+
+    fn string_token(src: &str) -> String {
+        let mut lx = Lexer::new(src);
+        for t in lx.tokenize() {
+            if let TokenKind::String(s) = t.kind {
+                return s;
+            }
+        }
+        panic!("no string token in {src:?}");
+    }
+
+    #[test]
+    fn crlf_inside_a_multiline_string_becomes_lf() {
+        assert_eq!(string_token("\"a\r\nb\""), "a\nb");
+        assert_eq!(string_token("\"a\nb\""), "a\nb");
+    }
+
+    #[test]
+    fn lone_carriage_return_is_preserved() {
+        // Not a line terminator: dropping it would silently edit the data.
+        assert_eq!(string_token("\"a\rb\""), "a\rb");
+        // A CR immediately before the closing quote is also not a CRLF.
+        assert_eq!(string_token("\"a\r\""), "a\r");
+    }
+
+    #[test]
+    fn escaped_cr_is_unaffected() {
+        // `\r` as an escape is a character the author asked for.
+        assert_eq!(string_token("\"a\\rb\""), "a\rb");
+        assert_eq!(string_token("\"a\\r\\nb\""), "a\r\nb");
+    }
+
+    #[test]
+    fn line_numbers_survive_normalization() {
+        let mut lx = Lexer::new("1\r\n2\r\n3");
+        let ts = lx.tokenize();
+        let lines: Vec<usize> = ts.iter().map(|t| t.span.line).collect();
+        assert_eq!(lines, vec![1, 2, 3, 3], "spans: {ts:?}");
     }
 }

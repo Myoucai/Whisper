@@ -664,6 +664,14 @@ export classify-nested
 : op-op    { tk-val 1 PushList } ;                      // [[opcode]]
 
 // Quote: compile inner body, emit single [PushRef, inner_bc] instruction
+//
+// ⚠️ 死代码（2026-09-21 收口时再次确认，勿据此判断引号可达性）：
+// 这个 opcode `53` 在整个 compiler.all.ws 里**只出现在这里**——cgen 没有
+// 53 分支，真走到它会落到 `#error whisper-cgen: unknown bare opcode`。
+// 引号之所以能用，靠的是 `fuse-hof` 把"引号作值"抬成顶层静态函数
+// （`[9, name, body]` 定义 + `[57, name]` 引用），与这条路径无关。
+// 保留而不删的理由：`compile-one` 将来若要支持"引号完全内联"，入口在这里；
+// 但那条路要先把嵌套函数 trampoline 的生命周期问题解决（见 spec §16 末尾）。
 : op-quote {
     tk-val compile              // inner_bc_list
     53 swap 2 PushList          // [53, inner_bc_list]
@@ -1096,7 +1104,18 @@ export split-defs
 
 : classify-full { tokenize structify classify-nested } ;
 
+// 行尾归一化（CRLF → LF）。与 Rust 前端 `Lexer::new` 里的
+// `normalize_newlines` 对称——**两边都要做**，否则同一个程序在三条路径上
+// 会给出不同结果：`whisper run` 走 Rust lexer（修前保留 \r）、`-t c2` 的
+// 源码在 Rust 侧经 `str::lines()` 已被吃掉 \r、自举链从 stdin 读时被
+// Windows 文本模式吃掉 \r，而 `wd` 用 `read-file`（二进制）读，\r 又回来了。
+// 差别不是外观：跨行字符串字面量里的那个 \r 会直接变成程序数据
+// （`"a\r\nb" strlen` 给 4 还是 3）。
+// 只折叠 CRLF 这一对；单独的 \r 是合法字符，保留。
+: normalize-eol { "\r\n" "\n" strreplace } ;
+
 : compile-full {
+    normalize-eol               // 行尾归一化（见上）
     classify-full               // tokenize → structify → classify
     fuse-hof                    // fuse {quote}+consumer pairs (main AND def bodies)
     split-defs                  // → [main_bc, [[name, bc]...]]

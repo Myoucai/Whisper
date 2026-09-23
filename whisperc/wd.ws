@@ -47,42 +47,98 @@
     drop ""
 } ;
 
-// ── 限定名克隆（里程碑 B）────────────────────────────────────────────
-// 把模块里每个**单行**定义 `: name { … } ;` 再发一行 `: ns.name { … } ;`，
-// 使 `std.math.sq` 这类限定引用在文本内联路径上也能解析（对齐 c2.rs 的
-// append_qualified_clones）。多行定义不克隆——见文件末尾的已知缺口。
+// ── 限定名克隆（里程碑 B / 收口 W2）─────────────────────────────────
+// 把模块里每个定义 `: name { … } ;` 再发一份 `: ns.name { … } ;`，使
+// `std.math.sq` 这类限定引用在文本内联路径上也能解析（对齐 c2.rs 的
+// append_qualified_clones）。
 //
-// 用「索引状态机」而不是 @fold：本文件其余循环也是这个形状，栈纪律只需
-// 一条——本地状态永远只有一件，读它一律 `dup N @nth`。
+// **多行定义必须连体一起克隆**：只发首行会得到一个没有体的定义。这正是
+// A3 残差的来源——带 import 的程序 wd 17451B vs c2 17875B，少的就是
+// `math.clamp` 这类多行定义的克隆（连带 `W_math_clamp` 整个函数）。
+//
+// 栈纪律：在调用者栈之上**只保留一个状态列表** [lines, idx, out, copying]，
+// 临时值一律走 KV。这不是洁癖——这个文件历史上两次栈事故都出在"同时有两个
+// 本地量"，而 `over`/`@nth` 一旦叠起来就会读到错误的槽。
 : wd-clones {                          // [src ns] → text
-    "wd.ns" swap kv-set                // ns 存 KV，本函数只折叠输出串
+    "wd.ns" swap kv-set                // 模块名进 KV，循环里只读它
     "\n" strsplit                      // lines
-    "" 0 swap                          // lines 0 ""
-    3 PushList                         // [lines, 0, ""]
+    0 "" 0                             // idx out copying —— 槽序必须与
+    4 PushList                         // [lines, idx, out, copying] 一致
     wd-clone-loop
 } ;
+
+// bool → "1"/"0"。KV 的键与值都按 `const char*` 走（cgen 把两边都
+// `w_as_ptr` 之后调用 w_kv_set/w_kv_get），所以**存不了布尔**——存进去会
+// 变成 "expected ptr"。标志位一律走字符串。
+: wd-flag { ?? "1" | "0" ] } ;
+
 : wd-clone-loop {                      // [state] → text
     dup 0 @nth len over 1 @nth swap >= ??
         2 @nth return ]
-    dup 0 @nth over 1 @nth @nth        // state line
-    wd-clone-piece                     // state piece
-    over 2 @nth swap strcat            // state out'
-    swap dup 0 @nth swap 1 @nth 1 + rot 3 PushList
+    dup 3 @nth ??
+        wd-clone-body-line             // 正在拷多行定义的体
+        wd-clone-loop return ]
+    wd-clone-next
     wd-clone-loop
 } ;
-: wd-clone-piece {                     // [line] → 克隆行（不是单行定义则 ""）
+
+// 体的一行：原样追加，并按本行是否闭合决定是否退出拷贝模式
+: wd-clone-body-line {                 // [state] → state'
+    dup 0 @nth over 1 @nth @nth        // state line
+    "wd.l" swap kv-set                 // state
+    dup 2 @nth "wd.l" kv-get strcat "\n" strcat   // state out'
+    "wd.o" swap kv-set                 // state
+    "wd.l" kv-get wd-closes? ! wd-flag // state flag'（还闭合不了就继续拷）
+    "wd.c" swap kv-set                 // state
+    dup 0 @nth                         // state lines
+    over 1 @nth 1 +                    // state lines idx+1
+    "wd.o" kv-get                      // state lines idx+1 out'
+    "wd.c" kv-get "0" str-eq? !        // state lines idx+1 out' copying'
+    4 PushList swap drop
+} ;
+
+// 非续行：本行若是可克隆的定义首行就发首行，并可能进入拷贝模式
+: wd-clone-next {                      // [state] → state'
+    dup 0 @nth over 1 @nth @nth        // state line
+    wd-clone-of                        // state piece copying
+    wd-flag "wd.c" swap kv-set         // state piece
+    "wd.p" swap kv-set                 // state
+    dup 2 @nth "wd.p" kv-get strcat    // state out'
+    "wd.o" swap kv-set                 // state
+    dup 0 @nth                         // state lines
+    over 1 @nth 1 +                    // state lines idx+1
+    "wd.o" kv-get                      // state lines idx+1 out'
+    "wd.c" kv-get "0" str-eq? !        // state lines idx+1 out' copying'
+    4 PushList swap drop
+} ;
+
+// [line] → 克隆首行（含换行）与"是否需要继续拷贝体"
+: wd-clone-of {
     dup wd-def-name                    // line name
     dup "" str-eq? ??
-        drop drop "" return ]          // 不是定义行
+        drop drop "" 0 return ]        // 不是定义行
     dup "." wd-contains? ??
-        drop drop "" return ]          // 已带限定名
-    over wd-code wd-last 59 = ! ??
-        drop drop "" return ]          // 多行定义（未以 ';' 收尾）
+        drop drop "" 0 return ]        // 已带限定名
     drop                               // line
-    str-strip 2 9999 strslice          // rest = name + after
-    "wd.ns" kv-get "." strcat swap strcat    // ns.rest
-    ": " swap strcat "\n" strcat       // ": ns.rest\n"
+    dup wd-closes?                     // line closed?
+    over                               // line closed? line
+    str-strip 2 9999 strslice          // line closed? rest
+    // 闭合判定必须在**本行还在栈上**时做。曾经把它排到 drop/切片之后，
+    // 于是 `over` 读到的是调用者的栈（裁到的是 state 列表），strfind 拿
+    // 列表当字符串 → "expected ptr"。同一个坑这个文件栽过两次。
+    rot                                // closed? rest line
+    drop                               // closed? rest
+    "wd.ns" kv-get "." strcat swap strcat   // closed? ns.rest
+    ": " swap strcat                   // closed? header
+    swap                               // header closed?  ← ?? 弹的是栈顶
+    ??                                 // header
+        "\n" strcat 0 return ]         // 单行定义：一行就完
+    "\n" strcat 1                      // 多行定义：进拷贝模式
 } ;
+
+// [s] → 剥掉行尾注释与空白后，是否以 ';' 收尾（= 定义已闭合）
+// 与 c2.rs 的 code_only(after).ends_with(";") 同判定。
+: wd-closes? { wd-code str-strip wd-last 59 = } ;
 
 // ── import 展开（里程碑 B）─────────────────────────────────────────
 // [line] → 这一行里的模块名；不是 import 行则为 ""
@@ -262,9 +318,9 @@
 // stdout，不补换行、不改写引号。曾经这里只能用 `.`，而 `.` 会补一个换行、
 // 两链对字符串的引号处理还不一致——`wd run` 因此做不到逐字节转发。
 //
-// 残留（已登记为 W-5，不在 L-1 范围）：`@5` 按设计对两个流做 trim（runtime.c
-// 里写明"mirror Rust 的 String::trim()"），所以子进程末尾的换行在 wd 看到
-// 它之前就没了。`wd` 这一侧现在是逐字节的；整条链还不是。
+// 取输出用 `@10`（exec-raw）而不是 `@5`：`@5` 按设计对两个流做 trim，子进程
+// 末尾的换行在 wd 看到它之前就没了。`@10` 是同一个能力、同一份授权
+// （CLI 绑 @5 时一起绑 @10），只是两个流原样返回。
 : wd-emit { dup strlen 0 = ?? drop | print ] } ;
 
 // ── 编译（并可跑）一个文件 ──────────────────────────────────────────
@@ -308,7 +364,7 @@
             drop drop
             "wd: cannot find the built artifact\n" .
             1 exit ]
-        @5                            // S [status out err]
+        @10                           // S [status out err]（原样，供逐字节转发）
         dup 1 @nth wd-emit            // S res
         dup 2 @nth wd-emit            // S res
         drop                          // S

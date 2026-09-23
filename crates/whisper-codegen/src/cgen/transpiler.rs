@@ -807,12 +807,18 @@ fn transpile_opcodes(
                 );
             }
 
-            // ── Capability (no-op in native) ────────────────────
-            Opcode::CapCall(_) => {
-                let _ = writeln!(out, "{pad}// cap_call: no-op in native mode");
+            // ── Capability ──────────────────────────────────────
+            // These used to emit a bare comment — i.e. the generated program
+            // silently did *less* than the source said, which is the worst
+            // failure mode there is. The runtime already provides both
+            // symbols (`W_call` for quotations and the `W__<n>` capability
+            // ABI the self-hosted cgen has always emitted), so mirror that
+            // here instead of dropping the operation.
+            Opcode::CapCall(id) => {
+                let _ = writeln!(out, "{pad}W__{id}();");
             }
             Opcode::CapExec => {
-                let _ = writeln!(out, "{pad}// cap_exec: no-op in native mode");
+                let _ = writeln!(out, "{pad}W_call();");
             }
 
             // ── Confidence (simplified — pass through value) ────

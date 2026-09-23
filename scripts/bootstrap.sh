@@ -22,6 +22,9 @@ mkdir -p "$OUT"
 trap 'rm -rf "$OUT/.tmp"' EXIT
 TMP="$OUT/.tmp"; mkdir -p "$TMP"
 
+# shellcheck source=lib/same-bytes.sh
+. "$(dirname "$0")/lib/same-bytes.sh"
+
 step() { echo "[bootstrap] $*"; }
 
 step "1/7 seed: gcc -> whisper0"
@@ -37,7 +40,7 @@ step "3/7 whisper1 recompiles the compiler -> whisper2 (the toolchain)"
 
 step "4/7 fixed-point check (whisper2 output must equal whisper1's)"
 "$OUT/whisper2" -c < "$ROOT/whisperc/compiler.all.ws" > "$TMP/gen3.c" 2>/dev/null
-if ! cmp -s "$TMP/gen2.c" "$TMP/gen3.c"; then
+if ! same_bytes "$TMP/gen2.c" "$TMP/gen3.c"; then
     echo "[bootstrap] FIXED POINT BROKEN: gen2 != gen3" >&2
     exit 1
 fi

@@ -18,7 +18,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.0.8-7cffc4" alt="version">
-  <img src="https://img.shields.io/badge/tests-482%20passed%20%2B%207%20gates-brightgreen" alt="tests">
+  <img src="https://img.shields.io/badge/tests-490%20passed%20%2B%207%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
   <img src="https://img.shields.io/badge/stdlib-20%20modules-blue" alt="stdlib">
@@ -266,6 +266,7 @@ whisper build hello.ws -t bundle -o app && ./app
 | `@7` | `http-audit` | — | ✅ | ❌ 同上 |
 | `@8` | `http-req-raw` | 同 `@6` | ✅ | ❌ 同上 |
 | `@9` | `http-req-parallel` | 同 `@6` | ✅ | ❌ 同上 |
+| `@10` | `exec-raw` | 同 `@5`，但两个流**不 trim** | ✅ | ✅（2026-09-21 起） |
 
 `@6` 家族另有 cookie 罐、每请求审计行、`Transfer-Encoding: chunked` 自动解码、
 host 白名单（零出域）、连接 10s/读写 15s 超时（挂死端点化为 status 0 无证据响应）。
@@ -277,9 +278,13 @@ host 白名单（零出域）、连接 10s/读写 15s 超时（挂死端点化�
 > **c2 链未实现的 `@6`-`@9` 会显式失败**：程序照常构建（只 `import "std/http"`
 > 而只用 `@2` 的程序不受影响），调用到未实现的 id 时打印
 > `capability @6 (http-req (session)) is not implemented on the C chain` 并退出。
-> 其余能力——`@0` 文件读、`@1` 文件写、`@4` 环境变量、`@5` 执行命令——两条链
-> 均已实现并逐行对拍一致。详见 `docs/independence-design.md` Step 2a/2b 与
-> `tests/step2b_preregistered.md`。
+> 其余能力——`@0` 文件读、`@1` 文件写、`@4` 环境变量、`@5` 执行命令、
+> `@10` 执行命令（原样流）——两条链均已实现并逐行对拍一致。详见
+> `docs/independence-design.md` Step 2a/2b 与 `tests/step2b_preregistered.md`。
+>
+> **`@10` 与 `@5` 是同一份授权的两种结果形状**：CLI 绑 `@5` 时一起绑 `@10`，
+> 未授权时 `@10` 一样被拒（`Capability not bound: @10`）。`@5` 的 `trim` 是
+> 命令替换惯用法依赖的行为，故保留；逐字节转发（`wd run`）用 `@10`。
 
 ## 性能
 
@@ -383,16 +388,16 @@ bash scripts/syntax-gate.sh                      # 26 语法断言（conformance
 bash scripts/stdlib-gate.sh                      # 58 双链 stdlib 断言（VM+c2 输出一致）
 bash scripts/net-gate.sh                         # 真实 HTTP 服务 + curl
 bash scripts/app-gate.sh                         # 13 路由 Web 应用断言
-bash tools/opcode_coverage.sh                    # 87 项逐特性双跑（VM vs 自举链）
+bash tools/opcode_coverage.sh                    # 90 项逐特性双跑（VM vs 自举链）
 bash scripts/typecheck-gate.sh                   # 类型检查假阳性棘轮（三语料 FP=0）
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验
 ```
 
-测试覆盖（482 项，`cargo test --workspace` 实测）：
-- 152 项 CLI（31 单元 + 6 基准 + 115 集成：stdlib 导入冒烟、关键字作 def 名回归、软/硬自举管线、c2 链端到端、能力 ABI 与 `call`/多引号/五种容器内引号双链对拍、`print` 逐字节与 `exit` 真退出码双链对拍、exe 产物零 Rust 断言、bundle 尾负载）
+测试覆盖（490 项，`cargo test --workspace` 实测）：
+- 156 项 CLI（31 单元 + 6 基准 + 119 集成：stdlib 导入冒烟、关键字作 def 名回归、软/硬自举管线、c2 链端到端、能力 ABI 与 `call`/多引号/五种容器内引号双链对拍、`print` 逐字节与 `exit` 真退出码、CRLF 归一化、`-t c` 的能力 opcode、`@10` exec-raw、`wd` 与 `-t c2` 的 C 输出逐字节相同、exe 产物零 Rust 断言、bundle 尾负载）
 - 135 项核心 VM（124 单元 + 7 模糊测试 2500+ 随机程序 + 4 项 opcode 元数据）
 - 139 项 codegen（62 单元 + 65 流水线 + 12 C 后端端到端 gcc）
-- 34 项 parser（含「每个关键字都可作 def 名」参数化回归）
+- 38 项 parser（含「每个关键字都可作 def 名」参数化回归、CRLF 归一化四条）
 - 15 项 typecheck + 5 项 LSP + 2 项包管理器
 - 优化器语义保持测试（优化前后执行结果必须一致）
 - CI 含 selfhost job：种子编译 → 22 核心用例双模式 → 7 道门禁（固定点 + stdlib/覆盖/类型/语法/网络/应用）
