@@ -207,7 +207,9 @@ E4 的验证用的是**零 Rust 链的产物**（`bash scripts/build-wd.sh` 端�
 
 `bash scripts/build-wd.sh` 本轮**端到端重跑通过**（此前只有 `bash -n` 级证据）——
 这条链要重新走一遍种子 → whisper0 → whisper1，是 `compiler.all.ws` 改动的
-独立复核。`scripts/bootstrap.sh` 仍未端到端重跑（见 W-3）。
+独立复核。`scripts/bootstrap.sh` 当时仍未端到端重跑；**收口战役 W3 已补上**：
+它的第 4 步因为本机缺 `cmp` 而假报固定点破裂（`! cmp -s` 在命令不存在时取反
+为真），修掉后**七步全过、EXIT=0**。
 
 ### 反向判据自查
 
