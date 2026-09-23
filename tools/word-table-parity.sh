@@ -15,9 +15,13 @@ LEX="$ROOT/crates/whisper-parser/src/lexer.rs"
 TBL="$ROOT/whisperc/compiler.all.ws"
 
 # 棘轮基线。数字只能往下调：每收掉一个就把它改小，别在没修的情况下调大。
-# 2026-09-21 建立时 = 18（对拍出 22 个，其中 4 个是下面白名单里的良性项）。
+# 2026-09-21 建立时 = 12。
+#   ⚠️ 初版写成 18 是**在错测量上建的棘轮**：提取时把 lexer.rs 里
+#   `read_at_word` 的名字表也扫了进来，而那张表的键只在 `@` **之后**生效
+#   （`@nth` / `@map` …），不是裸词关键字。于是 nth/map/each/fold/filter/times
+#   六个被误报成"只在 Rust 侧"。已把提取限定在第一个名字表（见下面的 awk）。
 # 可用 PARITY_CEIL 覆盖——用于自测"这门禁真的会拦"。
-CEIL="${PARITY_CEIL:-18}"
+CEIL="${PARITY_CEIL:-12}"
 
 # ── 白名单：确认良性，不算缺陷 ──────────────────────────────────────
 #   over     自举前端在 compiler.all.ws 里用**代码路径**处理它
@@ -34,8 +38,12 @@ call"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-# Rust 侧：词法关键字表里 `"词" => TokenKind::X`
-grep -oE '^[[:space:]]*"[^"]+"[[:space:]]*=>[[:space:]]*TokenKind::' "$LEX" \
+# Rust 侧：词法关键字表里 `"词" => TokenKind::X`。
+# **必须止于 `fn read_at_word`**：那之后还有一张名字表，但它的键只在 `@` 之后
+# 生效（`@nth`/`@map`/…），不是裸词。初版漏了这个截止条件，把六个 `@` 别名
+# 误报成"只有 Rust 认的裸词"，棘轮基线因此虚高。
+awk '/fn read_at_word/{exit}
+     /^[[:space:]]*"[^"]+"[[:space:]]*=>[[:space:]]*TokenKind::/ {print}' "$LEX" \
   | sed -E 's/^[[:space:]]*"([^"]+)".*/\1/' | sort -u > "$tmp/rust.txt"
 
 # 自举链侧：词表里的 `[n "word"]`

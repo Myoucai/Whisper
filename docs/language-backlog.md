@@ -81,23 +81,39 @@
 **判据（未达成）**：同时 import `std/str` 与 `std/list` 的程序两链都能编能跑。
 **现状：四对冲突未解决，该程序在 C 链上仍编不出。**
 
-## 战役 S-5：Rust 前端关键字 × 自举链词表的机械对拍（**2026-09-21 发现**）
+## 战役 S-5：Rust 前端关键字 × 自举链词表的机械对拍（**2026-09-21 工具已落地**）
 
-**做法**：机械提取 `crates/whisper-parser/src/lexer.rs` 的关键字表与
-`whisperc/compiler.all.ws` 的 `[n "word"]` 词表，求差集。
-**结果：22 个词只在 Rust 侧。** 分类如下（逐项经验验证过一部分）：
+**工具**：`tools/word-table-parity.sh`，带棘轮（`CEIL`，差异数只能减不能增），
+已接进 CI。**自测过会拦**：`PARITY_CEIL=11` → FAIL exit 1。
 
-| 类别 | 词 | 结论 |
-|---|---|---|
-| **误报** | `over` | 自举前端在 `compiler.all.ws:543` 用**代码路径**处理（不在 `[n "word"]` 列表里），两链都好用 |
-| **设计如此** | `import` `export` | 自举前端有意丢弃这两个结构关键字 |
-| **另有通路** | `call` | 词表里没有，但 cgen 发 `W_call()`，而 `runtime.c` 定义了它 |
-| **两链都坏的死别名** | `nth` `map` `each` `fold` `filter` `times` | 裸拼写在**两条链**上都 `Undefined word` —— 不是分叉，是**死词汇**。**S-4 的成因**：正因它们不可用，`std/list` 与 `std/str` 才各自定义 `: nth` 兜底，于是撞名 |
-| **真分叉（待逐项核）** | `chr` `listslice` `bytes->hex` `bytes-new` `bytes-push` `bytes-len` `bytes-write` `op-effect` `size-of` `word-size` `rand` `seed!` | 实测 `chr` VM 给 `"A"`、c2 编不出（`mod` 那一类） |
+**当前基线：12 个**。清单（自举链词表里没有这些拼写）：
 
-**判据（未达成）**：把对拍做成常驻工具（`tools/word-table-parity.sh`），带一个
-**棘轮**（差异数只能减不能增），并把"真分叉"那一档逐个收敛。
-**现状：只做了手工对拍，工具还没落地。**
+```
+bytes->hex  bytes-len  bytes-new  bytes-push  bytes-write
+chr  listslice  op-effect  rand  seed!  size-of  word-size
+```
+
+### ⚠️ 一次测量事故（写下来免得重犯）
+
+初版工具报 **18 个**，多出来的六个是 `nth` `map` `each` `fold` `filter` `times`。
+我当时把它们的性质写成"两链都坏的死别名"，还说它们是 **S-4 撞名的成因**——
+**两条都是错的，是提取脚本的 bug 造成的**：
+
+`lexer.rs` 里有**两张**名字表。第一张是裸词关键字表（`read_word` 用），
+第二张在 `read_at_word` 里，它的键**只在 `@` 之后生效**（`@nth`/`@map`/…）。
+我的正则 `^\s*"([^"]+)"\s*=>\s*TokenKind::` 把两张都扫了进来，于是把 `@` 别名
+当成了裸词。实测早就与此矛盾——裸 `map` 在 VM 上就是 `Undefined word: map`，
+它**从来不是关键字**。
+
+**教训**：棘轮是"把当前状态钉住"，所以**在错测量上建棘轮比不建更糟**——它会把
+错误制度化。修法是把提取止于 `fn read_at_word`（脚本里已加注释说明该截止条件）。
+
+**S-4 的成因据此更正**：`std/list` 与 `std/str` 各自定义 `nth` **不是**为了兜底
+某个坏别名，而是和 `first`/`last` 一样，就是各自模块的便利词；它们撞名是因为
+**两个模块的词汇表本身重叠**，与关键字表无关。
+
+**判据（未达成）**：把清单里那 12 个逐个收敛（补进词表，或从 Rust 前端删掉），
+每收掉一个就把 `CEIL` 下调一格。**现状：只落了工具，一个都还没收。**
 
 
 **根因**：`range-to` 定义在 `stdlib/list.ws:25`，而
