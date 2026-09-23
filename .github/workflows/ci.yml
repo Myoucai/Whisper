@@ -62,6 +62,9 @@ jobs:
           # just the exit code (the deleted second compiler also exited 0).
           cmp /tmp/bt_bootstrap.c /tmp/bt_c2.c
 
+      - name: Word-table parity (Rust front end vs self-hosted table)
+        run: bash tools/word-table-parity.sh
+
   c-backend:
     name: C transpiler end-to-end (gcc)
     runs-on: ubuntu-latest
