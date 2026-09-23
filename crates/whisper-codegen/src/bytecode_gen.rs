@@ -311,6 +311,8 @@ impl BytecodeGenerator {
             Operator::OutputTop => Opcode::OutputTop,
             Operator::OutputAll => Opcode::OutputAll,
             Operator::ReadInput => Opcode::ReadInput,
+            Operator::Print => Opcode::Print,
+            Operator::Exit => Opcode::Exit,
         };
         self.emit(opcode);
     }

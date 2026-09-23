@@ -448,6 +448,7 @@ export group-paired-rec
     [32 "&"] [33 "|"] [34 "!"]
     [0 "_"] [3 "@"] [1 "`"]
     [144 "."] [145 ".."] [146 ","]
+    [147 "print"] [148 "exit"]
     [160 ":"] [161 ";"]
     [80 "??"] [83 "#"] [4 "$"]
     [0 "dup"] [2 "drop"] [1 "swap"] [3 "rot"]
@@ -1301,6 +1302,10 @@ export classify-full
     dup 97 = ?? drop "return;\n" return ]
     dup 144 = ?? drop "w_print_val(w_pop());\n" return ]
     dup 145 = ?? drop "w_output_all();\n" return ]
+    // L-1: 裸打印（不补换行、不改写引号）与真退出码。
+    // 0x93/0x94 —— 不能取 0xC8/0xC9：那是 listdir/mkdir（十进制 200/201）。
+    dup 147 = ?? drop "{const char*_s=(const char*)w_as_ptr(w_pop());w_print_raw(_s);}\n" return ]
+    dup 148 = ?? drop "{int64_t _c=w_as_i64(w_pop());exit((int)_c);}\n" return ]
     dup 176 = ?? drop "{int64_t _n=w_as_i64(w_pop());w_push(W_F64((double)_n));}\n" return ]
     dup 177 = ?? drop "{double _f=w_as_f64(w_pop());w_push(W_I64((int64_t)_f));}\n" return ]
     dup 178 = ?? drop "{double _f=w_as_f64(w_pop());w_push(W_F64(w_fsqrt(_f)));}\n" return ]

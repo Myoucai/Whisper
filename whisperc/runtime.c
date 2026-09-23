@@ -20,6 +20,8 @@
 #include <ws2tcpip.h>
 #include <windows.h>
 #include <process.h>
+#include <io.h>         // _setmode / _fileno, for `print`'s binary stdout
+#include <fcntl.h>      // _O_BINARY
 #else
 #include <sys/mman.h>
 #include <netdb.h>      // getaddrinfo / freeaddrinfo for the HTTP client
@@ -741,6 +743,14 @@ static void w_dump_val(wval v);
 static void w_print_val(wval v) {
     w_dump_val(v);
     putchar('\n');
+}
+
+// L-1 `print`: write a string to stdout verbatim — no trailing newline, no
+// quoting, no rewriting. (Verbatim-ness also relies on stdout being binary;
+// w_init switches it there, so this is a plain write.)
+static void w_print_raw(const char *s) {
+    fputs(s, stdout);
+    fflush(stdout);
 }
 
 static int w_pair_is_marker(wval pv);  // defined with the map helpers
@@ -2643,6 +2653,15 @@ static void w_serve_concurrent(int64_t port, wfn handler) {
 static void w_init(int argc, char **argv) {
 #ifdef _WIN32
     SetUnhandledExceptionFilter(_seh_handler);
+    // L-1: stdout is a byte stream, not a text stream. Windows' default text
+    // mode rewrites every '\n' as CRLF — but `print` promises verbatim bytes,
+    // and the VM's stdout has never translated anything, so the two chains
+    // disagreed on every newline (the Rust tests had to strip '\r' to compare).
+    // Switching here rather than lazily inside `print` matters: text
+    // translation is applied when the buffer is *flushed*, so a lazy switch
+    // would silently retranslate earlier output and make `.` depend on
+    // whether some later code happened to call `print`.
+    _setmode(_fileno(stdout), _O_BINARY);
 #endif
     if (w_stack == NULL) {
         w_stack = (wval *)malloc(sizeof(wval) * STACK_SIZE);

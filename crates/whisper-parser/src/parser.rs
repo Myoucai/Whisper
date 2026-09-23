@@ -1019,6 +1019,14 @@ impl Parser {
                 self.advance();
                 Ok(Some(AstNode::Op(Operator::ReadInput)))
             }
+            TokenKind::Print => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Print)))
+            }
+            TokenKind::Exit => {
+                self.advance();
+                Ok(Some(AstNode::Op(Operator::Exit)))
+            }
 
             // Import/Export
             TokenKind::Import => {
@@ -1528,6 +1536,10 @@ mod tests {
             "str?",
             "bool?",
             "return",
+            // L-1 primitives. They must stay usable as definition names too:
+            // adding them to the keyword map is what makes that possible.
+            "print",
+            "exit",
         ];
         for kw in keywords {
             let src = format!(": {kw} {{ 1 }} ;");

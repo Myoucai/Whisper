@@ -201,6 +201,19 @@ t qdef-body    ': f { { 5 } drop 7 } ; f .'
 t qquote-nest  '{ { 5 } } call call .'
 t qhof-body    '[1 2] { { 7 } drop 1 + } @map .'
 
+# ── L-1：print / exit 两个原语（tests/l1_preregistered.md）────────
+# 分工说明：本函数的 t() 用 $( ) 取值，会吃掉尾换行，也不看退出码——所以
+# 它在这里只负责"两条链都认这两个 opcode 且不跑飞"。逐字节 stdout 与真实
+# 退出码由 Rust 集成测试负责（Command::output() 拿原始字节与 status）：
+#   l1_print_is_byte_exact_on_both_chains / l1_exit_sets_a_real_exit_code
+t print-basic  '"hi" print'
+t print-twice  '"a" print "b" print 7 .'
+t print-nl     '"x\n" print'
+t print-empty  '"" print 5 .'
+t exit-zero    '0 exit'
+t exit-code    '3 exit'
+t exit-in-word ': f { 7 exit } ; f 1 .'
+
 echo "coverage: $PASS pass, $FAIL fail, $GAP known-gap"
 echo "$GAPS" | tr '|' '\n' | grep -v '^$' | sed 's/^/  GAP /'
 echo "$FAILED" | tr '|' '\n' | grep -v '^$' | sed 's/^/  DIVERGE /'

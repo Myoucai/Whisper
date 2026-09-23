@@ -786,6 +786,8 @@ fn hover_info(word: &str) -> String {
         "." => "**Output** — print top of stack\n\nStack: `a →`".into(),
         ".." => "**OutputAll** — print entire stack".into(),
         "," => "**Read** — read input line → string".into(),
+        "print" => "**print** — write top string to stdout verbatim (no newline)\n\nStack: `str →`".into(),
+        "exit" => "**exit** — terminate the process with a real exit code\n\nStack: `i64 →`".into(),
 
         // Definition
         ":" => "**Word definition**\n\n`: name { body } ;`".into(),

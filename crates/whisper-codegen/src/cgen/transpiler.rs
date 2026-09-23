@@ -566,6 +566,20 @@ fn transpile_opcodes(
             Opcode::ReadInput => {
                 let _ = writeln!(out, "{pad}w_push(W_PTR(w_read_line()));");
             }
+            // L-1: verbatim write — no newline, no quoting.
+            Opcode::Print => {
+                let _ = writeln!(
+                    out,
+                    "{pad}{{ const char *_s = (const char*)w_as_ptr(w_pop()); w_print_raw(_s); }}"
+                );
+            }
+            // L-1: real termination (not a return-to-main).
+            Opcode::Exit => {
+                let _ = writeln!(
+                    out,
+                    "{pad}{{ int64_t _c = w_as_i64(w_pop()); exit((int)_c); }}"
+                );
+            }
 
             // ── Byte buffer ─────────────────────────────────────
             Opcode::BytesNew

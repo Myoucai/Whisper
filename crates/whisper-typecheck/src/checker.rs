@@ -967,6 +967,18 @@ impl TypeChecker {
             Operator::OutputAll => {
                 stack.clear();
             }
+            // L-1: raw write. It formats nothing, so unlike `.` it cannot
+            // accept "whatever happens to be on top" — a non-string has no
+            // byte representation to forward.
+            Operator::Print => {
+                self.expect(stack, &Type::Str, errors, ctx, "print string");
+            }
+            // L-1: pops the exit code. Nothing is pushed back: the code
+            // after `exit` is unreachable, and pretending otherwise would
+            // make the stack model lie.
+            Operator::Exit => {
+                self.expect(stack, &Type::I64, errors, ctx, "exit code");
+            }
 
             // Map operations
             Operator::MapNew => {

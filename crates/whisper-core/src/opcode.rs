@@ -368,13 +368,20 @@ pub enum Opcode {
     /// Probabilistic choice: {alt1} {alt2} ?|
     ProbChoice,
 
-    // === IO (0x90-0x93) ===
+    // === IO (0x90-0x94) ===
     /// Output top of stack
     OutputTop,
     /// Output entire stack
     OutputAll,
     /// Read input
     ReadInput,
+    /// Write top-of-stack string to stdout **verbatim** — no trailing
+    /// newline, no quoting. `OutputTop` is for humans; this is for byte
+    /// plumbing (forwarding a child process's output, emitting a fragment).
+    Print,
+    /// Terminate the process with the exit code on top of the stack.
+    /// Unlike `Return`/`Leave`, this does not unwind to `main`: it stops.
+    Exit,
 
     // === Definitions (0xA0-0xA3) ===
     /// Define a new word: name
@@ -588,6 +595,12 @@ impl Opcode {
             Opcode::OutputTop => 0x90,
             Opcode::OutputAll => 0x91,
             Opcode::ReadInput => 0x92,
+            // 0x93/0x94 sit right after the IO block. They were picked by
+            // machine-enumerating the free bytes of BOTH chains: the decimal
+            // literals `200`/`201` (listdir/mkdir) are 0xC8/0xC9, so the
+            // originally-planned bytes there were already taken.
+            Opcode::Print => 0x93,
+            Opcode::Exit => 0x94,
 
             // Definitions
             Opcode::DefWord(_) => 0xA0,
@@ -773,6 +786,8 @@ impl Opcode {
             Opcode::OutputTop => "output_top",
             Opcode::OutputAll => "output_all",
             Opcode::ReadInput => "read_input",
+            Opcode::Print => "print",
+            Opcode::Exit => "exit",
             Opcode::DefWord(_) => "def_word",
             Opcode::EndDef => "end_def",
             Opcode::Import => "import",
@@ -956,6 +971,8 @@ mod tests {
             Opcode::DropN,
             Opcode::ConfLabel(0.0),
             Opcode::ProbChoice,
+            Opcode::Print,
+            Opcode::Exit,
             Opcode::OutputTop,
             Opcode::OutputAll,
             Opcode::ReadInput,
@@ -984,5 +1001,13 @@ mod tests {
         // opcodes this bug involved — a direct regression pin.
         assert_eq!(Opcode::Try.to_byte(), 0xC1);
         assert_eq!(Opcode::BytesToHex.to_byte(), 0xCE);
+
+        // L-1: pin the IO-block additions. 0xC8/0xC9 look free in a hex
+        // grep but are `listdir`/`mkdir` (written as decimal 200/201), so
+        // the byte must stay in the 0x90 block or the two chains diverge.
+        assert_eq!(Opcode::Print.to_byte(), 0x93);
+        assert_eq!(Opcode::Exit.to_byte(), 0x94);
+        assert_ne!(Opcode::Print.to_byte(), Opcode::ListDir.to_byte());
+        assert_ne!(Opcode::Exit.to_byte(), Opcode::Mkdir.to_byte());
     }
 }

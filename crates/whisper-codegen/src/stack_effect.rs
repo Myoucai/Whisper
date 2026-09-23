@@ -86,6 +86,8 @@ pub fn stack_effect(op: &Opcode) -> Option<(usize, usize)> {
         OutputTop => (1, 0), // pops (the `_ .` idiom is Dup first)
         OutputAll => (0, 0), // prints, does not pop
         ReadInput => (0, 1),
+        Print => (1, 0), // pops the string it writes (nothing is echoed back)
+        Exit => (1, 0),  // pops the exit code; never returns, so no result
 
         // ── KV store ───────────────────────────────────────────
         OpEffect => (1, 2),

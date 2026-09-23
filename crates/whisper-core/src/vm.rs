@@ -1682,6 +1682,48 @@ impl Vm {
                 self.data_stack
                     .push(Value::Str(Rc::new(trimmed.to_string())));
             }
+            // L-1: verbatim write. `OutputTop` is a human-facing formatter
+            // (newline + quoting); this is byte plumbing, so it must not
+            // rewrite anything and must not add a newline.
+            Opcode::Print => {
+                let v = self.pop()?.unwrap_signal();
+                match v {
+                    Value::Str(s) => {
+                        use std::io::Write;
+                        let stdout = std::io::stdout();
+                        let mut lock = stdout.lock();
+                        lock.write_all(s.as_bytes())
+                            .and_then(|()| lock.flush())
+                            .map_err(|e| VmError::IoError(e.to_string()))?;
+                    }
+                    other => {
+                        return Err(VmError::TypeMismatch {
+                            expected: "str".into(),
+                            actual: other.type_name().into(),
+                        });
+                    }
+                }
+            }
+            // L-1: real process termination. `Return`/`Leave` unwind to the
+            // caller; this does not — X-3 pins that difference.
+            Opcode::Exit => {
+                let v = self.pop()?.unwrap_signal();
+                match v {
+                    Value::I64(code) => {
+                        // C's exit() flushes stdio; flush here too, so that
+                        // "what got printed before exit" does not depend on
+                        // which chain ran the program.
+                        let _ = std::io::Write::flush(&mut std::io::stdout());
+                        std::process::exit(code as i32)
+                    }
+                    other => {
+                        return Err(VmError::TypeMismatch {
+                            expected: "i64".into(),
+                            actual: other.type_name().into(),
+                        });
+                    }
+                }
+            }
 
             // === Definitions (compiler directives, no-op at runtime) ===
             Opcode::DefWord(_) | Opcode::EndDef | Opcode::Import | Opcode::Export => {

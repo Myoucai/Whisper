@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased (2026-09-21n) — 战役 L-1：`print` 与 `exit` 两个原语
+
+语言缺了两个原语，不是某个程序缺功能：C 链程序恒以 `return 0;` 结束（任何
+Whisper 写的 CLI 都报不了失败），唯一的打印词 `.` 自带换行且对字符串的引号
+处理两链不同（它不是字节通道）。本节补上，判据见 `tests/l1_preregistered.md`。
+
+    "hi" print          # hi        —— 逐字节，无换行
+    3 exit              # shell 看到退出码 3
+    : f { 7 exit } ; f 1 .   # 退出码 7，且不打印 1（真终止）
+
+- **opcode `0x93` = `Print`、`0x94` = `Exit`**，紧接 IO 区（`0x90` `.`、
+  `0x91` `..`、`0x92` 读输入）。走正规 opcode，没有借 `@n` 能力 ABI——
+  "退出进程"和"打印字符串"不是需要授权的事，塞进能力 ABI 会让每个用到的
+  程序都要 `--allow-…`。
+- 触点比预注册多三个（预注册写 11 个 Rust 文件，实际 14）：漏掉的是
+  `lexer.rs`（关键字表）、`token.rs`（`TokenKind` + `keyword_name()`）、
+  `lsp/lib.rs`（词条表）——按 opcode 视角想清单就会漏掉"词形"这一层。
+- **顺带修掉一条长期被测试抹平的真实双链分歧**：C 链在 Windows 上每写一个
+  `\n` 就变成 CRLF，VM 从不翻译。`print` 要求逐字节，绕不过去。修法是在
+  `w_init` 里一次性把 stdout 设为二进制模式。**行为变更**：C 链程序（含 `.`）
+  的换行从 CRLF 变为 LF。第一版修法（在 `print` 里惰性切换）是错的：文本
+  翻译发生在 flush 时，而重定向到文件时 stdout 全缓冲，缓冲区里更早的 `\n`
+  也会被按二进制写出——输出会取决于后面有没有调用 `print`。
+
+**实测**：E1（stdout 逐字节）4/4、E2（真退出码）3/3，VM 与 `-t c2` 两链全中；
+`cargo test --workspace` 482/0；syntax 26 / stdlib 58 / typecheck FP=0 / net /
+app 13 路由全绿；`opcode_coverage.sh` 80 → **87** 例全过；固定点 gen2 == gen3。
+
+**E4 只达成一半（如实登记）**：`wd` 的错误路径现在有真退出码（缺源文件 → 1，
+用法错 → 2），转发也改用了 `print`（不再自己补换行）。但 `wd run` 的转发段
+仍与直接运行产物不逐字节相同——差掉的字节是**子进程尾部空白**，它在 `wd`
+看到输出之前就被能力 `@5` 按设计 `trim()` 掉了（两链都写明"mirror Rust 的
+`String::trim()`"）。这是能力契约问题、不在 L-1 范围，登记为 W-5。
+
+**验证用的是零 Rust 链的产物**：`bash scripts/build-wd.sh` 本轮端到端重跑通过
+（种子 → whisper0 → whisper1 → wd，全程只有 gcc），E4 与四条 `wd run` 冒烟
+都在 `target/wd/wd` 上复验；`-t c`/`c2`/`exe`/`native`/`bundle`/`wbin` 六个
+构建目标也各自验过认得新 opcode。
+
 ## Unreleased (2026-09-21m) — `bootstrap.sh` 一条命令走到 `wd`
 
 `scripts/bootstrap.sh` 从 5 步扩到 7 步：固定点自检之后，用刚造出来的

@@ -429,3 +429,62 @@ Whisper 的 C 后端（`-t c` / `-t c2` / `-t exe` / `-t native`）把 **C 当�
 #t ?? { 9 } | { 8 } ] call .    # 9   （条件分支里的引号）
 : f { { 5 } drop 7 } ; f .      # 7   （词定义体里的引号）
 ```
+
+## 17. 词汇附录 v1.0.10 —— `print` 与 `exit`（两个缺失的原语）
+
+```
+"..."  print         ;; 把栈顶字符串逐字节写 stdout，不补换行
+n      exit          ;; 以 n 为退出码终止进程
+```
+
+两个词都不是"新功能"，而是**语言缺了两个原语**：在此之前，C 链程序恒以
+`return 0;` 结束（任何 Whisper 写的 CLI 都无法向 shell 报告失败），而唯一的
+打印词 `.` 自带换行并对字符串做与平台相关的处理（它不是字节通道）。
+`striter` 不是打印词，是字符串**迭代器**（推 `[字符码, 余串]`）。
+
+**opcode**：`0x93` = `Print`、`0x94` = `Exit`，紧接 IO 区（`0x90` `.`、
+`0x91` `..`、`0x92` 读输入）。
+
+> **选字节的教训**：初稿选了 `0xC8`/`0xC9`，看着空闲——其实那是
+> `listdir`/`mkdir`，它们在 `opcode.rs` 里写成**十进制** `200`/`201`，
+> 十六进制 grep 扫不到。字节占用必须机器枚举两链（`Opcode::to_byte` ×
+> `compiler.all.ws` 的词表与 `emit-bare`），不能眼看。
+
+**语义**
+
+| | VM | C 链 |
+|---|---|---|
+| `print` | 取栈顶（先 `unwrap_signal`），要求 `str`，`write_all` + `flush` | `w_print_raw`：`fputs` + `fflush` |
+| `exit` | 取栈顶，要求 `i64`，`std::process::exit(code)` | `exit((int)code)` |
+
+- 两者类型不符时都报错（`print` 收非字符串、`exit` 收非整数），不静默转换。
+- `exit` 是**真终止**，不是"提前 return 到 main"：`exit` 之后的代码不执行，
+  调用它的词也不返回。`return`/`leave` 仍是从当前词返回。
+- `print` 不消费 `.` 的格式化规则，也不受其影响：`. ` 面向人（补换行），
+  `print` 面向字节（转发子进程输出、拼装片段）。
+
+**逐字节的前提**：C 链在 Windows 上默认是文本模式 stdout，会把每个 `\n`
+改写成 CRLF，而 VM 从不翻译——两链因此在**每一个换行**上都不一致（此前靠
+集成测试里的 `.replace(['\r','"'], "")` 抹平）。现在 `w_init` 在程序启动时把
+stdout 设为二进制模式，两链的换行都是单个 LF。**这是行为变更**：C 链程序
+（含 `.`）从"CRLF"变为"LF"。
+
+**已知残留**：`print` 的逐字节只保证"写出去的字节 = 栈上字符串的字节"。
+若字符串来自 `@5`（exec），尾部空白在**到达 Whisper 之前**已被该能力的
+`trim()` 吃掉——见 `docs/language-backlog.md` 的 W-5。
+
+**示例**
+
+```
+"hi" print                      # hi        （无换行）
+"a" print "b" print             # ab
+"x\n" print                     # x + LF    （保留自带换行，不变成 CRLF）
+3 exit                          # shell 看到退出码 3
+: f { 7 exit } ; f 1 .          # 退出码 7，且不打印 1（真终止）
+```
+
+双链契约由 `tools/opcode_coverage.sh` 的 `print-*` / `exit-*` 七例，以及
+`crates/whisper-cli/tests/integration_tests.rs` 的
+`l1_print_is_byte_exact_on_both_chains`（逐字节比较原始 stdout）与
+`l1_exit_sets_a_real_exit_code`（比较真实 `ExitStatus`）把关。
+

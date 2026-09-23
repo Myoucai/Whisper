@@ -9,6 +9,10 @@
 //   wd build <src.ws> <out>     compile to <out>, leaving <out>.c behind
 //   wd run   <src.ws> <out>     same, then run <out>
 //
+// Exit codes: 0 success, 1 build/IO error (missing source, C compiler
+// failure, artifact not produced), 2 usage error. Being able to report
+// failure at all needs the `exit` primitive (opcode 148).
+//
 //   WHISPER_CC     C compiler to invoke        (default gcc)
 //   WHISPER_ROOT   repo root holding runtime.c (default .)
 //
@@ -214,7 +218,7 @@
     dup len 4 < ??
         drop
         "usage: wd build|run <src.ws> <out>\n" .
-        [] return ]
+        2 exit ]
     dup 1 @nth swap                   // verb A
     dup 2 @nth swap                   // verb src A
     dup 3 @nth swap                   // verb src out A
@@ -254,18 +258,21 @@
     drop ""
 } ;
 
-// [s] → 转发子进程输出。
-// 注意 `striter` 是字符串**迭代器**（推 [字符码, 余串]），不是打印词；
-// 打印只有 `.`，它会补一个换行。所以只转发非空输出，且文本末尾会多一个
-// 换行——本轮如实登记为缺口（逐字节转发需要语言侧给一个裸打印词）。
-: wd-emit { dup strlen 0 = ?? drop | . ] } ;
+// [s] → 转发子进程输出。用 `print`（opcode 147）：它把字符串**逐字节**写
+// stdout，不补换行、不改写引号。曾经这里只能用 `.`，而 `.` 会补一个换行、
+// 两链对字符串的引号处理还不一致——`wd run` 因此做不到逐字节转发。
+//
+// 残留（已登记为 W-5，不在 L-1 范围）：`@5` 按设计对两个流做 trim（runtime.c
+// 里写明"mirror Rust 的 String::trim()"），所以子进程末尾的换行在 wd 看到
+// 它之前就没了。`wd` 这一侧现在是逐字节的；整条链还不是。
+: wd-emit { dup strlen 0 = ?? drop | print ] } ;
 
 // ── 编译（并可跑）一个文件 ──────────────────────────────────────────
 // S = [verb src out]
 : wd-build {
     dup 1 @nth file-exists 0 = ??
         "wd: cannot read source: " over 1 @nth strcat "\n" strcat .
-        drop return ]
+        1 exit ]
 
     dup 1 @nth                        // S src
     read-file                         // S text
@@ -290,7 +297,7 @@
         drop                          // S           —— 编译成功
         dup 2 @nth "wd: compiled -> " swap strcat "\n" strcat .
     |   dup 2 @nth "wd: C compiler failed:\n" swap strcat .
-        drop return
+        1 exit
     ]
 
     dup 0 @nth "run" str-eq? ??
@@ -300,7 +307,7 @@
         dup strlen 0 = ??
             drop drop
             "wd: cannot find the built artifact\n" .
-            return ]
+            1 exit ]
         @5                            // S [status out err]
         dup 1 @nth wd-emit            // S res
         dup 2 @nth wd-emit            // S res

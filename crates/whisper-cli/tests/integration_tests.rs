@@ -1637,7 +1637,8 @@ fn wd_driver_compiles_and_runs_when_present() {
         norm(&run.stdout)
     );
 
-    // A4: a missing source is named
+    // A4: a missing source is named — and, since L-1 gave the language an
+    // `exit`, the failure also reaches the shell as a non-zero status.
     let bad = std::process::Command::new(&wd)
         .arg("build")
         .arg(dir.join("nope.ws"))
@@ -1650,6 +1651,12 @@ fn wd_driver_compiles_and_runs_when_present() {
     assert!(
         msg.contains("cannot read source") && msg.contains("nope.ws"),
         "wd should name the missing file, got {msg:?}"
+    );
+    assert_eq!(
+        bad.status.code(),
+        Some(1),
+        "E4-a: a failed build must not report success to the shell (stderr: {})",
+        String::from_utf8_lossy(&bad.stderr)
     );
 }
 
@@ -2074,4 +2081,168 @@ fn namespace_qualified_words() {
         vec!["\"1\"", "\"MINE\"", "\"MINE\""],
         "namespace output mismatch: {s}"
     );
+}
+
+// ── L-1: `print` and `exit` ─────────────────────────────────────────
+// tests/l1_preregistered.md. These two primitives were missing from the
+// language itself, not from any program: cgen always emitted `return 0;`
+// (so no Whisper CLI could report failure) and the only printing word was
+// `.`, which adds a newline and quotes strings differently per chain (so
+// nothing could forward a child process's output byte-for-byte).
+//
+// The assertions below are deliberately byte-level: `Command::output()`
+// hands back raw stdout and a real `ExitStatus`, which is exactly what the
+// coverage gate's `$( )`-based `t()` helper cannot see.
+
+/// Run `source` on the VM and on the C chain, returning raw stdout bytes.
+/// Panics with the compiler's stderr if either build fails.
+fn both_chains_stdout(dir: &std::path::Path, name: &str, source: &str) -> (Vec<u8>, Vec<u8>) {
+    let src = dir.join(format!("{name}.ws"));
+    std::fs::write(&src, source).unwrap();
+
+    let vm = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .args(["run", "--no-strict-types"])
+        .arg(&src)
+        .output()
+        .unwrap();
+    assert!(
+        vm.status.success(),
+        "VM failed on {name} ({source:?}): {}",
+        String::from_utf8_lossy(&vm.stderr)
+    );
+
+    let out = dir.join(name);
+    let build = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .args(["build", "-t", "c2", "-o"])
+        .arg(&out)
+        .arg(&src)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "c2 build failed on {name} ({source:?}): {}",
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let artifact = if out.exists() {
+        out.clone()
+    } else {
+        out.with_extension(std::env::consts::EXE_EXTENSION)
+    };
+    let c2 = std::process::Command::new(&artifact).output().unwrap();
+    assert!(
+        c2.status.success(),
+        "C chain failed on {name}: {}",
+        String::from_utf8_lossy(&c2.stderr)
+    );
+    (vm.stdout, c2.stdout)
+}
+
+/// E1 — `print` is byte plumbing, not formatting. The expected vectors are
+/// spelled as bytes on purpose: a `\r` smuggled in by Windows text mode, or
+/// a `\n` added by a formatter, is exactly the failure this pins.
+#[test]
+fn l1_print_is_byte_exact_on_both_chains() {
+    if std::process::Command::new("gcc")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        eprintln!("skipping: gcc not available");
+        return;
+    }
+    let dir = std::env::temp_dir().join("whisper_l1_print");
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let cases: &[(&str, &str, &[u8])] = &[
+        ("p1", "\"hi\" print\n", b"hi"),
+        ("p2", "\"a\" print \"b\" print\n", b"ab"),
+        // The literal's own newline survives as a single LF — no CRLF.
+        ("p3", "\"x\\n\" print\n", b"x\n"),
+        ("p4", "\"\" print\n", b""),
+    ];
+    for (name, source, want) in cases {
+        let (vm, c2) = both_chains_stdout(&dir, name, source);
+        assert_eq!(
+            vm, *want,
+            "VM stdout for {source:?} should be {want:?}, got {vm:?}"
+        );
+        assert_eq!(
+            c2, *want,
+            "C-chain stdout for {source:?} should be {want:?}, got {c2:?}"
+        );
+        assert_eq!(vm, c2, "chains disagree on {source:?}");
+    }
+}
+
+/// E2 — `exit` reports a real process exit code and really stops. X-3 is the
+/// one that matters: a fake `exit` implemented as "return to main" would
+/// still print the `1` after the call.
+#[test]
+fn l1_exit_sets_a_real_exit_code() {
+    if std::process::Command::new("gcc")
+        .arg("--version")
+        .output()
+        .is_err()
+    {
+        eprintln!("skipping: gcc not available");
+        return;
+    }
+    let dir = std::env::temp_dir().join("whisper_l1_exit");
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let cases: &[(&str, &str, i32)] = &[
+        ("x1", "0 exit\n", 0),
+        ("x2", "3 exit\n", 3),
+        ("x3", ": f { 7 exit } ;\nf 1 .\n", 7),
+    ];
+    for (name, source, want) in cases {
+        let src = dir.join(format!("{name}.ws"));
+        std::fs::write(&src, source).unwrap();
+
+        let vm = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+            .args(["run", "--no-strict-types"])
+            .arg(&src)
+            .output()
+            .unwrap();
+        assert_eq!(
+            vm.status.code(),
+            Some(*want),
+            "VM exit code for {source:?} (stderr: {})",
+            String::from_utf8_lossy(&vm.stderr)
+        );
+        assert!(
+            vm.stdout.is_empty(),
+            "X-3: `exit` must terminate, so nothing after it prints; got {:?}",
+            vm.stdout
+        );
+
+        let out = dir.join(name);
+        let build = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+            .args(["build", "-t", "c2", "-o"])
+            .arg(&out)
+            .arg(&src)
+            .output()
+            .unwrap();
+        assert!(
+            build.status.success(),
+            "c2 build failed on {source:?}: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        let artifact = if out.exists() {
+            out.clone()
+        } else {
+            out.with_extension(std::env::consts::EXE_EXTENSION)
+        };
+        let c2 = std::process::Command::new(&artifact).output().unwrap();
+        assert_eq!(
+            c2.status.code(),
+            Some(*want),
+            "C-chain exit code for {source:?}"
+        );
+        assert!(
+            c2.stdout.is_empty(),
+            "X-3 (C chain): nothing may print after `exit`; got {:?}",
+            c2.stdout
+        );
+    }
 }

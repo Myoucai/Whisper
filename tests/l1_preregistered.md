@@ -30,8 +30,16 @@ Step 3 写 `wd`（Whisper 自己写的驱动）时撞到两个**语言本身的�
 **词形**：`print`（裸打印字符串，不补换行）与 `exit`（取栈顶 i64 作为
 退出码并终止；栈空或非整数则报错）。
 
-**opcode 字节**：`0xC8` = `Print`、`0xC9` = `Exit`（0xC0-0xC7 已占：
-BytesWriteFile / Try / MapNew..MapHas；0xCE = BytesToHex）。
+**opcode 字节**：`0x93` = `Print`、`0x94` = `Exit`。
+
+> **修正（实施前，2026-09-21）**：本文件初稿写的是 `0xC8`/`0xC9`，**是错的**。
+> 当时只按十六进制扫了高字节区，而 `listdir`/`mkdir` 在 `opcode.rs` 里写的是
+> **十进制** `200`/`201` —— 正是 `0xC8`/`0xC9`，直接撞车。
+> 重新机械化清点（解析 `opcode.rs` 的 `to_byte` 全部匹配臂 × 解析
+> `compiler.all.ws` 的词表与 `emit-bare`），两链**同时**空闲的字节里，
+> `0x93`/`0x94` 紧接 IO 区（`0x90` `.`、`0x91` `..`、`0x92` 读输入），
+> 语义上是最自然的落点，故取之。
+> 教训照旧：**十六进制 grep 会漏掉十进制字面量**；字节占用表要机器枚举，不能眼看。
 
 **两链语义**：
 
@@ -107,4 +115,99 @@ Rust 侧（10）：
 
 ## 执行记录
 
-（实施后回填）
+2026-09-21 实施完成。**结论：E1、E2、E3(a/b) 达成；E4 的 a/b 达成，c 只达成
+了 `wd` 自己那一半**——根因在上游能力 `@5`，已如实登记为 W-5。
+
+### 触点清单修正（预注册写 11+2，实际 14+2）
+
+预注册漏了三个文件（都是「词形 → 语法」这一层，写清单时按 opcode 视角想，
+把它们算进了 parser）：
+
+| 文件 | 为什么漏不掉 |
+|------|--------------|
+| `crates/whisper-parser/src/lexer.rs` | 关键字表：`"print"` / `"exit"` 不登记就永远走 `Word` 分支 |
+| `crates/whisper-parser/src/token.rs` | `TokenKind` 变体 + `keyword_name()` 反查（有测试钉住该不变式） |
+| `crates/whisper-lsp/src/lib.rs` | 补全/悬停的词条表 |
+
+`runtime.c` 确实需要改（见下），这一点预注册猜对了，但原因不是"要写 C 实现"
+（`emit-bare` 直接内联 C），而是 **Windows 文本模式**。
+
+### 实现摘要
+
+- opcode `0x93` = `Print`、`0x94` = `Exit`（字节选择的修正见上）。
+- VM：`Print` 取栈顶（先 `unwrap_signal`）要求 `str`，`write_all` + `flush`；
+  `Exit` 要求 `i64`，`std::process::exit`。两者类型不符都报 `TypeMismatch`。
+- C 链：`emit-bare` 发 `w_print_raw(_s)` / `{int64_t _c=w_as_i64(w_pop());exit((int)_c);}`；
+  `-t c`（Rust 转译器）同语义。`runtime.c` 新增 `w_print_raw`。
+- typecheck：`Print` 期望 `str`，`Exit` 期望 `i64`，都不回压栈。
+
+### 实施中发现的第三个问题：C 链每个换行都变成 CRLF
+
+`print` 在 C 链第一次跑就暴露：`"x\n" print` 在 C 链给出 `78 0D 0A`，VM 给
+`78 0A`——E1 要求逐字节相同，直接不达标。
+
+根因是 Windows 文本模式：C 运行时把 stdout 上每个 `\n` 改写成 CRLF，而 Rust
+的 stdout 从不翻译。**这不是 L-1 引入的**——它一直存在，Rust 集成测试用
+`.replace(['\r','"'], "")` 把它抹掉了。
+
+第一版修法是"在 `print` 里惰性 `_setmode(_O_BINARY)`"。**错的**：文本翻译发生在
+**flush 时**，而 stdout 重定向到文件时是全缓冲的，于是缓冲区里**更早**的 `\n`
+也被按二进制写出——实测 `"A1" . "echo hi" @5 1 @nth print "A2" .` 里，
+`A1` 后面就没有 CR 了，删掉 `print` 又变回 CRLF。**输出取决于后面有没有调用
+`print`**，这比原来更糟。
+
+改成在 `w_init` 里一次性设定（`_setmode(_fileno(stdout), _O_BINARY)`），
+`w_print_raw` 退回纯 `fputs + fflush`。这样确定性成立，且顺带消掉了 C 链与 VM
+之间那条长期靠测试抹平的真实分歧。**行为变更**：C 链程序（含 `.`）现在只发
+LF，与 VM 一致。
+
+### 判据实测
+
+E1（stdout 逐字节，VM vs `-t c2`）：
+
+| 用例 | 源码 | 期望 | VM | C 链 |
+|------|------|------|----|------|
+| P-1 | `"hi" print` | `68 69` | ✅ | ✅ |
+| P-2 | `"a" print "b" print` | `61 62` | ✅ | ✅ |
+| P-3 | `"x\n" print` | `78 0A` | ✅ | ✅ |
+| P-4 | `"" print` | 空 | ✅ | ✅ |
+
+E2（shell 退出码）：X-1 `0 exit` → 0；X-2 `3 exit` → 3；X-3
+`: f { 7 exit } ; f 1 .` → 7 且 stdout 为空（真终止，不是提前 return）。两链全中。
+
+E3：`cargo test --workspace` 482/0（基线 480，新增两条 L-1 测试）；
+syntax 26 / stdlib 58 / typecheck FP=0 / net / app 13 路由 —— 全绿不降；
+`opcode_coverage.sh` **87/0/0**（80 → 87，新增 `print-basic`/`print-twice`/
+`print-nl`/`print-empty`/`exit-zero`/`exit-code`/`exit-in-word`）；固定点
+gen2 == gen3 通过。
+
+E4（`wd` 真正用上）：
+
+- (a) `wd build <不存在的文件> <out>` → **exit=1** ✅（修前恒为 0）
+- (b) 参数不足 → **exit=2** ✅
+- (c) ⚠️ **只达成一半**。`wd` 侧已改 `print`，不再自己补换行——但 `wd run` 的
+  转发段与直接运行产物仍不逐字节相同：子进程输出 `33 0A`，`wd` 转发 `33`。
+  差的 `0A` 在 `wd` 看到它**之前**就没了——`@5` 按设计对两个流做 `trim()`
+  （`capability.rs` 与 `runtime.c` 都写明"mirror Rust 的 `String::trim()`"，
+  是刻意的双链约定）。**这是能力契约问题，不是语言问题**，属 L-1 范围之外，
+  登记为 W-5。
+
+E4 的验证用的是**零 Rust 链的产物**（`bash scripts/build-wd.sh` 端到端重跑成功，
+产物 `target/wd/wd`，整条链只有 gcc + 冻结种子），不是快迭代配方编出来的
+临时二进制。四条 `wd run` 冒烟（自包含 / `import std/math` + `sq` /
+`import std/list` + `len` / 限定名 `math.sq`）与四条退出码用例在它上面全过；
+另外全构建目标（`-t c`/`c2`/`exe`/`native`/`bundle`/`wbin`）都单独验过认得
+这两个 opcode（`c` 看发射文本、`wbin` 看字节含 `93`/`94`、其余实际运行）。
+
+### 顺带确认
+
+`bash scripts/build-wd.sh` 本轮**端到端重跑通过**（此前只有 `bash -n` 级证据）——
+这条链要重新走一遍种子 → whisper0 → whisper1，是 `compiler.all.ws` 改动的
+独立复核。`scripts/bootstrap.sh` 仍未端到端重跑（见 W-3）。
+
+### 反向判据自查
+
+- 没有把 `exit`/`print` 做成 `@n` 能力 ✅
+- `exit` 是真终止（X-3 钉住，C 链用 `exit()` 而非 `return`）✅
+- 改 `compiler.all.ws` 后固定点成立 ✅
+

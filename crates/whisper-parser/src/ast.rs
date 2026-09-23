@@ -261,4 +261,8 @@ pub enum Operator {
     OutputTop,
     OutputAll,
     ReadInput,
+    /// L-1: raw stdout write, no newline (byte plumbing, not formatting).
+    Print,
+    /// L-1: terminate the process with the code on top of the stack.
+    Exit,
 }

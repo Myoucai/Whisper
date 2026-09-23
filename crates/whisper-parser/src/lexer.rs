@@ -509,6 +509,11 @@ impl Lexer {
             "bytes-write" => TokenKind::BytesWriteFile,
             "bytes->hex" => TokenKind::BytesToHex,
             "try" => TokenKind::Try,
+            // L-1: two primitives the language was missing. `print` writes the
+            // top string to stdout verbatim (`.` reformats: newline + quoting),
+            // `exit` stops the process with a real exit code (no word could).
+            "print" => TokenKind::Print,
+            "exit" => TokenKind::Exit,
             // `call`: invoke the quotation on top of the stack. The opcode
             // (CapExec) has existed since the beginning but had no reachable
             // spelling — `!` went to logical not (spec §3.2, frozen).

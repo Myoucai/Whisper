@@ -175,6 +175,8 @@ fn fmt_op(op: Operator) -> String {
         Operator::OutputTop => ".".into(),
         Operator::OutputAll => "..".into(),
         Operator::ReadInput => ",".into(),
+        Operator::Print => "print".into(),
+        Operator::Exit => "exit".into(),
         Operator::StrLen => "strlen".into(),
         Operator::StrCat => "strcat".into(),
         Operator::StrSlice => "strslice".into(),

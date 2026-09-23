@@ -547,6 +547,8 @@ impl WbinReader {
             0x90 => Ok(Opcode::OutputTop),
             0x91 => Ok(Opcode::OutputAll),
             0x92 => Ok(Opcode::ReadInput),
+            0x93 => Ok(Opcode::Print),
+            0x94 => Ok(Opcode::Exit),
 
             // Definitions
             0xA0 => Ok(Opcode::DefWord(String::new())),
