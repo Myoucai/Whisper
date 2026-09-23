@@ -8,7 +8,11 @@
 : replace    { strreplace } ;
 : to-int     { strtoi64 } ;
 : from-int   { i64tostr } ;
-: nth        { strnth } ;
+// 原本叫 `nth`，但 std/list 也叫 `nth`（`{ @nth }`，取列表元素）。两个模块各自
+// 都"对"，同时 import 就会生成两个 `W_nth` → gcc 报 `redefinition of 'W_nth'`，
+// 而报错离根因很远（S-4）。这里改成语义无歧义的名字：S-1 之后 `strnth` 是
+// **字节**语义，所以叫 `byte-at`。std/list 保留 `nth`（取列表元素是它的本义）。
+: byte-at    { strnth } ;
 : slice      { strslice } ;
 : empty?     { strlen 0 = } ;
 : contains?  { strfind 0 >= } ;
@@ -42,7 +46,7 @@ export find
 export replace
 export to-int
 export from-int
-export nth
+export byte-at
 export slice
 export empty?
 export contains?

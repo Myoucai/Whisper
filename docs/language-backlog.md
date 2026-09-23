@@ -49,26 +49,55 @@
 在 `whisper run` 下都能跑，但 `-t c2` **都编不出**：
 `implicit declaration of function 'W_range_to'`。
 
-## 战役 S-4：`std/str` 与 `std/list` 导出同名不同义的 `nth`（**2026-09-21 发现，待修**）
+## 战役 S-4：`std/str` 与 `std/list` 的导出同名冲突（**2026-09-21 部分修复：1/5**）
 
-**事实**：
-- `stdlib/str.ws:11` `: nth { strnth } ;`
-- `stdlib/list.ws:3` `: nth { @nth } ;`
+**事实（2026-09-21 实测，比初版登记的大）**：两个模块的导出**有五处同名**：
 
-两个模块**都没有 import 对方**，各自独立成立；但任何同时内联两者的程序
-（例如 `import "std/hash"` 之后再 `import "std/list"`）都会生成两个
-`W_nth` 定义，gcc 报 `redefinition of 'W_nth'`。S-3 就是撞上它才改用展开式的。
+| 名 | `std/str` | `std/list` |
+|---|---|---|
+| `nth` | `{ strnth }` | `{ @nth }` |
+| `first` / `last` | 首/末字符 | 首/末元素 |
+| `empty?` | 串空 | 列表空 |
+| `contains?` | 子串 | 成员 |
 
-**为什么值得单独修**：这是**静默的命名冲突**——两个都"对"的模块，组合起来
-不可用，而且报错出现在 gcc 层（"redefinition of W_nth"），离根因很远。
+同时 `import` 两者时：**VM 只警告**（`word 'first' exported by both …`，后者胜），
+**C 链硬失败**（`redefinition of 'W_first'` / `W_last` / `W_empty_` / `W_contains_`）。
+即**导入冲突的语义两链本身就不同**——这比"某个词不可用"更值得记一笔。
 
-**修法与判据（未定，需先查用途）**：候选 ① 把其中一个改名（`str.nth` /
-`list.nth` 的限定形式已经可用，裸名二选一）；② 让 c2 的 import 内联**按词名
-去重**——但这会把"两个语义不同的 nth"变成"看谁先内联"，是掩盖不是修复。
-倾向 ①。**动手前必须先查全仓库谁在用裸 `nth`**（S-2 的教训：先查用途再定方向）。
+**已做（`byte-at`）**：`std/str` 的 `nth` 改名为 **`byte-at`**（S-1 之后 `strnth`
+是字节语义，这名字无歧义），`std/list` 保留 `nth`。已验：两模块**各自单独**
+都能编能跑（VM `98` / c2 `98`；VM `8` / c2 `8`）。全仓库查过没有别的裸 `nth`
+使用者，所以改名安全。
 
-**判据**：① 同时 import `std/str` 与 `std/list` 的程序两链都能编能跑；
-② 既有 stdlib 门禁与六闸不回归；③ 若改名，文档与 `^export` 同步。
+**仍未做（4/5）**：`first`/`last`/`empty?`/`contains?` 四处。**没做是有理由的**——
+它们不像 `nth` 那样没人用，改名前要先查清谁在依赖哪一侧；而且四个都改会让两个
+模块的词汇表进一步分叉。**候选方案**：
+1. 逐个改名（要先做使用面普查）；
+2. 让 c2 的 import 内联**按词名去重**（对齐 VM 的"后者胜"）——但这把"两个语义
+   不同的同名词"变成"看谁先内联"，是**掩盖不是修复**，倾向不做；
+3. 长期：把这类跨模块同名提升为**限定名**（`str.first` / `list.first`），
+   限定名机制已经可用。
+
+**判据（未达成）**：同时 import `std/str` 与 `std/list` 的程序两链都能编能跑。
+**现状：四对冲突未解决，该程序在 C 链上仍编不出。**
+
+## 战役 S-5：Rust 前端关键字 × 自举链词表的机械对拍（**2026-09-21 发现**）
+
+**做法**：机械提取 `crates/whisper-parser/src/lexer.rs` 的关键字表与
+`whisperc/compiler.all.ws` 的 `[n "word"]` 词表，求差集。
+**结果：22 个词只在 Rust 侧。** 分类如下（逐项经验验证过一部分）：
+
+| 类别 | 词 | 结论 |
+|---|---|---|
+| **误报** | `over` | 自举前端在 `compiler.all.ws:543` 用**代码路径**处理（不在 `[n "word"]` 列表里），两链都好用 |
+| **设计如此** | `import` `export` | 自举前端有意丢弃这两个结构关键字 |
+| **另有通路** | `call` | 词表里没有，但 cgen 发 `W_call()`，而 `runtime.c` 定义了它 |
+| **两链都坏的死别名** | `nth` `map` `each` `fold` `filter` `times` | 裸拼写在**两条链**上都 `Undefined word` —— 不是分叉，是**死词汇**。**S-4 的成因**：正因它们不可用，`std/list` 与 `std/str` 才各自定义 `: nth` 兜底，于是撞名 |
+| **真分叉（待逐项核）** | `chr` `listslice` `bytes->hex` `bytes-new` `bytes-push` `bytes-len` `bytes-write` `op-effect` `size-of` `word-size` `rand` `seed!` | 实测 `chr` VM 给 `"A"`、c2 编不出（`mod` 那一类） |
+
+**判据（未达成）**：把对拍做成常驻工具（`tools/word-table-parity.sh`），带一个
+**棘轮**（差异数只能减不能增），并把"真分叉"那一档逐个收敛。
+**现状：只做了手工对拍，工具还没落地。**
 
 
 **根因**：`range-to` 定义在 `stdlib/list.ws:25`，而
