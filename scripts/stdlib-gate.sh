@@ -87,6 +87,16 @@ t core-fib     'import "std/math" 10 fib .' 55
 t core-pow     'import "std/math" 2 10 pow .' 1024
 t core-range   'import "std/list" 5 range-to len .' 5
 
+# ── S-2（2026-09-21）：`mod` 此前只有 Rust 前端认，自举链词表里没有它，
+#    于是 `7 3 mod .` 在 `-t c2` 下变成未定义的 `W_mod()` 编不出；而门禁的
+#    算术用例一直用 `%`，从未盖到。词名一律以 `^export` 行为准，不靠猜。
+t mod-spelling '7 3 mod .' 1
+
+# S-3（`std/encoding`、`std/hash` 用了 `std/list` 的 range-to 却没 import）
+# 的用例**暂不在此登记**：那不是"补一行 import"能修的——补进 hash 后会与
+# 另一处 `nth` 定义冲突（redefinition of 'W_nth'）。facts 见
+# docs/language-backlog.md 的 S-3。按项目规矩不往门禁里塞已知失败的用例。
+
 echo "=== stdlib gate: PASS=$pass FAIL=$fail ==="
 [ "$fail" -eq 0 ]
 rm -rf t_g1 t_zz

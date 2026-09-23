@@ -18,24 +18,42 @@
 **为什么一直没被发现**：覆盖门禁的算术用例用的是 `%`
 （`t arith '… 40 7 % .'`），从没用过 `mod`。
 
-**修法（两个选项，需裁决）**：① 往自举链词表加 `[20 "mod"]`（一行，但要改
-`compiler.all.ws` → 重生种子 + 整条自举链 + 固定点）；② 把 `mod` 从 Rust 前端
-**删掉**，只留 `%`（同样要改文档，但零风险）。**倾向 ②**：`mod` 是唯一一条
-"只有一侧认"的拼写，删掉它消除的是**歧义本身**，而不是再补一处对称。
+**修法（已裁决）**：往自举链词表补 `[20 "mod"]`（`compiler.all.ws:446` 那行旁边）。
 
-## 战役 S-3：`std/hash` 用了 `std/list` 的词却没 import（**2026-09-21 发现，待修**）
+> **一度倾向"删掉 Rust 侧的 `mod`、只留 `%`"，查用途后否掉了**：
+> `stdlib/encoding.ws:59,152` 与 `stdlib/hash.ws:71,73,74,110` **自己就在用
+> `mod`**。删别名会连 VM 一起弄坏两个 stdlib 模块。教训与 S-1 同源——
+> 先查用途再定方向。
 
-**事实**：`import "std/hash"` + `md5` 在 `whisper run` 下能跑（并给出正确的
-`md5("你好") = 7eca689f0d3389d9dea66ae112e5cfd7`），但 `-t c2` **编不出**：
+**判据**：① `7 3 mod .` 两链都给 `1`；② `stdlib/encoding` 与 `stdlib/hash`
+经 `-t c2` 能编出；③ 覆盖门禁补 `mod` 用例（现在只有 `%`）；④ 固定点仍成立
+（改了 `compiler.all.ws`）。
+
+## 战役 S-3：若干 stdlib 模块用了 `std/list` 的 `range-to` 却没 import（**2026-09-21 发现，待修**）
+
+**事实**：`import "std/hash"` + `md5`，以及 `import "std/encoding"` + `b64-enc`，
+在 `whisper run` 下都能跑，但 `-t c2` **都编不出**：
 `implicit declaration of function 'W_range_to'`。
 
-**根因**：`stdlib/hash.ws` 只 `import "std/str"`，却在第 151、164 行用了
-`range-to`——它定义在 `stdlib/list.ws:25`。
+**根因**：`range-to` 定义在 `stdlib/list.ws:25`，而
+- `stdlib/hash.ws` 只 `import "std/str"`（第 151、164 行用 `range-to`）
+- `stdlib/encoding.ws` 同样（`b64-dec-with` 里用）
 
-**为什么一直没被发现**：`scripts/stdlib-gate.sh` 里**没有任何 hash/md5 用例**。
+**为什么一直没被发现**：`scripts/stdlib-gate.sh` 里**没有任何 hash/encoding 用例**。
 
-**修法**：① 给 `hash.ws` 补 `import "std/list"`（一行）；② 顺带往 stdlib 门禁
-补 hash 用例——否则下次还会漏。
+**"补一行 import"试过了，不行**：给 `hash.ws` 补 `import "std/list"` 之后，
+生成的 C 报 `redefinition of 'W_nth'`——`std/list` 与另一条已被内联的路径各自
+定义了 `nth`。所以这不是补一行的事，**要先查清 stdlib 里 `nth`/`range-to`
+到底有几处定义、以及 c2 的 import 内联为什么没能去重**。
+
+**判据**：① `import "std/hash"` + `"abc" md5 .` 两链同值
+（`900150983cd24fb0d6963f7d28e17f72`）；② 非 ASCII 同值
+（`"你好"` → `7eca689f0d3389d9dea66ae112e5cfd7`）；③ `std/encoding` 的
+`b64-enc`/`b64-dec` 两链同值；④ stdlib 门禁登记这些用例；⑤ 六闸不回归。
+
+> **注**：`hash.ws` 在 C 链上编不出有**两个**独立原因——本条缺 import，
+> 以及 S-2 的 `mod`。S-2 已修，本条未修。
+
 
 ## 由 S-2 推出的建议：做一次"词表对拍"
 
