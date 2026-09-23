@@ -53,10 +53,14 @@ jobs:
           printf 'import "std/str"\n"hello" strlen .' > /tmp/sm3.ws
           ./target/release/whisper run /tmp/sm3.ws
 
-      - name: Hard self-hosting smoke
+      - name: Self-hosted compiler smoke (bootstrap == c2)
         run: |
           printf '2 3 + .' > /tmp/bt.ws
-          ./target/release/whisper bootstrap --hard /tmp/bt.ws
+          ./target/release/whisper bootstrap /tmp/bt.ws > /tmp/bt_bootstrap.c
+          ./target/release/whisper build -t c2 -o /tmp/bt_c2 /tmp/bt.ws
+          # The two must be the same pipeline — compare the generated C, not
+          # just the exit code (the deleted second compiler also exited 0).
+          cmp /tmp/bt_bootstrap.c /tmp/bt_c2.c
 
   c-backend:
     name: C transpiler end-to-end (gcc)

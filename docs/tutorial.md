@@ -418,6 +418,6 @@ whisper repl                 # Interactive REPL
 whisper fmt    file.ws       # Format source
 whisper install <pkg>        # Install package
 whisper serve  file.ws       # HTTP server
-whisper bootstrap file.ws    # Self-hosting pipeline
+whisper bootstrap file.ws    # Self-hosted compiler → C on stdout
 whisper lsp                  # LSP language server
 ```

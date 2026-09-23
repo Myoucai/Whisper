@@ -15,16 +15,27 @@
 `build-wd.sh` / `bootstrap.sh` 用 `sed '$d'` 去掉它再接 `wd.ws`——**只能按这个
 结构切除，不能按行号**。
 
-## 软自举链的模块（`whisper bootstrap` 用）
+## 软自举链的模块（**2026-09-21 已删除**）
 
-`lexer.ws` / `classify.ws` / `parser.ws` / `main.ws` / `src/compile.ws` 由
-`crates/whisper-cli/src/commands/bootstrap.rs` 用 `include_str!` 拼起来，在
-Rust VM 上跑一个模块化的编译器。它们**不是** `compiler.all.ws` 的副本，
-但两者会漂移——同一条流水线的两种写法。
+`lexer.ws` / `classify.ws` / `parser.ws` / `main.ws` / `src/compile.ws` 曾经是
+`whisper bootstrap` 驱动的第二棵编译器。收口战役 D-1 把它删了：
+
+- 实测它只是**部分可用**（基础算术/单行定义/引号/跨行字符串可以；
+  `@map` 融合、import 展开、`print`/`exit`、CRLF 归一化都不行）；
+- 它与 `compiler.all.ws` 各写一遍同一条流水线，而两者之间的漂移**没有任何
+  机制把关**（`test_pipeline_compare` 只比对一个表达式的结果，对手还是 Rust
+  前端）；
+- `compiler.all.ws` **已自带全部同名词**（`tokenize`/`structify`/
+  `classify-nested`/`compile-one`/`is-blank`/`read-str-acc`，已逐个核对），
+  所以删掉它不丢任何能力。
+
+现在 `whisper bootstrap <file>` 直接委托给权威流水线，把生成的 C 打到
+stdout；`bootstrap_matches_c2_byte_for_byte` 逐字节钉住它与 `build -t c2`
+一致。`--hard` 保留为历史别名（CI 曾用它），接受但不改变行为。
 
 ## 2026-09-21 清理
 
 删掉了四个**零引用**的历史快照：`compiler.ws`（早期手工合并版）、
-`src/cgen.ws`、`src/classify.ws`、`src/lexer.ws`。判定是机械的：全仓库
-`include_str!` 与 `import` 两种引用方式都数过，四个文件均为 0；模块之间也没有
-互相 `import`（Rust 侧拼接）。删掉的版本在 git 历史里。
+`src/cgen.ws`、`src/classify.ws`、`src/lexer.ws`，以及上面那棵模块化树。
+判定是机械的：全仓库 `include_str!` 与 `import` 两种引用方式都数过。删掉的
+版本在 git 历史里。

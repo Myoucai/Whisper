@@ -17,7 +17,9 @@ fn help() {
     println!("  whisper uninstall <name>    Remove a package");
     println!("  whisper search [query]      Search installed packages");
     println!("  whisper serve   <file.ws>   Start HTTP server");
-    println!("  whisper bootstrap <file.ws> Self-hosting compiler pipeline");
+    println!(
+        "  whisper bootstrap <file.ws> Compile with the self-hosted compiler, emit C to stdout"
+    );
     println!("  whisper lsp                 Start LSP language server");
     println!("  whisper test   [path]       Run test files (*_test.ws)");
     println!();
@@ -227,11 +229,14 @@ fn cmd_bootstrap(args: &[String]) -> Result<(), String> {
         .find(|a| !a.starts_with('-'))
         .ok_or("Expected: whisper bootstrap <file.ws>")?;
     let source = std::fs::read_to_string(file).map_err(|e| format!("Cannot read '{file}': {e}"))?;
-    if get_flag(args, "--hard") {
-        commands::bootstrap::hard_bootstrap_compile(&source)
-    } else {
-        commands::bootstrap::bootstrap_compile(&source)
-    }
+    // `--hard` 是历史别名：2026-09-21 收口战役 D-1 之后，软/硬两种模式合并为
+    // 同一条权威流水线（那棵模块化编译器已删除），接受该标志只为不打断既有
+    // 调用（CI 的 Hard self-hosting smoke 就在用）。
+    let base = std::path::Path::new(file)
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(std::path::Path::new("."));
+    commands::bootstrap::bootstrap_compile(&source, base)
 }
 
 fn cmd_serve(args: &[String]) -> Result<(), String> {

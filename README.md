@@ -18,7 +18,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.0.8-7cffc4" alt="version">
-  <img src="https://img.shields.io/badge/tests-490%20passed%20%2B%207%20gates-brightgreen" alt="tests">
+  <img src="https://img.shields.io/badge/tests-465%20passed%20%2B%207%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
   <img src="https://img.shields.io/badge/stdlib-20%20modules-blue" alt="stdlib">
@@ -186,25 +186,22 @@ gen1.c → gcc → whisper1 ──再编译自身──▶ gen2.c → gcc → wh
 ```
 
 ```bash
-# 软自举 (Rust 解析 + whisperc codegen)
-whisper bootstrap hello.ws
-
-# 硬自举 (whisperc 全管线: tokenize → structify → classify → compile)
-whisper bootstrap --hard hello.ws
-# whisperc: 2 main ops, 0 defs
-# rust:     2 main ops, 0 defs
-# Rust VM output: "Hello, World!"
-# whisperc VM output: "Hello, World!"
+# 用自举编译器编译，把生成的 C 打到 stdout（与 build -t c2 同一条流水线）
+whisper bootstrap hello.ws > hello.c
+gcc -O2 -o hello hello.c -I whisperc -lm
 ```
 
-**自举管线详解**：
+**自举管线**：这条流水线只有**一份源码**——`whisperc/compiler.all.ws`，
+`tokenize → structify → classify → compile-one → cgen` 全在里面。
+`whisper bootstrap`、`-t c2`、`scripts/bootstrap.sh`、`scripts/build-wd.sh`
+走的都是它；集成测试 `bootstrap_matches_c2_byte_for_byte` 逐字节钉住
+`whisper bootstrap` 与 `build -t c2` 的输出相同。
 
-| 阶段 | 实现 | 说明 |
-|------|------|------|
-| 词法分析 | `whisperc/lexer.ws` | 源码 → token 流 |
-| 结构分组 | `whisperc/parser.ws` | `{}`→Quote, `[]`→List, `??..|..]`→Cond, `{}{}#`→Loop, `:..;`→Def |
-| Token 分类 | `whisperc/classify.ws` | 字符串 → `[type, value]` 对，递归处理结构树 |
-| 字节码编译 | `whisperc/main.ws` | 分类 token → opcode 字节码 |
+> 2026-09-21 收口战役删掉了曾经并存的**第二棵编译器**
+> （`whisperc/lexer.ws` + `classify.ws` + `parser.ws` + `main.ws` +
+> `src/compile.ws`）与驱动的 `soft`/`hard` 两种模式。实测那棵树只是部分可用
+> （`@map` 融合、import 展开、`print`/`exit` 都不行），而且与权威编译器之间的
+> 漂移没有任何机制把关。`--hard` 现在只是历史别名，接受它但不改变行为。
 
 ## 构建目标
 
@@ -336,8 +333,7 @@ whisper build    hello.ws -t c       # 转译为 C 源码 (gcc 编译为原生�
 whisper check    hello.ws         # 类型检查
 whisper repl                     # 交互式 REPL
 whisper fmt      hello.ws         # 格式化
-whisper bootstrap hello.ws        # 自举管道 (软)
-whisper bootstrap --hard hello.ws # 自举管道 (硬)
+whisper bootstrap hello.ws        # 自举编译器 → C 源码（stdout）
 whisper install  github.com/u/r   # 安装包
 whisper install  --local .        # 本地安装
 whisper install  --list           # 已安装列表
@@ -393,8 +389,8 @@ bash scripts/typecheck-gate.sh                   # 类型检查假阳性棘轮�
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验
 ```
 
-测试覆盖（490 项，`cargo test --workspace` 实测）：
-- 156 项 CLI（31 单元 + 6 基准 + 119 集成：stdlib 导入冒烟、关键字作 def 名回归、软/硬自举管线、c2 链端到端、能力 ABI 与 `call`/多引号/五种容器内引号双链对拍、`print` 逐字节与 `exit` 真退出码、CRLF 归一化、`-t c` 的能力 opcode、`@10` exec-raw、`wd` 与 `-t c2` 的 C 输出逐字节相同、exe 产物零 Rust 断言、bundle 尾负载）
+测试覆盖（465 项，`cargo test --workspace` 实测）：
+- 131 项 CLI（4 单元 + 6 基准 + 121 集成：stdlib 导入冒烟、关键字作 def 名回归、软/硬自举管线、c2 链端到端、能力 ABI 与 `call`/多引号/五种容器内引号双链对拍、`print` 逐字节与 `exit` 真退出码、CRLF 归一化、`-t c` 的能力 opcode、`@10` exec-raw、`wd` 与 `-t c2` 的 C 输出逐字节相同、`whisper bootstrap` 与 `-t c2` 逐字节相同、exe 产物零 Rust 断言、bundle 尾负载）
 - 135 项核心 VM（124 单元 + 7 模糊测试 2500+ 随机程序 + 4 项 opcode 元数据）
 - 139 项 codegen（62 单元 + 65 流水线 + 12 C 后端端到端 gcc）
 - 38 项 parser（含「每个关键字都可作 def 名」参数化回归、CRLF 归一化四条）

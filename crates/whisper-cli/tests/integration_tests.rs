@@ -2505,3 +2505,94 @@ fn w2_wd_output_matches_c2_byte_for_byte() {
         assert!(a == b, "[{name}] wd and -t c2 C output differs");
     }
 }
+
+/// D-1 (收口战役第二轮) — `whisper bootstrap` 与 `whisper build -t c2` 必须
+/// 是**同一条流水线**。曾经这里挂着第二棵编译器（顶层 `whisperc/*.ws` +
+/// `src/compile.ws`），它与权威编译器各写一遍同一条流水线，而两者之间的漂移
+/// 没有任何机制把关。现在那棵树已删除，本测试逐字节钉住"只有一份"。
+///
+/// 注意比的是**生成的 C 文件**：只看退出码不够——被删掉的那棵树在简单程序上
+/// 退出码同样是 0。
+#[test]
+fn bootstrap_matches_c2_byte_for_byte() {
+    let dir = std::env::temp_dir().join("whisper_d1_bootstrap");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+
+    let cases: &[(&str, &str)] = &[
+        ("arith", "3 4 + 5 * .\n"),
+        ("def", ": sq { dup * } ;\n5 sq .\n"),
+        ("quote", "{ 42 } call .\n"),
+        ("hof", "[1 2 3] { 2 * } @map . drop\n"),
+        ("import", "import \"std/math\"\n5 sq .\n"),
+        ("print", "\"hi\" print\n"),
+        ("multiline", "\"a\nb\" strlen .\n"),
+        ("crlf", "\"x\r\ny\" strlen .\n"),
+    ];
+
+    for (name, source) in cases {
+        let src = dir.join(format!("{name}.ws"));
+        std::fs::write(&src, source).unwrap();
+
+        let boot = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+            .arg("bootstrap")
+            .arg(&src)
+            .output()
+            .unwrap();
+        assert!(
+            boot.status.success(),
+            "bootstrap failed on {name}: {}",
+            String::from_utf8_lossy(&boot.stderr)
+        );
+
+        let out = dir.join(format!("{name}_c2"));
+        let build = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+            .args(["build", "-t", "c2", "-o"])
+            .arg(&out)
+            .arg(&src)
+            .output()
+            .unwrap();
+        assert!(
+            build.status.success(),
+            "c2 build failed on {name}: {}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+
+        let from_c2 = std::fs::read(dir.join(format!("{name}_c2.c"))).unwrap();
+        assert_eq!(
+            boot.stdout.len(),
+            from_c2.len(),
+            "[{name}] bootstrap and -t c2 emitted different C sizes"
+        );
+        assert!(
+            boot.stdout == from_c2,
+            "[{name}] bootstrap and -t c2 emitted different C"
+        );
+    }
+}
+
+/// `--hard` 是历史别名（CI 曾用它），必须仍然接受且行为相同。
+#[test]
+fn bootstrap_hard_flag_is_a_legacy_alias() {
+    let dir = std::env::temp_dir().join("whisper_d1_hard");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = dir.join("p.ws");
+    std::fs::write(&src, "import \"std/math\"\n5 sq .\n").unwrap();
+
+    let plain = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .arg("bootstrap")
+        .arg(&src)
+        .output()
+        .unwrap();
+    let hard = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
+        .args(["bootstrap", "--hard"])
+        .arg(&src)
+        .output()
+        .unwrap();
+    assert!(plain.status.success() && hard.status.success());
+    assert_eq!(
+        plain.stdout, hard.stdout,
+        "--hard must not change behaviour"
+    );
+}

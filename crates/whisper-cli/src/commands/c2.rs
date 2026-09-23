@@ -194,6 +194,20 @@ pub fn compile_via_whisperc_vm(source: &str) -> Result<String, String> {
     ))
 }
 
+/// Parity with the Rust VM's built-in core words: auto-import `std/core`
+/// unless the source already does, then inline every import.
+///
+/// Shared by `build_c2` and `whisper bootstrap` so the two cannot drift —
+/// duplicating this six-line rule is how the second compiler got started.
+pub fn expand_with_core(source: &str, source_dir: &Path) -> Result<String, String> {
+    let with_core = if source.contains("std/core") {
+        source.to_string()
+    } else {
+        format!("import \"std/core\"\n{source}")
+    };
+    expand_imports(&with_core, source_dir)
+}
+
 /// Compile `source` to a native executable: inline imports, run the
 /// self-hosted compiler on the Rust VM, emit C, invoke the C compiler.
 pub fn build_c2(
@@ -203,14 +217,7 @@ pub fn build_c2(
     inline_imports: bool,
 ) -> Result<(), String> {
     let expanded = if inline_imports {
-        // Parity with the Rust VM's built-in core words: auto-import
-        // std/core unless the source already does.
-        let with_core = if source.contains("std/core") {
-            source.to_string()
-        } else {
-            format!("import \"std/core\"\n{source}")
-        };
-        expand_imports(&with_core, source_dir)?
+        expand_with_core(source, source_dir)?
     } else {
         source.to_string()
     };
