@@ -28,13 +28,16 @@ native `exe`/`c2`/`native`/`wd` 是 trusted-only。
 **判据**：见 `docs/security-model.md` §6 的 I-1..I-10 与
 `tests/wasm_preregistered.md` 的 W-5/W-6/W-7。
 
-## 战役 SEC-2：WASM/WASI 目标（**2026-10-20 立项，计划**）
+## 战役 SEC-2：WASM/WASI 目标（**2026-10-20 立项；M1 已通**）
 
-**目标**：不改 Rust，把 C 发射到 `wasm32-wasip1`，由 WAMR/wasmtime 执行；
-文件用 preopen、网络/执行/FFI 由宿主策略控制或显式拒绝。
+**目标**：不改 Rust，把 C 发射到 `wasm32-wasip1`，由零 Rust 的
+WAMR `iwasm` / wasm3 / wasm2c（AOT 到 C）执行；文件用 preopen、
+网络/执行/FFI 由宿主策略控制或显式拒绝。
 
-**状态**：仅文档/判据（`docs/wasm-wasi-plan.md`、
-`tests/wasm_preregistered.md`），代码未开始。
+**状态（2026-10-21）**：M1 打通——`wd c → zig cc → .wasm → iwasm`
+输出正确；core conformance 26/27（1 个原语义 skip）；preopen 文件
+正/负各一例。HOF 依赖 `scripts/lift-nested.py` 临时提升 GNU 嵌套函数
+（W2.5 永久修法待做）。完整负向套件、`-t wasm` CLI、性能基线未完成。
 
 **不在 v1**：`@5`/`@10`/FFI/裸 socket/`serve-concurrent`；native 仍是
 trusted-only。Step 5 的 Whisper VM 不替代本战役。

@@ -508,8 +508,9 @@ stdout 设为二进制模式，两链的换行都是单个 LF。**这是行为�
 
 Whisper 的语法不规定安全边界；**执行路径决定能力模型**。完整审计与
 整改不变量见 [docs/security-model.md](security-model.md)。WASM 目标
-目前是**计划**，判据见 [tests/wasm_preregistered.md](../tests/wasm_preregistered.md)，
-实现前不构成已交付的安全承诺。
+M1 已打通（hello/core conformance），但**负向安全门禁未完成**，
+判据见 [tests/wasm_preregistered.md](../tests/wasm_preregistered.md)，
+当前不构成已交付的安全承诺。
 
 ### 18.1 当前执行路径
 
@@ -519,7 +520,7 @@ Whisper 的语法不规定安全边界；**执行路径决定能力模型**。�
 | `-t bundle` | 同上，内含 Rust VM | 否（暂） |
 | `-t c`/`-t c2`/`-t exe`/`-t native` | 无语言级授权，OS 用户权限 | **否** |
 | `wd build/run` | 无语言级授权；构建期调 gcc/执行产物 | **否** |
-| `-t wasm`（规划） | WASI preopen + host imports | 目标：是 |
+| wasm（M1，`scripts/build-wasm.sh`） | WASI preopen + host imports；文件正/负已验证，其余负向门禁未完成 | **尚未**（W-5..W-7 未完） |
 
 ### 18.2 规范性要求（未来 WASM profile）
 

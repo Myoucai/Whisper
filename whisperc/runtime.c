@@ -12,7 +12,12 @@
 #include <string.h>
 #include <stdint.h>
 #include <math.h>
+#ifdef __wasi__
+#  define W_WASI 1
+#endif
+#ifndef W_WASI
 #include <setjmp.h>
+#endif
 
 #ifdef _WIN32
 // winsock2.h must precede windows.h
@@ -23,8 +28,10 @@
 #include <io.h>         // _setmode / _fileno, for `print`'s binary stdout
 #include <fcntl.h>      // _O_BINARY
 #else
-#include <sys/mman.h>
-#include <netdb.h>      // getaddrinfo / freeaddrinfo for the HTTP client
+#  ifndef W_WASI
+#    include <sys/mman.h>
+#    include <netdb.h>  // getaddrinfo / freeaddrinfo for the HTTP client
+#  endif
 #endif
 
 // ── Types ───────────────────────────────────────────────────────────
@@ -84,6 +91,7 @@ static W_TLS int  w_sp = 0;
 // Value-level failures (type error, division by zero, stack underflow,
 // JSON errors) unwind to the innermost try and push [0, message];
 // resource failures (heap exhausted, malloc) stay fatal.
+#ifndef W_WASI
 #define W_TRY_MAX 512
 static W_TLS jmp_buf w_try_jb[W_TRY_MAX];
 static W_TLS int w_try_base[W_TRY_MAX];
@@ -99,6 +107,14 @@ static void w_fail(const char *msg) {
     fprintf(stderr, "whisper: %s\n", msg);
     exit(1);
 }
+#else
+// WASI has no portable setjmp/longjmp (needs the wasm EH proposal).
+// v1: failures are fatal; `try` is explicitly unsupported on this profile.
+static void w_fail(const char *msg) {
+    fprintf(stderr, "whisper: %s\n", msg);
+    exit(1);
+}
+#endif
 
 static inline wval W_I64(int64_t x)  { wval r; r.v = (uint64_t)x; r.t = WT_I64; return r; }
 static inline wval W_F64(double d)   { wval r; memcpy(&r.v, &d, 8); r.t = WT_F64; return r; }
@@ -197,7 +213,13 @@ static void w_op_gt(void) { wval b=w_pop(),a=w_pop();
 // The bootstrap lexer consumes source one char per strslice, so cumulative
 // string allocation is O(source²): the full self-compile crosses 2 GB,
 // which the old 4 GB total / 2 GB per arena could not hold (K-5).
+#ifdef W_WASI
+// wasm32 linear memory: keep the arena well below 4GB. v1 uses 64MB;
+// bump this once the WASI target has a memory policy.
+#define HEAP_SIZE (64LL * 1024 * 1024)
+#else
 #define HEAP_SIZE (16384LL * 1024 * 1024)  // 16 GB total, 8 GB per arena
+#endif
 static W_TLS char *w_heap = NULL;
 static W_TLS size_t w_heap_pos = 0;       // string arena bump (up)
 static W_TLS size_t w_heap_list_pos = 0;  // list arena bump (down)
@@ -245,6 +267,10 @@ static void w_heap_init(void) {
     if (w_heap_size == 0) w_heap_size = HEAP_SIZE;
     w_heap = (char *)VirtualAlloc(NULL, (SIZE_T)w_heap_size, MEM_RESERVE, PAGE_READWRITE);
     if (w_heap == NULL) { fprintf(stderr, "VirtualAlloc failed for %lld bytes\n", w_heap_size); exit(1); }
+#elif defined(W_WASI)
+    if (w_heap_size == 0) w_heap_size = HEAP_SIZE;
+    w_heap = (char *)malloc((size_t)w_heap_size);
+    if (w_heap == NULL) { fprintf(stderr, "malloc failed for %lld bytes\n", w_heap_size); exit(1); }
 #else
     if (w_heap_size == 0) w_heap_size = HEAP_SIZE;
     w_heap = mmap(NULL, (size_t)w_heap_size, PROT_READ|PROT_WRITE,
@@ -311,6 +337,7 @@ static char *w_str_from_cstr(const char *cstr) {
 // try runner (L-01): VM Try semantics — run body; success pushes
 // [1, top-or-default-0], failure rolls the stack back to entry depth
 // and pushes [0, message].
+#ifndef W_WASI
 static void w_try_call(void (*fn)(void)) {
     if (w_try_sp >= W_TRY_MAX) w_fail("try nesting too deep");
     w_try_base[w_try_sp] = w_sp;
@@ -326,6 +353,12 @@ static void w_try_call(void (*fn)(void)) {
         w_push(W_PTR(w_str_from_cstr(w_try_msg)));
     }
 }
+#else
+static void w_try_call(void (*fn)(void)) {
+    (void)fn;
+    w_fail("try is unsupported on wasm profile (no setjmp/longjmp)");
+}
+#endif
 
 static char *w_str_concat(const char *a, const char *b) {
     uint32_t la = w_str_len(a), lb = w_str_len(b);
@@ -842,6 +875,7 @@ static wval w_str_strip(wval s) {
 // ── FFI (v1.0.8): native library loading and symbol calls ───────────
 // Mirrors crates/whisper-core/src/ffi.rs. Handles/fnptrs are raw i64s.
 
+#ifndef W_WASI
 #ifdef _WIN32
 #include <windows.h>
 static wval w_ffi_open(wval path) {
@@ -856,7 +890,7 @@ static void *w_ffi_sym(int64_t handle, const char *name) {
 #else
 #include <dlfcn.h>
 static void *w_ffi_open(const char *path) {
-    return dlopen(p, RTLD_NOW);
+    return dlopen(path, RTLD_NOW);
 }
 static void *w_ffi_sym(int64_t handle, const char *name) {
     if (handle <= 0) return NULL;
@@ -899,6 +933,7 @@ static int64_t w_ffi_call(int64_t fnptr, const char *fmt, wval *args) {
     return f(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7],
              a[8], a[9], a[10], a[11]);
 }
+#endif // !W_WASI
 
 // ── P2 vocabulary (v1.0.6): struct pack/unpack, little-endian ───────
 // Mirrors crates/whisper-core/src/structpack.rs byte for byte.
@@ -1935,6 +1970,7 @@ static LONG WINAPI _seh_handler(EXCEPTION_POINTERS *ep) {
 
 
 // ── Native IO: sockets, files, environment (v1.0.1 vocabulary) ──────
+#ifndef W_WASI
 #ifdef _WIN32
 typedef SOCKET w_socket_t;
 #define W_BAD_SOCKET INVALID_SOCKET
@@ -2262,6 +2298,7 @@ static char *w_http_request(const char *method, const char *url, const char *bod
     if (!out) snprintf(err, errlen, "out of memory");
     return out;
 }
+#endif // !W_WASI
 
 // Capabilities the C chain does not implement. Defined (so the build succeeds
 // for programs that merely *import* std/http) but fatal with a message that
@@ -2348,6 +2385,7 @@ static void W__1(void) {                        // @1 file write
     w_push(w_write_file(path, data));
 }
 
+#ifndef W_WASI
 static void W__2(void) {                        // @2 http get
     const char *url = (const char *)w_as_ptr(w_pop());
     char err[512];
@@ -2366,6 +2404,10 @@ static void W__3(void) {                        // @3 http post
     w_push(W_PTR(w_str_new(body, (uint32_t)strlen(body))));
     free(body);
 }
+#else
+static void W__2(void) { w_fail("capability @2 (http-get) is unsupported on wasm profile"); }
+static void W__3(void) { w_fail("capability @3 (http-post) is unsupported on wasm profile"); }
+#endif
 
 static void W__4(void) {                        // @4 env
     const char *name = (const char *)w_as_ptr(w_pop());
@@ -2377,6 +2419,7 @@ static void W__7(void) { w_cap_unimplemented(7, "http-audit"); }
 static void W__8(void) { w_cap_unimplemented(8, "http-req-raw"); }
 static void W__9(void) { w_cap_unimplemented(9, "http-req-parallel"); }
 
+#ifndef W_WASI
 // exec (@5). popen() captures one stream only, so stderr is redirected to a
 // temp file and read back. The command is wrapped in a group — `( cmd )`
 // groups in both POSIX sh and cmd.exe — so the redirection covers the whole
@@ -2510,6 +2553,10 @@ static void w_exec_impl(int trim) {
 
 static void W__5(void)  { w_exec_impl(1); }     // @5  exec（两流 trim）
 static void W__10(void) { w_exec_impl(0); }     // @10 exec-raw（两流原样）
+#else
+static void W__5(void)  { w_fail("capability @5 (exec) is unsupported on wasm profile"); }
+static void W__10(void) { w_fail("capability @10 (exec-raw) is unsupported on wasm profile"); }
+#endif
 
 // ── Shared KV store (v1.0.2 vocabulary) ──────────────────────────────
 // Process-global string→string map with a mutex; survives across the
@@ -2527,6 +2574,9 @@ static void w_kv_lock_enter(void) {
     EnterCriticalSection(&w_kv_lock);
 }
 static void w_kv_lock_leave(void) { LeaveCriticalSection(&w_kv_lock); }
+#elif defined(W_WASI)
+static void w_kv_lock_enter(void) { }
+static void w_kv_lock_leave(void) { }
 #else
 #include <pthread.h>
 static pthread_mutex_t w_kv_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -2607,6 +2657,7 @@ static wval *w_kv_keys_list(void) {
 }
 
 // ── Concurrent serve (v1.0.2) ────────────────────────────────────────
+#ifndef W_WASI
 // serve-concurrent(port, handler): native accept loop; one thread per
 // connection. Each worker initializes its own thread-local stack and a
 // compact heap, pushes the conn handle, and calls the handler (quote
@@ -2669,6 +2720,7 @@ static void w_serve_concurrent(int64_t port, wfn handler) {
 #endif
     }
 }
+#endif // !W_WASI
 
 static void w_init(int argc, char **argv) {
 #ifdef _WIN32
@@ -2688,7 +2740,9 @@ static void w_init(int argc, char **argv) {
         if (w_stack == NULL) { fprintf(stderr, "stack alloc failed\n"); exit(1); }
     }
     w_heap_init();
+#ifndef W_WASI
     w_net_init();
+#endif
     w_argc = argc;
     w_argv = argv;
     w_random_seed((uint64_t)time(NULL) ^ 0x12345678);

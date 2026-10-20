@@ -7,7 +7,8 @@ stdlib 文档里的安全承诺以本文为准。
 > **一句话结论**：当前只有 Rust VM 有 `CapabilityTable` 的**框架**，但
 > `read-file`/`write-file`/`getenv`/`ffi-*` 等 ambient opcode 绕过它；
 > 原生 C 产物完全没有语言级授权。**WASM/WASI 是已选定的原生安全目标**，
-> 见 `docs/wasm-wasi-plan.md`。
+> 见 `docs/wasm-wasi-plan.md`。WASM M1 已打通，但负向门禁
+> （W-5/W-6/W-7）未完成，**尚不能作为生产边界**。
 
 ---
 
@@ -35,11 +36,11 @@ stdlib 文档里的安全承诺以本文为准。
 | `-t bundle` | Rust VM + `.wbin` 单文件 | 同上 | **否**：同上；且内含完整 VM |
 | `-t c` / `-t c2` / `-t exe` / `-t native` | C → 原生 exe | **无** | **否**：只有 OS 用户权限 |
 | `wd build/run` | C → 原生 exe | **无**；构建期还需 gcc/执行 | **否**：构建/运行都不是沙箱 |
-| `-t wasm`（计划） | `.wasm` + 宿主策略 | WASI preopen + host imports | **目标**：是（Phase 3 后） |
+| wasm M1（`scripts/build-wasm.sh`） | `.wasm` + WAMR | WASI preopen + host imports | **尚未**：文件正/负通过；其余负向门禁未完成 |
 
 **原生产物是 trusted-only**：它适合“自己写的、已审阅的程序”，不适合
-“用户上传的、LLM 生成的、来源不明的程序”。在 WASM 目标落地前，不可信
-代码不应走 `exe`/`c2`/`native`/`wd`。
+“用户上传的、LLM 生成的、来源不明的程序”。在 WASM v1 的负向门禁完成前，
+不可信代码不应走 `exe`/`c2`/`native`/`wd`。
 
 ---
 

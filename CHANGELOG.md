@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased (2026-10-21) — WASM/WASI M1：零 Rust 运行链路打通
+
+### 新增/修改
+
+- `whisperc/runtime.c`：增加 `W_WASI` 条件编译——
+  - 64MB `malloc` 堆（替代 16GB `mmap`）；
+  - 文件/env/时间/core 保留；`@2`/`@3`/`@5`/`@10` 在 WASI 下显式
+    `unsupported`；FFI/裸 socket/`serve-concurrent` 不编译；
+  - `try` 在 WASI 下显式 unsupported（wasi-libc 无 setjmp/longjmp）；
+  - 修复非 Windows FFI 分支的 `dlopen(p, ...)` 未定义变量。
+- `whisperc/wd.ws`：新增 `wd c <src> <out.c>`——只发射 C，不调 cc、
+  不碰缓存；与 `whisper bootstrap` 的 hello C 输出逐字节一致。
+- `scripts/build-wasm.sh`：`wd c`（回退 bootstrap）→
+  `lift-nested.py` → Zig/wasi-sdk clang → `.wasm`；可用 `--run`。
+- `scripts/lift-nested.py`：把 cgen 的 GNU 嵌套函数 `_qb` 提升为文件级
+  `_qN`，使 clang/Zig 可编译 HOF 代码；这是 W2.5 的临时桥。
+- `tests/security/wasm_file.ws` 等：WASI preopen/负向安全用例。
+- `scripts/wd-c-gate.sh`：C-1..C-5，验证 `wd c` 不产 exe、与 bootstrap
+  逐字节一致、不调用 cc、`wd build` 不回归、usage 列出 c；已进 CI。
+- `scripts/wasm-security-gate.sh` + `tests/security/wasm_*.ws`：
+  S-1..S-8（无 preopen 拒绝、preopen 读写、env allowlist、
+  `@2`/`@5`/`try` 显式失败、无 Rust 运行时），本机 8/8。
+
+### 实测
+
+- `hello.ws → wd c → zig cc → .wasm → iwasm` 输出 `Hello, World!`。
+- core conformance：**26/27 通过，1 个原语义 skip**；HOF 全部通过。
+- 无 preopen：`write-file` 返回 `-1`、`read-file` 为空；
+  `--map-dir=/data::target/wasi-data`：`10`/`10`。
+- `cargo test --workspace`：**467 passed / 0 failed**。
+- 运行链路无 Rust：Zig（C 工具链）+ WAMR（C）；`crates/**` 未改。
+
 ## Unreleased (2026-10-20) — 安全模型审计 + WASM/WASI 整改计划
 
 ### 审计结论（文档，无行为变更）
@@ -20,6 +52,9 @@
 - `tests/wasm_preregistered.md`：W-1..W-9 判据与反向判据。
 - `scripts/wasm-preflight.sh`：clang/wasm32 target、wasi-sysroot、WASM
   runtime 的前置检查；默认只报告，`--strict` 供 CI 用。
+- 零 Rust 约束：运行时只接受 C 实现（WAMR `iwasm` / wasm3 / wasm2c），
+  **不采用 wasmtime/wasmer**；编译器可用 wasi-sdk clang 或 Zig `cc`
+  （Zig 自带 wasi-libc）。
 
 ### 文档同步
 

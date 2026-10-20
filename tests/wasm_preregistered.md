@@ -14,8 +14,8 @@
 
 - `scripts/wasm-preflight.sh` 能报告 clang 的 wasm32 target、wasi-sysroot、
   WASM runtime；缺任何一项时给出可操作的安装提示。
-- 对 `hello.ws`（`"Hello, WASM" .`）能产出 `.wasm` 文件，且
-  `wasmtime run`（或 WAMR `iwasm`）输出与 c2 一致。
+- 对 `hello.ws`（`"Hello, WASM" .`）能产出 `.wasm` 文件，且由**零 Rust**
+  C 运行时（WAMR `iwasm` / wasm3 / wasm2c）执行，输出与 c2 一致。
 - 构建命令不要求修改 `crates/**`；`git diff --stat -- crates` 为空。
 
 ### W-2 基础语义
@@ -108,4 +108,78 @@
 
 ## 执行记录
 
-（实现完成后按 W-1..W-9 逐条追加：命令、结果、失败原因、修复提交。）
+### 2026-10-20 / 21 — M1 首通（零 Rust 运行时）
+
+**工具链**（本机）：
+
+- C→wasm：Zig `0.17.0-dev.217+c47c05386`（自带 wasi-libc）；
+  也支持 wasi-sdk clang。
+- 运行时：WAMR `iwasm 2.4.5`（C，官方 Windows 预编译）；
+  **未使用 wasmtime/wasmer**。
+- C 发射：`wd c`（Whisper 自身，纯 C 产物），回退路径
+  `whisper bootstrap`（Rust CLI，仅 Phase 1 兼容用）。
+- 引号/HOF 的 GNU 嵌套函数由 `scripts/lift-nested.py` 提升为文件级
+  `_qN()`；这是 **W2.5 临时桥**，永久修法仍是 cgen 直接发射顶层函数。
+
+**W-1（部分通过）**：
+
+```bash
+bash scripts/build-wasm.sh docs/examples/hello.ws target/toolchain/hello.wasm
+iwasm target/toolchain/hello.wasm
+# Hello, World!
+```
+
+**W-2（部分通过）**：
+
+- `exit`、`args`、stdout 尚未逐项固化成测试；hello 的 stdout 正确。
+- wasm 产物 970,744 字节；WAMR 退出码 0。
+
+**W-3（26/27 通过，1 个原语义跳过）**：
+
+```bash
+# 逐文件：build-wasm → iwasm；与 `-t c2` 原生输出逐字节比较
+wasm conformance: pass=26 fail=0 skip=1
+```
+
+- 唯一 skip：`tests/conformance/26_file_io.ws` 使用宿主绝对路径
+  `D:/tmp/wsconf.txt`，在 WASI 下无意义。
+- 新增 `tests/security/wasm_file.ws`，用 guest 路径
+  `/data/wsconf.txt`；`--map-dir=/data::target/wasi-data` 下输出
+  `10`、`10`，通过。
+- 26 个通过用例里包含 HOF（`13_times`/`14_map_fold`/`15_each_filter`/
+  `24_nested_structures`/`25_import`/`s4_both_strlist`），依赖
+  `lift-nested.py`；未 lift 时这些文件全部报
+  `function definition is not allowed here`。
+
+**W-5/W-6/W-7（S-1..S-8，8/8）**：
+
+```bash
+bash scripts/wasm-security-gate.sh
+# S-1 无 preopen：write=-1 / read=0
+# S-2 preopen /data：write=10 / read=10
+# S-3 未 --env：getenv 为空
+# S-4 --env=WHISPER_TEST=ok：ok
+# S-5 @5 exec：显式 unsupported
+# S-6 @2 http：显式 unsupported
+# S-7 try：显式 unsupported
+# S-8 无 Rust 运行时；crates/ 无改动
+```
+
+仍未覆盖：`../`/绝对路径/symlink 逃逸、`listdir`/`mkdir`/
+`file-exists` 负向、FFI 链接失败、未知 host import、host 代理白名单。
+这些是 W-5/W-6 的剩余项，不能因为 8/8 就宣称 WASM 已是安全边界。
+
+**W-8（通过约束检查）**：
+
+- `crates/**` 无改动；运行时不含 Rust；`wasmtime/wasmer` 未进入链路。
+- `wd c` 与 `whisper bootstrap` 对 hello 的 C 输出 SHA256 相同。
+
+**W-9（未做）**：性能基线尚未记录。
+
+### 结论
+
+M1 **打通**：`hello.ws → wd c → Zig cc → .wasm → iwasm`，
+核心 conformance 26/27（1 个原语义 skip；可运行子集 26/26）通过，
+文件 IO 在 preopen 下通过；安全门禁 S-1..S-8 8/8。
+仍未完成：路径逃逸/FFI/未知 import 负向、W2.5（cgen 顶层化）、
+`-t wasm` CLI、性能基线。因此**还不能**把 WASM 宣称为生产安全边界。

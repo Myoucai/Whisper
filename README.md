@@ -232,7 +232,7 @@ gcc -O2 -o hello hello.c -I whisperc -lm
 | **native 特化** | `whisper build file.ws -t native -o prog` | 按主机 CPU 特化的原生可执行文件（内容寻址缓存） | gcc |
 | **exe 原生** | `whisper build file.ws -t exe -o app` | 原生可执行文件（**产物零 Rust**） | gcc（构建期） |
 | bundle 打包 | `whisper build file.ws -t bundle -o app` | 单文件可执行（**内含 Rust VM**，构建期无需工具链） | 无 |
-| **wasm 沙箱（规划）** | `whisper build file.ws -t wasm -o app.wasm`（计划） | `.wasm`（由 WASM runtime 执行） | wasi-sdk clang + WAMR/wasmtime |
+| **wasm（M1）** | `bash scripts/build-wasm.sh file.ws app.wasm`（`-t wasm` 规划） | `.wasm`（由零 Rust 的 C 运行时执行） | Zig cc / wasi-sdk clang + WAMR/wasm3/wasm2c |
 | 固定点复验 | `scripts/verify-fixedpoint.sh` | 自举链验证 | gcc |
 
 ```bash
@@ -266,7 +266,7 @@ Whisper 的安全承诺**按执行路径分档**，不是所有产物都等价�
 | VM 解释 | `whisper run` | ⚠️ 部分 | `@n` 有 `CapabilityTable`，但 `read-file`/`write-file`/`getenv`/`ffi-*` 等 ambient opcode 目前可绕过；**暂不作为不可信代码边界** |
 | bundle | `-t bundle` | ⚠️ 部分 | 内含 Rust VM，同上；体积也更大 |
 | C / 原生 | `-t c`/`-t c2`/`-t exe`/`-t native`/`wd` | ❌ 无 | 直接使用 OS 用户权限；**trusted-only**，不要用来跑不可信源码 |
-| WASM | `-t wasm`（规划） | ✅ 目标 | `wasm32-wasi` + preopen + host policy；见 [docs/wasm-wasi-plan.md](docs/wasm-wasi-plan.md) |
+| WASM | `bash scripts/build-wasm.sh`（`-t wasm` 规划） | 🟡 M1 | core 26/27 已通；preopen 文件正/负各一例；负向安全套件未完成，**尚不可用于生产** |
 
 当前已确认的缺口（2026-10-20 实测）：
 
@@ -274,12 +274,22 @@ Whisper 的安全承诺**按执行路径分档**，不是所有产物都等价�
 - VM 默认配置下 `"msvcrt.dll" ffi-open .` 直接拿到 handle；
 - `-t c2` 产物无授权直接读文件、执行 `@5` 命令。
 
-**在 WASM 目标落地前，不可信代码请放在 OS 沙箱/容器里运行；不要依赖
-`whisper run` 或 native 产物做安全隔离。** 完整威胁模型、缺口清单和整改
-不变量见 [docs/security-model.md](docs/security-model.md)。
+**在 WASM v1 的负向安全门禁（W-5/W-6/W-7）完成前，不可信代码仍需放在
+OS 沙箱/容器里运行；不要依赖 `whisper run` 或 native 产物做安全隔离。**
+完整威胁模型、缺口清单和整改不变量见
+[docs/security-model.md](docs/security-model.md)。
+
 WASM/WASI 的详细计划与判据见 [docs/wasm-wasi-plan.md](docs/wasm-wasi-plan.md)
-和 [tests/wasm_preregistered.md](tests/wasm_preregistered.md)；当前工具链
-状态用 `bash scripts/wasm-preflight.sh` 检查（缺失只报告，不阻塞现有 CI）。
+和 [tests/wasm_preregistered.md](tests/wasm_preregistered.md)。当前 M1 已打通：
+
+```bash
+# 需要 Zig（或 wasi-sdk clang）与 C 运行时 WAMR iwasm；不需要 Rust runtime
+bash scripts/build-wasm.sh docs/examples/hello.ws target/hello.wasm
+iwasm target/hello.wasm          # Hello, World!
+```
+
+工具链状态用 `bash scripts/wasm-preflight.sh` 检查（缺失只报告，
+不阻塞现有 CI）。
 
 ## 置信度与不确定性（std/conf，已定稿）
 
@@ -359,7 +369,7 @@ append 模式已消除（`range-to` 10 万元素 83s → 19ms）。
 | 循环控制 (leave，编译期跳转回填) | ✅ |
 | 静态类型推导（strict 默认：类型错误致命，`--no-strict-types` 降级） | ✅ |
 | 能力沙箱 | ⚠️ VM 的 `@n` 部分；ambient/FFI 待收口；C 链无 |
-| WASM/WASI 安全执行目标 | 🚧 规划中（`-t wasm`） |
+| WASM/WASI 安全执行目标 | 🟡 M1（core 26/27；`-t wasm` 未接） |
 | 置信度系统 + 概率选择 | ✅ |
 | .wbin 二进制格式 | ✅ |
 | 包管理器 | ✅ |
@@ -438,6 +448,8 @@ bash scripts/app-gate.sh                         # 13 路由 Web 应用断言
 bash tools/opcode_coverage.sh                    # 101 项逐特性双跑（VM vs 自举链）
 bash scripts/typecheck-gate.sh                   # 类型检查假阳性棘轮（三语料 FP=0）
 bash scripts/wd-cache-gate.sh                    # wd 内容寻址缓存 C-1..C-6（8 条断言）
+bash scripts/wd-c-gate.sh                        # wd c 零 Rust C 发射（C-1..C-5）
+bash scripts/wasm-security-gate.sh               # WASI 安全 S-1..S-8（需 Zig/WAMR）
 bash scripts/build-wfmt.sh && bash scripts/fmt-gate.sh  # Whisper 写的 fmt（F-1..F-6）
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验
 ```

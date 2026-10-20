@@ -470,10 +470,11 @@ Whisper VM 只在两个场景有独立价值：
 的约束下，原生安全的主路线是 **C → WebAssembly + WASI**，而不是再写一个
 VM。
 
-**架构**：`source.ws → C → clang --target=wasm32-wasip1 → .wasm`，
-由 WAMR/wasmtime 执行；文件只通过 preopen，网络/执行/FFI 走宿主策略或
-显式拒绝。Rust 代码不改；`-t wasm` 先由 `scripts/build-wasm.sh` 用现成的
-`whisper bootstrap` 出 C，后续再给 `wd` 加 `c`/`wasm` 动词。
+**架构**：`source.ws → wd c → C → zig cc/clang → .wasm`，
+由 WAMR/wasm3（C 运行时）/ wasm2c（AOT 到 C）执行；文件只通过 preopen，
+网络/执行/FFI 走宿主策略或显式拒绝。Rust 代码不改；`wd c` 已是零 Rust
+发射器，`whisper bootstrap` 仅作回退。HOF 的 GNU 嵌套函数暂由
+`scripts/lift-nested.py` 提升到顶层（W2.5 永久修法待做）。
 
 **明确不做**：v1 不支持 `@5`/`@10`/FFI/裸 socket/`serve-concurrent`；
 这些必须显式报错，不能 no-op。native `exe`/`c2`/`native` 保持
@@ -481,10 +482,12 @@ trusted-only。
 
 **判据**：`tests/wasm_preregistered.md`；计划与风险：
 `docs/wasm-wasi-plan.md`；威胁模型：`docs/security-model.md`。
-**工具链探测**：`scripts/wasm-preflight.sh`（已落地，本机当前缺
-clang/wasi-sysroot/runtime）。
+**工具链探测**：`scripts/wasm-preflight.sh`；本机已装 Zig + WAMR
+（`target/toolchain`）。
 
-**状态**：文档/判据/preflight 已落地，WASM 代码未开始。
+**状态（2026-10-21）**：M1 打通——hello 输出正确；core conformance
+26/27 通过（1 个原语义 skip）；preopen 文件正/负各一例通过。
+W-5/W-6/W-7 完整负向套件、`-t wasm` CLI、性能基线未完成。
 
 ---
 
@@ -501,7 +504,7 @@ Step 3   (驱动 wd)      3-5 天    ✅ 已完成 2026-09-21（里程碑 A/B + 
 Step 4   (工具迁移)     1-2 周    🔄 fmt v1 已落地（2026-10-20，布局规范化 + 门禁）；其余未开始
 Step 5   (Whisper VM)   ?         ← 可选，前置是 call + 可变数组；**不是安全方案**（见 Step 7）
 Step 6   (C 降级为接口) 数天      ✅ 已完成 2026-09-21
-Step 7   (WASM/WASI)    4-6 周    🚧 计划 2026-10-20（文档/判据已落地，代码未开始）
+Step 7   (WASM/WASI)    4-6 周    🟡 M1 打通（hello + core 26/27；W2.5 待做）
 ```
 
 **门禁基线（2026-09-21 收口战役后，本机实测，gcc = msys64 mingw 16.1.0）**：

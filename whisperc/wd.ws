@@ -8,6 +8,7 @@
 //
 //   wd build <src.ws> <out>     compile to <out>, leaving <out>.c behind
 //   wd run   <src.ws> <out>     same, then run <out>
+//   wd c     <src.ws> <out.c>   emit C only (no cc, no cache; for wasm/zig)
 //
 // Exit codes: 0 success, 1 build/IO error (missing source, C compiler
 // failure, artifact not produced), 2 usage error. Being able to report
@@ -274,7 +275,7 @@
     args                              // A
     dup len 4 < ??
         drop
-        "usage: wd build|run <src.ws> <out>" .
+        "usage: wd build|run|c <src.ws> <out>" .
         2 exit ]
     dup 1 @nth swap                   // verb A
     dup 2 @nth swap                   // verb src A
@@ -419,6 +420,12 @@
     compile-full                      // S main_bc defs
     cgen                              // S csrc
     header swap strcat                // S full_c
+
+    // `wd c <src> <out.c>`：只生成 C，不调 cc、不碰缓存。
+    over 0 @nth "c" str-eq? ??
+        over 2 @nth swap write-file drop
+        drop
+        return ]
 
     // 缓存键：full_c ++ runtime.c ++ cc。full_c 留在栈上供写 .c。
     dup                               // S full_c full_c

@@ -126,6 +126,7 @@ jobs:
         run: |
           bash scripts/build-wd.sh
           bash scripts/wd-cache-gate.sh
+          bash scripts/wd-c-gate.sh
       - name: Step 4 fmt gate (Whisper formatter)
         run: |
           bash scripts/build-wfmt.sh

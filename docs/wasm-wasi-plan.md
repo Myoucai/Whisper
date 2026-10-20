@@ -16,20 +16,40 @@
 **依据**：`docs/security-model.md` 的审计结果——当前 VM 的 ambient opcode
 与 FFI 绕过 `CapabilityTable`，C 链完全没有授权层。
 
+### 0.1 当前进展（2026-10-21）
+
+- **M1 已打通**：`hello.ws → wd c → Zig cc → .wasm → WAMR iwasm`，
+  输出 `Hello, World!`。运行链路零 Rust（Zig 是 C 工具链，WAMR 是 C）。
+- `wd c` 只发射 C、不调 cc、不碰缓存；与 `whisper bootstrap` 的 C
+  输出逐字节一致（hello SHA256 相同）。
+- core conformance：**26/27 通过，1 个按原语义跳过**（`26_file_io`
+  用宿主 `D:/tmp` 绝对路径）。新增 WASI 版文件 IO 用例，在
+  `--map-dir` preopen 下通过；无 preopen 时写入返回 `-1`、读取为空。
+- 发现的硬阻塞：cgen 为 quote/HOF 生成 **GNU C 嵌套函数**
+  （`auto void _qb`），clang/Zig 不支持。已用
+  `scripts/lift-nested.py` 做构建期提升（W2.5），全部 HOF 用例通过；
+  永久修法仍是 cgen 直接发射顶层 `_qN()`。
+- 安全门禁 `scripts/wasm-security-gate.sh`：**S-1..S-8 8/8**（文件
+  默认拒绝/preopen、env allowlist、`@2`/`@5`/`try` 显式失败、无 Rust
+  运行时）。
+- 未完成：路径逃逸/symlink、FFI 链接失败、未知 host import、
+  `-t wasm` CLI、W-9 性能基线。
+
 ---
 
 ## 1. 目标架构
 
 ```text
 source.ws
-   │  whisper bootstrap（现成，Rust CLI 不改）或未来的 wd c
+   │  wd c（零 Rust 发射器）或 whisper bootstrap（Phase 1 回退）
    ▼
-app.c  ── clang --target=wasm32-wasip1 ──┐
+app.c  ── clang / zig cc --target=wasm32-wasip1 ──┐
    │                                      │
    │  runtime_core.c                      │
    │  runtime_wasi.c  ────────────────────┤
    ▼                                      ▼
-app.wasm  ── wrun policy ──>  WAMR / wasmtime / AOT
+app.wasm  ── wrun policy ──>  WAMR iwasm / wasm3 / wasm2c
+                              （全部 C 实现，零 Rust）
                               │
                               ├─ preopen dirs（只读/读写）
                               ├─ env allowlist
@@ -80,16 +100,19 @@ app.wasm  ── wrun policy ──>  WAMR / wasmtime / AOT
 
 ### W1 — 工具链 preflight（0.5–1 天）
 
-- 确认 `wasi-sdk`（clang + wasi-libc）版本；目标 triple：
-  `wasm32-wasip1`（新）或 `wasm32-wasi`（旧，按 SDK 版本）。
-- 确认运行时：`wasmtime`（开发方便）或 `WAMR`（C，适合零 Rust 分发）；
-  记录版本并固定。
-- `scripts/wasm-preflight.sh` 已落地（2026-10-20）；本机实测报告
-  clang/wasi-sysroot/runtime 三项缺失，属于预期（尚未安装工具链）。
+- 确认 C→wasm 编译器：`wasi-sdk` 的 clang（+ wasi-libc）或 **Zig
+  `zig cc`**（自带 wasi-libc）；目标 triple：`wasm32-wasip1`（新）或
+  `wasm32-wasi`（旧，按工具链版本）。
+- 确认运行时：**只接受 C 实现**——WAMR `iwasm`（推荐，官方有
+  Windows/Linux 预编译）、wasm3，或 `wasm2c`（WABT，AOT 到 C + 宿主 shim）。
+  **不接受 wasmtime/wasmer（Rust 实现）**。
+- `scripts/wasm-preflight.sh` 已落地；本机把 Zig 0.17 与 WAMR 2.4.5
+  放进 PATH 后 `--strict` **通过**（wasmtime/wasmer 不进入链路）。
   脚本默认只报告、不阻塞 CI；`--strict` 供 CI 使用。
-- 记录 AOT 可行性（`wamrc`）作为后续选项。
+- 记录 AOT 可行性（WAMR `wamrc`，C++ 工具）作为后续选项。
 
-**验收**：preflight 能在一台干净机器上准确报告缺什么；CI 镜像可复现。
+**验收**：preflight 能在一台干净机器上准确报告缺什么；CI 镜像可复现；
+最终运行链路中没有任何 Rust 运行时。
 
 ### W2 — 运行时分层与 WASI 移植（5–8 天）
 
@@ -129,26 +152,62 @@ WASI 实现：
 **验收**：`hello.ws`、算术、字符串、列表、JSON 在 wasm 上与 c2 输出一致；
 `read-file` 只能读 preopen。
 
+### W2.5 — 把 quote 函数提升到顶层（硬前置，1–2 周）
+
+**事实**：cgen 对 `@map`/`@each`/`@fold`/`@times`/`@filter`/`try`
+生成的 C 是
+
+```c
+{ auto void _qb(void) { ... } ... _qb(); ... }
+```
+
+这是 **GNU C 嵌套函数扩展**，GCC 能编译，clang/Zig/wasm32-wasi 不能。
+这不是“WASI 缺功能”，而是 C 发射产品本身不可移植；spec 的
+“C 当作可移植汇编”表述因此在 HOF 上不成立。
+
+**临时桥（已落地）**：`scripts/lift-nested.py` 在构建期把每个
+`_qb` 提升为文件级 `static void _qN(void)`，并替换调用点。
+26/26 可运行 conformance 通过；但它是文本后处理，不应作为长期契约。
+
+**永久修法**：在 `compiler.all.ws` 的 cgen 中直接发射顶层 `_qN()`，
+带唯一名字/前置声明；或改成不依赖嵌套函数的闭包 ABI。
+这会改动冻结的编译器源码，必须走固定点/seed 重新验证。
+
+**判据**：
+
+- `.c` 中不再出现 `auto void _qb`；
+- 同一源码经 cgen 直接产出的 C 与“cgen + lift”的语义一致；
+- 固定点仍成立；
+- 迁移完成后删除 `scripts/lift-nested.py` 的调用（保留测试）。
+
 ### W3 — 构建目标（2–3 天）
 
 **Phase 1（不改 Rust）**：
 
 ```bash
-whisper bootstrap hello.ws > hello.c
-clang --target=wasm32-wasip1 --sysroot="$WASI_SDK/share/wasi-sysroot" \
-      -O2 -I whisperc hello.c -o hello.wasm
-wasmtime run --dir=.:ro hello.wasm
+# 零 Rust C 发射（wd 是 Whisper 自身编译出的 C 程序）
+wd c hello.ws hello.c
+# 方案 1（零额外 sysroot）：Zig 自带 wasi-libc
+zig cc -target wasm32-wasi -O2 \
+  -D_WASI_EMULATED_MMAN -D_WASI_EMULATED_SIGNAL \
+  -I whisperc hello.c -o hello.wasm \
+  -lwasi-emulated-mman -lwasi-emulated-signal
+# 方案 2：wasi-sdk clang
+# clang --target=wasm32-wasip1 --sysroot="$WASI_SDK/share/wasi-sysroot" ...
+iwasm --dir=. hello.wasm        # WAMR（C 运行时，零 Rust）
 ```
 
-封装为 `scripts/build-wasm.sh`，参数：`<src> <out.wasm>`；支持
-`WHISPER_CC`/`WASI_SDK`/`WASI_RUNTIME` 环境变量。
+以上已封装为 `scripts/build-wasm.sh`：参数 `<src> <out.wasm>`，
+内部用 `wd c`（缺失时回退 `whisper bootstrap`）+ `lift-nested.py` +
+Zig/clang；支持 `WASM_CC`/`WASI_SDK_PATH`/`WASM_RUNTIME` 环境变量。
+`wd c` 与 `whisper bootstrap` 的 C 输出已逐字节对拍（hello）。
 
-**Phase 2（零 Rust 构建）**：
+**状态**：
 
-- 给 `wd` 增加 `wd c <src> <out.c>`（只生成 C，不调 gcc）或
-  `wd wasm <src> <out.wasm>`（生成 C 后调 clang）。
-- `wd` 仍是纯 Whisper；不依赖 Rust CLI。
-- 与 `whisper bootstrap` 的输出做逐字节对拍（复用现有 c2/bootstrap 契约）。
+- hello：✅ `Hello, World!`
+- core conformance：✅ 26/27（1 个原语义 skip；WASI 文件 IO 单独用例通过）
+- HOF：✅ 经 `lift-nested.py`，全部通过；cgen 直接顶层化仍是 W2.5
+- `-t wasm` CLI：❌ 尚未加（当前用 `scripts/build-wasm.sh`）
 
 **验收**：同一源码经 Phase 1/Phase 2 产出语义一致的 wasm；构建可复现
 （固定 `-g0`/路径/版本；若 clang 仍带路径，记录差异原因）。
@@ -233,15 +292,15 @@ wrun [--dir DIR[:ro|rw]]... [--env NAME]... [--http-allow HOST]... \
 
 ## 4. 里程碑
 
-| 里程碑 | 内容 | 预计 |
-|--------|------|------|
-| M0 | 文档/安全模型/判据（本次） | 1–2 天 |
-| M1 | 工具链 + hello.wasm + preflight | 2–3 天 |
-| M2 | 运行时分层 + core conformance | 1–2 周 |
-| M3 | preopen/policy + 负向安全测试 | 1 周 |
-| M4 | journal/文件应用 + CI wasm job | 3–5 天 |
-| M5 | HTTP 代理/exec host（可选） | 1–2 周 |
-| M6 | 性能/发布/评审 | 3–5 天 |
+| 里程碑 | 内容 | 预计 | 状态 |
+|--------|------|------|------|
+| M0 | 文档/安全模型/判据（本次） | 1–2 天 | ✅ 已落地 |
+| M1 | 工具链 + hello.wasm + preflight | 2–3 天 | ✅ hello 全链路通过 |
+| M2 | 运行时分层 + core conformance | 1–2 周 | 🟡 runtime WASI 守卫 + 26/27；cgen 顶层化待做 |
+| M3 | preopen/policy + 负向安全测试 | 1 周 | 🟡 preopen 正/负各一例；完整套件待补 |
+| M4 | journal/文件应用 + CI wasm job | 3–5 天 | ❌ |
+| M5 | HTTP 代理/exec host（可选） | 1–2 周 | ❌ |
+| M6 | 性能/发布/评审 | 3–5 天 | ❌ |
 
 总计：**4–6 周（1 人，低置信度；W2 的 libc/`setjmp`/路径问题可能拉长）**。
 
@@ -251,10 +310,11 @@ wrun [--dir DIR[:ro|rw]]... [--env NAME]... [--http-allow HOST]... \
 
 - **D1**：先 WASI Preview 1（`wasi_snapshot_preview1`），不追 Preview 2
   的 component model；C 工具链成熟度优先。
-- **D2**：运行时开发期用 wasmtime；若要求“零 Rust 运行时”，发布用
-  WAMR（C）或 AOT（`wamrc`）。本计划不强制二选一。
-- **D3**：不改 Rust 源码；Phase 1 用现成 `whisper bootstrap` 出 C，
-  Phase 2 给 `wd` 加 C/wasm 动词。
+- **D2**：运行时**只用 C 实现**：WAMR `iwasm` 首选，wasm3 备选，
+  `wasm2c`（WABT，AOT 到 C）用于单文件/无外部 runtime 的场景。
+  **wasmtime/wasmer 是 Rust 实现，不采用**。
+- **D3**：不改 Rust 源码；`wd c` 已能零 Rust 发射 C；Zig `cc`/wasi-sdk
+  clang 负责 C→wasm，`whisper bootstrap` 只作回退。
 - **D4**：v1 不支持 `@5`/FFI/裸 socket/多线程 server；显式报错。
 - **D5**：native `exe/c2/native/wd` 标记 trusted-only；WASM 是不可信代码
   的唯一目标。
@@ -267,15 +327,16 @@ wrun [--dir DIR[:ro|rw]]... [--env NAME]... [--http-allow HOST]... \
 | 风险 | 影响 | 缓解 |
 |------|------|------|
 | WASI P1 无 socket/thread/exec/ffi | 功能缺口 | v1 明确不支持；HTTP/exec 走 host import（Phase 4） |
-| `runtime.c` POSIX 假设多 | 移植超期 | 先拆 host 接口，逐词迁移；M1 先跑 hello |
-| `setjmp/longjmp` 在 wasi-libc 不可用 | `try` 需重写 | M1 验证；不可用则 W2 增加错误传播改造 |
+| `runtime.c` POSIX 假设多 | 移植超期 | 已加 WASI 守卫（文件/env/时间/core 可跑；network/exec/FFI 排除）；M1 通过 |
+| `setjmp/longjmp` 在 wasi-libc 不可用 | `try` 需重写 | 已确认不可用；v1 `try` 显式 unsupported，后续用错误传播改造 |
+| cgen 生成 GNU C 嵌套函数（HOF） | clang/Zig 直接编译失败 | `scripts/lift-nested.py` 临时桥；永久修法 W2.5 |
+| 文本后处理提升嵌套函数 | 解析脆弱/可能与新 cgen 输出漂移 | 固定生成器版本 + 对拍；W2.5 顶层化后删除桥 |
 | `wasm32` 4GB 线性内存 | 大数据受限 | 记录上限；必要时 memory64（远期） |
 | 路径语义（Windows 盘符/`\`/symlink） | 逃逸或不可用 | 统一转 `/`；preopen + `..`/绝对路径拒绝；负向测试 |
 | 时区/`strftime` | 输出差异 | v1 标 UTC/受限；测试记录 |
 | 性能/启动 | 不如 native | 记录基线；计算密集可接受；host call 优化 |
-| wasmtime 是 Rust | 与“零 Rust”冲突 | 发布用 WAMR/AOT；wasmtime 只做开发/对照 |
-| 工具链不可复现 | 构建差异 | pin 版本；`-g0`；固定 sysroot；记录 hash |
-| `whisper bootstrap` 依赖 Rust CLI | Phase 1 不是零 Rust | Phase 2 补 `wd c/wasm`；验收时区分 |
+| 工具链不可复现 | 构建差异 | pin Zig/wasi-sdk 版本；`-g0`；固定 sysroot；记录 hash |
+| `whisper bootstrap` 依赖 Rust CLI | 构建链非零 Rust | `wd c` 已落地并逐字节对拍；bootstrap 仅回退 |
 | 未知 host import 静默失败 | 安全假象 | 启动时校验 import 表；未知即拒绝 |
 | `serve-concurrent` 迁移 | webapp 不可用 | v1 明确不支持；保留在 VM/native trusted |
 
@@ -283,15 +344,19 @@ wrun [--dir DIR[:ro|rw]]... [--env NAME]... [--http-allow HOST]... \
 
 ## 7. Definition of Done（WASM v1）
 
-- [ ] `scripts/build-wasm.sh` 能从 `.ws` 产出 `.wasm`，hello 输出正确。
-- [ ] core conformance（27 个子集）VM/c2/WASM 输出一致（允许已记录差异）。
-- [ ] `read-file`/`write-file`/`listdir`/`mkdir`/`file-exists` 只能访问 preopen。
-- [ ] 无 policy 时，文件/env/network/exec/ffi 全部拒绝；有负向测试。
-- [ ] `@5`/`@10`/`ffi-*`/`listen`/`serve-concurrent` 显式 unsupported。
+- [x] `scripts/build-wasm.sh` 能从 `.ws` 产出 `.wasm`，hello 输出正确。
+- [x] core conformance：26/27 可运行用例通过；原 `26_file_io` 用宿主
+      绝对路径，按语义 skip，另有 WASI preopen 版本通过。
+- [ ] `read-file`/`write-file`/`listdir`/`mkdir`/`file-exists` 只能访问 preopen
+      （当前只验证了 read/write + `--map-dir`；逃逸负向测试待补）。
+- [ ] 无 policy 时，文件/env/network/exec/ffi 全部拒绝；有负向测试
+      （文件已验；env/network/exec/ffi 待补）。
+- [ ] `@5`/`@10`/`ffi-*`/`listen`/`serve-concurrent` 显式 unsupported
+      （`@2/@3/@5/@10` 有 stub；`ffi` 链接期失败；listen/serve 待验）。
 - [ ] CI 有 `wasm` job，工具链 pin，不阻塞现有门禁。
-- [ ] README/spec/security-model/stdlib/tutorial 与实现一致。
+- [x] README/spec/security-model/stdlib/tutorial 与实现一致（持续维护）。
 - [ ] 性能基线记录在案（journal 10k）。
-- [ ] `crates/**` 无改动（`git diff --stat -- crates` 为空）。
+- [x] `crates/**` 无改动（`git diff --stat -- crates` 为空）。
 
 ---
 
