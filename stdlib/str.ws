@@ -14,8 +14,10 @@
 // **字节**语义，所以叫 `byte-at`。std/list 保留 `nth`（取列表元素是它的本义）。
 : byte-at    { strnth } ;
 : slice      { strslice } ;
-: empty?     { strlen 0 = } ;
-: contains?  { strfind 0 >= } ;
+// 与 std/list 的同名导出冲突（S-4）：字符串侧统一加 str- 前缀，
+// 列表侧保留 first/last/empty?/contains?（与 core 的列表语义一致）。
+: str-empty? { strlen 0 = } ;
+: str-contains? { strfind 0 >= } ;
 : starts-with? { 0 ` strlen strslice ` streq } ;
 : ends-with? { _ strlen over strlen - ` strslice ` streq } ;
 : str-rev    { strchars rev charsstr } ;
@@ -33,8 +35,8 @@
 : from-chars { charsstr } ;
 : lines      { "\n" strsplit } ;
 : words      { " " strsplit } ;
-: first      { 0 strnth ctos } ;
-: last       { _ strlen 1 - strnth ctos } ;
+: first-char { 0 strnth ctos } ;
+: last-char  { _ strlen 1 - strnth ctos } ;
 : rest       { 1 9999 strslice } ;
 : palindrome? { _ str-rev streq } ;
 export strlen
@@ -48,8 +50,8 @@ export to-int
 export from-int
 export byte-at
 export slice
-export empty?
-export contains?
+export str-empty?
+export str-contains?
 export starts-with?
 export ends-with?
 export str-rev
@@ -64,7 +66,7 @@ export chars
 export from-chars
 export lines
 export words
-export first
-export last
+export first-char
+export last-char
 export rest
 export palindrome?

@@ -18,9 +18,15 @@
 : tail      { 1 drop-n } ;
 : init      { _ len 1 - take } ;
 : empty?    { len 0 = } ;
-: contains? { #f ` { $1 = ?? drop #t | ] } @fold } ;
-: all?      { #t ` { & } @fold } ;
-: any?      { #f ` { | } @fold } ;
+: contains? {
+    over len 0 = ??
+        drop drop #f return ]
+    over 0 @nth over =
+    ?? drop drop #t return ]
+    swap 1 drop-n swap contains?
+} ;
+: all?      { #t { & } @fold } ;
+: any?      { #f { | } @fold } ;
 : range     { _ 0 > ?? _ 1 - range _ append | [] ] } ;
 : range-to  { 1 ` range } ;   // n -> [1..n]（range 内建预分配，替代递归 append 的 O(n²)）
 : filter    { @filter } ;

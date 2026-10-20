@@ -3,7 +3,11 @@
 2026-09-10 盘点确立。此处登记**已实锤、暂不实施**的语言级问题——
 每项含事实、选项与预注册判据要求；开工时先落判据再动手。
 
-## 战役 S-2：`mod` 只是 Rust 前端的别名（**2026-09-21 发现，待修**）
+## 战役 S-2：`mod` 曾经只是 Rust 前端的别名（**2026-09-21 发现，已修复**）
+
+**状态（2026-09-21，cd4e248）**：自举链词表已补 `[20 "mod"]`；
+`7 3 mod .` 两链都给 `1`，`stdlib/encoding`/`stdlib/hash` 经 `-t c2`
+能编能跑，词表对拍门禁覆盖了这类拼写缺口。以下保留立项时的事实与判据。
 
 **事实**：`7 3 mod .`
 - `whisper run` → `1`（对）
@@ -49,16 +53,23 @@
 在 `whisper run` 下都能跑，但 `-t c2` **都编不出**：
 `implicit declaration of function 'W_range_to'`。
 
-## 战役 S-4：`std/str` 与 `std/list` 的导出同名冲突（**2026-09-21 部分修复：1/5**）
+## 战役 S-4：`std/str` 与 `std/list` 的导出同名冲突（**2026-09-21 发现，2026-10-20 已关闭**）
+
+**状态（2026-10-20）**：五处同名全部消除。`std/str` 的 `nth` → `byte-at`
+（2026-09-21），`first`/`last` → `first-char`/`last-char`，`empty?` →
+`str-empty?`，`contains?` → `str-contains?`；`std/list` 保留
+`first`/`last`/`empty?`/`contains?`（与 core 的列表语义一致）。新增
+`tests/conformance/s4_both_strlist.ws` 同时 import 两者，VM 与 c2 输出一致。
+以下保留立项时的事实与候选方案。
 
 **事实（2026-09-21 实测，比初版登记的大）**：两个模块的导出**有五处同名**：
 
-| 名 | `std/str` | `std/list` |
-|---|---|---|
-| `nth` | `{ strnth }` | `{ @nth }` |
-| `first` / `last` | 首/末字符 | 首/末元素 |
-| `empty?` | 串空 | 列表空 |
-| `contains?` | 子串 | 成员 |
+| 名 | `std/str`（旧） | `std/str`（现） | `std/list` |
+|---|---|---|---|
+| `nth` | `{ strnth }` | `byte-at` | `{ @nth }` |
+| `first` / `last` | 首/末字符 | `first-char` / `last-char` | 首/末元素 |
+| `empty?` | 串空 | `str-empty?` | 列表空 |
+| `contains?` | 子串 | `str-contains?` | 成员 |
 
 同时 `import` 两者时：**VM 只警告**（`word 'first' exported by both …`，后者胜），
 **C 链硬失败**（`redefinition of 'W_first'` / `W_last` / `W_empty_` / `W_contains_`）。
@@ -69,29 +80,36 @@
 都能编能跑（VM `98` / c2 `98`；VM `8` / c2 `8`）。全仓库查过没有别的裸 `nth`
 使用者，所以改名安全。
 
-**仍未做（4/5）**：`first`/`last`/`empty?`/`contains?` 四处。**没做是有理由的**——
-它们不像 `nth` 那样没人用，改名前要先查清谁在依赖哪一侧；而且四个都改会让两个
-模块的词汇表进一步分叉。**候选方案**：
+**已做（其余 4 处，2026-10-20）**：`first`/`last`/`empty?`/`contains?` 四处按
+"字符串侧加前缀、列表侧保留"改名；全仓库普查过没有外部使用者（只在两个
+stdlib 定义、docs/backlog 的说明文字和 `whisper-stdlib` 快照里出现）。两边
+的 `str.ws` 已同步，避免词汇表再次分叉。**顺带修复了 `std/list` 的
+`contains?`/`all?`/`any?`**：`contains?` 原来用 fold 但在 `[acc item]` 上取
+`$1`（取到 acc），三个词都多了一个 `swap`，运行时直接报 `expected [T]`；
+现在 `contains?` 用显式首元素递归，`all?`/`any?` 去掉多余 swap，两链实测
+一致（`[1 2 3] 2 contains?` → `#t`，`[] 0 contains?` → `#f`）。
+
+**候选方案（立项时）**：
 1. 逐个改名（要先做使用面普查）；
 2. 让 c2 的 import 内联**按词名去重**（对齐 VM 的"后者胜"）——但这把"两个语义
    不同的同名词"变成"看谁先内联"，是**掩盖不是修复**，倾向不做；
 3. 长期：把这类跨模块同名提升为**限定名**（`str.first` / `list.first`），
    限定名机制已经可用。
 
-**判据（未达成）**：同时 import `std/str` 与 `std/list` 的程序两链都能编能跑。
-**现状：四对冲突未解决，该程序在 C 链上仍编不出。**
+**判据（已达成）**：同时 import `std/str` 与 `std/list` 的程序两链都能编能跑。
+`tests/conformance/s4_both_strlist.ws` 是常驻回归，`bash scripts/syntax-gate.sh`
+在 VM 与 c2 两侧都跑它。
 
-## 战役 S-5：Rust 前端关键字 × 自举链词表的机械对拍（**2026-09-21 工具已落地**）
+## 战役 S-5：Rust 前端关键字 × 自举链词表的机械对拍（**2026-09-21 已收口**）
 
 **工具**：`tools/word-table-parity.sh`，带棘轮（`CEIL`，差异数只能减不能增），
 已接进 CI。**自测过会拦**：`PARITY_CEIL=11` → FAIL exit 1。
 
-**当前基线：12 个**。清单（自举链词表里没有这些拼写）：
-
-```
-bytes->hex  bytes-len  bytes-new  bytes-push  bytes-write
-chr  listslice  op-effect  rand  seed!  size-of  word-size
-```
+**当前状态：0 个待处理，14 个白名单**（`CEIL=0`）。白名单分三类：
+`over`/`import`/`export`/`call` 是结构性关键字，`op-effect`/`size-of`/
+`word-size`/`seed!`/`rand` 与 `bytes-new`/`bytes-push`/`bytes-len`/
+`bytes-write`/`bytes->hex` 是 **VM-only 功能**（`emit-bare` 里没有分支，
+C 链发射不了），不是拼写缺口。历史清单里的 `chr`/`listslice` 已补进词表。
 
 ### ⚠️ 一次测量事故（写下来免得重犯）
 
@@ -112,8 +130,9 @@ chr  listslice  op-effect  rand  seed!  size-of  word-size
 某个坏别名，而是和 `first`/`last` 一样，就是各自模块的便利词；它们撞名是因为
 **两个模块的词汇表本身重叠**，与关键字表无关。
 
-**判据（未达成）**：把清单里那 12 个逐个收敛（补进词表，或从 Rust 前端删掉），
-每收掉一个就把 `CEIL` 下调一格。**现状：只落了工具，一个都还没收。**
+**判据（已达成）**：清单中的拼写差异已收敛——`chr`/`listslice` 补进词表，
+其余 10 个 VM-only 功能与 4 个结构性关键字移入白名单，`CEIL` 从 12 收到
+**0**。今后任何新增的、未解释的"只在 Rust 侧"的词都会立刻让门禁失败。
 
 
 **根因**：`range-to` 定义在 `stdlib/list.ws:25`，而

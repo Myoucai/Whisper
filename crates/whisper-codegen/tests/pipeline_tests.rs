@@ -610,7 +610,7 @@ fn test_upper_lambda() {
 fn test_stdlib_str_first() {
     let mut vm = Vm::new();
     load_stdlib(&mut vm, &["str"]).unwrap();
-    let source = "\"hello\" first";
+    let source = "\"hello\" first-char";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
     let (bc, _) = gen.compile(&ast).unwrap();
@@ -618,7 +618,7 @@ fn test_stdlib_str_first() {
     assert_eq!(
         result,
         Some(Value::Str(Rc::new("h".into()))),
-        "first of 'hello' = 'h'"
+        "first-char of 'hello' = 'h'"
     );
 }
 
@@ -626,7 +626,7 @@ fn test_stdlib_str_first() {
 fn test_stdlib_str_last() {
     let mut vm = Vm::new();
     load_stdlib(&mut vm, &["str"]).unwrap();
-    let source = "\"hello\" last";
+    let source = "\"hello\" last-char";
     let ast = Parser::parse_source(source).unwrap();
     let mut gen = BytecodeGenerator::new();
     let (bc, _) = gen.compile(&ast).unwrap();
@@ -634,7 +634,7 @@ fn test_stdlib_str_last() {
     assert_eq!(
         result,
         Some(Value::Str(Rc::new("o".into()))),
-        "last of 'hello' = 'o'"
+        "last-char of 'hello' = 'o'"
     );
 }
 

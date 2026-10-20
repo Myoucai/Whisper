@@ -79,8 +79,12 @@ t str-len      'import "std/str" "hello" strlen .' 5
 t str-concat   'import "std/str" "hello" "world" strcat strlen .' 10
 t str-upper    'import "std/str" "hello" upper .' HELLO
 t str-split    'import "std/str" "a,b,c" "," strsplit len .' 3
-t str-contains 'import "std/str" "hello" "ell" contains? .' '#t'
+t str-contains 'import "std/str" "hello" "ell" str-contains? .' '#t'
 t str-fromint  'import "std/str" 42 from-int strlen .' 2
+t list-contains 'import "std/list" [1 2 3] 2 contains? .' '#t'
+t list-contains-no 'import "std/list" [1 2 3] 9 contains? .' '#f'
+t list-all     'import "std/list" [#t #t] all? .' '#t'
+t list-any     'import "std/list" [#f #t] any? .' '#t'
 t mathf-sqrt   'import "std/mathf" 9 i64>f64 fsqrt f64>i64 .' 3
 t core-gcd     'import "std/core" 12 18 gcd .' 6
 t core-fib     'import "std/math" 10 fib .' 55
