@@ -80,6 +80,30 @@ else
     bad S-9 "路径逃逸未被拒绝"; cat "$TMP/path.out" 2>/dev/null
 fi
 
+# S-10/S-11: preopen directory ops; denied without preopen
+if build tests/security/wasm_dir.ws "$TMP/dir.wasm" \
+   && "$RT" --map-dir="/data::$HOSTDIR" "$TMP/dir.wasm" >"$TMP/dir.out" 2>"$TMP/dir.err" \
+   && [ "$(tr -d '\r' < "$TMP/dir.out" | tr '\n' '|')" = "0|2|1|" ]; then
+    ok S-10 "preopen 目录：mkdir=0 / write=2 / exists=1"
+else
+    bad S-10 "preopen 目录操作失败"; cat "$TMP/dir.out" 2>/dev/null
+fi
+if "$RT" "$TMP/dir.wasm" >"$TMP/dir-none.out" 2>/dev/null \
+   && [ "$(tr -d '\r' < "$TMP/dir-none.out" | tr '\n' '|')" = "-1|-1|0|" ]; then
+    ok S-11 "无 preopen：mkdir=-1 / write=-1 / exists=0"
+else
+    bad S-11 "无 preopen 目录操作未拒绝"; cat "$TMP/dir-none.out" 2>/dev/null
+fi
+
+# S-12: FFI is not compiled into the wasm profile
+if bash scripts/build-wasm.sh tests/security/wasm_ffi.ws "$TMP/ffi.wasm" >/dev/null 2>"$TMP/ffi.build.err"; then
+    bad S-12 "FFI 源码竟然编译成功"
+elif grep -q 'w_ffi_open' "$TMP/ffi.build.err"; then
+    ok S-12 "FFI 在 wasm profile 下不可用（构建期失败）"
+else
+    bad S-12 "FFI 失败信息不含 w_ffi_open"; tail -3 "$TMP/ffi.build.err"
+fi
+
 # S-8: no Rust runtime / no Rust source changes
 if ! grep -v '^#' scripts/build-wasm.sh | grep -q 'wasmtime\|wasmer' \
    && [ -z "$(git diff --name-only -- crates 2>/dev/null)" ]; then
