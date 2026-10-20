@@ -159,7 +159,7 @@ stdlib 文档里的安全承诺以本文为准。
 
 | profile | 载体 | 文件 | 网络 | 执行 | FFI | 环境 |
 |---------|------|------|------|------|-----|------|
-| `untrusted` | WASM | 只读 preopen（可选） | 无 / host 代理白名单 | 无 | 无 | 白名单 |
+| `untrusted` | WASM + `scripts/wrun.sh` | preopen（v1 只有 rw；ro 待实现） | 无 / host 代理白名单 | 无 | 无 | 白名单 |
 | `trusted-native` | C/exe | OS 用户权限 | OS 用户权限 | OS 用户权限 | 允许（显式） | 全部 |
 | `ci` | WASM 或 VM | 临时目录只读/读写 | 无 | 无 | 无 | 最小 |
 | `build` | native | 源码目录 + 输出目录 | 无 | gcc/clang | 无 | 最小 |

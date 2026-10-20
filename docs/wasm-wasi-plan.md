@@ -32,6 +32,8 @@
 - 安全门禁 `scripts/wasm-security-gate.sh`：**S-1..S-9 9/9**（文件
   默认拒绝/preopen、env allowlist、`@2`/`@5`/`try` 显式失败、路径
   逃逸拒绝、无 Rust 运行时）。
+- 宿主启动器 `scripts/wrun.sh`：W-1..W-7 7/7；默认无 preopen/env，
+  `--dir`/`--env` 显式放行，`--http-allow`/`--exec`/`--ffi` 显式拒绝。
 - 未完成：路径逃逸/symlink、FFI 链接失败、未知 host import、
   `-t wasm` CLI、W-9 性能基线。
 
@@ -214,21 +216,23 @@ Zig/clang；支持 `WASM_CC`/`WASI_SDK_PATH`/`WASM_RUNTIME` 环境变量。
 
 ### W4 — `wrun` 宿主策略（3–5 天）
 
-`wrun` 是宿主启动器（可以是 shell/PowerShell 薄包装，后续用 C/Whisper 写）：
+`wrun` 是宿主启动器（当前为 bash 薄包装，后续可用 C/Whisper 重写）：
 
 ```text
-wrun [--dir DIR[:ro|rw]]... [--env NAME]... [--http-allow HOST]... \
+wrun [--dir GUEST::HOST]... [--env NAME]... \
      [--no-network] [--no-exec] [--no-ffi] app.wasm [args...]
 ```
 
 - 默认：无 dir、无 env、无 network、无 exec、无 ffi。
-- `--dir` 映射到 WASI preopen；只读/读写分开。
-- `--env` 白名单；不透传整份环境。
-- `--http-allow` 由 host 代理执行；WASM 侧只调用 `whisper.http_fetch`，
-  不直接拿 socket。
-- `--exec` 仅 trusted profile；argv 数组，不走 shell；命令白名单。
-- FFI：v1 不提供 host import；未知 import 由链接/运行时拒绝。
+- `--dir GUEST::HOST` 映射到 WASI preopen；**v1 只有 rw**（WAMR
+  没有 read-only preopen 开关），只读需求要靠 OS 账户/容器。
+- `--env NAME` 白名单；只透传显式列出的变量。
+- `--http-allow`/`--exec`/`--ffi` **显式拒绝**（“not implemented in
+  wasm v1”），不静默忽略；host 代理/exec 留到 Phase 4。
 - 策略在 wasm 外；`.wasm` 无法自我提权。
+
+**状态（2026-10-21）**：`scripts/wrun.sh` + `scripts/wrun-gate.sh`
+（W-1..W-7 7/7）已落地；默认拒绝、preopen、env、unsupported 均实测。
 
 **验收**：无 policy 时 `read-file`/`getenv`/`@2`/`@5`/`ffi-*` 全拒绝；
 有 policy 时只允许指定范围；错误信息可定位（不泄漏未授权路径）。

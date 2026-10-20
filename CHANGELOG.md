@@ -22,6 +22,9 @@
 - `scripts/wasm-security-gate.sh` + `tests/security/wasm_*.ws`：
   S-1..S-9（无 preopen 拒绝、preopen 读写、env allowlist、
   `@2`/`@5`/`try` 显式失败、路径逃逸拒绝、无 Rust 运行时），本机 9/9。
+- `scripts/wrun.sh` + `scripts/wrun-gate.sh`：宿主策略启动器；
+  默认无 preopen/env，`--dir GUEST::HOST` / `--env NAME` 显式放行，
+  `--http-allow`/`--exec`/`--ffi` 显式拒绝；W-1..W-7 7/7。
 
 ### 实测
 

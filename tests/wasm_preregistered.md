@@ -170,6 +170,10 @@ bash scripts/wasm-security-gate.sh
 FFI 链接失败、未知 host import、host 代理白名单。
 这些是 W-5/W-6 的剩余项，不能因为 9/9 就宣称 WASM 已是安全边界。
 
+**宿主启动器**：`scripts/wrun.sh` 已落地，`scripts/wrun-gate.sh`
+W-1..W-7 7/7——默认无 preopen/env，`--dir`/`--env` 显式放行，
+`--http-allow`/`--exec`/`--ffi` 显式拒绝。v1 无 read-only preopen。
+
 **W-8（通过约束检查）**：
 
 - `crates/**` 无改动；运行时不含 Rust；`wasmtime/wasmer` 未进入链路。

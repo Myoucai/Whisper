@@ -274,7 +274,7 @@ Whisper 的安全承诺**按执行路径分档**，不是所有产物都等价�
 - VM 默认配置下 `"msvcrt.dll" ffi-open .` 直接拿到 handle；
 - `-t c2` 产物无授权直接读文件、执行 `@5` 命令。
 
-**在 WASM v1 的负向安全门禁（W-5/W-6/W-7）完成前，不可信代码仍需放在
+**在 WASM v1 的完整负向安全门禁完成前，不可信代码仍需放在
 OS 沙箱/容器里运行；不要依赖 `whisper run` 或 native 产物做安全隔离。**
 完整威胁模型、缺口清单和整改不变量见
 [docs/security-model.md](docs/security-model.md)。
@@ -285,7 +285,11 @@ WASM/WASI 的详细计划与判据见 [docs/wasm-wasi-plan.md](docs/wasm-wasi-pl
 ```bash
 # 需要 Zig（或 wasi-sdk clang）与 C 运行时 WAMR iwasm；不需要 Rust runtime
 bash scripts/build-wasm.sh docs/examples/hello.ws target/hello.wasm
-iwasm target/hello.wasm          # Hello, World!
+iwasm target/hello.wasm                    # Hello, World!
+bash scripts/wrun.sh target/hello.wasm     # 默认无 preopen/env
+
+# 显式给 /data 预打开目录（v1 为 rw；--env NAME 逐个放行）
+bash scripts/wrun.sh --dir /data::target/data app.wasm
 ```
 
 工具链状态用 `bash scripts/wasm-preflight.sh` 检查（缺失只报告，
@@ -450,6 +454,7 @@ bash scripts/typecheck-gate.sh                   # 类型检查假阳性棘轮�
 bash scripts/wd-cache-gate.sh                    # wd 内容寻址缓存 C-1..C-6（8 条断言）
 bash scripts/wd-c-gate.sh                        # wd c 零 Rust C 发射（C-1..C-5）
 bash scripts/wasm-security-gate.sh               # WASI 安全 S-1..S-9（需 Zig/WAMR）
+bash scripts/wrun-gate.sh                        # wrun 策略 W-1..W-7（需 WAMR）
 bash scripts/build-wfmt.sh && bash scripts/fmt-gate.sh  # Whisper 写的 fmt（F-1..F-6）
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验
 ```
