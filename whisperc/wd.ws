@@ -262,6 +262,7 @@
 
 : wd-cc   { "WHISPER_CC"   "gcc" wd-env } ;
 : wd-root { "WHISPER_ROOT" "."   wd-env } ;
+: wd-runtime-path { wd-root "/whisperc/runtime.c" strcat } ;
 
 // ── argv ────────────────────────────────────────────────────────────
 // args → [verb src out]，参数不足时打印用法并返回空列表
@@ -273,7 +274,7 @@
     args                              // A
     dup len 4 < ??
         drop
-        "usage: wd build|run <src.ws> <out>\n" .
+        "usage: wd build|run <src.ws> <out>" .
         2 exit ]
     dup 1 @nth swap                   // verb A
     dup 2 @nth swap                   // verb src A
@@ -329,11 +330,87 @@
 // （CLI 绑 @5 时一起绑 @10），只是两个流原样返回。
 : wd-emit { dup strlen 0 = ?? drop | print ] } ;
 
+// ── 内容寻址缓存（收口 ③）───────────────────────────────────────────
+// 键 = hash(生成的 C ++ runtime.c 内容 ++ cc 名)。不把"编译器版本"放进键：
+// 同一份 C 经同一个 cc 出来就是同一个二进制；把编译器身份放进键反而多一条
+// 忘 bump 就吐旧产物的脆弱不变式。runtime.c 必须进键，因为它以
+// `#include "runtime.c"` 的形式被引用，并不在 C 文本里。
+//
+// 哈希是多项式 64 位（i64 自然回绕），结果拼上原文长度。不是密码学哈希：
+// 输入只有本机构建产物，非对抗。长度入键让"内容不同但哈希撞车"先分道。
+: wd-hash {                            // [s] → "哈希-长度"
+    dup strlen swap                                   // len s
+    dup strchars 0 { swap 1000003 * swap + } @fold    // len s h
+    swap drop                                         // len h
+    i64tostr swap i64tostr "-" swap strcat strcat     // "h-len"
+} ;
+
+// [s] → shell 双引号形式
+: wd-q { "\"" swap strcat "\"" strcat } ;
+
+// [out] → 本次平台的实际产物名：Windows 补 .exe，其它平台原样。
+// 命中缓存时按它落盘，后续 wd-real / @10 才找得到。
+: wd-out-target {
+    "OS" "" wd-env "Windows_NT" str-eq? ?? ".exe" strcat ]
+} ;
+
+: wd-cache-dir  { wd-root "/target/whisper-cache" strcat } ;
+: wd-cache-path { wd-cache-dir swap "/" swap strcat strcat } ;  // [key] → dir/key
+
+// [src dst] → shell 真实 status。Windows 的 copy 不认正斜杠（会当开关），
+// 而 wd 内部路径全是 D:/…，所以两边都先换成反斜杠再交给 cmd。
+: wd-cp {
+    swap
+    "OS" "" wd-env "Windows_NT" str-eq? ?? "/" "\\" strreplace ]
+    swap
+    "OS" "" wd-env "Windows_NT" str-eq? ?? "/" "\\" strreplace ]
+    swap
+    wd-q
+    "OS" "" wd-env "Windows_NT" str-eq? ?? "copy /Y " | "cp " ]
+    swap strcat " " strcat
+    swap wd-q strcat
+    "OS" "" wd-env "Windows_NT" str-eq? ?? " > NUL" strcat ]
+    @10 dup 0 @nth swap drop
+} ;
+
+// [S] → S hit?：命中则把缓存条目拷到 <out>[.exe]，返回真；否则只返回假。
+// `wd-cp` 失败（例如缓存条目损坏）也按未命中处理，交给下面的正常编译兜底。
+: wd-hit? {
+    "wd.key" kv-get wd-cache-path       // S cachepath
+    dup file-exists ??
+        over 2 @nth wd-out-target       // S cachepath target
+        wd-cp                           // S status
+        0 =
+    |   drop 0 ]
+} ;
+
+// [S] → S：把本次编译产物回填缓存。缓存失败不影响构建成功。
+: wd-store {
+    wd-root "/target" strcat mkdir drop
+    wd-cache-dir mkdir drop
+    dup 2 @nth wd-real                  // S realout
+    dup strlen 0 = ??
+        drop
+    |   "wd.key" kv-get wd-cache-path   // S realout cachepath
+        wd-cp                           // S status  [src=realout, dst=cachepath]
+        drop
+    ]
+} ;
+
+// [S] → S [status out err]：调 C 编译器，命令拼装与原来完全一致。
+: wd-cc-run {
+    dup 2 @nth dup ".c" strcat          // S out cpath
+    wd-cc                               // S out cpath cc
+    rot rot                             // S cc out cpath
+    wd-cc-cmd                           // S cmd
+    @5                                  // S [status out err]
+} ;
+
 // ── 编译（并可跑）一个文件 ──────────────────────────────────────────
 // S = [verb src out]
 : wd-build {
     dup 1 @nth file-exists 0 = ??
-        "wd: cannot read source: " over 1 @nth strcat "\n" strcat .
+        "wd: cannot read source: " over 1 @nth strcat .
         1 exit ]
 
     dup 1 @nth                        // S src
@@ -343,23 +420,30 @@
     cgen                              // S csrc
     header swap strcat                // S full_c
 
+    // 缓存键：full_c ++ runtime.c ++ cc。full_c 留在栈上供写 .c。
+    dup                               // S full_c full_c
+    wd-runtime-path read-file         // S full_c full_c runtime
+    strcat                            // S full_c full_c+runtime
+    wd-cc strcat                      // S full_c material
+    wd-hash                           // S full_c key
+    "wd.key" swap kv-set              // S full_c
+
     over 2 @nth ".c" strcat           // S full_c cpath
     swap                              // S cpath full_c
     write-file                        // S nwritten
     drop                              // S
 
-    dup 2 @nth                        // S out
-    dup ".c" strcat                   // S out cpath
-    wd-cc                             // S out cpath cc
-    rot rot                           // S cc out cpath
-    wd-cc-cmd                         // S cmd
-    @5                                // S [status out err]
-
-    dup 0 @nth 0 = ??
-        drop                          // S           —— 编译成功
-        dup 2 @nth "wd: compiled -> " swap strcat "\n" strcat .
-    |   dup 2 @nth "wd: C compiler failed:\n" swap strcat .
-        1 exit
+    wd-hit? ??
+        // 命中：wd-hit? 已把条目拷到 <out>[.exe]；.c 仍留在磁盘上
+        dup 2 @nth "wd: compiled -> " swap strcat .
+    |   wd-cc-run                     // S [status out err]
+        dup 0 @nth 0 = ??
+            drop                      // S           —— 编译成功
+            dup 2 @nth "wd: compiled -> " swap strcat .
+            wd-store
+        |   dup 2 @nth "wd: C compiler failed: " swap strcat .
+            1 exit
+        ]
     ]
 
     dup 0 @nth "run" str-eq? ??
@@ -368,7 +452,7 @@
         dup 2 @nth wd-real           // S realpath
         dup strlen 0 = ??
             drop drop
-            "wd: cannot find the built artifact\n" .
+            "wd: cannot find the built artifact" .
             1 exit ]
         @10                           // S [status out err]（原样，供逐字节转发）
         dup 1 @nth wd-emit            // S res

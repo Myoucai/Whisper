@@ -59,7 +59,7 @@ gcc -O2 -o hello hello.c -I whisperc -lm && ./hello
 `bootstrap.sh` 最后两步会用刚造出来的 `whisper2` 编出 **`wd`**（见下），所以
 一条命令就能从冻结种子走到「能编能跑任何程序」，全程只用 gcc。
 
-### 零 Rust 驱动 `wd`（进行中）
+### 零 Rust 驱动 `wd`（缓存已落地）
 
 `whisperc/wd.ws` 是一个**用 Whisper 自己写的驱动**，把上面那三行手工胶水
 （内联 import、调 gcc、跑产物）收进一条命令。它同样只需 gcc + 冻结种子：
@@ -71,10 +71,13 @@ bash scripts/build-wd.sh              # 全程无 cargo
 ```
 
 **当前范围（如实说明）**：能编含 `import` 的程序（`std/core` 自动补、命名
-空间限定名按 `math.sq` 形式可用），与 `-t c2` 的 C 输出**接近但未逐字节一致**
-（自包含程序差 3 字节；差异来自多行定义不做限定名克隆）。另外 C 链程序没有
-退出码（cgen 固定 `return 0;`），所以 `wd` 出错时 shell 看到的仍是 0。
-详见 `tests/step3_preregistered.md` 与 `docs/independence-design.md` Step 3。
+空间限定名按 `math.sq` 形式可用），与 `-t c2` 的 C 输出**逐字节一致**（自包含、
+带 import、多行定义四类程序由 `w2_wd_output_matches_c2_byte_for_byte` 常驻
+钉住）。`wd` 的失败路径返回 1（构建/IO）或 2（用法），转发用 `print` + `@10`
+逐字节。`wd build/run` 走**内容寻址缓存**：键 = hash(生成的 C ++ `runtime.c`
+内容 ++ cc 名)，命中直接拷贝产物；改源码、改运行时、换 cc 都会失效，缓存位于
+`target/whisper-cache/`。判据见 `tests/wd_cache_preregistered.md`，
+门禁 `bash scripts/wd-cache-gate.sh`（C-1..C-6 八条）。
 
 ### 安装（Rust 工具链，含 REPL/LSP/c2 一键编译）
 
@@ -302,6 +305,7 @@ append 模式已消除（`range-to` 10 万元素 83s → 19ms）。
 |------|------|
 | 栈式虚拟机 (158 opcodes) | ✅ |
 | 硬自举编译器 (纯 Whisper + C 种子，固定点已验证) | ✅ |
+| 零 Rust 驱动 `wd` + 内容寻址缓存 | ✅ |
 | C 转译后端 (gcc 编译为原生可执行) | ✅ |
 | 正则子集 (strmatch/strfind-re，双链手写匹配器) | ✅ |
 | struct 二进制打包 (pack/unpack，小端) | ✅ |
@@ -379,13 +383,14 @@ Whisper/
 ## 测试
 
 ```bash
-cargo test --workspace                           # 476 tests: all passed
-bash scripts/syntax-gate.sh                      # 26 语法断言（conformance 语料，VM 与 c2 双侧）
-bash scripts/stdlib-gate.sh                      # 63 双链 stdlib 断言（VM+c2 输出一致）
+cargo test --workspace                           # 467 tests: all passed
+bash scripts/syntax-gate.sh                      # 27 语法断言（conformance 语料，VM 与 c2 双侧）
+bash scripts/stdlib-gate.sh                      # 67 双链 stdlib 断言（VM+c2 输出一致）
 bash scripts/net-gate.sh                         # 真实 HTTP 服务 + curl
 bash scripts/app-gate.sh                         # 13 路由 Web 应用断言
 bash tools/opcode_coverage.sh                    # 101 项逐特性双跑（VM vs 自举链）
 bash scripts/typecheck-gate.sh                   # 类型检查假阳性棘轮（三语料 FP=0）
+bash scripts/wd-cache-gate.sh                    # wd 内容寻址缓存 C-1..C-6（8 条断言）
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验
 ```
 

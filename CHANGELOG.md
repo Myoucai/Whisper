@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased (2026-10-20) — 收口 ③：`wd` 缓存落地 + S-4 关闭
+
+### `wd` 内容寻址缓存（收口 ③）
+
+- 键 = hash(生成的 C ++ `runtime.c` 内容 ++ cc 名)，缓存落在
+  `<WHISPER_ROOT>/target/whisper-cache/<key>`；命中拷贝产物直接跑，
+  未命中才调 cc，成功后回填；cc 失败不写缓存。
+- 新增 `wd-hash`/`wd-q`/`wd-out-target`/`wd-cache-dir`/`wd-cache-path`/
+  `wd-cp`/`wd-hit?`/`wd-store`/`wd-cc-run`；`wd-build` 的 gcc 段抽成
+  `wd-cc-run`，命中/未命中共用运行段。
+- 门禁 `scripts/wd-cache-gate.sh`：C-1..C-6 **8 pass / 0 fail**，
+  实测首次 801ms、命中 148ms。
+- 修掉两处真 bug：`wd-store` 的 `wd-cp` 源/目标操作数反了；编译成功消息
+  自带 `\n` 又叠加 `.` 的换行，导致 stdout 多一空行。
+
+### S-4：`std/str` 与 `std/list` 同名冲突关闭
+
+- `std/str`：`first`/`last` → `first-char`/`last-char`，`empty?` →
+  `str-empty?`，`contains?` → `str-contains?`；`std/list` 保留原名。
+  `crates/whisper-stdlib/std/str.ws` 快照同步。
+- 顺带修 `std/list` 的 `contains?`/`all?`/`any?`（fold/each 体里多一个
+  `swap`，运行时直接报 `expected [T]`）；`contains?` 改成显式首元素递归。
+- 新增 `tests/conformance/s4_both_strlist.ws`：同时 import 两个模块，
+  VM 与 c2 输出一致，已进 syntax-gate。
+
+### 门禁
+
+- `cargo test --workspace`：**467 passed / 0 failed**
+- syntax-gate **27/0**、stdlib-gate **67/0**、wd-cache-gate **8/8**
+- 待办：`scripts/build-wd.sh`（零 Rust 链）在本机单次 30 分钟+ / 6GB+，
+  本轮用 `-t c2` 从同一份 `compiler.all.ws` + `wd.ws` 编出 `target/wd/wd`
+  做行为验收；收口前应补跑一次零 Rust 构建。
+
 ## Unreleased (2026-09-21p) — 收口战役第二轮：删掉第二棵编译器（D-1）
 
 第一轮把"漂移"关掉了一半——顶层 `lexer.ws`/`classify.ws`/`parser.ws`/
