@@ -122,6 +122,10 @@ jobs:
         run: |
           cargo build -p whisper-cli
           bash scripts/stdlib-gate.sh
+      - name: Zero-Rust wd build + cache gate
+        run: |
+          bash scripts/build-wd.sh
+          bash scripts/wd-cache-gate.sh
       - name: Opcode coverage gate (VM vs self-hosted C chain, per-feature dual-run)
         run: bash tools/opcode_coverage.sh ./target/debug/whisper
       - name: Typecheck FP-ratchet gate (encoding/conformance; lexicon skipped on CI)

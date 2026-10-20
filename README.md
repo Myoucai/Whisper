@@ -18,7 +18,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.0.8-7cffc4" alt="version">
-  <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%207%20gates-brightgreen" alt="tests">
+  <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%208%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
   <img src="https://img.shields.io/badge/stdlib-20%20modules-blue" alt="stdlib">
@@ -401,7 +401,7 @@ bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复�
 - 38 项 parser（含「每个关键字都可作 def 名」参数化回归、CRLF 归一化四条）
 - 15 项 typecheck + 5 项 LSP + 2 项包管理器
 - 优化器语义保持测试（优化前后执行结果必须一致）
-- CI 含 selfhost job：种子编译 → 22 核心用例双模式 → 7 道门禁（固定点 + stdlib/覆盖/类型/语法/网络/应用）
+- CI 含 selfhost job：种子编译 → 22 核心用例双模式 → 8 道门禁（固定点 + stdlib/缓存/覆盖/类型/语法/网络/应用）
 
 ## License
 
