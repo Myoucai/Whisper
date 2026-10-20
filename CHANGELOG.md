@@ -25,10 +25,23 @@
 - 新增 `tests/conformance/s4_both_strlist.ws`：同时 import 两个模块，
   VM 与 c2 输出一致，已进 syntax-gate。
 
+### Step 4：Whisper 写的 `fmt` v1
+
+- 新增 `whisperc/fmt.ws`（纯 Whisper）与 `scripts/build-wfmt.sh`（`wd` 零 Rust
+  构建）。CLI：`wfmt <src>` / `wfmt <src> <out>`。
+- v1 是布局规范化：CRLF→LF、字符串外的行首/行尾空白；字符串内容、注释正文、
+  token 间距不动。逐行状态机处理多行字符串、转义引号、注释里的引号。
+- 门禁 `scripts/fmt-gate.sh`：F-1..F-6 **5 pass / 0 fail**（conformance 27 个
+  文件幂等且 VM 输出一致；5 个代表文件 c2 输出一致）。
+- 过程中修掉四个真 bug：`fmt-set` 的 `strcat` 操作数顺序、`fmt-chomp` 的
+  `strnth` 后重复 `dup`、`fmt-main` 的 `write-file` 参数顺序、门禁临时文件
+  缺少 `.ws` 扩展导致 c2 拒绝。
+
 ### 门禁
 
 - `cargo test --workspace`：**467 passed / 0 failed**
-- syntax-gate **27/0**、stdlib-gate **67/0**、wd-cache-gate **8/8**
+- syntax-gate **27/0**、stdlib-gate **67/0**、wd-cache-gate **8/8**、
+  fmt-gate **5/5**
 - 待办：`scripts/build-wd.sh`（零 Rust 链）在本机单次 30 分钟+ / 6GB+，
   本轮用 `-t c2` 从同一份 `compiler.all.ws` + `wd.ws` 编出 `target/wd/wd`
   做行为验收；收口前应补跑一次零 Rust 构建。

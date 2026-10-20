@@ -361,11 +361,16 @@ TLS 缺口是两链**共同的**现状，不是 C 链独有的。
 
 ### Step 4 —— 工具链迁移（机械工程）
 
+> **状态（2026-10-20）**：`fmt` 第一片已落地——`whisperc/fmt.ws`，
+> 零 Rust 的 `wd` 构建，门禁 `scripts/fmt-gate.sh`（F-1..F-6）。
+> v1 只做布局规范化（保留注释/字符串），AST 重排留 v2。
+> 包管理/REPL/check/LSP 尚未开始。
+
 按难度递增：
 
 | 工具 | 难度 | 说明 |
 |------|------|------|
-| `fmt` | 低 | `compiler.all.ws` 已有 parser，加 printer 即可 |
+| `fmt` | 低 | ✅ v1（布局规范化）；v2 AST printer |
 | 包管理 | 低 | `read-file`/`write-file`/`mkdir` + HTTP + MD5 够用 |
 | `repl` | 低 | `read-line` + Step 3 的编译路径 |
 | `check` | **高** | 需把 typecheck 逻辑用 Whisper 重写（见下） |
@@ -463,7 +468,7 @@ Step 2b  (@2/@3 上 C 链) 半天      ✅ 已完成 2026-09-21（量级修正�
                                   ⏳ @6/@7/@8/@9 仍未实现，但已改为显式报错
 Step 3   (驱动 wd)      3-5 天    ✅ 已完成 2026-09-21（里程碑 A/B + L-1 + A3 逐字节一致）
                                   ✅ 内容寻址缓存 2026-10-20（C-1..C-6 八条全绿）
-Step 4   (工具迁移)     1-2 周    ← fmt/包管理/REPL 快，check/LSP 慢；**尚未开始**
+Step 4   (工具迁移)     1-2 周    🔄 fmt v1 已落地（2026-10-20，布局规范化 + 门禁）；其余未开始
 Step 5   (Whisper VM)   ?         ← 可选，前置是 call + 可变数组两个原语
 Step 6   (C 降级为接口) 数天      ✅ 已完成 2026-09-21
 ```

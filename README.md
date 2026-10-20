@@ -18,7 +18,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.0.8-7cffc4" alt="version">
-  <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%208%20gates-brightgreen" alt="tests">
+  <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%209%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
   <img src="https://img.shields.io/badge/stdlib-20%20modules-blue" alt="stdlib">
@@ -78,6 +78,22 @@ bash scripts/build-wd.sh              # 全程无 cargo
 内容 ++ cc 名)，命中直接拷贝产物；改源码、改运行时、换 cc 都会失效，缓存位于
 `target/whisper-cache/`。判据见 `tests/wd_cache_preregistered.md`，
 门禁 `bash scripts/wd-cache-gate.sh`（C-1..C-6 八条）。
+
+### Whisper 写的 `fmt`（Step 4 第一项）
+
+`whisperc/fmt.ws` 是 Step 4 的第一片：纯 Whisper 写的布局规范化器，
+由 `wd` 零 Rust 构建：
+
+```bash
+bash scripts/build-wfmt.sh                 # -> target/wfmt/wfmt
+./target/wfmt/wfmt src.ws                  # 格式化到 stdout
+./target/wfmt/wfmt src.ws src.ws           # 就地格式化
+```
+
+v1 只做安全布局：CRLF→LF、字符串外的行首缩进/行尾空白去掉；字符串内容、
+注释正文、token 间距都不动。多行字符串、转义引号和注释里的引号都由逐行
+状态机处理。判据与执行记录见 `tests/step4_fmt_preregistered.md`，
+门禁 `bash scripts/fmt-gate.sh`（F-1..F-6）。AST 重排留到 v2。
 
 ### 安装（Rust 工具链，含 REPL/LSP/c2 一键编译）
 
@@ -306,6 +322,7 @@ append 模式已消除（`range-to` 10 万元素 83s → 19ms）。
 | 栈式虚拟机 (158 opcodes) | ✅ |
 | 硬自举编译器 (纯 Whisper + C 种子，固定点已验证) | ✅ |
 | 零 Rust 驱动 `wd` + 内容寻址缓存 | ✅ |
+| Whisper 写的 `fmt`（布局规范化 v1，`wd` 构建） | ✅ |
 | C 转译后端 (gcc 编译为原生可执行) | ✅ |
 | 正则子集 (strmatch/strfind-re，双链手写匹配器) | ✅ |
 | struct 二进制打包 (pack/unpack，小端) | ✅ |
@@ -391,6 +408,7 @@ bash scripts/app-gate.sh                         # 13 路由 Web 应用断言
 bash tools/opcode_coverage.sh                    # 101 项逐特性双跑（VM vs 自举链）
 bash scripts/typecheck-gate.sh                   # 类型检查假阳性棘轮（三语料 FP=0）
 bash scripts/wd-cache-gate.sh                    # wd 内容寻址缓存 C-1..C-6（8 条断言）
+bash scripts/build-wfmt.sh && bash scripts/fmt-gate.sh  # Whisper 写的 fmt（F-1..F-6）
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验
 ```
 
@@ -401,7 +419,7 @@ bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复�
 - 38 项 parser（含「每个关键字都可作 def 名」参数化回归、CRLF 归一化四条）
 - 15 项 typecheck + 5 项 LSP + 2 项包管理器
 - 优化器语义保持测试（优化前后执行结果必须一致）
-- CI 含 selfhost job：种子编译 → 22 核心用例双模式 → 8 道门禁（固定点 + stdlib/缓存/覆盖/类型/语法/网络/应用）
+- CI 含 selfhost job：种子编译 → 22 核心用例双模式 → 9 道门禁（固定点 + stdlib/缓存/fmt/覆盖/类型/语法/网络/应用）
 
 ## License
 

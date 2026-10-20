@@ -126,6 +126,10 @@ jobs:
         run: |
           bash scripts/build-wd.sh
           bash scripts/wd-cache-gate.sh
+      - name: Step 4 fmt gate (Whisper formatter)
+        run: |
+          bash scripts/build-wfmt.sh
+          bash scripts/fmt-gate.sh
       - name: Opcode coverage gate (VM vs self-hosted C chain, per-feature dual-run)
         run: bash tools/opcode_coverage.sh ./target/debug/whisper
       - name: Typecheck FP-ratchet gate (encoding/conformance; lexicon skipped on CI)
