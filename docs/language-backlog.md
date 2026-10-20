@@ -3,6 +3,42 @@
 2026-09-10 盘点确立。此处登记**已实锤、暂不实施**的语言级问题——
 每项含事实、选项与预注册判据要求；开工时先落判据再动手。
 
+## 战役 SEC-1：能力模型的执行缺口（**2026-10-20 登记，待修**）
+
+**事实（实测）**：
+
+- VM 默认拒绝 `@0`，但 `read-file`/`write-file`/`getenv`/`listdir`/`mkdir`/
+  `file-exists` 等 ambient opcode 直接调用宿主，绕过 `CapabilityTable`；
+- `ffi-open`/`ffi-sym`/`ffi-call` 在 VM 默认配置下直接可用，无授权门；
+- `listen`/`accept`/`recv`/`send`/`serve-concurrent` 同样没有授权门；
+- C 链 `@0`-`@5`/`@10` 全部直通，无 policy；
+- `docs/spec.md` 旧表述“C 链能力 = no-op”与实现不符（已修正为“直通”）。
+
+**影响**：当前 `whisper run`/`bundle` **不是**不可信代码的安全边界；
+native `exe`/`c2`/`native`/`wd` 是 trusted-only。
+
+**修法（按优先级）**：
+
+1. 安全模型/文档真相化（已完成：`docs/security-model.md`）；
+2. 负向安全测试基线（每个 effect 的“无授权必须失败”）；
+3. WASM/WASI 目标作为不可信执行主路线（`docs/wasm-wasi-plan.md`）；
+4. VM 侧 FFI/ambient 门需要 Rust 改动；在“Rust 不改”约束下暂不做，
+   保留为待办。
+
+**判据**：见 `docs/security-model.md` §6 的 I-1..I-10 与
+`tests/wasm_preregistered.md` 的 W-5/W-6/W-7。
+
+## 战役 SEC-2：WASM/WASI 目标（**2026-10-20 立项，计划**）
+
+**目标**：不改 Rust，把 C 发射到 `wasm32-wasip1`，由 WAMR/wasmtime 执行；
+文件用 preopen、网络/执行/FFI 由宿主策略控制或显式拒绝。
+
+**状态**：仅文档/判据（`docs/wasm-wasi-plan.md`、
+`tests/wasm_preregistered.md`），代码未开始。
+
+**不在 v1**：`@5`/`@10`/FFI/裸 socket/`serve-concurrent`；native 仍是
+trusted-only。Step 5 的 Whisper VM 不替代本战役。
+
 ## 战役 S-2：`mod` 曾经只是 Rust 前端的别名（**2026-09-21 发现，已修复**）
 
 **状态（2026-09-21，cd4e248）**：自举链词表已补 `[20 "mod"]`；

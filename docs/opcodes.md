@@ -1,6 +1,9 @@
 > **⚠️ 本文档为历史参考。字节分配的权威来源是
 > `crates/whisper-core/src/opcode.rs` 的 `to_byte()`。**
 > 两者出现不一致时以代码为准；seed 兼容原语使用 0xE4-0xE7 与 0xF0。
+>
+> **安全**：opcode 的 effect 分类、ambient 绕过与授权缺口见
+> `docs/security-model.md`；本文件不是安全契约，不要据此判断“某个词是否安全”。
 
 # Whisper Opcode Reference v1.1
 

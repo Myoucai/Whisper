@@ -386,6 +386,11 @@ TLS 缺口是两链**共同的**现状，不是 C 链独有的。
 **先澄清一个常见误解：写 VM 不是摆脱 Rust 的必要条件。**
 Step 3 的驱动路线已经能达成 L3，且不需要任何语言新特性。
 
+> **安全提醒（2026-10-20）**：VM **不是**当前的安全边界。`read-file`/
+> `write-file`/`getenv`/`ffi-*` 等 ambient opcode 绕过 `CapabilityTable`；
+> 原生 C 产物也没有语言级授权。不可信执行的路线是 WASM/WASI（Step 7），
+> 不是“再写一个 VM”。详见 `docs/security-model.md`。
+
 Whisper VM 只在两个场景有独立价值：
 
 1. **无 gcc 的 `run` 快速路径**（Step 3 的编译延迟在 REPL 里可感知）
@@ -458,6 +463,31 @@ Whisper VM 只在两个场景有独立价值：
 
 ---
 
+### Step 7 —— WASM/WASI 安全执行目标（2026-10-20 立项，计划）
+
+**动因**：C 链是 trusted-only；VM 的 `@n` 表又被 ambient opcode 与 FFI
+绕过（实测 `read-file`/`getenv`/`ffi-open` 均无授权可用）。在“不改 Rust”
+的约束下，原生安全的主路线是 **C → WebAssembly + WASI**，而不是再写一个
+VM。
+
+**架构**：`source.ws → C → clang --target=wasm32-wasip1 → .wasm`，
+由 WAMR/wasmtime 执行；文件只通过 preopen，网络/执行/FFI 走宿主策略或
+显式拒绝。Rust 代码不改；`-t wasm` 先由 `scripts/build-wasm.sh` 用现成的
+`whisper bootstrap` 出 C，后续再给 `wd` 加 `c`/`wasm` 动词。
+
+**明确不做**：v1 不支持 `@5`/`@10`/FFI/裸 socket/`serve-concurrent`；
+这些必须显式报错，不能 no-op。native `exe`/`c2`/`native` 保持
+trusted-only。
+
+**判据**：`tests/wasm_preregistered.md`；计划与风险：
+`docs/wasm-wasi-plan.md`；威胁模型：`docs/security-model.md`。
+**工具链探测**：`scripts/wasm-preflight.sh`（已落地，本机当前缺
+clang/wasi-sysroot/runtime）。
+
+**状态**：文档/判据/preflight 已落地，WASM 代码未开始。
+
+---
+
 ## 六、执行顺序与工作量
 
 ```
@@ -469,8 +499,9 @@ Step 2b  (@2/@3 上 C 链) 半天      ✅ 已完成 2026-09-21（量级修正�
 Step 3   (驱动 wd)      3-5 天    ✅ 已完成 2026-09-21（里程碑 A/B + L-1 + A3 逐字节一致）
                                   ✅ 内容寻址缓存 2026-10-20（C-1..C-6 八条全绿）
 Step 4   (工具迁移)     1-2 周    🔄 fmt v1 已落地（2026-10-20，布局规范化 + 门禁）；其余未开始
-Step 5   (Whisper VM)   ?         ← 可选，前置是 call + 可变数组两个原语
+Step 5   (Whisper VM)   ?         ← 可选，前置是 call + 可变数组；**不是安全方案**（见 Step 7）
 Step 6   (C 降级为接口) 数天      ✅ 已完成 2026-09-21
+Step 7   (WASM/WASI)    4-6 周    🚧 计划 2026-10-20（文档/判据已落地，代码未开始）
 ```
 
 **门禁基线（2026-09-21 收口战役后，本机实测，gcc = msys64 mingw 16.1.0）**：

@@ -6,6 +6,13 @@
 
 All modules are loaded via `import "std/<name>"`.
 
+> **安全提示（2026-10-20）**：本页部分 “Requires `--allow-*`” 只适用于
+> `@n` 能力别名。`read-file` / `write-file` / `getenv` 是 **native opcode**，
+> 当前 VM 与 C 链都会**直接调用宿主**，`--allow-file-*` / `--allow-env`
+> 并不会拦它们；FFI 目前也没有授权门。完整边界见
+> [docs/security-model.md](security-model.md)，不可信代码请等 WASM 目标
+> （[docs/wasm-wasi-plan.md](wasm-wasi-plan.md)）。
+
 ---
 
 ## std/encoding — base64 / base64url / 百分号编码
@@ -169,17 +176,17 @@ import "std/list"
 import "std/io"
 ```
 
-Requires `--allow-file-read` / `--allow-file-write` flags.
+`@0` / `@1` 能力需要 `--allow-file-read` / `--allow-file-write` flags。
+
+> **注意**：`read-file` / `write-file` 是 **native opcode**（v1.0.1），
+> 不是 `@0` / `@1` 的别名；当前两者都直接调用宿主，`--allow-file-*` 不拦
+> 它们。`@0` / `@1` 才是走 `CapabilityTable` 的显式能力令牌。
 
 | Function | Cap | Stack Effect | Description |
 |----------|-----|-------------|-------------|
-| `read-file` | @0 | `path → content` | Read file to string |
-| `write-file` | @1 | `path content →` | Write string to file |
+| `read-file` | native opcode（非 @0） | `path → content` | Read file to string |
+| `write-file` | native opcode（非 @1） | `path content →` | Write string to file |
 | `println` | — | `value →` | Print value |
-
-```whisper
-whisper run --allow-file-read script.ws
-```
 
 ---
 
@@ -221,15 +228,17 @@ Requires `--allow-http` flag.
 
 | Function | Cap | Stack Effect | Description |
 |----------|-----|-------------|-------------|
-| `http-get` | @2 | `url → body` | HTTP GET request |
-| `http-post` | @3 | `url body → response` | HTTP POST request |
-| `http-req` | @6 | `method url headers-json body → status headers-json body` | 会话请求：cookie 罐、状态码/响应头、审计 |
-| `http-audit` | @7 | `→ 审计行（
- 连接）` | 导出全量请求审计 |
+| `http-get` | @2 | `url → body` | HTTP GET（仅 `http://`） |
+| `http-post` | @3 | `url body → response` | HTTP POST（仅 `http://`） |
+| `http-req` | @6 | `method url headers-json body → status headers-json body` | 会话请求：cookie 罐、状态码/响应头、审计（VM-only） |
+| `http-audit` | @7 | `→ audit-json` | 导出全量请求审计（VM-only） |
+| `http-req-raw` | @8 | 同 @6，body 为 hex | 原始字节通道（VM-only） |
+| `http-req-parallel` | @9 | `count method url headers body → results-json` | 并发会话（VM-only） |
 
-`http://` 与 `https://` 均支持（rustls + webpki 根）；响应
-`Transfer-Encoding: chunked` 自动解码；连接 10s / 读写 15s 超时，
-挂死端点化为 `status 0` 空响应。
+`@2`/`@3` 只支持 `http://`；`https://` 需要 `@6`（rustls + webpki 根），
+而 `@6`-`@9` **目前只有 VM 有**，C 链调用会显式报
+`not implemented on the C chain`。`@6` 的响应会自动解码
+`Transfer-Encoding: chunked`，连接 10s / 读写 15s 超时。
 
 ```whisper
 whisper run --allow-http script.ws
@@ -245,9 +254,13 @@ import "std/os"
 
 Requires `--allow-env` / `--allow-exec` flags.
 
+> **注意**：`std/os` 的 `getenv` 是 `@4` 别名，受 `--allow-env` 约束；
+> 但 **bare `getenv` 是 native opcode**，当前直接读环境，不受 flag 约束。
+> `exec` 是 `@5`，VM 侧受 `--allow-exec`；C 链直接 `popen`。
+
 | Function | Cap | Stack Effect | Description |
 |----------|-----|-------------|-------------|
-| `getenv` | @4 | `name → value` | Read environment variable |
+| `getenv` | @4 | `name → value` | Read environment variable（别名） |
 | `exec` | @5 | `cmd → [status stdout stderr]` | Execute shell command |
 
 ```whisper

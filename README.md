@@ -27,7 +27,7 @@
 
 ---
 
-Whisper 是一门**栈式、后置表示法**的编程语言，专为 **AI 生成和阅读**而设计。极简符号、零信任安全、原生置信度系统。
+Whisper 是一门**栈式、后置表示法**的编程语言，专为 **AI 生成和阅读**而设计。极简符号、零信任能力模型（按执行路径分档）、原生置信度系统。
 
 **核心亮点**：编译器（lexer + parser + classifier + cgen）完全用 Whisper 自身编写，生成 C 源码后经 gcc 编译为独立原生可执行文件；从冻结 C 种子（由自举链自身生成，非手写）出发已达**自举固定点**（whisper2 重新编译自身，输出与来源逐字节一致，`scripts/verify-fixedpoint.sh` 可随时复验）。
 
@@ -37,7 +37,7 @@ Whisper 是一门**栈式、后置表示法**的编程语言，专为 **AI 生�
 |------|------|
 | **Token 极简** | 同样逻辑的 Token 消耗仅为 Python 的 30-60% |
 | **栈式执行** | 后缀表示法，无需括号和优先级规则 |
-| **能力沙箱** | 默认无 IO，所有副作用必须显式授权；`@6` 走 HTTPS（rustls）+ host 白名单 + 审计 |
+| **能力沙箱** | 目标：VM/WASM 默认无 IO、显式授权；**当前 VM 仍有 ambient/FFI 绕过，native C 无沙箱**（见 [docs/security-model.md](docs/security-model.md)） |
 | **置信度原生** | 每个值携带置信度：`:c` 标注 / `conf-of` 窥视 / `unwrap` 剥壳 / `p {a} {b} ?|` 概率分支（std/conf 已定稿） |
 | **双模态** | 文本 `.ws` 和二进制 `.wbin` 等价 |
 | **硬自举** | 编译器自身用 Whisper 编写，输出原生代码 |
@@ -232,6 +232,7 @@ gcc -O2 -o hello hello.c -I whisperc -lm
 | **native 特化** | `whisper build file.ws -t native -o prog` | 按主机 CPU 特化的原生可执行文件（内容寻址缓存） | gcc |
 | **exe 原生** | `whisper build file.ws -t exe -o app` | 原生可执行文件（**产物零 Rust**） | gcc（构建期） |
 | bundle 打包 | `whisper build file.ws -t bundle -o app` | 单文件可执行（**内含 Rust VM**，构建期无需工具链） | 无 |
+| **wasm 沙箱（规划）** | `whisper build file.ws -t wasm -o app.wasm`（计划） | `.wasm`（由 WASM runtime 执行） | wasi-sdk clang + WAMR/wasmtime |
 | 固定点复验 | `scripts/verify-fixedpoint.sh` | 自举链验证 | gcc |
 
 ```bash
@@ -255,6 +256,30 @@ whisper build hello.ws -t bundle -o app && ./app
 - **`-t c2`（自举链）**：编译器完全由 Whisper 自身编写（`whisperc/compiler.all.ws`），在 Rust VM 上运行并生成 C；支持 import 内联（含 `std/*`）、浮点字面量、循环/条件/递归、高阶函数融合（`@map`/`@each`/`@fold`/`@filter`/`@times` 编译为嵌套函数 + 循环）、v1.0.3-1.0.8 全部新词汇（regex/struct/目录/时间/leave/FFI 等）。C 运行时值带 5 种类型标签（WT_I64/WT_F64/WT_PTR/WT_SIG/WT_BOOL），多态算术（任一侧 f64 即提升）与 VM 逐位一致——`1.5 2.5 +` 原生输出 4，与 VM 相同。已知残留分歧：字符串打印不带引号（VM 带）、`=`/去重按值位等同而非深度相等（`runtime.c` 的 `w_val_eq` 仅比标签+位）。
 - **`-t exe` 与 `-t bundle` 的区别**：两者都产出单文件，但分发模型相反。`exe` 走自举链出机器码——**产物零 Rust**，代价是构建期需要 C 编译器；`bundle` 把 Rust VM 与字节码尾部打包——构建期不需要任何工具链，代价是**产物内含整个 Rust VM**（含 LSP/REPL/类型检查器/包管理器）。追求"产物零 Rust"就用 `exe`。
 - 固定点（whisper2 编译自身输出逐字节一致）可随时用脚本复验，已纳入 CI。
+
+## 安全与执行模式（重要）
+
+Whisper 的安全承诺**按执行路径分档**，不是所有产物都等价：
+
+| 模式 | 命令 | 语言级沙箱 | 说明 |
+|------|------|------------|------|
+| VM 解释 | `whisper run` | ⚠️ 部分 | `@n` 有 `CapabilityTable`，但 `read-file`/`write-file`/`getenv`/`ffi-*` 等 ambient opcode 目前可绕过；**暂不作为不可信代码边界** |
+| bundle | `-t bundle` | ⚠️ 部分 | 内含 Rust VM，同上；体积也更大 |
+| C / 原生 | `-t c`/`-t c2`/`-t exe`/`-t native`/`wd` | ❌ 无 | 直接使用 OS 用户权限；**trusted-only**，不要用来跑不可信源码 |
+| WASM | `-t wasm`（规划） | ✅ 目标 | `wasm32-wasi` + preopen + host policy；见 [docs/wasm-wasi-plan.md](docs/wasm-wasi-plan.md) |
+
+当前已确认的缺口（2026-10-20 实测）：
+
+- VM 默认拒绝 `@0`，但 `"README.md" read-file strlen .` 直接成功；
+- VM 默认配置下 `"msvcrt.dll" ffi-open .` 直接拿到 handle；
+- `-t c2` 产物无授权直接读文件、执行 `@5` 命令。
+
+**在 WASM 目标落地前，不可信代码请放在 OS 沙箱/容器里运行；不要依赖
+`whisper run` 或 native 产物做安全隔离。** 完整威胁模型、缺口清单和整改
+不变量见 [docs/security-model.md](docs/security-model.md)。
+WASM/WASI 的详细计划与判据见 [docs/wasm-wasi-plan.md](docs/wasm-wasi-plan.md)
+和 [tests/wasm_preregistered.md](tests/wasm_preregistered.md)；当前工具链
+状态用 `bash scripts/wasm-preflight.sh` 检查（缺失只报告，不阻塞现有 CI）。
 
 ## 置信度与不确定性（std/conf，已定稿）
 
@@ -297,10 +322,14 @@ host 白名单（零出域）、连接 10s/读写 15s 超时（挂死端点化�
 > 其余能力——`@0` 文件读、`@1` 文件写、`@4` 环境变量、`@5` 执行命令、
 > `@10` 执行命令（原样流）——两条链均已实现并逐行对拍一致。详见
 > `docs/independence-design.md` Step 2a/2b 与 `tests/step2b_preregistered.md`。
+> **这里的“实现”指语义/输出对拍，不是授权**：C 链没有 `CapabilityTable`，
+> 也没有 policy；`@0`/`@5` 在 native 里直接调用宿主。
 >
-> **`@10` 与 `@5` 是同一份授权的两种结果形状**：CLI 绑 `@5` 时一起绑 `@10`，
+> **`@10` 与 `@5` 是同一份授权的两种结果形状**：CLI/VM 侧绑 `@5` 时一起绑 `@10`，
 > 未授权时 `@10` 一样被拒（`Capability not bound: @10`）。`@5` 的 `trim` 是
 > 命令替换惯用法依赖的行为，故保留；逐字节转发（`wd run`）用 `@10`。
+> **注意**：C 原生产物没有 CLI，也没有这层绑定；`@5`/`@10` 在 native 里是
+> 直接 `popen`，见 [docs/security-model.md](docs/security-model.md)。
 
 ## 性能
 
@@ -329,7 +358,8 @@ append 模式已消除（`range-to` 10 万元素 83s → 19ms）。
 | 共享 KV 存储 + 并发 Web 服务器 (serve-concurrent) | ✅ |
 | 循环控制 (leave，编译期跳转回填) | ✅ |
 | 静态类型推导（strict 默认：类型错误致命，`--no-strict-types` 降级） | ✅ |
-| 能力安全沙箱 (6 caps) | ✅ |
+| 能力沙箱 | ⚠️ VM 的 `@n` 部分；ambient/FFI 待收口；C 链无 |
+| WASM/WASI 安全执行目标 | 🚧 规划中（`-t wasm`） |
 | 置信度系统 + 概率选择 | ✅ |
 | .wbin 二进制格式 | ✅ |
 | 包管理器 | ✅ |
@@ -386,7 +416,7 @@ Whisper/
 ├── tests/conformance/     #   双实现一致性语料（syntax-gate 的输入）
 ├── tools/                 #   opcode 覆盖门禁
 ├── vscode-extension/      # VS Code 插件
-├── docs/                  # 文档和示例
+├── docs/                  # 规范/教程/安全模型/WASM-WASI 计划/示例
 └── .github/workflows/     # CI/CD
 ```
 

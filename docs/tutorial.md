@@ -187,14 +187,21 @@ rand .        // next uniform f64 in [0,1) — replayable after seed!
 // write-file OVERWRITES — append = read + strcat + write (see journal)
 ```
 
+> **安全提示（2026-10-20）**：`read-file` / `write-file` 是 native opcode，
+> 当前 VM 与 C 链都直接调用宿主，`--allow-file-read/write` 不会拦它们。
+> 不可信代码不要依赖这两个词做沙箱；见
+> [docs/security-model.md](security-model.md) 与
+> [docs/wasm-wasi-plan.md](wasm-wasi-plan.md)。
+
 ## HTTP Client
 
 ```whisper
 // Requires: whisper run --allow-http
+// 注意：http-get (@2) 只支持 http://；https:// 请用 http-req (@6)，且 @6 目前只有 VM 有。
 
 import "std/http"
 
-"https://api.example.com/data" http-get .   // https:// 同样支持（rustls）
+"http://api.example.com/data" http-get .
 ```
 
 会话级请求（cookie 罐 + 状态码/响应头 + 审计行）：
@@ -203,6 +210,11 @@ import "std/http"
 "GET" "https://api.example.com/data" "{}" "" http-req
 // → status headers-json body；chunked 响应自动解码
 ```
+
+> `http-req` / `http-audit` / `http-req-raw` / `http-req-parallel`（`@6`-`@9`）
+> 目前是 VM-only；C 链调用会显式报 “not implemented on the C chain”。
+> 不可信代码的 HTTP 能力应由 WASM 宿主代理按 host 白名单提供，而不是给 guest
+> 裸 socket。
 
 ## Confidence（置信度）
 

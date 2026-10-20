@@ -1,5 +1,40 @@
 # Changelog
 
+## Unreleased (2026-10-20) — 安全模型审计 + WASM/WASI 整改计划
+
+### 审计结论（文档，无行为变更）
+
+- 实测确认当前 VM **不是**完整沙箱：`@0` 未绑定会拒绝，但
+  `read-file`/`write-file`/`getenv` 等 ambient opcode 直接调用宿主；
+  `ffi-open` 默认可用（可加载任意 native 库）。
+- 实测确认 C 链 `@0`/`@5` 无任何授权检查；`-t c2` 产物可直接读文件、
+  执行命令。native 产物定位改为 **trusted-only**。
+- 修正 `docs/spec.md` 的“C 链能力 = no-op”旧表述为“直通、无检查”。
+
+### 新增文档
+
+- `docs/security-model.md`：威胁模型、信任边界、effect 矩阵、F-1..F-8
+  发现、I-1..I-10 不变量、profile 与审计清单。
+- `docs/wasm-wasi-plan.md`：WASM/WASI 目标架构、W0..W8 工作包、
+  M0..M6 里程碑（4–6 周）、功能矩阵、风险与 DoD。
+- `tests/wasm_preregistered.md`：W-1..W-9 判据与反向判据。
+- `scripts/wasm-preflight.sh`：clang/wasm32 target、wasi-sysroot、WASM
+  runtime 的前置检查；默认只报告，`--strict` 供 CI 用。
+
+### 文档同步
+
+- README：新增“安全与执行模式”分档表；构建目标增加 wasm（规划）；
+  能力沙箱状态改为“VM 部分 / native 无”。
+- `docs/spec.md`：§4 差异表、§13 FFI 授权现状、§15 C 契约
+  trusted-only、新增 §18 安全模型与 WASM 规范性要求。
+- `docs/stdlib.md`：修正 `read-file`/`write-file` 被误标为 `@0/@1`、
+  `getenv` 被误标为受 `--allow-env` 约束的说明。
+- `docs/tutorial.md`：文件 IO 安全提示；修正 `http-get` 的 HTTPS 说明。
+- `docs/language-backlog.md`：登记 SEC-1（能力执行缺口）与 SEC-2
+  （WASM/WASI 目标）。
+- `docs/independence-design.md`：新增 Step 7（WASM/WASI），Step 5
+  明确“VM 不是安全方案”。
+
 ## Unreleased (2026-10-20) — 收口 ③：`wd` 缓存落地 + S-4 关闭
 
 ### `wd` 内容寻址缓存（收口 ③）

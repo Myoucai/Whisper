@@ -135,7 +135,13 @@ export name                ;; 导出（一词一行）
 | `..` 格式 | `Stack: [...]` | `[...]` |
 | try 捕获的错误消息文本 | Rust VmError 全文（含位置上下文） | 简短消息（"Division by zero" 等关键字一致）；形状 [#t,值]/[#f,消息] 与栈回卷完全一致 |
 | JSON `\uXXXX` 代理对 | 完整解码 | BMP-only（罕见，已记录） |
-| 能力 `@0-@5` | 支持 | no-op |
+| 能力 `@0-@5` / `@10` | `CapabilityTable`：未绑定则 `Capability not bound` | **直接调用宿主函数，无授权检查** |
+| ambient IO（`read-file`/`write-file`/`getenv`/`listdir`/…） | 直接调用宿主（绕过 `@n` 表） | 直接调用宿主 |
+| FFI（`ffi-open`/`ffi-sym`/`ffi-call`） | 直接 `dlopen`/调用（当前无授权门） | 直接 `dlopen`/调用 |
+
+> 上表只记**行为差异**，不是安全承诺。当前执行边界、已知绕过和整改目标
+> 以 [docs/security-model.md](security-model.md) 为准；native C 产物是
+> trusted-only，不可信代码的沙箱目标是 WASM/WASI（规划）。
 
 N-1（2026-09-10）起 **bool 数值协变两侧一致**：`#t 1 +`→2、
 `"ab" #t strnth`→98、`0 1 atan2`→0、`#t bitnot`→-2、`#t 0.5 +`→1.5
@@ -306,6 +312,11 @@ runtime.c，链接适配不涉编译器逻辑）。
 最强的能力**——可调用任意 native 函数（包括读写文件、起进程的函数），
 授权语义等同 shell 访问。
 
+> **授权现状（2026-10-20）**：FFI **目前没有 capability gate**；
+> `whisper run` 默认配置下 `"msvcrt.dll" ffi-open .` 也能直接拿到 handle。
+> “等同 shell 访问”是设计意图，不是当前实现。不可信代码必须禁用
+> `ffi-*`；WASM 目标不提供 FFI。见 `docs/security-model.md`。
+
 | 词 | 字节 | 栈效应 | 说明 |
 |----|------|--------|------|
 | `ffi-open` | 150 | path → handle \| -1 | dlopen/LoadLibrary 加载 .dll/.so |
@@ -359,6 +370,11 @@ runtime.c，链接适配不涉编译器逻辑）。
 Whisper 的 C 后端（`-t c` / `-t c2` / `-t exe` / `-t native`）把 **C 当作
 可移植汇编**，而不是把某个编译器当作依赖。为此锁定以下契约——它是
 **对发射产物与运行时（`whisperc/runtime.c`）的要求**，不是对用户程序的要求：
+
+> **安全边界（2026-10-20）**：C 后端是 **trusted-only**。它没有语言级
+> capability 授权；`@0`/`@5`/`read-file`/`ffi-*` 都直接使用 OS 用户权限。
+> 不可信代码的沙箱目标是 WASM/WASI（规划），不是 C 产物。见
+> `docs/security-model.md`。
 
 1. **语言子集：C99 + POSIX/Win32**。允许标准库头、posix 头（`unistd.h`/
    `pthread.h`/`sys/socket.h`）与 Win32 头（`winsock2.h`/`windows.h`/
@@ -487,4 +503,48 @@ stdout 设为二进制模式，两链的换行都是单个 LF。**这是行为�
 `crates/whisper-cli/tests/integration_tests.rs` 的
 `l1_print_is_byte_exact_on_both_chains`（逐字节比较原始 stdout）与
 `l1_exit_sets_a_real_exit_code`（比较真实 `ExitStatus`）把关。
+
+## 18. 安全模型与执行目标（非语法，规范性说明）
+
+Whisper 的语法不规定安全边界；**执行路径决定能力模型**。完整审计与
+整改不变量见 [docs/security-model.md](security-model.md)。WASM 目标
+目前是**计划**，判据见 [tests/wasm_preregistered.md](../tests/wasm_preregistered.md)，
+实现前不构成已交付的安全承诺。
+
+### 18.1 当前执行路径
+
+| 路径 | 能力模型 | 可用于不可信代码？ |
+|------|----------|--------------------|
+| `whisper run` | Rust VM `CapabilityTable` 管 `@n`；ambient opcode/FFI 仍可绕过 | 否（暂） |
+| `-t bundle` | 同上，内含 Rust VM | 否（暂） |
+| `-t c`/`-t c2`/`-t exe`/`-t native` | 无语言级授权，OS 用户权限 | **否** |
+| `wd build/run` | 无语言级授权；构建期调 gcc/执行产物 | **否** |
+| `-t wasm`（规划） | WASI preopen + host imports | 目标：是 |
+
+### 18.2 规范性要求（未来 WASM profile）
+
+一个符合“不可信执行”要求的 WASM 运行环境 **MUST**：
+
+1. 默认拒绝文件、环境、网络、执行、FFI；
+2. 文件只通过 preopen 暴露，拒绝绝对路径、`..`、symlink 逃逸；
+3. 环境变量只暴露 allowlist；
+4. 网络只通过 host 代理/白名单，不提供裸 socket；
+5. 执行只通过 argv 白名单 host import，不走 shell；
+6. 不提供 FFI（`ffi-open`/`ffi-sym`/`ffi-call` 在不可信 profile 下必须失败）；
+7. 对不支持的词显式报错，不得 no-op；
+8. 策略由宿主持有，不能由 guest 自我声明。
+
+### 18.3 原生 C 的定位
+
+`-t c`/`c2`/`exe`/`native` 与 `wd` 是 **trusted-only** 构建产物；它们
+不是沙箱，不承诺抵御恶意源码或内存攻击。要跑不可信代码：
+
+- 使用 WASM/WASI 目标（规划）；或
+- 在 OS 沙箱/容器/microVM 中运行 native 产物；或
+- 等待 VM 的 ambient/FFI 门收口（需要 Rust 侧改动，不在本轮约束内）。
+
+### 18.4 文档一致性
+
+README、`docs/stdlib.md`、`docs/tutorial.md` 中所有“能力沙箱/默认无 IO”
+表述都必须限定到具体执行路径；发现不一致按规范级缺陷处理。
 
