@@ -181,7 +181,20 @@ W-1..W-7 7/7——默认无 preopen/env，`--dir`/`--env` 显式放行，
 - `crates/**` 无改动；运行时不含 Rust；`wasmtime/wasmer` 未进入链路。
 - `wd c` 与 `whisper bootstrap` 对 hello 的 C 输出 SHA256 相同。
 
-**W-9（未做）**：性能基线尚未记录。
+**W-9（已记录基线，2026-10-21，同一台 Windows 机器）**：
+
+- 数据集：`apps/journal/bench_out.txt`，10,000 行 / 538,890 字节，
+  复制为 preopen 目录下的 `journal.txt`。
+- `journal list`（输出 10,000 行 / 837,782 字节）：
+  - WASM/WAMR：**0.76 s**
+  - c2 native：**0.24 s**
+  - 输出 SHA256 相同 (`72ca1f55…`)。
+- `journal search benchmark`（同样 10,000 行）：
+  - WASM：**0.70 s**
+  - native：**0.19 s**
+  - 输出 SHA256 相同。
+- 结论：WASM 约为 native 的 3–4 倍耗时；计算/IO 量级可接受，
+  但未做优化（WAMR 解释执行、无 AOT）。
 
 ### 结论
 

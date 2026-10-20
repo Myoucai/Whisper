@@ -486,8 +486,9 @@ trusted-only。
 （`target/toolchain`）。
 
 **状态（2026-10-21）**：M1 打通——hello 输出正确；core conformance
-26/27 通过（1 个原语义 skip）；preopen 文件正/负各一例通过。
-W-5/W-6/W-7 完整负向套件、`-t wasm` CLI、性能基线未完成。
+26/27 通过（1 个原语义 skip）；preopen 文件/目录正负各例通过；
+安全门禁 12/12；journal 10k list 0.76s vs native 0.24s（输出一致）。
+W-5/W-6 的 symlink/未知 import、`-t wasm` CLI、W2.5 永久顶层化未完成。
 
 ---
 

@@ -33,6 +33,8 @@
 - core conformance：**26/27 通过，1 个原语义 skip**；HOF 全部通过。
 - 无 preopen：`write-file` 返回 `-1`、`read-file` 为空；
   `--map-dir=/data::target/wasi-data`：`10`/`10`。
+- journal 10k（538KB）WASM vs native：list 0.76s/0.24s，
+  search 0.70s/0.19s；输出 SHA256 一致。
 - `cargo test --workspace`：**467 passed / 0 failed**。
 - 运行链路无 Rust：Zig（C 工具链）+ WAMR（C）；`crates/**` 未改。
 

@@ -34,6 +34,8 @@
   路径逃逸拒绝、FFI 构建期失败、无 Rust 运行时）。
 - 宿主启动器 `scripts/wrun.sh`：W-1..W-7 7/7；默认无 preopen/env，
   `--dir`/`--env` 显式放行，`--http-allow`/`--exec`/`--ffi` 显式拒绝。
+- journal 10k 基线：list 0.76s vs native 0.24s，search 0.70s vs 0.19s，
+  输出 SHA256 一致（WAMR 解释执行，未 AOT）。
 - 未完成：路径逃逸/symlink、FFI 链接失败、未知 host import、
   `-t wasm` CLI、W-9 性能基线。
 
@@ -304,7 +306,7 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
 | M3 | preopen/policy + 负向安全测试 | 1 周 | 🟡 preopen 正/负各一例；完整套件待补 |
 | M4 | journal/文件应用 + CI wasm job | 3–5 天 | ❌ |
 | M5 | HTTP 代理/exec host（可选） | 1–2 周 | ❌ |
-| M6 | 性能/发布/评审 | 3–5 天 | ❌ |
+| M6 | 性能/发布/评审 | 3–5 天 | 🟡 journal 10k 基线已记录；发布/评审待做 |
 
 总计：**4–6 周（1 人，低置信度；W2 的 libc/`setjmp`/路径问题可能拉长）**。
 
@@ -359,7 +361,8 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
       （`@2/@3/@5/@10`、`try`、FFI 已验；listen/serve 待验）。
 - [ ] CI 有 `wasm` job，工具链 pin，不阻塞现有门禁。
 - [x] README/spec/security-model/stdlib/tutorial 与实现一致（持续维护）。
-- [ ] 性能基线记录在案（journal 10k）。
+- [x] 性能基线记录在案（journal 10k）——已记录：list 0.76s vs native 0.24s，
+      search 0.70s vs 0.19s（输出逐字节一致）。
 - [x] `crates/**` 无改动（`git diff --stat -- crates` 为空）。
 
 ---
