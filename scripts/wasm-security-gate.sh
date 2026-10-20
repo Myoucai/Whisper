@@ -70,6 +70,16 @@ check_unsupported S-5 tests/security/wasm_exec.ws "capability @5 (exec) is unsup
 check_unsupported S-6 tests/security/wasm_http.ws "capability @2 (http-get) is unsupported"
 check_unsupported S-7 tests/security/wasm_try.ws "try is unsupported on wasm profile"
 
+# S-9: path escape via .. and absolute path must be denied
+printf 'SECRET\n' > "$TMP/secret.txt"
+if build tests/security/wasm_path_escape.ws "$TMP/path.wasm" \
+   && "$RT" --map-dir="/data::$HOSTDIR" "$TMP/path.wasm" >"$TMP/path.out" 2>"$TMP/path.err" \
+   && [ "$(tr -d '\r' < "$TMP/path.out" | tr '\n' '|')" = "0|0|" ]; then
+    ok S-9 "preopen 外的 ../ 与绝对路径均不可读"
+else
+    bad S-9 "路径逃逸未被拒绝"; cat "$TMP/path.out" 2>/dev/null
+fi
+
 # S-8: no Rust runtime / no Rust source changes
 if ! grep -v '^#' scripts/build-wasm.sh | grep -q 'wasmtime\|wasmer' \
    && [ -z "$(git diff --name-only -- crates 2>/dev/null)" ]; then

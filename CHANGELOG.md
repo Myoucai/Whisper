@@ -20,8 +20,8 @@
 - `scripts/wd-c-gate.sh`：C-1..C-5，验证 `wd c` 不产 exe、与 bootstrap
   逐字节一致、不调用 cc、`wd build` 不回归、usage 列出 c；已进 CI。
 - `scripts/wasm-security-gate.sh` + `tests/security/wasm_*.ws`：
-  S-1..S-8（无 preopen 拒绝、preopen 读写、env allowlist、
-  `@2`/`@5`/`try` 显式失败、无 Rust 运行时），本机 8/8。
+  S-1..S-9（无 preopen 拒绝、preopen 读写、env allowlist、
+  `@2`/`@5`/`try` 显式失败、路径逃逸拒绝、无 Rust 运行时），本机 9/9。
 
 ### 实测
 

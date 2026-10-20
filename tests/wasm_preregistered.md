@@ -151,7 +151,7 @@ wasm conformance: pass=26 fail=0 skip=1
   `lift-nested.py`；未 lift 时这些文件全部报
   `function definition is not allowed here`。
 
-**W-5/W-6/W-7（S-1..S-8，8/8）**：
+**W-5/W-6/W-7（S-1..S-9，9/9）**：
 
 ```bash
 bash scripts/wasm-security-gate.sh
@@ -162,12 +162,13 @@ bash scripts/wasm-security-gate.sh
 # S-5 @5 exec：显式 unsupported
 # S-6 @2 http：显式 unsupported
 # S-7 try：显式 unsupported
+# S-9 preopen 外 ../ 与绝对路径：0/0
 # S-8 无 Rust 运行时；crates/ 无改动
 ```
 
-仍未覆盖：`../`/绝对路径/symlink 逃逸、`listdir`/`mkdir`/
-`file-exists` 负向、FFI 链接失败、未知 host import、host 代理白名单。
-这些是 W-5/W-6 的剩余项，不能因为 8/8 就宣称 WASM 已是安全边界。
+仍未覆盖：symlink 逃逸、`listdir`/`mkdir`/`file-exists` 负向、
+FFI 链接失败、未知 host import、host 代理白名单。
+这些是 W-5/W-6 的剩余项，不能因为 9/9 就宣称 WASM 已是安全边界。
 
 **W-8（通过约束检查）**：
 
@@ -180,6 +181,6 @@ bash scripts/wasm-security-gate.sh
 
 M1 **打通**：`hello.ws → wd c → Zig cc → .wasm → iwasm`，
 核心 conformance 26/27（1 个原语义 skip；可运行子集 26/26）通过，
-文件 IO 在 preopen 下通过；安全门禁 S-1..S-8 8/8。
+文件 IO 在 preopen 下通过；安全门禁 S-1..S-9 9/9。
 仍未完成：路径逃逸/FFI/未知 import 负向、W2.5（cgen 顶层化）、
 `-t wasm` CLI、性能基线。因此**还不能**把 WASM 宣称为生产安全边界。

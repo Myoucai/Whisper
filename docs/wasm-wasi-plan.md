@@ -29,9 +29,9 @@
   （`auto void _qb`），clang/Zig 不支持。已用
   `scripts/lift-nested.py` 做构建期提升（W2.5），全部 HOF 用例通过；
   永久修法仍是 cgen 直接发射顶层 `_qN()`。
-- 安全门禁 `scripts/wasm-security-gate.sh`：**S-1..S-8 8/8**（文件
-  默认拒绝/preopen、env allowlist、`@2`/`@5`/`try` 显式失败、无 Rust
-  运行时）。
+- 安全门禁 `scripts/wasm-security-gate.sh`：**S-1..S-9 9/9**（文件
+  默认拒绝/preopen、env allowlist、`@2`/`@5`/`try` 显式失败、路径
+  逃逸拒绝、无 Rust 运行时）。
 - 未完成：路径逃逸/symlink、FFI 链接失败、未知 host import、
   `-t wasm` CLI、W-9 性能基线。
 

@@ -449,7 +449,7 @@ bash tools/opcode_coverage.sh                    # 101 项逐特性双跑（VM v
 bash scripts/typecheck-gate.sh                   # 类型检查假阳性棘轮（三语料 FP=0）
 bash scripts/wd-cache-gate.sh                    # wd 内容寻址缓存 C-1..C-6（8 条断言）
 bash scripts/wd-c-gate.sh                        # wd c 零 Rust C 发射（C-1..C-5）
-bash scripts/wasm-security-gate.sh               # WASI 安全 S-1..S-8（需 Zig/WAMR）
+bash scripts/wasm-security-gate.sh               # WASI 安全 S-1..S-9（需 Zig/WAMR）
 bash scripts/build-wfmt.sh && bash scripts/fmt-gate.sh  # Whisper 写的 fmt（F-1..F-6）
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验
 ```
