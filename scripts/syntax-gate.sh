@@ -12,7 +12,8 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BIN="${BIN:-}"
 if [ -z "$BIN" ]; then
-    for b in "$ROOT/target/debug/whisper" "$ROOT/target/debug/whisper.exe"; do
+    for b in "$ROOT/target/debug/whisper" "$ROOT/target/debug/whisper.exe" \
+             "$ROOT/target/release/whisper" "$ROOT/target/release/whisper.exe"; do
         [ -x "$b" ] && { BIN="$b"; break; }
     done
 fi
