@@ -85,5 +85,7 @@ conformance 通过，但它是文本后处理，不能作为长期契约。
   integration test 的两处跨平台假设（`-lws2_32`、`echo` 换行长度）。
 - **G-3 ✅**：`verify-fixedpoint.sh` 通过：
   `gen2 == gen3 (self-hosting fixed point holds)`，退出码 0。
+  随后用新编译器重建 `compiler_seed.c`；新 seed 编译通过，
+  跑 `42 .` 生成的 C 编译后输出 `42`。
 - **G-8 ✅**：当前 `build-wasm.sh` 不走 `lift-nested.py`；脚本只作为
   stale compiler 的检测回退保留。

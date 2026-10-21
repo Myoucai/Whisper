@@ -41,7 +41,7 @@
 - `whisper_test/run_core.sh`：C 链的 `>` / `<` 输出是 `#t`/`#f`，
   修正 test 7/8 的错误期望；本地 C-emission 22/22。
 - `tests/cgen_toplevel_preregistered.md`：W2.5 G-1..G-8；cgen 已实现，
-  fixedpoint 通过（`gen2 == gen3`）；seed 重建留作后续。
+  fixedpoint 通过（`gen2 == gen3`）；seed 已用新编译器重建并通过冒烟。
 - 测试夹具跨平台修正（非运行时）：`-lws2_32` 只在 Windows 加；
   `@10` raw newline 期望值按 POSIX/Windows 区分；
   `wd-c-gate` C-4 兼容无 `.exe` 的 POSIX 产物；
