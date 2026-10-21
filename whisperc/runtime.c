@@ -30,6 +30,7 @@
 #else
 #  ifndef W_WASI
 #    include <sys/mman.h>
+#    include <sys/time.h> // struct timeval for socket timeouts (musl needs this)
 #    include <netdb.h>  // getaddrinfo / freeaddrinfo for the HTTP client
 #  endif
 #endif
@@ -284,12 +285,15 @@ static void w_heap_init(void) {
         int flags = MAP_PRIVATE | MAP_ANONYMOUS;
 #endif
         w_heap = MAP_FAILED;
+        int got = 0;
         while (want >= (size_t)(256LL * 1024 * 1024)) {
             w_heap = mmap(NULL, want, PROT_READ | PROT_WRITE, flags, -1, 0);
-            if (w_heap != MAP_FAILED) break;
+            if (w_heap != MAP_FAILED) { got = 1; break; }
+            w_heap = (char *)malloc(want);
+            if (w_heap != NULL) { got = 1; break; }
             want /= 4;
         }
-        if (w_heap == MAP_FAILED) { perror("mmap"); exit(1); }
+        if (!got) { perror("mmap"); exit(1); }
         w_heap_size = (long long)want;
     }
 #endif
