@@ -83,7 +83,7 @@ conformance 通过，但它是文本后处理，不能作为长期契约。
   (`72CA1F…`)；WASM 0.63s。
 - **G-7 ✅（按修订后口径）**：Rust runtime/library 未改；仅修了
   integration test 的两处跨平台假设（`-lws2_32`、`echo` 换行长度）。
-- **G-3 ⏳**：`verify-fixedpoint.sh` 在本地 Windows 跑 gen2 超过 10 分钟，
-  已停止；CI 继续验证。未通过前不能宣称 W2.5 完全收口。
-- **G-8 ⏳**：`lift-nested.py` 调用已改为仅在检测到旧嵌套函数时回退；
-  固定点通过后删除调用并保留脚本。
+- **G-3 ✅**：`verify-fixedpoint.sh` 通过：
+  `gen2 == gen3 (self-hosting fixed point holds)`，退出码 0。
+- **G-8 ✅**：当前 `build-wasm.sh` 不走 `lift-nested.py`；脚本只作为
+  stale compiler 的检测回退保留。

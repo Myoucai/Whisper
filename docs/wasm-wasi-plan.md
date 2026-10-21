@@ -177,11 +177,12 @@ body 变成文件级 `static void _qN(void)`（带前置声明），wrapper 用�
 函数指针 `_qfn` 绑定；`build-wasm.sh` 对当前 cgen 不再调用 Python lifter
 （只对 stale compiler 保留回退）。macOS/clang/wasm32-wasi 可直接编译。
 
-**待验证**：固定点/seed 重建。这会改动冻结的编译器源码，必须走
-`verify-fixedpoint.sh` + seed 重新验证。
+**验证**：`verify-fixedpoint.sh` 已通过（`gen2 == gen3`）。seed 仍是
+旧 cgen 生成的冻结产物；若要 `bootstrap.sh` 在 clang/macOS 上也完全不
+依赖嵌套函数，需要另外重建 seed（列为后续项，不阻塞当前 W2.5 判据）。
 
-**状态（2026-10-21）**：cgen 实现完成；本地 integration 123/123、
-wasm conformance 26/0、journal hash 不变；fixedpoint 运行中。
+**状态（2026-10-21）**：cgen 实现完成；fixedpoint 通过；
+本地 integration 123/123、wasm conformance 26/0、journal hash 不变。
 
 **判据**：完整 G-1..G-8 见
 [`tests/cgen_toplevel_preregistered.md`](../tests/cgen_toplevel_preregistered.md)。

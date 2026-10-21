@@ -489,7 +489,8 @@ trusted-only。
 26/27 通过（1 个原语义 skip）；preopen 文件/目录正负各例通过；
 安全门禁 17/17；journal 10k list 0.63s vs native 0.24s（输出一致）。
 cgen 顶层化（W2.5）已实现，clang/macOS 不再需要 GNU 嵌套函数；
-fixedpoint 验证中。未知 host import、`-t wasm` CLI 未完成。
+fixedpoint 已验证 `gen2 == gen3`。seed 仍是旧 cgen 产物，重建列为
+后续项。未知 host import、`-t wasm` CLI 未完成。
 
 ---
 
