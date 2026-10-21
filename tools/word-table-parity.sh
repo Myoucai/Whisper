@@ -77,6 +77,8 @@ chain_n=$(wc -l < "$tmp/chain.txt")
 raw_n=$(wc -l < "$tmp/only_rust.txt")
 n=$(wc -l < "$tmp/suspect.txt")
 
+CEIL="${CEIL:-0}"
+
 echo "[parity] Rust 关键字 $rust_n 个 · 自举链词表 $chain_n 项"
 echo "[parity] 只在 Rust 侧 $raw_n 个，其中白名单 $((raw_n - n)) 个，**待处理 $n 个**（上限 $CEIL）"
 if [ "$n" -gt 0 ]; then

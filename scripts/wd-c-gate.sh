@@ -49,10 +49,15 @@ else
     bad C-3 "wd c 仍依赖 cc"; tail -3 "$TMP/no-cc.err"
 fi
 
-# C-4: build still works
-if WHISPER_ROOT="$ROOT" "$WD" build "$SRC" "$TMP/native" >/dev/null 2>"$TMP/build.err" \
-   && [ -f "$TMP/native.exe" ] && "$TMP/native.exe" | grep -q 'Hello, World!'; then
-    ok C-4 "wd build 仍编译并运行 hello"
+# C-4: build still works (Windows appends .exe; POSIX does not)
+if WHISPER_ROOT="$ROOT" "$WD" build "$SRC" "$TMP/native" >/dev/null 2>"$TMP/build.err"; then
+    NATIVE="$TMP/native"
+    [ -f "$NATIVE.exe" ] && NATIVE="$NATIVE.exe"
+    if [ -f "$NATIVE" ] && "$NATIVE" | grep -q 'Hello, World!'; then
+        ok C-4 "wd build 仍编译并运行 hello"
+    else
+        bad C-4 "wd build 产物未运行"; tail -3 "$TMP/build.err"
+    fi
 else
     bad C-4 "wd build 回归"; tail -3 "$TMP/build.err"
 fi
