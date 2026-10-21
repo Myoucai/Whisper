@@ -45,7 +45,9 @@
 - 测试夹具跨平台修正（非运行时）：`-lws2_32` 只在 Windows 加；
   `@10` raw newline 期望值按 POSIX/Windows 区分；
   `wd-c-gate` C-4 兼容无 `.exe` 的 POSIX 产物；
-  `word-table-parity.sh` 在 `set -u` 下重新兜底 `CEIL`。
+  `word-table-parity.sh` 用 `${CEIL}` 避免全角标点被当成变量名；
+  `syntax-gate.sh` 同时查找 debug/release 二进制，并在 macOS 上回退
+  到 `gtimeout` / 不设超时。
 - 本地：integration 123/123、cargo 467/0、syntax 27/0、stdlib 67/0；
   wasm conformance 26/0；journal 10k hash 不变。
 
