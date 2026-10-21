@@ -1,8 +1,8 @@
 # cgen 顶层化（W2.5）预注册判据
 
 2026-10-21 立项。目标：去掉 cgen 为 quote/HOF 生成的 **GNU C 嵌套函数**，
-让 clang/Zig 直接编译 Whisper C 输出，删除 `scripts/lift-nested.py` 这个
-构建期文本后处理桥。
+让 clang/Zig 直接编译 Whisper C 输出；`scripts/lift-nested.py` 只保留为
+stale compiler 的兼容回退。
 
 背景：cgen 当前生成
 

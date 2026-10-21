@@ -18,7 +18,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.0.8-7cffc4" alt="version">
-  <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%209%20gates-brightgreen" alt="tests">
+  <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2013%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
   <img src="https://img.shields.io/badge/stdlib-20%20modules-blue" alt="stdlib">
@@ -232,7 +232,7 @@ gcc -O2 -o hello hello.c -I whisperc -lm
 | **native 特化** | `whisper build file.ws -t native -o prog` | 按主机 CPU 特化的原生可执行文件（内容寻址缓存） | gcc |
 | **exe 原生** | `whisper build file.ws -t exe -o app` | 原生可执行文件（**产物零 Rust**） | gcc（构建期） |
 | bundle 打包 | `whisper build file.ws -t bundle -o app` | 单文件可执行（**内含 Rust VM**，构建期无需工具链） | 无 |
-| **wasm（M1）** | `wd wasm file.ws app.wasm` 或 `bash scripts/build-wasm.sh ...` | `.wasm` + `.wasm.c`（零 Rust runtime） | Zig cc / wasi-sdk clang + WAMR/wasm3/wasm2c |
+| **wasm（M2 部分）** | `wd wasm file.ws app.wasm` 或 `bash scripts/build-wasm.sh ...` | `.wasm` + `.wasm.c`（零 Rust runtime） | Zig cc / wasi-sdk clang + WAMR/wasm3/wasm2c |
 | 固定点复验 | `scripts/verify-fixedpoint.sh` | 自举链验证 | gcc |
 
 ```bash
@@ -266,7 +266,7 @@ Whisper 的安全承诺**按执行路径分档**，不是所有产物都等价�
 | VM 解释 | `whisper run` | ⚠️ 部分 | `@n` 有 `CapabilityTable`，但 `read-file`/`write-file`/`getenv`/`ffi-*` 等 ambient opcode 目前可绕过；**暂不作为不可信代码边界** |
 | bundle | `-t bundle` | ⚠️ 部分 | 内含 Rust VM，同上；体积也更大 |
 | C / 原生 | `-t c`/`-t c2`/`-t exe`/`-t native`/`wd` | ❌ 无 | 直接使用 OS 用户权限；**trusted-only**，不要用来跑不可信源码 |
-| WASM | `bash scripts/build-wasm.sh`（`-t wasm` 规划） | 🟡 M1 | core 26/27 已通；preopen 文件正/负各一例；负向安全套件未完成，**尚不可用于生产** |
+| WASM | `wd wasm` / `bash scripts/build-wasm.sh` | 🟡 M2 部分 | core 26/27、安全门禁 18/18、symlink/import 拒绝已通；host HTTP 代理/read-only preopen 未完成，**尚不可用于生产** |
 
 当前已确认的缺口（2026-10-20 实测）：
 
@@ -280,7 +280,7 @@ OS 沙箱/容器里运行；不要依赖 `whisper run` 或 native 产物做安�
 [docs/security-model.md](docs/security-model.md)。
 
 WASM/WASI 的详细计划与判据见 [docs/wasm-wasi-plan.md](docs/wasm-wasi-plan.md)
-和 [tests/wasm_preregistered.md](tests/wasm_preregistered.md)。当前 M1 已打通：
+和 [tests/wasm_preregistered.md](tests/wasm_preregistered.md)。当前 M2 部分已打通：
 
 ```bash
 # 需要 Zig（或 wasi-sdk clang）与 C 运行时 WAMR iwasm；不需要 Rust runtime
@@ -379,7 +379,7 @@ append 模式已消除（`range-to` 10 万元素 83s → 19ms）。
 | 循环控制 (leave，编译期跳转回填) | ✅ |
 | 静态类型推导（strict 默认：类型错误致命，`--no-strict-types` 降级） | ✅ |
 | 能力沙箱 | ⚠️ VM 的 `@n` 部分；ambient/FFI 待收口；C 链无 |
-| WASM/WASI 安全执行目标 | 🟡 M1（core 26/27；`-t wasm` 未接） |
+| WASM/WASI 安全执行目标 | 🟡 M2 部分（core 26/27；`wd wasm`；安全 18/18） |
 | 置信度系统 + 概率选择 | ✅ |
 | .wbin 二进制格式 | ✅ |
 | 包管理器 | ✅ |

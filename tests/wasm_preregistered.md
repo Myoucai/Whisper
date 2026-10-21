@@ -141,11 +141,10 @@ iwasm target/toolchain/hello.wasm
 wasm conformance: pass=26 fail=0 skip=1
 ```
 
-- 唯一 skip：`tests/conformance/26_file_io.ws` 使用宿主绝对路径
-  `D:/tmp/wsconf.txt`，在 WASI 下无意义。
-- 新增 `tests/security/wasm_file.ws`，用 guest 路径
-  `/data/wsconf.txt`；`--map-dir=/data::target/wasi-data` 下输出
-  `10`、`10`，通过。
+- 唯一 skip：`26_file_io` 由批量 wasm 脚本跳过；文件 IO 由
+  `tests/security/wasm_file.ws` 的 preopen 用例覆盖。
+- WASI 文件 IO：`/data/wsconf.txt`，`--map-dir=/data::target/wasi-data`
+  下输出 `10`、`10`，通过；无 preopen 时 `-1`/空。
 - 26 个通过用例里包含 HOF（`13_times`/`14_map_fold`/`15_each_filter`/
   `24_nested_structures`/`25_import`/`s4_both_strlist`），现在直接由
   cgen 顶层函数编译，不依赖 `lift-nested.py`。
@@ -193,7 +192,7 @@ W-1..W-7 7/7——默认无 preopen/env，`--dir`/`--env` 显式放行，
 - 数据集：`apps/journal/bench_out.txt`，10,000 行 / 538,890 字节，
   复制为 preopen 目录下的 `journal.txt`。
 - `journal list`（输出 10,000 行 / 837,782 字节）：
-  - WASM/WAMR：**0.76 s**
+  - WASM/WAMR：**0.63 s**（cgen 顶层化后复测；初版 0.76 s）
   - c2 native：**0.24 s**
   - 输出 SHA256 相同 (`72ca1f55…`)。
 - `journal search benchmark`（同样 10,000 行）：

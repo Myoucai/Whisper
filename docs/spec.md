@@ -141,7 +141,8 @@ export name                ;; 导出（一词一行）
 
 > 上表只记**行为差异**，不是安全承诺。当前执行边界、已知绕过和整改目标
 > 以 [docs/security-model.md](security-model.md) 为准；native C 产物是
-> trusted-only，不可信代码的沙箱目标是 WASM/WASI（规划）。
+> trusted-only，不可信代码的沙箱目标是 WASM/WASI（M1；未完成负向门禁前
+> 不构成生产安全承诺）。
 
 N-1（2026-09-10）起 **bool 数值协变两侧一致**：`#t 1 +`→2、
 `"ab" #t strnth`→98、`0 1 atan2`→0、`#t bitnot`→-2、`#t 0.5 +`→1.5
@@ -373,7 +374,7 @@ Whisper 的 C 后端（`-t c` / `-t c2` / `-t exe` / `-t native`）把 **C 当�
 
 > **安全边界（2026-10-20）**：C 后端是 **trusted-only**。它没有语言级
 > capability 授权；`@0`/`@5`/`read-file`/`ffi-*` 都直接使用 OS 用户权限。
-> 不可信代码的沙箱目标是 WASM/WASI（规划），不是 C 产物。见
+> 不可信代码的沙箱目标是 WASM/WASI（M1），不是 C 产物。见
 > `docs/security-model.md`。
 
 1. **语言子集：C99 + POSIX/Win32**。允许标准库头、posix 头（`unistd.h`/
@@ -507,10 +508,9 @@ stdout 设为二进制模式，两链的换行都是单个 LF。**这是行为�
 ## 18. 安全模型与执行目标（非语法，规范性说明）
 
 Whisper 的语法不规定安全边界；**执行路径决定能力模型**。完整审计与
-整改不变量见 [docs/security-model.md](security-model.md)。WASM 目标
-M1 已打通（hello/core conformance），但**负向安全门禁未完成**，
-判据见 [tests/wasm_preregistered.md](../tests/wasm_preregistered.md)，
-当前不构成已交付的安全承诺。
+整改不变量见 [docs/security-model.md](security-model.md)。WASM 目标到 M2 部分（hello/core conformance/安全 18/18），但
+host HTTP 代理与 read-only preopen 未完成，**尚不构成生产安全承诺**。
+判据见 [tests/wasm_preregistered.md](../tests/wasm_preregistered.md)。
 
 ### 18.1 当前执行路径
 
@@ -520,7 +520,7 @@ M1 已打通（hello/core conformance），但**负向安全门禁未完成**，
 | `-t bundle` | 同上，内含 Rust VM | 否（暂） |
 | `-t c`/`-t c2`/`-t exe`/`-t native` | 无语言级授权，OS 用户权限 | **否** |
 | `wd build/run` | 无语言级授权；构建期调 gcc/执行产物 | **否** |
-| wasm（M1，`scripts/build-wasm.sh`） | WASI preopen + host imports；文件正/负已验证，其余负向门禁未完成 | **尚未**（W-5..W-7 未完） |
+| wasm M2（`wd wasm` / `scripts/build-wasm.sh`） | WASI preopen + import allowlist；host 代理/ro preopen 未完成 | **尚未**（host 代理/ro 未完） |
 
 ### 18.2 规范性要求（未来 WASM profile）
 
@@ -540,7 +540,7 @@ M1 已打通（hello/core conformance），但**负向安全门禁未完成**，
 `-t c`/`c2`/`exe`/`native` 与 `wd` 是 **trusted-only** 构建产物；它们
 不是沙箱，不承诺抵御恶意源码或内存攻击。要跑不可信代码：
 
-- 使用 WASM/WASI 目标（规划）；或
+- 使用 WASM/WASI 目标（`wd wasm` / `scripts/build-wasm.sh`，M1）；或
 - 在 OS 沙箱/容器/microVM 中运行 native 产物；或
 - 等待 VM 的 ambient/FFI 门收口（需要 Rust 侧改动，不在本轮约束内）。
 

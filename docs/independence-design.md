@@ -470,11 +470,11 @@ Whisper VM 只在两个场景有独立价值：
 的约束下，原生安全的主路线是 **C → WebAssembly + WASI**，而不是再写一个
 VM。
 
-**架构**：`source.ws → wd c → C → zig cc/clang → .wasm`，
+**架构**：`source.ws → wd c / wd wasm → C → zig cc/clang → .wasm`，
 由 WAMR/wasm3（C 运行时）/ wasm2c（AOT 到 C）执行；文件只通过 preopen，
-网络/执行/FFI 走宿主策略或显式拒绝。Rust 代码不改；`wd c` 已是零 Rust
-发射器，`whisper bootstrap` 仅作回退。HOF 的 GNU 嵌套函数暂由
-`scripts/lift-nested.py` 提升到顶层（W2.5 永久修法待做）。
+网络/执行/FFI 走宿主策略或显式拒绝。Rust 代码不改；`wd c`/`wd wasm`
+已是零 Rust 入口，`whisper bootstrap` 仅作回退。HOF 由 cgen 直接发射
+顶层 `_qN`；`scripts/lift-nested.py` 只对 stale compiler 回退。
 
 **明确不做**：v1 不支持 `@5`/`@10`/FFI/裸 socket/`serve-concurrent`；
 这些必须显式报错，不能 no-op。native `exe`/`c2`/`native` 保持
@@ -487,10 +487,11 @@ trusted-only。
 
 **状态（2026-10-21）**：M1 打通——hello 输出正确；core conformance
 26/27 通过（1 个原语义 skip）；preopen 文件/目录正负各例通过；
-安全门禁 17/17；journal 10k list 0.63s vs native 0.24s（输出一致）。
+安全门禁 18/18；journal 10k list 0.63s vs native 0.24s（输出一致）。
 cgen 顶层化（W2.5）已实现，clang/macOS 不再需要 GNU 嵌套函数；
 fixedpoint 已验证 `gen2 == gen3`；seed 已用新编译器重建并通过
-`42 .` 冒烟。零 Rust `wd wasm` 已落地；未知 host import 仍未完成。
+`42 .` 冒烟。零 Rust `wd wasm` 已落地；未知 import 已由 wrun 拒绝；
+host HTTP 代理 / read-only preopen 仍未完成。
 
 ---
 

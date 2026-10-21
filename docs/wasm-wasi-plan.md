@@ -18,17 +18,15 @@
 
 ### 0.1 当前进展（2026-10-21）
 
-- **M1 已打通**：`hello.ws → wd c → Zig cc → .wasm → WAMR iwasm`，
+- **M1/M2 已打通**：`hello.ws → wd c/wd wasm → Zig cc → .wasm`，
   输出 `Hello, World!`。运行链路零 Rust（Zig 是 C 工具链，WAMR 是 C）。
-- `wd c` 只发射 C、不调 cc、不碰缓存；与 `whisper bootstrap` 的 C
-  输出逐字节一致（hello SHA256 相同）。
+- `wd c` 只发射 C；`wd wasm` 直接调 zig（不经过 bash）；`wd c` 与
+  `whisper bootstrap` 的 C 输出逐字节一致（hello SHA256 相同）。
 - core conformance：**26/27 通过，1 个按原语义跳过**（`26_file_io`
-  用宿主 `D:/tmp` 绝对路径）。新增 WASI 版文件 IO 用例，在
-  `--map-dir` preopen 下通过；无 preopen 时写入返回 `-1`、读取为空。
-- 发现的硬阻塞：cgen 为 quote/HOF 生成 **GNU C 嵌套函数**
-  （`auto void _qb`），clang/Zig 不支持。已用
-  `scripts/lift-nested.py` 做构建期提升（W2.5），全部 HOF 用例通过；
-  永久修法仍是 cgen 直接发射顶层 `_qN()`。
+  的批量 wasm 脚本跳过；文件 IO 由 S-2/S-9/S-10/S-11 的 preopen
+  用例覆盖）。无 preopen 时写入返回 `-1`、读取为空。
+- 硬阻塞已解决：cgen 现直接发射文件级 `_qN()` + 局部 `_qfn`，不再生成
+  GNU 嵌套函数；`scripts/lift-nested.py` 仅作为 stale compiler 回退。
 - 安全门禁 `scripts/wasm-security-gate.sh`：**S-1..S-18 18/18**（文件
   默认拒绝/preopen、目录操作、env allowlist、`@2`/`@5`/`@6`/`@10`/
   `try`/`listen`/`serve-concurrent` 显式失败、路径逃逸拒绝、
@@ -36,7 +34,7 @@
 - 宿主启动器 `scripts/wrun.sh`：W-1..W-7 7/7；默认无 preopen/env，
   `--dir`/`--env` 显式放行，`--http-allow`/`--exec`/`--ffi` 显式拒绝；
   **拒绝含 symlink 的 preopen**（裸 iwasm 会跟随 symlink 逃逸）。
-- journal 10k 基线：list 0.76s vs native 0.24s，search 0.70s vs 0.19s，
+- journal 10k 基线：list 0.63s vs native 0.24s，search 0.70s vs 0.19s，
   输出 SHA256 一致（WAMR 解释执行，未 AOT）。
 - CI：`.github/workflows/wasm.yml` 已加（Zig 0.14.1 + WAMR 2.4.5 pin），
   跑 hello、安全门禁、wrun 门禁；首次远端运行待确认。
@@ -319,9 +317,9 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
 |--------|------|------|------|
 | M0 | 文档/安全模型/判据（本次） | 1–2 天 | ✅ 已落地 |
 | M1 | 工具链 + hello.wasm + preflight | 2–3 天 | ✅ hello 全链路通过 |
-| M2 | 运行时分层 + core conformance | 1–2 周 | 🟡 runtime WASI 守卫 + 26/27；cgen 顶层化待做 |
-| M3 | preopen/policy + 负向安全测试 | 1 周 | 🟡 preopen 正/负各一例；完整套件待补 |
-| M4 | journal/文件应用 + CI wasm job | 3–5 天 | ❌ |
+| M2 | 运行时分层 + core conformance | 1–2 周 | ✅ runtime WASI 守卫 + 26/27；cgen 顶层化完成 |
+| M3 | preopen/policy + 负向安全测试 | 1 周 | 🟡 S-1..S-18 通过；host 代理/ro preopen 待做 |
+| M4 | journal/文件应用 + CI wasm job | 3–5 天 | ✅ journal 10k + wasm workflow；首次远端运行待确认 |
 | M5 | HTTP 代理/exec host（可选） | 1–2 周 | ❌ |
 | M6 | 性能/发布/评审 | 3–5 天 | 🟡 journal 10k 基线已记录；发布/评审待做 |
 
@@ -352,7 +350,7 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
 | WASI P1 无 socket/thread/exec/ffi | 功能缺口 | v1 明确不支持；HTTP/exec 走 host import（Phase 4） |
 | `runtime.c` POSIX 假设多 | 移植超期 | 已加 WASI 守卫（文件/env/时间/core 可跑；network/exec/FFI 排除）；M1 通过 |
 | `setjmp/longjmp` 在 wasi-libc 不可用 | `try` 需重写 | 已确认不可用；v1 `try` 显式 unsupported，后续用错误传播改造 |
-| cgen 生成 GNU C 嵌套函数（HOF） | clang/Zig 直接编译失败 | `scripts/lift-nested.py` 临时桥；永久修法 W2.5 |
+| cgen 生成 GNU C 嵌套函数（HOF） | clang/Zig 直接编译失败 | 已顶层化；`lift-nested.py` 只作 stale compiler 回退 |
 | 文本后处理提升嵌套函数 | 解析脆弱/可能与新 cgen 输出漂移 | 固定生成器版本 + 对拍；W2.5 顶层化后删除桥 |
 | `wasm32` 4GB 线性内存 | 大数据受限 | 记录上限；必要时 memory64（远期） |
 | 路径语义（Windows 盘符/`\`/symlink） | 逃逸或不可用 | 统一转 `/`；preopen + `..`/绝对路径拒绝；负向测试 |
@@ -367,21 +365,26 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
 
 ## 7. Definition of Done（WASM v1）
 
-- [x] `scripts/build-wasm.sh` 能从 `.ws` 产出 `.wasm`，hello 输出正确。
-- [x] core conformance：26/27 可运行用例通过；原 `26_file_io` 用宿主
-      绝对路径，按语义 skip，另有 WASI preopen 版本通过。
+- [x] `scripts/build-wasm.sh` 与零 Rust `wd wasm` 能从 `.ws` 产出
+      `.wasm`，hello 输出正确。
+- [x] core conformance：26/27；`26_file_io` 在批量 wasm 脚本中跳过，
+      文件 IO 由 S-2/S-9/S-10/S-11 覆盖。
 - [x] `read-file`/`write-file`/`mkdir`/`file-exists` 只能访问 preopen；
       `../` 与绝对路径被拒（S-2/S-9/S-10/S-11）；`listdir` 尚未单列门禁。
 - [x] 无 policy 时，文件/env/network/exec/ffi 全部拒绝；有负向测试
       （S-1/S-3/S-5/S-6/S-12）。
+- [x] import 白名单：只允许 `wasi_snapshot_preview1`，未知 import
+      加载前拒绝（S-18）。
 - [x] `@5`/`@10`/`ffi-*`/`listen`/`serve-concurrent` 显式 unsupported
       （S-5/S-12/S-13/S-14/S-15/S-16）。
 - [x] CI 有 `wasm` job，工具链 pin，不阻塞现有门禁
       （`.github/workflows/wasm.yml`；首次远端运行待确认）。
 - [x] README/spec/security-model/stdlib/tutorial 与实现一致（持续维护）。
-- [x] 性能基线记录在案（journal 10k）——已记录：list 0.76s vs native 0.24s，
+- [x] 性能基线记录在案（journal 10k）——已记录：list 0.63s vs native 0.24s，
       search 0.70s vs 0.19s（输出逐字节一致）。
-- [x] `crates/**` 无改动（`git diff --stat -- crates` 为空）。
+- [x] 零 Rust `wd wasm` 入口可用（W-1..W-4 4/4）。
+- [ ] host HTTP 代理 / read-only preopen。
+- [x] 不改 Rust 运行时/库；仅测试夹具跨平台修正（已记录）。
 
 ---
 

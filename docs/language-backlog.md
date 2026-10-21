@@ -34,12 +34,12 @@ native `exe`/`c2`/`native`/`wd` 是 trusted-only。
 WAMR `iwasm` / wasm3 / wasm2c（AOT 到 C）执行；文件用 preopen、
 网络/执行/FFI 由宿主策略控制或显式拒绝。
 
-**状态（2026-10-21）**：M1 打通——`wd c → zig cc → .wasm → iwasm`
-输出正确；core conformance 26/27（1 个原语义 skip）；preopen 文件/目录
-正负用例通过；安全门禁 17/17；journal 10k list/search 输出与 native
-一致（0.76s/0.70s vs 0.24s/0.19s）。HOF 依赖
-`scripts/lift-nested.py` 临时提升 GNU 嵌套函数（W2.5 永久修法待做）。
-`-t wasm` CLI、symlink/未知 import 负向未完成。
+**状态（2026-10-21）**：M1 打通——`wd c`/`wd wasm` → zig cc → `.wasm`
+→ iwasm 输出正确；core conformance 26/27（1 个原语义 skip）；preopen
+文件/目录正负用例通过；安全门禁 18/18；journal 10k list/search 输出与
+native 一致。cgen 顶层化（W2.5）已完成，fixedpoint `gen2 == gen3`，
+seed 已重建。symlink/未知 import 已拒绝；host HTTP 代理与 read-only
+preopen 未完成。
 
 **不在 v1**：`@5`/`@10`/FFI/裸 socket/`serve-concurrent`；native 仍是
 trusted-only。Step 5 的 Whisper VM 不替代本战役。
