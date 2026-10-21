@@ -172,23 +172,25 @@ WASI 实现：
 这不是“WASI 缺功能”，而是 C 发射产品本身不可移植；spec 的
 “C 当作可移植汇编”表述因此在 HOF 上不成立。
 
-**临时桥（已落地）**：`scripts/lift-nested.py` 在构建期把每个
-`_qb` 提升为文件级 `static void _qN(void)`，并替换调用点。
-26/26 可运行 conformance 通过；但它是文本后处理，不应作为长期契约。
+**实现（2026-10-21，已落地）**：cgen 不再生成嵌套函数。每个 quote/HOF
+body 变成文件级 `static void _qN(void)`（带前置声明），wrapper 用局部
+函数指针 `_qfn` 绑定；`build-wasm.sh` 对当前 cgen 不再调用 Python lifter
+（只对 stale compiler 保留回退）。macOS/clang/wasm32-wasi 可直接编译。
 
-**永久修法**：在 `compiler.all.ws` 的 cgen 中直接发射顶层 `_qN()`，
-带唯一名字/前置声明；或改成不依赖嵌套函数的闭包 ABI。
-这会改动冻结的编译器源码，必须走固定点/seed 重新验证。
-**状态（2026-10-21）**：判据已预注册；cgen 代码未开始。
+**待验证**：固定点/seed 重建。这会改动冻结的编译器源码，必须走
+`verify-fixedpoint.sh` + seed 重新验证。
+
+**状态（2026-10-21）**：cgen 实现完成；本地 integration 123/123、
+wasm conformance 26/0、journal hash 不变；fixedpoint 运行中。
 
 **判据**：完整 G-1..G-8 见
 [`tests/cgen_toplevel_preregistered.md`](../tests/cgen_toplevel_preregistered.md)。
 摘要：
 
-- `.c` 中不再出现 `auto void _qb`；
+- `.c` 中不再出现 `auto void _qb` / `_qb`；
 - 同一源码经 cgen 直接产出的 C 与“cgen + lift”的语义一致；
 - 固定点仍成立；
-- 迁移完成后删除 `scripts/lift-nested.py` 的调用（保留测试）。
+- `lift-nested.py` 只作为 stale compiler 回退，不再参与当前构建。
 
 ### W3 — 构建目标（2–3 天）
 

@@ -118,8 +118,8 @@
   **未使用 wasmtime/wasmer**。
 - C 发射：`wd c`（Whisper 自身，纯 C 产物），回退路径
   `whisper bootstrap`（Rust CLI，仅 Phase 1 兼容用）。
-- 引号/HOF 的 GNU 嵌套函数由 `scripts/lift-nested.py` 提升为文件级
-  `_qN()`；这是 **W2.5 临时桥**，永久修法仍是 cgen 直接发射顶层函数。
+- 引号/HOF 已由 cgen 发射为文件级 `_qN()` + 局部 `_qfn` 指针；
+  `lift-nested.py` 只对旧编译器保留回退，当前构建不走它。
 
 **W-1（部分通过）**：
 
@@ -147,9 +147,8 @@ wasm conformance: pass=26 fail=0 skip=1
   `/data/wsconf.txt`；`--map-dir=/data::target/wasi-data` 下输出
   `10`、`10`，通过。
 - 26 个通过用例里包含 HOF（`13_times`/`14_map_fold`/`15_each_filter`/
-  `24_nested_structures`/`25_import`/`s4_both_strlist`），依赖
-  `lift-nested.py`；未 lift 时这些文件全部报
-  `function definition is not allowed here`。
+  `24_nested_structures`/`25_import`/`s4_both_strlist`），现在直接由
+  cgen 顶层函数编译，不依赖 `lift-nested.py`。
 
 **W-5/W-6/W-7（S-1..S-17，17/17）**：
 

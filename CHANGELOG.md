@@ -15,10 +15,13 @@
     Ubuntu/macOS CI 上 C 程序启动即空输出的问题。
 - `whisperc/wd.ws`：新增 `wd c <src> <out.c>`——只发射 C，不调 cc、
   不碰缓存；与 `whisper bootstrap` 的 hello C 输出逐字节一致。
-- `scripts/build-wasm.sh`：`wd c`（回退 bootstrap）→
-  `lift-nested.py` → Zig/wasi-sdk clang → `.wasm`；可用 `--run`。
-- `scripts/lift-nested.py`：把 cgen 的 GNU 嵌套函数 `_qb` 提升为文件级
-  `_qN`，使 clang/Zig 可编译 HOF 代码；这是 W2.5 的临时桥。
+- `scripts/build-wasm.sh`：`wd c`（回退 bootstrap）→ Zig/wasi-sdk clang
+  → `.wasm`；当前 cgen 已顶层化，不再调用 Python lifter（旧编译器才回退）。
+- `scripts/lift-nested.py`：旧 cgen 的 GNU 嵌套函数 `_qb` 文本提升桥；
+  仅作为 stale compiler 的兼容回退保留。
+- `whisperc/compiler.all.ws`：cgen 把 quote/HOF body 发射为文件级
+  `static void _qN(void)`，wrapper 用局部 `_qfn` 函数指针；不再生成
+  GNU 嵌套函数。clang/macOS/wasm32-wasi 可直接编译。
 - `tests/security/wasm_file.ws` 等：WASI preopen/负向安全用例。
 - `scripts/wd-c-gate.sh`：C-1..C-5，验证 `wd c` 不产 exe、与 bootstrap
   逐字节一致、不调用 cc、`wd build` 不回归、usage 列出 c；已进 CI。
@@ -37,8 +40,12 @@
   stderr 便于定位启动失败。
 - `whisper_test/run_core.sh`：C 链的 `>` / `<` 输出是 `#t`/`#f`，
   修正 test 7/8 的错误期望；本地 C-emission 22/22。
-- `tests/cgen_toplevel_preregistered.md`：W2.5（cgen 顶层化）G-1..G-8
-  判据已预注册；代码未开始。
+- `tests/cgen_toplevel_preregistered.md`：W2.5 G-1..G-8；cgen 已实现，
+  fixedpoint/seed 验证中。
+- 测试夹具跨平台修正（非运行时）：`-lws2_32` 只在 Windows 加；
+  `@10` raw newline 期望值按 POSIX/Windows 区分。
+- 本地：integration 123/123、cargo 467/0、syntax 27/0、stdlib 67/0；
+  wasm conformance 26/0；journal 10k hash 不变。
 
 ### 实测
 
