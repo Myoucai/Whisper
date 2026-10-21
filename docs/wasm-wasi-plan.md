@@ -38,6 +38,8 @@
   **拒绝含 symlink 的 preopen**（裸 iwasm 会跟随 symlink 逃逸）。
 - journal 10k 基线：list 0.76s vs native 0.24s，search 0.70s vs 0.19s，
   输出 SHA256 一致（WAMR 解释执行，未 AOT）。
+- CI：`.github/workflows/wasm.yml` 已加（Zig 0.14.1 + WAMR 2.4.5 pin），
+  跑 hello、安全门禁、wrun 门禁；首次远端运行待确认。
 - 未完成：未知 host import、read-only preopen、`-t wasm` CLI、W2.5。
 
 ---
@@ -362,7 +364,8 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
       （S-1/S-3/S-5/S-6/S-12）。
 - [x] `@5`/`@10`/`ffi-*`/`listen`/`serve-concurrent` 显式 unsupported
       （S-5/S-12/S-13/S-14/S-15/S-16）。
-- [ ] CI 有 `wasm` job，工具链 pin，不阻塞现有门禁。
+- [x] CI 有 `wasm` job，工具链 pin，不阻塞现有门禁
+      （`.github/workflows/wasm.yml`；首次远端运行待确认）。
 - [x] README/spec/security-model/stdlib/tutorial 与实现一致（持续维护）。
 - [x] 性能基线记录在案（journal 10k）——已记录：list 0.76s vs native 0.24s，
       search 0.70s vs 0.19s（输出逐字节一致）。

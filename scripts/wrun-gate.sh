@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
-# Gate for wrun (host policy launcher). W-1..W-6.
+# Gate for wrun (host policy launcher). W-1..W-7.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT" || exit 1
-export PATH="/mingw64/bin:/usr/bin:/c/msys64/clang64/bin:$PATH"
-export WRUN_IWASM="${WRUN_IWASM:-$ROOT/target/toolchain/wamr/iwasm.exe}"
+for d in /mingw64/bin /usr/bin /c/msys64/clang64/bin; do
+    [ -d "$d" ] && PATH="$d:$PATH"
+done
+export PATH
+if [ -z "${WRUN_IWASM:-}" ]; then
+    for r in "$ROOT/target/toolchain/wamr/iwasm" "$ROOT/target/toolchain/wamr/iwasm.exe" iwasm; do
+        if [ -x "$r" ] || command -v "$r" >/dev/null 2>&1; then WRUN_IWASM="$r"; break; fi
+    done
+fi
+export WRUN_IWASM
+[ -n "$WRUN_IWASM" ] || { echo "wrun-gate: no iwasm; set WRUN_IWASM" >&2; exit 1; }
 TMP="$ROOT/target/wrun-gate"
 rm -rf "$TMP"; mkdir -p "$TMP/data"
 PASS=0; FAIL=0

@@ -1,0 +1,54 @@
+name: WASM (zero-Rust runtime)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  ZIG_VERSION: "0.14.1"
+  WAMR_VERSION: "2.4.5"
+
+jobs:
+  wasm:
+    name: WASM M1 + security gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build CLI (C emission fallback)
+        run: cargo build -p whisper-cli
+
+      - name: Install Zig (pinned)
+        run: |
+          curl -fL "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz" -o zig.tar.xz
+          tar -xJf zig.tar.xz
+          echo "$PWD/zig-x86_64-linux-${ZIG_VERSION}" >> "$GITHUB_PATH"
+
+      - name: Install WAMR iwasm (pinned, C runtime)
+        run: |
+          curl -fL "https://github.com/bytecodealliance/wasm-micro-runtime/releases/download/WAMR-${WAMR_VERSION}/iwasm-${WAMR_VERSION}-x86_64-ubuntu-22.04.tar.gz" -o iwasm.tar.gz
+          mkdir -p wamr
+          tar -xzf iwasm.tar.gz -C wamr
+          IWASM="$(find "$PWD/wamr" -maxdepth 2 -type f -name iwasm | head -1)"
+          test -n "$IWASM"
+          echo "WASM_RUNTIME=$IWASM" >> "$GITHUB_ENV"
+          echo "WRUN_IWASM=$IWASM" >> "$GITHUB_ENV"
+
+      - name: Toolchain preflight
+        run: bash scripts/wasm-preflight.sh --strict
+
+      - name: Hello end-to-end
+        run: |
+          bash scripts/build-wasm.sh docs/examples/hello.ws target/wasm-hello.wasm
+          "$WASM_RUNTIME" target/wasm-hello.wasm
+
+      - name: WASI security gate
+        run: bash scripts/wasm-security-gate.sh
+
+      - name: wrun policy gate
+        run: bash scripts/wrun-gate.sh

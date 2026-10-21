@@ -1,20 +1,37 @@
 #!/usr/bin/env bash
 # WASI negative/positive security gate (W-5/W-6/W-7 subset).
 #
-# Requires: target/wd/wd (wd c), Zig, WAMR iwasm.
+# Requires: wd c or whisper bootstrap, Zig, WAMR iwasm, Python 3.
 #   bash scripts/wasm-security-gate.sh
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT" || exit 1
-export PATH="/mingw64/bin:/usr/bin:/c/msys64/clang64/bin:$PATH"
-RT="${WASM_RUNTIME:-$ROOT/target/toolchain/wamr/iwasm.exe}"
-[ -f "$RT" ] || { echo "wasm-security-gate: missing $RT" >&2; exit 1; }
+for d in /mingw64/bin /usr/bin /c/msys64/clang64/bin; do
+    [ -d "$d" ] && PATH="$d:$PATH"
+done
+export PATH
+if [ -z "${WASM_RUNTIME:-}" ]; then
+    for r in "$ROOT/target/toolchain/wamr/iwasm" "$ROOT/target/toolchain/wamr/iwasm.exe" iwasm; do
+        if [ -x "$r" ] || command -v "$r" >/dev/null 2>&1; then WASM_RUNTIME="$r"; break; fi
+    done
+fi
+RT="${WASM_RUNTIME:-}"
+[ -n "$RT" ] || { echo "wasm-security-gate: no iwasm; set WASM_RUNTIME" >&2; exit 1; }
+[ -f "$RT" ] || RT="$(command -v "$RT" || true)"
+[ -n "$RT" ] || { echo "wasm-security-gate: missing iwasm" >&2; exit 1; }
 TMP="$ROOT/target/wasm-security"
 rm -rf "$TMP"; mkdir -p "$TMP/data"
 PASS=0; FAIL=0
 ok()  { PASS=$((PASS+1)); printf '  %-6s ✅ %s\n' "$1" "$2"; }
 bad() { FAIL=$((FAIL+1)); printf '  %-6s ❌ %s\n' "$1" "$2"; }
 build() { bash scripts/build-wasm.sh "$1" "$2" >/dev/null 2>"$TMP/build.err"; }
+hostpath() {
+    if command -v cygpath >/dev/null 2>&1; then
+        cygpath -w "$1"
+    else
+        ( cd "$1" && pwd )
+    fi
+}
 
 # S-1: no preopen -> file operations denied (write -1, read 0)
 if build tests/security/wasm_file.ws "$TMP/file.wasm" \
@@ -25,7 +42,7 @@ else
     bad S-1 "无 preopen 未拒绝"; cat "$TMP/file-no-dir.out" 2>/dev/null
 fi
 
-HOSTDIR="$(cd "$TMP/data" && pwd -W)"
+HOSTDIR="$(hostpath "$TMP/data")"
 # S-2: preopen -> exact confined access
 if build tests/security/wasm_file.ws "$TMP/file2.wasm" \
    && "$RT" --map-dir="/data::$HOSTDIR" "$TMP/file2.wasm" >"$TMP/file-dir.out" 2>"$TMP/file-dir.err" \
@@ -109,9 +126,19 @@ else
 fi
 
 # S-17: wrun refuses a preopen tree containing symlinks (WAMR follows them)
-SEC_WIN="$(cygpath -w "$TMP/secret.txt")"
-LINK_WIN="$(cygpath -w "$TMP/data/link.txt")"
-if python -c "import os; os.symlink(r'''$SEC_WIN''', r'''$LINK_WIN''')" 2>/dev/null; then
+PY="${PYTHON:-}"
+if [ -z "$PY" ]; then
+    for p in python3 python; do command -v "$p" >/dev/null 2>&1 && { PY="$p"; break; }; done
+fi
+[ -n "$PY" ] || { echo "wasm-security-gate: python3/python required for S-17" >&2; exit 1; }
+if command -v cygpath >/dev/null 2>&1; then
+    SEC_PATH="$(cygpath -w "$TMP/secret.txt")"
+    LINK_PATH="$(cygpath -w "$TMP/data/link.txt")"
+else
+    SEC_PATH="$TMP/secret.txt"
+    LINK_PATH="$TMP/data/link.txt"
+fi
+if "$PY" -c "import os; os.symlink(r'''$SEC_PATH''', r'''$LINK_PATH''')" 2>/dev/null; then
     if bash scripts/wrun.sh --iwasm "$RT" --dir "/data::$TMP/data" "$TMP/dir.wasm" \
          >"$TMP/link.out" 2>"$TMP/link.err"; then
         bad S-17 "wrun 接受了含 symlink 的 preopen"

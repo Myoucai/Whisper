@@ -56,12 +56,17 @@ fi
 
 echo "== 零 Rust WASM runtime =="
 found=""
-for r in iwasm wasm3; do
-    if command -v "$r" >/dev/null 2>&1; then
-        found="$r: $("$r" --version 2>/dev/null | head -1)"
-        break
-    fi
-done
+if [ -n "${WASM_RUNTIME:-}" ] && [ -x "${WASM_RUNTIME}" ]; then
+    found="${WASM_RUNTIME}: $("${WASM_RUNTIME}" --version 2>/dev/null | head -1)"
+fi
+if [ -z "$found" ]; then
+    for r in iwasm wasm3; do
+        if command -v "$r" >/dev/null 2>&1; then
+            found="$r: $("$r" --version 2>/dev/null | head -1)"
+            break
+        fi
+    done
+fi
 if [ -n "$found" ]; then
     ok runtime "$found（C 实现）"
 elif command -v wasm2c >/dev/null 2>&1; then

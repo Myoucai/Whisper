@@ -27,6 +27,8 @@
 - `scripts/wrun.sh` + `scripts/wrun-gate.sh`：宿主策略启动器；
   默认无 preopen/env，`--dir GUEST::HOST` / `--env NAME` 显式放行，
   `--http-allow`/`--exec`/`--ffi` 显式拒绝；W-1..W-7 7/7。
+- `.github/workflows/wasm.yml`：Zig 0.14.1 + WAMR 2.4.5 pin，
+  跑 hello、安全门禁、wrun 门禁（首次远端运行待确认）。
 
 ### 实测
 

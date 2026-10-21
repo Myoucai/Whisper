@@ -56,8 +56,13 @@ fi
 
 # clang/Zig do not support GNU nested functions. cgen still emits them for
 # quote bodies, so lift them to file-scope functions before compiling.
-PY="${PYTHON:-python}"
-command -v "$PY" >/dev/null 2>&1 || { echo "build-wasm: python not found (needed to lift nested functions)" >&2; exit 1; }
+PY="${PYTHON:-}"
+if [ -z "$PY" ]; then
+    for p in python3 python; do
+        command -v "$p" >/dev/null 2>&1 && { PY="$p"; break; }
+    done
+fi
+command -v "$PY" >/dev/null 2>&1 || { echo "build-wasm: python3/python not found (needed to lift nested functions)" >&2; exit 1; }
 "$PY" "$ROOT/scripts/lift-nested.py" "$C" "$LIFT"
 C="$LIFT"
 
