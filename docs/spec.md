@@ -508,7 +508,7 @@ stdout 设为二进制模式，两链的换行都是单个 LF。**这是行为�
 ## 18. 安全模型与执行目标（非语法，规范性说明）
 
 Whisper 的语法不规定安全边界；**执行路径决定能力模型**。完整审计与
-整改不变量见 [docs/security-model.md](security-model.md)。WASM 目标到 M2 部分（hello/core conformance/安全 19/19），但
+整改不变量见 [docs/security-model.md](security-model.md)。WASM 目标到 M2 部分（hello/core conformance/安全 20/20），但
 host HTTP 代理未完成，**尚不构成生产安全承诺**。
 判据见 [tests/wasm_preregistered.md](../tests/wasm_preregistered.md)。
 

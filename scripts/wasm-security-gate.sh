@@ -174,6 +174,16 @@ else
     bad S-18 "import 拒绝信息不明确"; cat "$TMP/import.err"
 fi
 
+# S-20: WAMR's WASI socket extension is not allowlisted
+if bash scripts/wrun.sh --iwasm "$RT" tests/security/sock_import.wasm \
+     >"$TMP/sock.out" 2>"$TMP/sock.err"; then
+    bad S-20 "wrun 接受了 sock_open import"
+elif grep -q 'non-allowlisted WASI import' "$TMP/sock.err"; then
+    ok S-20 "wrun 拒绝 wasi sock_open import"
+else
+    bad S-20 "sock import 拒绝信息不明确"; cat "$TMP/sock.err"
+fi
+
 # S-8: no Rust runtime / no Rust source changes
 if ! grep -v '^#' scripts/build-wasm.sh | grep -q 'wasmtime\|wasmer' \
    && [ -z "$(git diff --name-only -- crates 2>/dev/null)" ]; then

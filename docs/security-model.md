@@ -7,7 +7,7 @@ stdlib 文档里的安全承诺以本文为准。
 > **一句话结论**：当前只有 Rust VM 有 `CapabilityTable` 的**框架**，但
 > `read-file`/`write-file`/`getenv`/`ffi-*` 等 ambient opcode 绕过它；
 > 原生 C 产物完全没有语言级授权。**WASM/WASI 是已选定的原生安全目标**，
-> 见 `docs/wasm-wasi-plan.md`。WASM 已到 M2 部分（安全门禁 19/19），
+> 见 `docs/wasm-wasi-plan.md`。WASM 已到 M2 部分（安全门禁 20/20），
 > 但 host HTTP 代理未完成，**尚不能作为生产边界**。
 
 ---
@@ -131,6 +131,7 @@ stdlib 文档里的安全承诺以本文为准。
 | F-8 | C 产物无 OS 沙箱、无 CFI/加固 | **High** | 内存破坏可越权 |
 | F-9 | WAMR preopen 会跟随 symlink 逃逸到目录外 | **High** | 裸 `iwasm --map-dir` 不可用于不可信代码；`wrun` 拒绝含 symlink 的 preopen（S-17） |
 | F-10 | 未知/非 WASI import 只会等到调用时才失败 | **Medium** | `wrun` 加载前检查 import 表，只允许 `wasi_snapshot_preview1`（S-18） |
+| F-11 | WAMR 的 WASI socket 扩展也挂在 `wasi_snapshot_preview1` 下 | **High** | import 检查同时限制函数名，`sock_*` 不在白名单（S-20） |
 
 ---
 
@@ -156,8 +157,8 @@ stdlib 文档里的安全承诺以本文为准。
 - **I-9 可审计**：策略、拒绝原因、允许的 host 调用可记录；默认不记录敏感内容。
 - **I-10 显式 unsupported**：WASM 目标不支持的词必须编译期或运行期显式报错，
   不能静默变成 no-op。
-- **I-11 import 白名单**：guest 只能 import `wasi_snapshot_preview1`；
-  未知模块/字段在加载前拒绝，不能等到调用时才失败。
+- **I-11 import 白名单**：guest 只能 import `wasi_snapshot_preview1` 的
+  显式函数白名单；未知模块/函数（含 WAMR `sock_*` 扩展）在加载前拒绝。
 - **I-12 只读 preopen**：`--dir-ro` 用临时副本快照，guest 写入只落快照；
   宿主树不暴露，退出时删除。它提供“宿主不被修改”的保证，不是 EROFS。
 

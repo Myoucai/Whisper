@@ -8,6 +8,22 @@ only when the import is called.
 """
 import sys
 
+# Preview 1 functions the Whisper C runtime is allowed to import.  Notably
+# absent: sock_* (WAMR socket extension), path_symlink/path_link, proc_raise.
+WASI_ALLOWED = {
+    "args_get", "args_sizes_get",
+    "environ_get", "environ_sizes_get",
+    "clock_res_get", "clock_time_get",
+    "fd_advise", "fd_allocate", "fd_close", "fd_datasync",
+    "fd_fdstat_get", "fd_fdstat_set_flags", "fd_filestat_get",
+    "fd_filestat_set_size", "fd_filestat_set_times",
+    "fd_pread", "fd_prestat_get", "fd_prestat_dir_name", "fd_pwrite",
+    "fd_read", "fd_readdir", "fd_seek", "fd_sync", "fd_tell", "fd_write",
+    "path_create_directory", "path_filestat_get", "path_filestat_set_times",
+    "path_open", "path_remove_directory", "path_rename", "path_unlink_file",
+    "poll_oneoff", "proc_exit", "random_get", "sched_yield",
+}
+
 
 class Reader:
     def __init__(self, data):
@@ -100,6 +116,11 @@ def main():
     if bad:
         for mod, field, _ in bad:
             print(f"wasm-imports: refusing non-WASI import {mod}.{field}", file=sys.stderr)
+        return 1
+    bad = [x for x in imports if x[2] != 0 or x[1] not in WASI_ALLOWED]
+    if bad:
+        for mod, field, _ in bad:
+            print(f"wasm-imports: refusing non-allowlisted WASI import {mod}.{field}", file=sys.stderr)
         return 1
     return 0
 

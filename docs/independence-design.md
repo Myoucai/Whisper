@@ -487,7 +487,7 @@ trusted-only。
 
 **状态（2026-10-21）**：M1 打通——hello 输出正确；core conformance
 26/27 通过（1 个原语义 skip）；preopen 文件/目录正负各例通过；
-安全门禁 19/19；journal 10k list 0.63s vs native 0.24s（输出一致）。
+安全门禁 20/20；journal 10k list 0.63s vs native 0.24s（输出一致）。
 cgen 顶层化（W2.5）已实现，clang/macOS 不再需要 GNU 嵌套函数；
 fixedpoint 已验证 `gen2 == gen3`；seed 已用新编译器重建并通过
 `42 .` 冒烟。零 Rust `wd wasm` 已落地；未知 import 与 `--dir-ro`

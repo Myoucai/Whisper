@@ -38,8 +38,8 @@
   `--http-allow`/`--exec`/`--ffi` 显式拒绝；W-1..W-7 7/7。
   新增 `--dir-ro GUEST::HOST`：复制到临时快照，guest 写入丢弃，
   宿主树不变（S-19）。
-  新增 `scripts/wasm-imports.py`：加载前只允许 `wasi_snapshot_preview1`，
-  拒绝 `env.*` 等未知 import（S-18）。
+  新增 `scripts/wasm-imports.py`：加载前只允许 `wasi_snapshot_preview1`
+  的显式函数白名单，拒绝 `env.*` 与 WAMR `sock_*`（S-18/S-20）。
 - `.github/workflows/wasm.yml`：Zig 0.14.1 + WAMR 2.4.5 pin，
   跑 hello、安全门禁、wrun 门禁（首次远端运行待确认）。
 - CI selfhost：`compiler_seed.c` 是编译器而非解释器，去掉错误的

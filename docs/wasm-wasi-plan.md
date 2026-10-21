@@ -27,7 +27,7 @@
   用例覆盖）。无 preopen 时写入返回 `-1`、读取为空。
 - 硬阻塞已解决：cgen 现直接发射文件级 `_qN()` + 局部 `_qfn`，不再生成
   GNU 嵌套函数；`scripts/lift-nested.py` 仅作为 stale compiler 回退。
-- 安全门禁 `scripts/wasm-security-gate.sh`：**S-1..S-19 19/19**（文件
+- 安全门禁 `scripts/wasm-security-gate.sh`：**S-1..S-20 20/20**（文件
   默认拒绝/preopen、目录操作、env allowlist、`@2`/`@5`/`@6`/`@10`/
   `try`/`listen`/`serve-concurrent` 显式失败、路径逃逸拒绝、
   FFI 构建期失败、symlink preopen 拒绝、无 Rust 运行时）。
@@ -251,8 +251,9 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
 **preopen symlink 检查**：WAMR 会跟随 symlink 逃逸；`wrun` 现在拒绝
 含 symlink 的 preopen（S-17）。裸 `iwasm --map-dir` 不提供此保护。
 **import 检查**：`wrun` 在加载前用 `scripts/wasm-imports.py` 只允许
-`wasi_snapshot_preview1`；`env.*` 等未知 import 直接拒绝（S-18），
-不依赖运行时“调用时才失败”。wrun 需要 python3（host 工具，不是 runtime）。
+`wasi_snapshot_preview1` 的显式函数白名单；`env.*` 与 WAMR `sock_*`
+扩展直接拒绝（S-18/S-20），不依赖运行时“调用时才失败”。wrun 需要
+python3（host 工具，不是 runtime）。
 
 **验收**：无 policy 时 `read-file`/`getenv`/`@2`/`@5`/`ffi-*` 全拒绝；
 有 policy 时只允许指定范围；错误信息可定位（不泄漏未授权路径）。
@@ -321,7 +322,7 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
 | M0 | 文档/安全模型/判据（本次） | 1–2 天 | ✅ 已落地 |
 | M1 | 工具链 + hello.wasm + preflight | 2–3 天 | ✅ hello 全链路通过 |
 | M2 | 运行时分层 + core conformance | 1–2 周 | ✅ runtime WASI 守卫 + 26/27；cgen 顶层化完成 |
-| M3 | preopen/policy + 负向安全测试 | 1 周 | 🟡 S-1..S-19 通过；host 代理待做 |
+| M3 | preopen/policy + 负向安全测试 | 1 周 | 🟡 S-1..S-20 通过；host 代理待做 |
 | M4 | journal/文件应用 + CI wasm job | 3–5 天 | ✅ journal 10k + wasm workflow；首次远端运行待确认 |
 | M5 | HTTP 代理/exec host（可选） | 1–2 周 | ❌ |
 | M6 | 性能/发布/评审 | 3–5 天 | 🟡 journal 10k 基线已记录；发布/评审待做 |
@@ -376,8 +377,8 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
       `../` 与绝对路径被拒（S-2/S-9/S-10/S-11）；`listdir` 尚未单列门禁。
 - [x] 无 policy 时，文件/env/network/exec/ffi 全部拒绝；有负向测试
       （S-1/S-3/S-5/S-6/S-12）。
-- [x] import 白名单：只允许 `wasi_snapshot_preview1`，未知 import
-      加载前拒绝（S-18）。
+- [x] import 白名单：只允许 `wasi_snapshot_preview1` 的显式函数白名单；
+      未知 import 与 `sock_*` 加载前拒绝（S-18/S-20）。
 - [x] `@5`/`@10`/`ffi-*`/`listen`/`serve-concurrent` 显式 unsupported
       （S-5/S-12/S-13/S-14/S-15/S-16）。
 - [x] CI 有 `wasm` job，工具链 pin，不阻塞现有门禁
