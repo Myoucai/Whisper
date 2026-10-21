@@ -27,7 +27,7 @@
   用例覆盖）。无 preopen 时写入返回 `-1`、读取为空。
 - 硬阻塞已解决：cgen 现直接发射文件级 `_qN()` + 局部 `_qfn`，不再生成
   GNU 嵌套函数；`scripts/lift-nested.py` 仅作为 stale compiler 回退。
-- 安全门禁 `scripts/wasm-security-gate.sh`：**S-1..S-18 18/18**（文件
+- 安全门禁 `scripts/wasm-security-gate.sh`：**S-1..S-19 19/19**（文件
   默认拒绝/preopen、目录操作、env allowlist、`@2`/`@5`/`@6`/`@10`/
   `try`/`listen`/`serve-concurrent` 显式失败、路径逃逸拒绝、
   FFI 构建期失败、symlink preopen 拒绝、无 Rust 运行时）。
@@ -38,8 +38,8 @@
   输出 SHA256 一致（WAMR 解释执行，未 AOT）。
 - CI：`.github/workflows/wasm.yml` 已加（Zig 0.14.1 + WAMR 2.4.5 pin），
   跑 hello、安全门禁、wrun 门禁；首次远端运行待确认。
-- 未完成：host HTTP 代理、read-only preopen；`-t wasm` Rust CLI 不做，
-  零 Rust 入口是 `wd wasm`。未知 import 已由 wrun 启动前拒绝。
+- 未完成：host HTTP 代理；`-t wasm` Rust CLI 不做，零 Rust 入口是
+  `wd wasm`。未知 import 已由 wrun 拒绝；`--dir-ro` 用副本快照保护宿主。
 
 ---
 
@@ -237,7 +237,10 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
 
 - 默认：无 dir、无 env、无 network、无 exec、无 ffi。
 - `--dir GUEST::HOST` 映射到 WASI preopen；**v1 只有 rw**（WAMR
-  没有 read-only preopen 开关），只读需求要靠 OS 账户/容器。
+  没有 read-only preopen 开关）。
+- `--dir-ro GUEST::HOST` 把 HOST 复制到 `target/wrun-ro.*` 快照再 preopen；
+  guest 写入只落在快照，退出时删除，宿主树不变（S-19）。这不是 EROFS：
+  guest 可能看到写入成功，但不会持久化到宿主。
 - `--env NAME` 白名单；只透传显式列出的变量。
 - `--http-allow`/`--exec`/`--ffi` **显式拒绝**（“not implemented in
   wasm v1”），不静默忽略；host 代理/exec 留到 Phase 4。
@@ -318,7 +321,7 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
 | M0 | 文档/安全模型/判据（本次） | 1–2 天 | ✅ 已落地 |
 | M1 | 工具链 + hello.wasm + preflight | 2–3 天 | ✅ hello 全链路通过 |
 | M2 | 运行时分层 + core conformance | 1–2 周 | ✅ runtime WASI 守卫 + 26/27；cgen 顶层化完成 |
-| M3 | preopen/policy + 负向安全测试 | 1 周 | 🟡 S-1..S-18 通过；host 代理/ro preopen 待做 |
+| M3 | preopen/policy + 负向安全测试 | 1 周 | 🟡 S-1..S-19 通过；host 代理待做 |
 | M4 | journal/文件应用 + CI wasm job | 3–5 天 | ✅ journal 10k + wasm workflow；首次远端运行待确认 |
 | M5 | HTTP 代理/exec host（可选） | 1–2 周 | ❌ |
 | M6 | 性能/发布/评审 | 3–5 天 | 🟡 journal 10k 基线已记录；发布/评审待做 |
@@ -383,7 +386,8 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
 - [x] 性能基线记录在案（journal 10k）——已记录：list 0.63s vs native 0.24s，
       search 0.70s vs 0.19s（输出逐字节一致）。
 - [x] 零 Rust `wd wasm` 入口可用（W-1..W-4 4/4）。
-- [ ] host HTTP 代理 / read-only preopen。
+- [x] `--dir-ro` 副本快照：guest 写入只落在临时副本，宿主树不变（S-19）。
+- [ ] host HTTP 代理。
 - [x] 不改 Rust 运行时/库；仅测试夹具跨平台修正（已记录）。
 
 ---

@@ -266,7 +266,7 @@ Whisper 的安全承诺**按执行路径分档**，不是所有产物都等价�
 | VM 解释 | `whisper run` | ⚠️ 部分 | `@n` 有 `CapabilityTable`，但 `read-file`/`write-file`/`getenv`/`ffi-*` 等 ambient opcode 目前可绕过；**暂不作为不可信代码边界** |
 | bundle | `-t bundle` | ⚠️ 部分 | 内含 Rust VM，同上；体积也更大 |
 | C / 原生 | `-t c`/`-t c2`/`-t exe`/`-t native`/`wd` | ❌ 无 | 直接使用 OS 用户权限；**trusted-only**，不要用来跑不可信源码 |
-| WASM | `wd wasm` / `bash scripts/build-wasm.sh` | 🟡 M2 部分 | core 26/27、安全门禁 18/18、symlink/import 拒绝已通；host HTTP 代理/read-only preopen 未完成，**尚不可用于生产** |
+| WASM | `wd wasm` / `bash scripts/build-wasm.sh` | 🟡 M2 部分 | core 26/27、安全门禁 19/19、symlink/import/ro 已通；host HTTP 代理未完成，**尚不可用于生产** |
 
 当前已确认的缺口（2026-10-20 实测）：
 
@@ -291,6 +291,9 @@ bash scripts/wrun.sh target/hello.wasm     # 默认无 preopen/env
 
 # 显式给 /data 预打开目录（v1 为 rw；--env NAME 逐个放行）
 bash scripts/wrun.sh --dir /data::target/data app.wasm
+
+# 只读视图：复制到临时快照，guest 写入不落宿主
+bash scripts/wrun.sh --dir-ro /data::target/data app.wasm
 ```
 
 > **不要用裸 `iwasm --map-dir` 跑不可信代码**：WAMR 会跟随 preopen 里的
@@ -379,7 +382,7 @@ append 模式已消除（`range-to` 10 万元素 83s → 19ms）。
 | 循环控制 (leave，编译期跳转回填) | ✅ |
 | 静态类型推导（strict 默认：类型错误致命，`--no-strict-types` 降级） | ✅ |
 | 能力沙箱 | ⚠️ VM 的 `@n` 部分；ambient/FFI 待收口；C 链无 |
-| WASM/WASI 安全执行目标 | 🟡 M2 部分（core 26/27；`wd wasm`；安全 18/18） |
+| WASM/WASI 安全执行目标 | 🟡 M2 部分（core 26/27；`wd wasm`；安全 19/19） |
 | 置信度系统 + 概率选择 | ✅ |
 | .wbin 二进制格式 | ✅ |
 | 包管理器 | ✅ |
@@ -460,7 +463,7 @@ bash scripts/typecheck-gate.sh                   # 类型检查假阳性棘轮�
 bash scripts/wd-cache-gate.sh                    # wd 内容寻址缓存 C-1..C-6（8 条断言）
 bash scripts/wd-c-gate.sh                        # wd c 零 Rust C 发射（C-1..C-5）
 bash scripts/wd-wasm-gate.sh                     # wd wasm 零 Rust C→wasm（W-1..W-4）
-bash scripts/wasm-security-gate.sh               # WASI 安全 S-1..S-18（需 Zig/WAMR）
+bash scripts/wasm-security-gate.sh               # WASI 安全 S-1..S-19（需 Zig/WAMR）
 bash scripts/wrun-gate.sh                        # wrun 策略 W-1..W-7（需 WAMR）
 bash scripts/build-wfmt.sh && bash scripts/fmt-gate.sh  # Whisper 写的 fmt（F-1..F-6）
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验

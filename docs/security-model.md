@@ -7,8 +7,8 @@ stdlib 文档里的安全承诺以本文为准。
 > **一句话结论**：当前只有 Rust VM 有 `CapabilityTable` 的**框架**，但
 > `read-file`/`write-file`/`getenv`/`ffi-*` 等 ambient opcode 绕过它；
 > 原生 C 产物完全没有语言级授权。**WASM/WASI 是已选定的原生安全目标**，
-> 见 `docs/wasm-wasi-plan.md`。WASM 已到 M2 部分（安全门禁 18/18），
-> 但 host HTTP 代理/read-only preopen 未完成，**尚不能作为生产边界**。
+> 见 `docs/wasm-wasi-plan.md`。WASM 已到 M2 部分（安全门禁 19/19），
+> 但 host HTTP 代理未完成，**尚不能作为生产边界**。
 
 ---
 
@@ -36,7 +36,7 @@ stdlib 文档里的安全承诺以本文为准。
 | `-t bundle` | Rust VM + `.wbin` 单文件 | 同上 | **否**：同上；且内含完整 VM |
 | `-t c` / `-t c2` / `-t exe` / `-t native` | C → 原生 exe | **无** | **否**：只有 OS 用户权限 |
 | `wd build/run` | C → 原生 exe | **无**；构建期还需 gcc/执行 | **否**：构建/运行都不是沙箱 |
-| wasm M2（`wd wasm` / `scripts/build-wasm.sh`） | `.wasm` + WAMR | WASI preopen + import allowlist | **尚未**：文件/import 负向通过；host 代理/ro preopen 未完成 |
+| wasm M2（`wd wasm` / `scripts/build-wasm.sh`） | `.wasm` + WAMR | WASI preopen + import allowlist + ro snapshot | **尚未**：文件/import/ro 负向通过；host 代理未完成 |
 
 **原生产物是 trusted-only**：它适合“自己写的、已审阅的程序”，不适合
 “用户上传的、LLM 生成的、来源不明的程序”。在 WASM v1 的负向门禁完成前，
@@ -158,6 +158,8 @@ stdlib 文档里的安全承诺以本文为准。
   不能静默变成 no-op。
 - **I-11 import 白名单**：guest 只能 import `wasi_snapshot_preview1`；
   未知模块/字段在加载前拒绝，不能等到调用时才失败。
+- **I-12 只读 preopen**：`--dir-ro` 用临时副本快照，guest 写入只落快照；
+  宿主树不暴露，退出时删除。它提供“宿主不被修改”的保证，不是 EROFS。
 
 ---
 

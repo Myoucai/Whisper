@@ -52,6 +52,19 @@ else
     bad S-2 "preopen 读写失败"; cat "$TMP/file-dir.out" 2>/dev/null
 fi
 
+# S-19: --dir-ro snapshots the host tree; guest writes are discarded
+mkdir -p "$TMP/rodata"
+printf 'HOST' > "$TMP/rodata/host.txt"
+if bash scripts/wrun.sh --iwasm "$RT" --dir-ro "/data::$TMP/rodata" "$TMP/file2.wasm" \
+     >"$TMP/ro.out" 2>"$TMP/ro.err" \
+   && [ "$(tr -d '\r' < "$TMP/ro.out" | tr '\n' '|')" = "10|10|" ] \
+   && [ ! -e "$TMP/rodata/wsconf.txt" ] \
+   && [ "$(cat "$TMP/rodata/host.txt")" = HOST ]; then
+    ok S-19 "dir-ro 写只落在快照，宿主不变"
+else
+    bad S-19 "dir-ro 写逸出或失败"; cat "$TMP/ro.err" 2>/dev/null
+fi
+
 # S-3: env not passed -> empty
 if build tests/security/wasm_env.ws "$TMP/env.wasm" \
    && ( cd "$TMP" && "$RT" env.wasm ) >"$TMP/env-none.out" 2>/dev/null \

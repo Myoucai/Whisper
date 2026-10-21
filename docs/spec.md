@@ -508,8 +508,8 @@ stdout 设为二进制模式，两链的换行都是单个 LF。**这是行为�
 ## 18. 安全模型与执行目标（非语法，规范性说明）
 
 Whisper 的语法不规定安全边界；**执行路径决定能力模型**。完整审计与
-整改不变量见 [docs/security-model.md](security-model.md)。WASM 目标到 M2 部分（hello/core conformance/安全 18/18），但
-host HTTP 代理与 read-only preopen 未完成，**尚不构成生产安全承诺**。
+整改不变量见 [docs/security-model.md](security-model.md)。WASM 目标到 M2 部分（hello/core conformance/安全 19/19），但
+host HTTP 代理未完成，**尚不构成生产安全承诺**。
 判据见 [tests/wasm_preregistered.md](../tests/wasm_preregistered.md)。
 
 ### 18.1 当前执行路径
@@ -520,7 +520,7 @@ host HTTP 代理与 read-only preopen 未完成，**尚不构成生产安全承�
 | `-t bundle` | 同上，内含 Rust VM | 否（暂） |
 | `-t c`/`-t c2`/`-t exe`/`-t native` | 无语言级授权，OS 用户权限 | **否** |
 | `wd build/run` | 无语言级授权；构建期调 gcc/执行产物 | **否** |
-| wasm M2（`wd wasm` / `scripts/build-wasm.sh`） | WASI preopen + import allowlist；host 代理/ro preopen 未完成 | **尚未**（host 代理/ro 未完） |
+| wasm M2（`wd wasm` / `scripts/build-wasm.sh`） | WASI preopen + import allowlist + ro 快照；host 代理未完成 | **尚未**（host 代理未完） |
 
 ### 18.2 规范性要求（未来 WASM profile）
 

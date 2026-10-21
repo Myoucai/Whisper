@@ -149,7 +149,7 @@ wasm conformance: pass=26 fail=0 skip=1
   `24_nested_structures`/`25_import`/`s4_both_strlist`），现在直接由
   cgen 顶层函数编译，不依赖 `lift-nested.py`。
 
-**W-5/W-6/W-7（S-1..S-18，18/18）**：
+**W-5/W-6/W-7（S-1..S-19，19/19）**：
 
 ```bash
 bash scripts/wasm-security-gate.sh
@@ -170,17 +170,19 @@ bash scripts/wasm-security-gate.sh
 # S-12 FFI：构建期失败（w_ffi_open 未定义）
 # S-17 wrun 拒绝含 symlink 的 preopen
 # S-18 wrun 拒绝非 WASI import（env.foo）
+# S-19 --dir-ro 写入只落快照，宿主不变
 # S-8 无 Rust 运行时；crates/ 无改动
 ```
 
-仍未覆盖：host HTTP 代理白名单、read-only preopen。
+仍未覆盖：host HTTP 代理白名单。
 `iwasm --map-dir` **会跟随 symlink 逃逸**；已由 `wrun` 拒绝含 symlink
-的 preopen（S-17），但裸 iwasm 不能用于不可信代码。不能因为 18/18
+的 preopen（S-17），但裸 iwasm 不能用于不可信代码。不能因为 19/19
 就宣称 WASM 已是生产安全边界。
 
 **宿主启动器**：`scripts/wrun.sh` 已落地，`scripts/wrun-gate.sh`
 W-1..W-7 7/7——默认无 preopen/env，`--dir`/`--env` 显式放行，
-`--http-allow`/`--exec`/`--ffi` 显式拒绝。v1 无 read-only preopen。
+`--http-allow`/`--exec`/`--ffi` 显式拒绝；`--dir-ro` 为快照只读视图
+（写入丢弃，宿主不变）。
 
 **W-8（通过约束检查）**：
 
@@ -206,6 +208,6 @@ W-1..W-7 7/7——默认无 preopen/env，`--dir`/`--env` 显式放行，
 
 M1 **打通**：`hello.ws → wd c → Zig cc → .wasm → iwasm`，
 核心 conformance 26/27（1 个原语义 skip；可运行子集 26/26）通过，
-文件 IO 在 preopen 下通过；安全门禁 S-1..S-18 18/18（含 symlink/import 拒绝）。
+文件 IO 在 preopen 下通过；安全门禁 S-1..S-19 19/19（含 symlink/import/ro 拒绝）。
 仍未完成：路径逃逸/FFI/未知 import 负向、W2.5（cgen 顶层化）、
 `-t wasm` CLI、性能基线。因此**还不能**把 WASM 宣称为生产安全边界。
