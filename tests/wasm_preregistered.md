@@ -151,7 +151,7 @@ wasm conformance: pass=26 fail=0 skip=1
   `lift-nested.py`；未 lift 时这些文件全部报
   `function definition is not allowed here`。
 
-**W-5/W-6/W-7（S-1..S-12，12/12）**：
+**W-5/W-6/W-7（S-1..S-17，17/17）**：
 
 ```bash
 bash scripts/wasm-security-gate.sh
@@ -162,15 +162,22 @@ bash scripts/wasm-security-gate.sh
 # S-5 @5 exec：显式 unsupported
 # S-6 @2 http：显式 unsupported
 # S-7 try：显式 unsupported
+# S-13 @10 exec-raw：显式 unsupported
+# S-14 @6 http-req：显式 unsupported
+# S-15 listen：显式 unsupported
+# S-16 serve-concurrent：显式 unsupported
 # S-9 preopen 外 ../ 与绝对路径：0/0
 # S-10 preopen 目录：mkdir=0 / write=2 / exists=1
 # S-11 无 preopen 目录：-1 / -1 / 0
 # S-12 FFI：构建期失败（w_ffi_open 未定义）
+# S-17 wrun 拒绝含 symlink 的 preopen
 # S-8 无 Rust 运行时；crates/ 无改动
 ```
 
-仍未覆盖：symlink 逃逸、未知 host import、host 代理白名单。
-这些是 W-5/W-6 的剩余项，不能因为 12/12 就宣称 WASM 已是安全边界。
+仍未覆盖：未知 host import、host 代理白名单。
+`iwasm --map-dir` **会跟随 symlink 逃逸**；已由 `wrun` 拒绝含 symlink
+的 preopen（S-17），但裸 iwasm 不能用于不可信代码。不能因为 17/17
+就宣称 WASM 已是安全边界。
 
 **宿主启动器**：`scripts/wrun.sh` 已落地，`scripts/wrun-gate.sh`
 W-1..W-7 7/7——默认无 preopen/env，`--dir`/`--env` 显式放行，
@@ -200,6 +207,6 @@ W-1..W-7 7/7——默认无 preopen/env，`--dir`/`--env` 显式放行，
 
 M1 **打通**：`hello.ws → wd c → Zig cc → .wasm → iwasm`，
 核心 conformance 26/27（1 个原语义 skip；可运行子集 26/26）通过，
-文件 IO 在 preopen 下通过；安全门禁 S-1..S-12 12/12。
+文件 IO 在 preopen 下通过；安全门禁 S-1..S-17 17/17（含 symlink 拒绝）。
 仍未完成：路径逃逸/FFI/未知 import 负向、W2.5（cgen 顶层化）、
 `-t wasm` CLI、性能基线。因此**还不能**把 WASM 宣称为生产安全边界。

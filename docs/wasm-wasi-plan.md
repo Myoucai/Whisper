@@ -29,15 +29,16 @@
   （`auto void _qb`），clang/Zig 不支持。已用
   `scripts/lift-nested.py` 做构建期提升（W2.5），全部 HOF 用例通过；
   永久修法仍是 cgen 直接发射顶层 `_qN()`。
-- 安全门禁 `scripts/wasm-security-gate.sh`：**S-1..S-12 12/12**（文件
-  默认拒绝/preopen、目录操作、env allowlist、`@2`/`@5`/`try` 显式失败、
-  路径逃逸拒绝、FFI 构建期失败、无 Rust 运行时）。
+- 安全门禁 `scripts/wasm-security-gate.sh`：**S-1..S-17 17/17**（文件
+  默认拒绝/preopen、目录操作、env allowlist、`@2`/`@5`/`@6`/`@10`/
+  `try`/`listen`/`serve-concurrent` 显式失败、路径逃逸拒绝、
+  FFI 构建期失败、symlink preopen 拒绝、无 Rust 运行时）。
 - 宿主启动器 `scripts/wrun.sh`：W-1..W-7 7/7；默认无 preopen/env，
-  `--dir`/`--env` 显式放行，`--http-allow`/`--exec`/`--ffi` 显式拒绝。
+  `--dir`/`--env` 显式放行，`--http-allow`/`--exec`/`--ffi` 显式拒绝；
+  **拒绝含 symlink 的 preopen**（裸 iwasm 会跟随 symlink 逃逸）。
 - journal 10k 基线：list 0.76s vs native 0.24s，search 0.70s vs 0.19s，
   输出 SHA256 一致（WAMR 解释执行，未 AOT）。
-- 未完成：路径逃逸/symlink、FFI 链接失败、未知 host import、
-  `-t wasm` CLI、W-9 性能基线。
+- 未完成：未知 host import、read-only preopen、`-t wasm` CLI、W2.5。
 
 ---
 
@@ -235,6 +236,8 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
 
 **状态（2026-10-21）**：`scripts/wrun.sh` + `scripts/wrun-gate.sh`
 （W-1..W-7 7/7）已落地；默认拒绝、preopen、env、unsupported 均实测。
+**preopen symlink 检查**：WAMR 会跟随 symlink 逃逸；`wrun` 现在拒绝
+含 symlink 的 preopen（S-17）。裸 `iwasm --map-dir` 不提供此保护。
 
 **验收**：无 policy 时 `read-file`/`getenv`/`@2`/`@5`/`ffi-*` 全拒绝；
 有 policy 时只允许指定范围；错误信息可定位（不泄漏未授权路径）。
@@ -357,8 +360,8 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
       `../` 与绝对路径被拒（S-2/S-9/S-10/S-11）；`listdir` 尚未单列门禁。
 - [x] 无 policy 时，文件/env/network/exec/ffi 全部拒绝；有负向测试
       （S-1/S-3/S-5/S-6/S-12）。
-- [ ] `@5`/`@10`/`ffi-*`/`listen`/`serve-concurrent` 显式 unsupported
-      （`@2/@3/@5/@10`、`try`、FFI 已验；listen/serve 待验）。
+- [x] `@5`/`@10`/`ffi-*`/`listen`/`serve-concurrent` 显式 unsupported
+      （S-5/S-12/S-13/S-14/S-15/S-16）。
 - [ ] CI 有 `wasm` job，工具链 pin，不阻塞现有门禁。
 - [x] README/spec/security-model/stdlib/tutorial 与实现一致（持续维护）。
 - [x] 性能基线记录在案（journal 10k）——已记录：list 0.76s vs native 0.24s，

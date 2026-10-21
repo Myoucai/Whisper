@@ -20,9 +20,10 @@
 - `scripts/wd-c-gate.sh`：C-1..C-5，验证 `wd c` 不产 exe、与 bootstrap
   逐字节一致、不调用 cc、`wd build` 不回归、usage 列出 c；已进 CI。
 - `scripts/wasm-security-gate.sh` + `tests/security/wasm_*.ws`：
-  S-1..S-12（无 preopen 拒绝、preopen 读写/目录、env allowlist、
-  `@2`/`@5`/`try` 显式失败、路径逃逸拒绝、FFI 构建期失败、
-  无 Rust 运行时），本机 12/12。
+  S-1..S-17（无 preopen 拒绝、preopen 读写/目录、env allowlist、
+  `@2`/`@5`/`@6`/`@10`/`try`/`listen`/`serve-concurrent` 显式失败、
+  路径逃逸拒绝、FFI 构建期失败、symlink preopen 拒绝、无 Rust
+  运行时），本机 17/17。
 - `scripts/wrun.sh` + `scripts/wrun-gate.sh`：宿主策略启动器；
   默认无 preopen/env，`--dir GUEST::HOST` / `--env NAME` 显式放行，
   `--http-allow`/`--exec`/`--ffi` 显式拒绝；W-1..W-7 7/7。

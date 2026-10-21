@@ -75,6 +75,9 @@ for d in "${DIRS[@]:-}"; do
     guest="${d%%::*}"
     host="${d#*::}"
     [ -d "$host" ] || die "no such preopen dir: $host"
+    command -v find >/dev/null 2>&1 || die "find is required for the preopen symlink check"
+    badlink="$(find "$host" -type l -print -quit 2>/dev/null || true)"
+    [ -z "$badlink" ] || die "preopen contains a symlink; refusing (escape risk): $badlink"
     host_win="$(cd "$host" && pwd -W 2>/dev/null || true)"
     [ -n "$host_win" ] || host_win="$(cd "$host" && pwd)"
     ARGS+=("--map-dir=$guest::$host_win")

@@ -487,8 +487,9 @@ trusted-only。
 
 **状态（2026-10-21）**：M1 打通——hello 输出正确；core conformance
 26/27 通过（1 个原语义 skip）；preopen 文件/目录正负各例通过；
-安全门禁 12/12；journal 10k list 0.76s vs native 0.24s（输出一致）。
-W-5/W-6 的 symlink/未知 import、`-t wasm` CLI、W2.5 永久顶层化未完成。
+安全门禁 17/17；journal 10k list 0.76s vs native 0.24s（输出一致）。
+W-5/W-6 的 symlink（已由 wrun 拒绝）/未知 import、`-t wasm` CLI、
+W2.5 永久顶层化未完成。
 
 ---
 

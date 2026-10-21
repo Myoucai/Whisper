@@ -292,6 +292,10 @@ bash scripts/wrun.sh target/hello.wasm     # 默认无 preopen/env
 bash scripts/wrun.sh --dir /data::target/data app.wasm
 ```
 
+> **不要用裸 `iwasm --map-dir` 跑不可信代码**：WAMR 会跟随 preopen 里的
+> symlink 逃逸到目录外。`wrun` 会拒绝含 symlink 的 preopen（S-17）；
+> 裸 iwasm 没有这层检查。
+
 工具链状态用 `bash scripts/wasm-preflight.sh` 检查（缺失只报告，
 不阻塞现有 CI）。
 
@@ -453,7 +457,7 @@ bash tools/opcode_coverage.sh                    # 101 项逐特性双跑（VM v
 bash scripts/typecheck-gate.sh                   # 类型检查假阳性棘轮（三语料 FP=0）
 bash scripts/wd-cache-gate.sh                    # wd 内容寻址缓存 C-1..C-6（8 条断言）
 bash scripts/wd-c-gate.sh                        # wd c 零 Rust C 发射（C-1..C-5）
-bash scripts/wasm-security-gate.sh               # WASI 安全 S-1..S-12（需 Zig/WAMR）
+bash scripts/wasm-security-gate.sh               # WASI 安全 S-1..S-17（需 Zig/WAMR）
 bash scripts/wrun-gate.sh                        # wrun 策略 W-1..W-7（需 WAMR）
 bash scripts/build-wfmt.sh && bash scripts/fmt-gate.sh  # Whisper 写的 fmt（F-1..F-6）
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验

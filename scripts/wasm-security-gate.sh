@@ -69,6 +69,10 @@ check_unsupported() {
 check_unsupported S-5 tests/security/wasm_exec.ws "capability @5 (exec) is unsupported"
 check_unsupported S-6 tests/security/wasm_http.ws "capability @2 (http-get) is unsupported"
 check_unsupported S-7 tests/security/wasm_try.ws "try is unsupported on wasm profile"
+check_unsupported S-13 tests/security/wasm_exec_raw.ws "capability @10 (exec-raw) is unsupported"
+check_unsupported S-14 tests/security/wasm_http_session.ws "capability @6 (http-req (session)) is unsupported"
+check_unsupported S-15 tests/security/wasm_listen.ws "listen is unsupported on wasm profile"
+check_unsupported S-16 tests/security/wasm_serve.ws "serve-concurrent is unsupported on wasm profile"
 
 # S-9: path escape via .. and absolute path must be denied
 printf 'SECRET\n' > "$TMP/secret.txt"
@@ -102,6 +106,22 @@ elif grep -q 'w_ffi_open' "$TMP/ffi.build.err"; then
     ok S-12 "FFI 在 wasm profile 下不可用（构建期失败）"
 else
     bad S-12 "FFI 失败信息不含 w_ffi_open"; tail -3 "$TMP/ffi.build.err"
+fi
+
+# S-17: wrun refuses a preopen tree containing symlinks (WAMR follows them)
+SEC_WIN="$(cygpath -w "$TMP/secret.txt")"
+LINK_WIN="$(cygpath -w "$TMP/data/link.txt")"
+if python -c "import os; os.symlink(r'''$SEC_WIN''', r'''$LINK_WIN''')" 2>/dev/null; then
+    if bash scripts/wrun.sh --iwasm "$RT" --dir "/data::$TMP/data" "$TMP/dir.wasm" \
+         >"$TMP/link.out" 2>"$TMP/link.err"; then
+        bad S-17 "wrun 接受了含 symlink 的 preopen"
+    elif grep -q 'symlink' "$TMP/link.err"; then
+        ok S-17 "wrun 拒绝含 symlink 的 preopen"
+    else
+        bad S-17 "wrun 失败但信息不含 symlink"; cat "$TMP/link.err"
+    fi
+else
+    bad S-17 "无法创建测试 symlink"
 fi
 
 # S-8: no Rust runtime / no Rust source changes

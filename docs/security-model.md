@@ -129,6 +129,7 @@ stdlib 文档里的安全承诺以本文为准。
 | F-6 | spec/stdlib/README 与实现不一致 | **Medium** | 会误导安全评估 |
 | F-7 | `wd` 构建期调用 gcc 并执行产物 | **Medium** | 编译不可信源码本身是特权操作 |
 | F-8 | C 产物无 OS 沙箱、无 CFI/加固 | **High** | 内存破坏可越权 |
+| F-9 | WAMR preopen 会跟随 symlink 逃逸到目录外 | **High** | 裸 `iwasm --map-dir` 不可用于不可信代码；`wrun` 拒绝含 symlink 的 preopen（S-17） |
 
 ---
 
@@ -149,6 +150,8 @@ stdlib 文档里的安全承诺以本文为准。
   不可信代码只允许 WASM（目标）或修复后的 VM。
 - **I-8 路径规范化**：拒绝绝对路径、`..`、symlink 逃逸；WASI 用 preopen，
   native 用 `openat`/`RESOLVE_BENEATH`（若做 native policy）。
+  WAMR 会跟随 symlink；`wrun` 拒绝含 symlink 的 preopen（S-17），
+  裸 `iwasm` 不满足此不变量。
 - **I-9 可审计**：策略、拒绝原因、允许的 host 调用可记录；默认不记录敏感内容。
 - **I-10 显式 unsupported**：WASM 目标不支持的词必须编译期或运行期显式报错，
   不能静默变成 no-op。

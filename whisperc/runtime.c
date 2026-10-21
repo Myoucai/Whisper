@@ -2300,17 +2300,58 @@ static char *w_http_request(const char *method, const char *url, const char *bod
 }
 #endif // !W_WASI
 
+#ifdef W_WASI
+// Socket/server words compile (so the module links) but fail explicitly at
+// runtime: WASI Preview 1 has no socket API, and v1 does not provide a host
+// network import.
+static wval w_sock_listen(int64_t port) {
+    (void)port;
+    w_fail("listen is unsupported on wasm profile (WASI P1 has no socket API)");
+    return W_I64(-1);
+}
+static wval w_sock_accept(wval srv) {
+    (void)srv;
+    w_fail("accept is unsupported on wasm profile (WASI P1 has no socket API)");
+    return W_I64(-1);
+}
+static wval w_sock_recv(wval h) {
+    (void)h;
+    w_fail("recv is unsupported on wasm profile (WASI P1 has no socket API)");
+    return W_I64(-1);
+}
+static wval w_sock_send(wval h, const char *s) {
+    (void)h; (void)s;
+    w_fail("send is unsupported on wasm profile (WASI P1 has no socket API)");
+    return W_I64(-1);
+}
+static void w_sock_close(wval h) {
+    (void)h;
+    w_fail("close is unsupported on wasm profile (WASI P1 has no socket API)");
+}
+static void w_serve_concurrent(int64_t port, wfn handler) {
+    (void)port; (void)handler;
+    w_fail("serve-concurrent is unsupported on wasm profile (no threads/sockets in v1)");
+}
+#endif // W_WASI
+
 // Capabilities the C chain does not implement. Defined (so the build succeeds
 // for programs that merely *import* std/http) but fatal with a message that
 // names the root cause the moment one is actually called — instead of the
 // `implicit declaration of function 'W__6'` gcc used to report.
 static void w_cap_unimplemented(int id, const char *name) {
     char msg[256];
+#ifdef W_WASI
+    snprintf(msg, sizeof(msg),
+             "capability @%d (%s) is unsupported on wasm profile; "
+             "see docs/wasm-wasi-plan.md.",
+             id, name);
+#else
     snprintf(msg, sizeof(msg),
              "capability @%d (%s) is not implemented on the C chain; it is "
              "VM-only for now. See docs/independence-design.md Step 2b and "
              "tests/step2b_preregistered.md.",
              id, name);
+#endif
     w_fail(msg);
 }
 
