@@ -273,9 +273,25 @@ static void w_heap_init(void) {
     if (w_heap == NULL) { fprintf(stderr, "malloc failed for %lld bytes\n", w_heap_size); exit(1); }
 #else
     if (w_heap_size == 0) w_heap_size = HEAP_SIZE;
-    w_heap = mmap(NULL, (size_t)w_heap_size, PROT_READ|PROT_WRITE,
-                  MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
-    if (w_heap == MAP_FAILED) { perror("mmap"); exit(1); }
+    {
+        // GitHub Linux/macOS runners may cap virtual address space below the
+        // 16GB reserve. Keep the lazy reserve but fall back to smaller heaps
+        // instead of failing every program at startup.
+        size_t want = (size_t)w_heap_size;
+#ifdef MAP_NORESERVE
+        int flags = MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE;
+#else
+        int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+#endif
+        w_heap = MAP_FAILED;
+        while (want >= (size_t)(256LL * 1024 * 1024)) {
+            w_heap = mmap(NULL, want, PROT_READ | PROT_WRITE, flags, -1, 0);
+            if (w_heap != MAP_FAILED) break;
+            want /= 4;
+        }
+        if (w_heap == MAP_FAILED) { perror("mmap"); exit(1); }
+        w_heap_size = (long long)want;
+    }
 #endif
 }
 
