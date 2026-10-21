@@ -80,7 +80,7 @@ n=$(wc -l < "$tmp/suspect.txt")
 CEIL="${CEIL:-0}"
 
 echo "[parity] Rust 关键字 $rust_n 个 · 自举链词表 $chain_n 项"
-echo "[parity] 只在 Rust 侧 $raw_n 个，其中白名单 $((raw_n - n)) 个，**待处理 $n 个**（上限 $CEIL）"
+echo "[parity] 只在 Rust 侧 $raw_n 个，其中白名单 $((raw_n - n)) 个，**待处理 $n 个**（上限 ${CEIL}）"
 if [ "$n" -gt 0 ]; then
   echo "[parity] 待处理清单（自举链词表里没有这些拼写）："
   sed 's/^/  /' "$tmp/suspect.txt"
@@ -91,6 +91,6 @@ if [ "$n" -gt "$CEIL" ]; then
   exit 1
 fi
 if [ "$n" -lt "$CEIL" ]; then
-  echo "[parity] 比基线少了 $((CEIL - n)) 个 —— 请把脚本里的 CEIL 下调到 $n（棘轮只往下走）。"
+  echo "[parity] 比基线少了 $((CEIL - n)) 个 —— 请把脚本里的 CEIL 下调到 ${n}（棘轮只往下走）。"
 fi
 echo "[parity] PASS（$n ≤ $CEIL）"

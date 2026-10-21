@@ -10,7 +10,18 @@
 #     depends on raw output)
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="${BIN:-$ROOT/target/debug/whisper.exe}"
+BIN="${BIN:-}"
+if [ -z "$BIN" ]; then
+    for b in "$ROOT/target/debug/whisper" "$ROOT/target/debug/whisper.exe"; do
+        [ -x "$b" ] && { BIN="$b"; break; }
+    done
+fi
+[ -n "$BIN" ] || { echo "syntax-gate: whisper binary not found" >&2; exit 1; }
+TIMEOUT="$(command -v timeout || command -v gtimeout || true)"
+run_limited() {
+    local secs="$1"; shift
+    if [ -n "$TIMEOUT" ]; then "$TIMEOUT" "$secs" "$@"; else "$@"; fi
+}
 CORPUS="$ROOT/tests/conformance"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -22,8 +33,8 @@ for f in "$CORPUS"/*.ws; do
     name="$(basename "$f" .ws)"
     expected="$(head -1 "$f" | sed 's|^// expect: ||')"
 
-    vm_out=$(timeout 60 "$BIN" run "$f" 2>/dev/null | norm)
-    c2_out=$(timeout 180 "$BIN" build "$f" -t c2 -o "$TMP/t.exe" 2>/dev/null >/dev/null \
+    vm_out=$(run_limited 60 "$BIN" run "$f" 2>/dev/null | norm)
+    c2_out=$(run_limited 180 "$BIN" build "$f" -t c2 -o "$TMP/t.exe" 2>/dev/null >/dev/null \
         && "$TMP/t.exe" 2>/dev/null | norm)
 
     if [ "$vm_out" = "$expected" ] && [ "$c2_out" = "$expected" ]; then
