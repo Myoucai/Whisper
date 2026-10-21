@@ -112,6 +112,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build seed compiler
         run: gcc -O2 -o whisper0 whisperc/seed/compiler_seed.c -lm
+      - name: Seed startup diagnostics
+        run: |
+          set +e
+          echo '42 .' | ./whisper0 >/tmp/seed.out 2>/tmp/seed.err
+          rc=$?
+          echo "seed rc=$rc"
+          echo "--- seed stderr ---"
+          cat /tmp/seed.err
+          echo "--- seed stdout (head) ---"
+          head -5 /tmp/seed.out
       - name: Core tests (interpreter mode)
         run: bash whisper_test/run_core.sh ./whisper0 run
       - name: Core tests (C-emission mode)
