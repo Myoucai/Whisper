@@ -211,16 +211,18 @@ iwasm --dir=. hello.wasm        # WAMR（C 运行时，零 Rust）
 ```
 
 以上已封装为 `scripts/build-wasm.sh`：参数 `<src> <out.wasm>`，
-内部用 `wd c`（缺失时回退 `whisper bootstrap`）+ `lift-nested.py` +
+内部用 `wd c`（缺失时回退 `whisper bootstrap`）+ 当前 cgen 顶层函数 +
 Zig/clang；支持 `WASM_CC`/`WASI_SDK_PATH`/`WASM_RUNTIME` 环境变量。
+另有零 Rust 入口 `wd wasm <src> <out.wasm>`，直接调 zig，不经过 bash。
 `wd c` 与 `whisper bootstrap` 的 C 输出已逐字节对拍（hello）。
 
 **状态**：
 
 - hello：✅ `Hello, World!`
 - core conformance：✅ 26/27（1 个原语义 skip；WASI 文件 IO 单独用例通过）
-- HOF：✅ 经 `lift-nested.py`，全部通过；cgen 直接顶层化仍是 W2.5
-- `-t wasm` CLI：❌ 尚未加（当前用 `scripts/build-wasm.sh`）
+- HOF：✅ cgen 顶层 `_qN`，全部通过；不依赖 `lift-nested.py`
+- 构建入口：✅ `scripts/build-wasm.sh` 与零 Rust `wd wasm`
+- `-t wasm` Rust CLI：❌ 未加（为保持语言独立，入口走 `wd wasm`）
 
 **验收**：同一源码经 Phase 1/Phase 2 产出语义一致的 wasm；构建可复现
 （固定 `-g0`/路径/版本；若 clang 仍带路径，记录差异原因）。

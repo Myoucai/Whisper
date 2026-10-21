@@ -490,7 +490,7 @@ trusted-only。
 安全门禁 17/17；journal 10k list 0.63s vs native 0.24s（输出一致）。
 cgen 顶层化（W2.5）已实现，clang/macOS 不再需要 GNU 嵌套函数；
 fixedpoint 已验证 `gen2 == gen3`；seed 已用新编译器重建并通过
-`42 .` 冒烟。未知 host import、`-t wasm` CLI 未完成。
+`42 .` 冒烟。零 Rust `wd wasm` 已落地；未知 host import 仍未完成。
 
 ---
 

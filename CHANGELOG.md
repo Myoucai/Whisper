@@ -15,6 +15,9 @@
     Ubuntu/macOS CI 上 C 程序启动即空输出的问题。
 - `whisperc/wd.ws`：新增 `wd c <src> <out.c>`——只发射 C，不调 cc、
   不碰缓存；与 `whisper bootstrap` 的 hello C 输出逐字节一致。
+- `whisperc/wd.ws`：新增 `wd wasm <src> <out.wasm>`——发射 C 后直接调
+  `zig cc -target wasm32-wasi -mno-simd128`，不经过 bash；新增
+  `scripts/wd-wasm-gate.sh`（W-1..W-4）。
 - `scripts/build-wasm.sh`：`wd c`（回退 bootstrap）→ Zig/wasi-sdk clang
   → `.wasm`；当前 cgen 已顶层化，不再调用 Python lifter（旧编译器才回退）。
 - `scripts/lift-nested.py`：旧 cgen 的 GNU 嵌套函数 `_qb` 文本提升桥；

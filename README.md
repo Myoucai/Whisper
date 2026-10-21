@@ -232,7 +232,7 @@ gcc -O2 -o hello hello.c -I whisperc -lm
 | **native 特化** | `whisper build file.ws -t native -o prog` | 按主机 CPU 特化的原生可执行文件（内容寻址缓存） | gcc |
 | **exe 原生** | `whisper build file.ws -t exe -o app` | 原生可执行文件（**产物零 Rust**） | gcc（构建期） |
 | bundle 打包 | `whisper build file.ws -t bundle -o app` | 单文件可执行（**内含 Rust VM**，构建期无需工具链） | 无 |
-| **wasm（M1）** | `bash scripts/build-wasm.sh file.ws app.wasm`（`-t wasm` 规划） | `.wasm`（由零 Rust 的 C 运行时执行） | Zig cc / wasi-sdk clang + WAMR/wasm3/wasm2c |
+| **wasm（M1）** | `wd wasm file.ws app.wasm` 或 `bash scripts/build-wasm.sh ...` | `.wasm` + `.wasm.c`（零 Rust runtime） | Zig cc / wasi-sdk clang + WAMR/wasm3/wasm2c |
 | 固定点复验 | `scripts/verify-fixedpoint.sh` | 自举链验证 | gcc |
 
 ```bash
@@ -285,7 +285,8 @@ WASM/WASI 的详细计划与判据见 [docs/wasm-wasi-plan.md](docs/wasm-wasi-pl
 ```bash
 # 需要 Zig（或 wasi-sdk clang）与 C 运行时 WAMR iwasm；不需要 Rust runtime
 bash scripts/build-wasm.sh docs/examples/hello.ws target/hello.wasm
-iwasm target/hello.wasm                    # Hello, World!
+wd wasm docs/examples/hello.ws target/hello-wd.wasm   # 零 Rust 的 wd 入口
+iwasm target/hello-wd.wasm                 # Hello, World!
 bash scripts/wrun.sh target/hello.wasm     # 默认无 preopen/env
 
 # 显式给 /data 预打开目录（v1 为 rw；--env NAME 逐个放行）
@@ -457,6 +458,7 @@ bash tools/opcode_coverage.sh                    # 101 项逐特性双跑（VM v
 bash scripts/typecheck-gate.sh                   # 类型检查假阳性棘轮（三语料 FP=0）
 bash scripts/wd-cache-gate.sh                    # wd 内容寻址缓存 C-1..C-6（8 条断言）
 bash scripts/wd-c-gate.sh                        # wd c 零 Rust C 发射（C-1..C-5）
+bash scripts/wd-wasm-gate.sh                     # wd wasm 零 Rust C→wasm（W-1..W-4）
 bash scripts/wasm-security-gate.sh               # WASI 安全 S-1..S-17（需 Zig/WAMR）
 bash scripts/wrun-gate.sh                        # wrun 策略 W-1..W-7（需 WAMR）
 bash scripts/build-wfmt.sh && bash scripts/fmt-gate.sh  # Whisper 写的 fmt（F-1..F-6）

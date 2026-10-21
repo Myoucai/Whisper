@@ -9,6 +9,7 @@
 //   wd build <src.ws> <out>     compile to <out>, leaving <out>.c behind
 //   wd run   <src.ws> <out>     same, then run <out>
 //   wd c     <src.ws> <out.c>   emit C only (no cc, no cache; for wasm/zig)
+//   wd wasm  <src.ws> <out.wasm> emit C, then zig cc to wasm
 //
 // Exit codes: 0 success, 1 build/IO error (missing source, C compiler
 // failure, artifact not produced), 2 usage error. Being able to report
@@ -275,7 +276,7 @@
     args                              // A
     dup len 4 < ??
         drop
-        "usage: wd build|run|c <src.ws> <out>" .
+        "usage: wd build|run|c|wasm <src.ws> <out>" .
         2 exit ]
     dup 1 @nth swap                   // verb A
     dup 2 @nth swap                   // verb src A
@@ -298,6 +299,20 @@
     wd-root strcat "/whisperc" strcat
     " -lm" strcat
     "OS" "" wd-env "Windows_NT" str-eq? ?? " -lws2_32" strcat ]
+} ;
+
+// [cpath out.wasm] → zig wasm 命令行。直接调 zig（不经过 bash）。
+: wd-wasm-cmd {
+    "wd.wasm.out" swap kv-set
+    "wd.wasm.cpath" swap kv-set
+    "zig cc -target wasm32-wasi -O2 -mno-simd128 "
+    "-D_WASI_EMULATED_MMAN -D_WASI_EMULATED_SIGNAL -I " strcat
+    wd-root "/whisperc" strcat wd-q strcat
+    " " strcat
+    "wd.wasm.cpath" kv-get wd-q strcat
+    " -o " strcat
+    "wd.wasm.out" kv-get wd-q strcat
+    " -lwasi-emulated-mman -lwasi-emulated-signal" strcat
 } ;
 
 // [s] → 去掉末尾一个换行（若有）
@@ -407,6 +422,30 @@
     @5                                  // S [status out err]
 } ;
 
+// ── wasm：C → zig cc → .wasm ────────────────────────────────────────
+// S = [verb src out.wasm]
+: wd-wasm {
+    dup 1 @nth file-exists 0 = ??
+        "wd: cannot read source: " over 1 @nth strcat .
+        1 exit ]
+
+    dup 1 @nth read-file wd-source compile-full cgen header swap strcat
+    over 2 @nth ".c" strcat           // S full_c cpath
+    swap write-file drop              // S
+    dup 2 @nth ".c" strcat            // S cpath
+    over 2 @nth                       // S cpath out
+    wd-wasm-cmd                       // S cmd
+    @5                                // S [status out err]
+    dup 0 @nth 0 = ??
+        drop
+        dup 2 @nth "wd: wasm -> " swap strcat .
+        drop
+        return
+    |   dup 2 @nth "wd: wasm compiler failed: " swap strcat .
+        1 exit
+    ]
+} ;
+
 // ── 编译（并可跑）一个文件 ──────────────────────────────────────────
 // S = [verb src out]
 : wd-build {
@@ -472,7 +511,9 @@
 : wd-main {
     wd-argv                           // S | []
     dup len 0 = ?? drop return ]
-    wd-build
+    dup 0 @nth "wasm" str-eq? ??
+        wd-wasm
+    |   wd-build ]
 } ;
 
 wd-main
