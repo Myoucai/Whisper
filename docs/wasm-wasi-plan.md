@@ -179,8 +179,11 @@ WASI 实现：
 **永久修法**：在 `compiler.all.ws` 的 cgen 中直接发射顶层 `_qN()`，
 带唯一名字/前置声明；或改成不依赖嵌套函数的闭包 ABI。
 这会改动冻结的编译器源码，必须走固定点/seed 重新验证。
+**状态（2026-10-21）**：判据已预注册；cgen 代码未开始。
 
-**判据**：
+**判据**：完整 G-1..G-8 见
+[`tests/cgen_toplevel_preregistered.md`](../tests/cgen_toplevel_preregistered.md)。
+摘要：
 
 - `.c` 中不再出现 `auto void _qb`；
 - 同一源码经 cgen 直接产出的 C 与“cgen + lift”的语义一致；

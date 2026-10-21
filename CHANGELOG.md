@@ -29,6 +29,8 @@
   `--http-allow`/`--exec`/`--ffi` 显式拒绝；W-1..W-7 7/7。
 - `.github/workflows/wasm.yml`：Zig 0.14.1 + WAMR 2.4.5 pin，
   跑 hello、安全门禁、wrun 门禁（首次远端运行待确认）。
+- `tests/cgen_toplevel_preregistered.md`：W2.5（cgen 顶层化）G-1..G-8
+  判据已预注册；代码未开始。
 
 ### 实测
 
