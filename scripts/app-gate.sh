@@ -4,15 +4,26 @@
 # gcc + curl.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="${BIN:-$ROOT/target/debug/whisper.exe}"
+BIN="${BIN:-}"
+if [ -z "$BIN" ]; then
+    for b in "$ROOT/target/debug/whisper" "$ROOT/target/debug/whisper.exe" \
+             "$ROOT/target/release/whisper" "$ROOT/target/release/whisper.exe"; do
+        [ -x "$b" ] && { BIN="$b"; break; }
+    done
+fi
+[ -n "$BIN" ] || { echo "app-gate: whisper binary not found" >&2; exit 1; }
+TIMEOUT="$(command -v timeout || command -v gtimeout || true)"
 APP="$ROOT/apps/webapp"
 PORT="${APP_GATE_PORT:-18211}"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"; [ -n "${SRV_PID:-}" ] && kill "$SRV_PID" 2>/dev/null' EXIT
 
-if ! (cd "$APP" && timeout 240 "$BIN" build server.ws -t c2 -o "$TMP/server.exe" >/dev/null 2>&1); then
-    echo "FAIL: c2 build failed"
-    exit 1
+if [ -n "$TIMEOUT" ]; then
+    (cd "$APP" && "$TIMEOUT" 240 "$BIN" build server.ws -t c2 -o "$TMP/server.exe" >/dev/null 2>&1) || {
+        echo "FAIL: c2 build failed"; exit 1; }
+else
+    (cd "$APP" && "$BIN" build server.ws -t c2 -o "$TMP/server.exe" >/dev/null 2>&1) || {
+        echo "FAIL: c2 build failed"; exit 1; }
 fi
 
 # reset the persistent counter for a deterministic check
