@@ -54,17 +54,23 @@ if [ ! -s "$C" ]; then
     exit 1
 fi
 
-# clang/Zig do not support GNU nested functions. cgen still emits them for
-# quote bodies, so lift them to file-scope functions before compiling.
-PY="${PYTHON:-}"
-if [ -z "$PY" ]; then
-    for p in python3 python; do
-        command -v "$p" >/dev/null 2>&1 && { PY="$p"; break; }
-    done
+# cgen now emits file-scope _qN functions. Keep a fallback for a stale wd/binary
+# that still emits GNU nested functions; the current compiler takes the fast
+# path and does not call the Python lifter.
+if grep -q 'auto void _qb' "$C"; then
+    echo "[build-wasm] warning: stale compiler emitted GNU nested functions; using lift-nested.py fallback" >&2
+    PY="${PYTHON:-}"
+    if [ -z "$PY" ]; then
+        for p in python3 python; do
+            command -v "$p" >/dev/null 2>&1 && { PY="$p"; break; }
+        done
+    fi
+    command -v "$PY" >/dev/null 2>&1 || { echo "build-wasm: python3/python not found (needed for stale nested functions)" >&2; exit 1; }
+    "$PY" "$ROOT/scripts/lift-nested.py" "$C" "$LIFT"
+    C="$LIFT"
+else
+    echo "[build-wasm] cgen top-level: no nested functions"
 fi
-command -v "$PY" >/dev/null 2>&1 || { echo "build-wasm: python3/python not found (needed to lift nested functions)" >&2; exit 1; }
-"$PY" "$ROOT/scripts/lift-nested.py" "$C" "$LIFT"
-C="$LIFT"
 
 CC="${WASM_CC:-}"
 if [ -z "$CC" ]; then
@@ -101,8 +107,8 @@ echo "[build-wasm] wasm: $OUT ($(wc -c < "$OUT") bytes, compiler=$CC)"
 if [ "${3:-}" = "--run" ] || [ "${WASM_RUN:-0}" = "1" ]; then
     RT="${WASM_RUNTIME:-}"
     if [ -z "$RT" ]; then
-        for r in iwasm wasm3; do
-            if command -v "$r" >/dev/null 2>&1; then RT="$r"; break; fi
+        for r in "$ROOT/target/toolchain/wamr/iwasm.exe" "$ROOT/target/toolchain/wamr/iwasm" iwasm wasm3; do
+            if [ -x "$r" ] || command -v "$r" >/dev/null 2>&1; then RT="$r"; break; fi
         done
     fi
     [ -n "$RT" ] || { echo "build-wasm: no iwasm/wasm3 runtime for --run" >&2; exit 1; }

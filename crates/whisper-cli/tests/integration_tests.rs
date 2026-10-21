@@ -2353,15 +2353,17 @@ fn w4_c_transpiler_executes_call_and_capabilities() {
 
         let exe = dir.join(format!("{name}.exe"));
         let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let cc = std::process::Command::new("gcc")
-            .args(["-O2", "-w", "-o"])
+        let mut cc = std::process::Command::new("gcc");
+        cc.args(["-O2", "-w", "-o"])
             .arg(&exe)
             .arg(&cfile)
             .arg("-I")
             .arg(repo.join("whisperc"))
-            .args(["-lm", "-lws2_32"])
-            .output()
-            .unwrap();
+            .arg("-lm");
+        if cfg!(windows) {
+            cc.arg("-lws2_32");
+        }
+        let cc = cc.output().unwrap();
         assert!(
             cc.status.success(),
             "{}",
@@ -2427,8 +2429,9 @@ fn w6_exec_raw_is_verbatim_and_needs_the_same_grant() {
     assert_eq!(vals.len(), 2, "expected two lengths, got {out:?}");
     let raw: usize = vals[0].parse().unwrap();
     let trimmed: usize = vals[1].parse().unwrap();
+    let raw_expected = if cfg!(windows) { 3 } else { 2 };
     assert_eq!(
-        raw, 3,
+        raw, raw_expected,
         "@10 should keep the child's trailing newline: {out:?}"
     );
     assert_eq!(trimmed, 1, "@5 must keep trimming: {out:?}");

@@ -1476,18 +1476,44 @@ export classify-full
     "{wval _c=w_pop();if(w_as_i64(_c))goto L_" swap ";}\n" strcat strcat
 } ;
 
+// ── Quote/HOF functions: lift to file scope ───────────────────────
+// cgen used to emit `auto void _qb(void) { ... }` (a GNU nested function).
+// clang/wasm32-wasi reject that.  Each quote body is now a file-scope
+// `_qN(void)` with a forward declaration; the wrapper binds a local
+// function pointer named `_qfn` so the existing wrapper text stays valid.
+: q-name {
+    "cgen.qn" kv-get strtoi64
+    dup 1 + i64tostr "cgen.qn" swap kv-set
+    i64tostr "_q" swap strcat
+} ;
+
+: q-register {
+    "cgen.tmpbody" swap kv-set
+    q-name
+    // prototype: static void _qN(void);
+    dup "static void " swap strcat "(void);\n" strcat
+    "cgen.qprotos" kv-get swap strcat
+    "cgen.qprotos" swap kv-set
+    // definition: static void _qN(void) { <body> }
+    dup "static void " swap strcat "(void) {\n" strcat
+    "cgen.tmpbody" kv-get strcat
+    "}\n" strcat
+    "cgen.qdefs" kv-get swap strcat
+    "cgen.qdefs" swap kv-set
+} ;
+
 // ── Emit single instruction → C string ───────────────────────────
 : emit-one {
     dup list? ??
         dup 0 @nth
         dup 48 = ?? drop 1 @nth i64tostr "w_push(W_I64((int64_t)" swap "L));\n" strcat strcat return ]
         dup 49 = ?? drop 1 @nth "{double _d=" swap "; w_push(W_F64(_d));}\n" strcat strcat return ]
-        dup 249 = ?? drop 1 @nth emit-func-body "{ auto void _qb(void) { " swap strcat " } wval *_l=(wval*)w_as_ptr(w_pop()); int64_t _n=w_list_len(_l); wval *_r=w_list_new(_n); for (int64_t _i=0;_i<_n;_i++){ w_push(_l[1+_i]); _qb(); _r[1+_i]=w_pop(); } w_push(W_PTR(_r)); }\n" strcat return ]
-        dup 250 = ?? drop 1 @nth emit-func-body "{ auto void _qb(void) { " swap strcat " } wval *_l=(wval*)w_as_ptr(w_pop()); int64_t _n=w_list_len(_l); for (int64_t _i=0;_i<_n;_i++){ int _s0=w_sp; w_push(_l[1+_i]); _qb(); if (w_sp>_s0) w_sp=_s0; } }\n" strcat return ]
-        dup 251 = ?? drop 1 @nth emit-func-body "{ auto void _qb(void) { " swap strcat " } wval _a=w_pop(); wval *_l=(wval*)w_as_ptr(w_pop()); int64_t _n=w_list_len(_l); for (int64_t _i=0;_i<_n;_i++){ w_push(_a); w_push(_l[1+_i]); _qb(); _a=w_pop(); } w_push(_a); }\n" strcat return ]
-        dup 252 = ?? drop 1 @nth emit-func-body "{ auto void _qb(void) { " swap strcat " } int64_t _n=w_as_i64(w_pop()); for (int64_t _i=0;_i<_n;_i++){ _qb(); } }\n" strcat return ]
-        dup 253 = ?? drop 1 @nth emit-func-body "{ auto void _qb(void) { " swap strcat " } wval *_l=(wval*)w_as_ptr(w_pop()); int64_t _n=w_list_len(_l); wval *_tmp=(wval*)malloc((_n>0?_n:1)*sizeof(wval)); int64_t _c=0; for (int64_t _i=0;_i<_n;_i++){ w_push(_l[1+_i]); _qb(); if (w_as_i64(w_pop())!=0) _tmp[_c++]=_l[1+_i]; } wval *_r=w_list_new(_c); for (int64_t _j=0;_j<_c;_j++) _r[1+_j]=_tmp[_j]; free(_tmp); w_push(W_PTR(_r)); }\n" strcat return ]
-        dup 254 = ?? drop 1 @nth emit-func-body "{ auto void _qb(void) { " swap strcat " } w_try_call(_qb); }\n" strcat return ]
+        dup 249 = ?? drop 1 @nth emit-func-body q-register "{ void (*_qfn)(void) = " swap strcat "; " strcat "wval *_l=(wval*)w_as_ptr(w_pop()); int64_t _n=w_list_len(_l); wval *_r=w_list_new(_n); for (int64_t _i=0;_i<_n;_i++){ w_push(_l[1+_i]); _qfn(); _r[1+_i]=w_pop(); } w_push(W_PTR(_r)); }\n" strcat return ]
+        dup 250 = ?? drop 1 @nth emit-func-body q-register "{ void (*_qfn)(void) = " swap strcat "; " strcat "wval *_l=(wval*)w_as_ptr(w_pop()); int64_t _n=w_list_len(_l); for (int64_t _i=0;_i<_n;_i++){ int _s0=w_sp; w_push(_l[1+_i]); _qfn(); if (w_sp>_s0) w_sp=_s0; } }\n" strcat return ]
+        dup 251 = ?? drop 1 @nth emit-func-body q-register "{ void (*_qfn)(void) = " swap strcat "; " strcat "wval _a=w_pop(); wval *_l=(wval*)w_as_ptr(w_pop()); int64_t _n=w_list_len(_l); for (int64_t _i=0;_i<_n;_i++){ w_push(_a); w_push(_l[1+_i]); _qfn(); _a=w_pop(); } w_push(_a); }\n" strcat return ]
+        dup 252 = ?? drop 1 @nth emit-func-body q-register "{ void (*_qfn)(void) = " swap strcat "; " strcat "int64_t _n=w_as_i64(w_pop()); for (int64_t _i=0;_i<_n;_i++){ _qfn(); } }\n" strcat return ]
+        dup 253 = ?? drop 1 @nth emit-func-body q-register "{ void (*_qfn)(void) = " swap strcat "; " strcat "wval *_l=(wval*)w_as_ptr(w_pop()); int64_t _n=w_list_len(_l); wval *_tmp=(wval*)malloc((_n>0?_n:1)*sizeof(wval)); int64_t _c=0; for (int64_t _i=0;_i<_n;_i++){ w_push(_l[1+_i]); _qfn(); if (w_as_i64(w_pop())!=0) _tmp[_c++]=_l[1+_i]; } wval *_r=w_list_new(_c); for (int64_t _j=0;_j<_c;_j++) _r[1+_j]=_tmp[_j]; free(_tmp); w_push(W_PTR(_r)); }\n" strcat return ]
+        dup 254 = ?? drop 1 @nth emit-func-body q-register "{ void (*_qfn)(void) = " swap strcat "; " strcat "w_try_call(_qfn); }\n" strcat return ]
         dup 50 = ?? drop 1 @nth escape-c-str "w_push(W_PTR(w_str_from_cstr(\"" swap "\")));\n" strcat strcat return ]
         dup 51 = ?? drop 1 @nth i64tostr "w_push(W_BOOL((int64_t)" swap "L));\n" strcat strcat return ]
         dup 55 = ?? drop 1 @nth "{ wval _s=w_sig(W_BOOL(1)," swap "); w_push(_s); }\n" strcat strcat return ]
@@ -1692,6 +1718,9 @@ export classify-full
 
 : cgen {
     // Stack: [main_bc, defs]
+    "cgen.qn" "0" kv-set
+    "cgen.qdefs" "" kv-set
+    "cgen.qprotos" "" kv-set
     dup 1 @nth                        // list, defs
     dup emit-fwd-decls                // list, defs, fwd_str
     "static wfn w_find_word(const char *n){
@@ -1714,6 +1743,8 @@ export classify-full
         strcat                        // list, combined
     ]
     swap drop                         // combined
+    "cgen.qprotos" kv-get swap strcat  // protos + combined
+    "cgen.qdefs" kv-get strcat         // combined + defs
 } ;
 
 export cgen

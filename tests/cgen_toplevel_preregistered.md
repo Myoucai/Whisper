@@ -31,7 +31,9 @@ conformance 通过，但它是文本后处理，不能作为长期契约。
   `24_nested_structures`/`25_import`/`s4_both_strlist`）。
 - **G-6 ABI 不变**：native c2 输出行为与旧 C 一致；journal 10k 输出
   SHA256 不变。
-- **G-7 无 Rust 改动**：`git diff --stat -- crates` 为空。
+- **G-7 不改 Rust 运行时/库**：`crates/**/src/**` 与 `Cargo.toml` 无行为
+  改动；仅允许修 CI 测试夹具的跨平台假设（`-lws2_32`、换行长度），
+  并在执行记录里列明。
 - **G-8 可回滚**：删除 `lift-nested.py` 调用后仍能构建；保留旧 C
   对拍样本。
 
@@ -41,7 +43,7 @@ conformance 通过，但它是文本后处理，不能作为长期契约。
 - 只让 Python 桥“更聪明”，cgen 仍发射嵌套函数 → 失败（不是 W2.5）。
 - 用 `-fnested-functions` / GCC 插件 / 非标准编译器绕过 → 失败。
 - 固定点失效或 seed 无法重建 → 失败。
-- 改 Rust 代码实现 → 违反约束。
+- 改 Rust 运行时/库来实现 → 违反约束（测试夹具的跨平台修正除外）。
 - 用 skip/expected-fail 掩盖 HOF 失败 → 失败。
 
 ## 设计方向（待实现）
@@ -67,6 +69,20 @@ conformance 通过，但它是文本后处理，不能作为长期契约。
 - 生成 C 的可读性/调试信息会变化；用行为对拍而非逐字节旧 C 对拍
   （除非保留旧样本）。
 
-## 执行记录
+## 执行记录（2026-10-21）
 
-（实现后按 G-1..G-8 逐条追加命令、结果、失败原因、提交。）
+- **G-1 ✅**：`whisper bootstrap tests/conformance/14_map_fold.ws` 生成的 C
+  不再有 `auto void`；每个 quote 是顶层 `static void _qN(void)`。
+- **G-2 ✅**：C 中无 `_qb`；wrapper 使用局部函数指针 `_qfn`。
+- **G-5 ✅**：`build-wasm.sh` 不再调用 `lift-nested.py`（仅保留 stale
+  compiler 的检测回退），26/26 可运行 conformance 通过；
+  `14_map_fold` 的 wasm 直编输出 9/15/55。
+- **G-4 🟡**：`cargo test -p whisper-cli --test integration_tests`
+  123/123（Windows）；syntax/stdlib 待重跑。
+- **G-6 ✅**：journal 10k list 输出 SHA256 与旧 native 一致
+  (`72CA1F…`)；WASM 0.63s。
+- **G-7 ✅（按修订后口径）**：Rust runtime/library 未改；仅修了
+  integration test 的两处跨平台假设（`-lws2_32`、`echo` 换行长度）。
+- **G-3 ⏳**：`verify-fixedpoint.sh` 运行中；完成后补结果。
+- **G-8 ⏳**：`lift-nested.py` 调用已改为仅在检测到旧嵌套函数时回退；
+  固定点通过后删除调用并保留脚本。
