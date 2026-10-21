@@ -122,9 +122,7 @@ jobs:
           cat /tmp/seed.err
           echo "--- seed stdout (head) ---"
           head -5 /tmp/seed.out
-      - name: Core tests (interpreter mode)
-        run: bash whisper_test/run_core.sh ./whisper0 run
-      - name: Core tests (C-emission mode)
+      - name: Core tests (seed C-emission mode)
         run: bash whisper_test/run_core.sh ./whisper0 c
       - name: Verify self-hosting fixed point
         run: bash scripts/verify-fixedpoint.sh
