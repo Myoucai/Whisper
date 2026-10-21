@@ -35,6 +35,8 @@
 - CI selfhost：`compiler_seed.c` 是编译器而非解释器，去掉错误的
   `run_core.sh ./whisper0 run`，只保留 C-emission 模式；并打印 seed
   stderr 便于定位启动失败。
+- `whisper_test/run_core.sh`：C 链的 `>` / `<` 输出是 `#t`/`#f`，
+  修正 test 7/8 的错误期望；本地 C-emission 22/22。
 - `tests/cgen_toplevel_preregistered.md`：W2.5（cgen 顶层化）G-1..G-8
   判据已预注册；代码未开始。
 
