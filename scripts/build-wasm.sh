@@ -81,7 +81,7 @@ echo "[build-wasm] C: $C"
 case "$CC" in
     zig)
         command -v zig >/dev/null 2>&1 || { echo "build-wasm: zig not found" >&2; exit 1; }
-        zig cc -target wasm32-wasi -O2 \
+        zig cc -target wasm32-wasi -O2 -mno-simd128 \
             -D_WASI_EMULATED_MMAN -D_WASI_EMULATED_SIGNAL \
             -I "$ROOT/whisperc" "$C" -o "$OUT" \
             -lwasi-emulated-mman -lwasi-emulated-signal
@@ -93,7 +93,7 @@ case "$CC" in
             SYSROOT="$WASI_SDK_PATH/share/wasi-sysroot"
         fi
         [ -n "$SYSROOT" ] || { echo "build-wasm: set WASI_SDK_PATH/WASI_SYSROOT for clang" >&2; exit 1; }
-        clang --target=wasm32-wasip1 --sysroot="$SYSROOT" -O2 \
+        clang --target=wasm32-wasip1 --sysroot="$SYSROOT" -O2 -mno-simd128 \
             -D_WASI_EMULATED_MMAN -D_WASI_EMULATED_SIGNAL \
             -I "$ROOT/whisperc" "$C" -o "$OUT" \
             -lwasi-emulated-mman -lwasi-emulated-signal

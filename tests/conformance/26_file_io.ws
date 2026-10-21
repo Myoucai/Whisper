@@ -1,4 +1,5 @@
 // expect: 10|10|0
-"D:/tmp/wsconf.txt" "conf-data!" write-file .
-"D:/tmp/wsconf.txt" read-file strlen .
-"D:/tmp" "sub" strcat getenv strlen .
+// Relative path: the gate runs in a temp cwd, so this is portable.
+"wsconf.txt" "conf-data!" write-file .
+"wsconf.txt" read-file strlen .
+"WHISPER_NO_SUCH_ENV" getenv strlen .

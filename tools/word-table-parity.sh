@@ -93,4 +93,4 @@ fi
 if [ "$n" -lt "$CEIL" ]; then
   echo "[parity] 比基线少了 $((CEIL - n)) 个 —— 请把脚本里的 CEIL 下调到 ${n}（棘轮只往下走）。"
 fi
-echo "[parity] PASS（$n ≤ $CEIL）"
+echo "[parity] PASS（${n} ≤ ${CEIL}）"
