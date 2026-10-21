@@ -130,6 +130,7 @@ stdlib 文档里的安全承诺以本文为准。
 | F-7 | `wd` 构建期调用 gcc 并执行产物 | **Medium** | 编译不可信源码本身是特权操作 |
 | F-8 | C 产物无 OS 沙箱、无 CFI/加固 | **High** | 内存破坏可越权 |
 | F-9 | WAMR preopen 会跟随 symlink 逃逸到目录外 | **High** | 裸 `iwasm --map-dir` 不可用于不可信代码；`wrun` 拒绝含 symlink 的 preopen（S-17） |
+| F-10 | 未知/非 WASI import 只会等到调用时才失败 | **Medium** | `wrun` 加载前检查 import 表，只允许 `wasi_snapshot_preview1`（S-18） |
 
 ---
 
@@ -155,6 +156,8 @@ stdlib 文档里的安全承诺以本文为准。
 - **I-9 可审计**：策略、拒绝原因、允许的 host 调用可记录；默认不记录敏感内容。
 - **I-10 显式 unsupported**：WASM 目标不支持的词必须编译期或运行期显式报错，
   不能静默变成 no-op。
+- **I-11 import 白名单**：guest 只能 import `wasi_snapshot_preview1`；
+  未知模块/字段在加载前拒绝，不能等到调用时才失败。
 
 ---
 

@@ -63,6 +63,14 @@ done
 [ -n "$RT" ] || RT="$(command -v iwasm || command -v wasm3 || true)"
 [ -n "$RT" ] || die "no C WASM runtime found (set WRUN_IWASM or put iwasm in PATH)"
 
+# Fail closed before load: only wasi_snapshot_preview1 imports are allowed.
+PY="${PYTHON:-}"
+if [ -z "$PY" ]; then
+    for p in python3 python; do command -v "$p" >/dev/null 2>&1 && { PY="$p"; break; }; done
+fi
+[ -n "$PY" ] || die "python3/python is required for the import policy"
+"$PY" "$(cd "$(dirname "$0")" && pwd)/wasm-imports.py" "$APP" || die "non-WASI import rejected"
+
 APPDIR="$(cd "$(dirname "$APP")" && pwd)"
 APPBASE="$(basename "$APP")"
 ARGS=()

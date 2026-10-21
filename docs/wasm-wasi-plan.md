@@ -29,7 +29,7 @@
   （`auto void _qb`），clang/Zig 不支持。已用
   `scripts/lift-nested.py` 做构建期提升（W2.5），全部 HOF 用例通过；
   永久修法仍是 cgen 直接发射顶层 `_qN()`。
-- 安全门禁 `scripts/wasm-security-gate.sh`：**S-1..S-17 17/17**（文件
+- 安全门禁 `scripts/wasm-security-gate.sh`：**S-1..S-18 18/18**（文件
   默认拒绝/preopen、目录操作、env allowlist、`@2`/`@5`/`@6`/`@10`/
   `try`/`listen`/`serve-concurrent` 显式失败、路径逃逸拒绝、
   FFI 构建期失败、symlink preopen 拒绝、无 Rust 运行时）。
@@ -40,7 +40,8 @@
   输出 SHA256 一致（WAMR 解释执行，未 AOT）。
 - CI：`.github/workflows/wasm.yml` 已加（Zig 0.14.1 + WAMR 2.4.5 pin），
   跑 hello、安全门禁、wrun 门禁；首次远端运行待确认。
-- 未完成：未知 host import、read-only preopen、`-t wasm` CLI、W2.5。
+- 未完成：host HTTP 代理、read-only preopen；`-t wasm` Rust CLI 不做，
+  零 Rust 入口是 `wd wasm`。未知 import 已由 wrun 启动前拒绝。
 
 ---
 
@@ -248,6 +249,9 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
 （W-1..W-7 7/7）已落地；默认拒绝、preopen、env、unsupported 均实测。
 **preopen symlink 检查**：WAMR 会跟随 symlink 逃逸；`wrun` 现在拒绝
 含 symlink 的 preopen（S-17）。裸 `iwasm --map-dir` 不提供此保护。
+**import 检查**：`wrun` 在加载前用 `scripts/wasm-imports.py` 只允许
+`wasi_snapshot_preview1`；`env.*` 等未知 import 直接拒绝（S-18），
+不依赖运行时“调用时才失败”。wrun 需要 python3（host 工具，不是 runtime）。
 
 **验收**：无 policy 时 `read-file`/`getenv`/`@2`/`@5`/`ffi-*` 全拒绝；
 有 policy 时只允许指定范围；错误信息可定位（不泄漏未授权路径）。

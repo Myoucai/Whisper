@@ -151,6 +151,16 @@ else
     bad S-17 "无法创建测试 symlink"
 fi
 
+# S-18: unser (non-WASI) imports are rejected before the guest runs
+if bash scripts/wrun.sh --iwasm "$RT" tests/security/unknown_import.wasm \
+     >"$TMP/import.out" 2>"$TMP/import.err"; then
+    bad S-18 "wrun 接受了 env.foo import"
+elif grep -q 'non-WASI import' "$TMP/import.err"; then
+    ok S-18 "wrun 拒绝非 WASI import（env.foo）"
+else
+    bad S-18 "import 拒绝信息不明确"; cat "$TMP/import.err"
+fi
+
 # S-8: no Rust runtime / no Rust source changes
 if ! grep -v '^#' scripts/build-wasm.sh | grep -q 'wasmtime\|wasmer' \
    && [ -z "$(git diff --name-only -- crates 2>/dev/null)" ]; then
