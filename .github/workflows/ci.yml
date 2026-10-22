@@ -195,3 +195,7 @@ jobs:
             target/release/whisper
             docs/release-notes.md
             docs/wasm-v1-release.md
+      - name: Sync release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --notes-file docs/release-notes.md
