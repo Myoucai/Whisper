@@ -79,7 +79,8 @@
   `syntax-gate.sh` 同时查找 debug/release 二进制，并在 macOS 上回退
   到 `gtimeout` / 不设超时；`net-gate.sh` 同样查找 debug/release 并
   回退 timeout；`26_file_io` 改用相对路径并在临时 cwd 执行；
-  `build-wasm.sh` 加 `-mno-simd128`，避免 WAMR 的 SIMD 检查失败；
+  `build-wasm.sh` 加 `-mno-simd128`，并加 `-mcpu=mvp` 强制 baseline CPU
+  （Zig 0.14.1 的 libc/代码路径仍可能带 SIMD），避免 WAMR 的 SIMD 检查失败。
   `whisper_test/run_core.sh` 的 `=` 期望改为 `#t/#f`（与 spec/VM 一致）；
   `app-gate.sh` 增加 server readiness 轮询并保留启动日志，避免把
   “还没起来”误报成 13 条路由全空；
