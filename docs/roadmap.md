@@ -19,11 +19,11 @@ Whisper 同时有两类使用者，优先级不同的地方必须明确：
 
 目标：把已完成的 native 网络开关稳定发布。
 
-- [ ] `docs/release-notes.md` 定稿（1.2.0）
-- [ ] `WHISPER_NET=0` 文档、help、测试一致
-- [ ] 全量验收：cargo test / integration / app / net / wasm gates
-- [ ] release workflow 使用 1.2.0 release notes
-- [ ] 打 tag `v1.2.0` 并确认 GitHub Release
+- [x] `docs/release-notes.md` 定稿（1.2.0）
+- [x] `WHISPER_NET=0` 文档、help、测试一致
+- [x] 全量验收：cargo test / integration / app / net / wasm gates
+- [x] release workflow 使用 1.2.0 release notes
+- [x] 打 tag `v1.2.0` 并确认 GitHub Release
 
 验收：`WHISPER_NET=0` 显式拒绝所有网络 opcode；默认行为不变；
 native/HTTP server 测试全绿；WASM 无网络不变。

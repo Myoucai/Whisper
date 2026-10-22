@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (1.2.0) — native network switch
+## v1.2.0 (2026-10-22) — native network switch
 
 - 新增 [`docs/roadmap.md`](docs/roadmap.md) 与
   [`docs/release-notes.md`](docs/release-notes.md)：把 P0（1.2.0 收口）、
