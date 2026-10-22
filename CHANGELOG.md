@@ -57,8 +57,11 @@
   到 `gtimeout` / 不设超时；`net-gate.sh` 同样查找 debug/release 并
   回退 timeout；`26_file_io` 改用相对路径并在临时 cwd 执行；
   `build-wasm.sh` 加 `-mno-simd128`，避免 WAMR 的 SIMD 检查失败。
+- WASM 核心 conformance 补齐 `26_file_io`：新增
+  `scripts/wasm-conformance.sh`，用 root preopen 跑相对路径文件用例，
+  **27/27 通过**；CI wasm job 增加该门禁。
 - 本地：integration 123/123、cargo 467/0、syntax 27/0、stdlib 67/0；
-  wasm conformance 26/0；journal 10k hash 不变。
+  journal 10k hash 不变。
 
 ### 实测
 

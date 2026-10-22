@@ -22,9 +22,8 @@
   输出 `Hello, World!`。运行链路零 Rust（Zig 是 C 工具链，WAMR 是 C）。
 - `wd c` 只发射 C；`wd wasm` 直接调 zig（不经过 bash）；`wd c` 与
   `whisper bootstrap` 的 C 输出逐字节一致（hello SHA256 相同）。
-- core conformance：**26/27 通过，1 个按原语义跳过**（`26_file_io`
-  的批量 wasm 脚本跳过；文件 IO 由 S-2/S-9/S-10/S-11 的 preopen
-  用例覆盖）。无 preopen 时写入返回 `-1`、读取为空。
+- core conformance：**27/27 通过**；`26_file_io` 在 `--dir /::临时目录`
+  的 root preopen 下执行。无 preopen 时写入返回 `-1`、读取为空。
 - 硬阻塞已解决：cgen 现直接发射文件级 `_qN()` + 局部 `_qfn`，不再生成
   GNU 嵌套函数；`scripts/lift-nested.py` 仅作为 stale compiler 回退。
 - 安全门禁 `scripts/wasm-security-gate.sh`：**S-1..S-20 20/20**（文件
@@ -181,7 +180,7 @@ body 变成文件级 `static void _qN(void)`（带前置声明），wrapper 用�
 `42 .`；完整 bootstrap 的第二次 fixedpoint 留给 CI。
 
 **状态（2026-10-21）**：cgen 实现完成；fixedpoint 通过；
-本地 integration 123/123、wasm conformance 26/0、journal hash 不变。
+本地 integration 123/123、wasm conformance 27/0、journal hash 不变。
 
 **判据**：完整 G-1..G-8 见
 [`tests/cgen_toplevel_preregistered.md`](../tests/cgen_toplevel_preregistered.md)。
@@ -218,7 +217,7 @@ Zig/clang；支持 `WASM_CC`/`WASI_SDK_PATH`/`WASM_RUNTIME` 环境变量。
 **状态**：
 
 - hello：✅ `Hello, World!`
-- core conformance：✅ 26/27（1 个原语义 skip；WASI 文件 IO 单独用例通过）
+- core conformance：✅ 27/27（`26_file_io` 在 root preopen 下）
 - HOF：✅ cgen 顶层 `_qN`，全部通过；不依赖 `lift-nested.py`
 - 构建入口：✅ `scripts/build-wasm.sh` 与零 Rust `wd wasm`
 - `-t wasm` Rust CLI：❌ 未加（为保持语言独立，入口走 `wd wasm`）
@@ -321,7 +320,7 @@ python3（host 工具，不是 runtime）。
 |--------|------|------|------|
 | M0 | 文档/安全模型/判据（本次） | 1–2 天 | ✅ 已落地 |
 | M1 | 工具链 + hello.wasm + preflight | 2–3 天 | ✅ hello 全链路通过 |
-| M2 | 运行时分层 + core conformance | 1–2 周 | ✅ runtime WASI 守卫 + 26/27；cgen 顶层化完成 |
+| M2 | 运行时分层 + core conformance | 1–2 周 | ✅ runtime WASI 守卫 + 27/27；cgen 顶层化完成 |
 | M3 | preopen/policy + 负向安全测试 | 1 周 | 🟡 S-1..S-20 通过；host 代理待做 |
 | M4 | journal/文件应用 + CI wasm job | 3–5 天 | ✅ journal 10k + wasm workflow；首次远端运行待确认 |
 | M5 | HTTP 代理/exec host（可选） | 1–2 周 | ❌ |
@@ -371,8 +370,7 @@ python3（host 工具，不是 runtime）。
 
 - [x] `scripts/build-wasm.sh` 与零 Rust `wd wasm` 能从 `.ws` 产出
       `.wasm`，hello 输出正确。
-- [x] core conformance：26/27；`26_file_io` 在批量 wasm 脚本中跳过，
-      文件 IO 由 S-2/S-9/S-10/S-11 覆盖。
+- [x] core conformance：27/27；`26_file_io` 在 root preopen 下通过。
 - [x] `read-file`/`write-file`/`mkdir`/`file-exists` 只能访问 preopen；
       `../` 与绝对路径被拒（S-2/S-9/S-10/S-11）；`listdir` 尚未单列门禁。
 - [x] 无 policy 时，文件/env/network/exec/ffi 全部拒绝；有负向测试

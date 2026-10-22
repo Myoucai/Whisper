@@ -134,18 +134,18 @@ iwasm target/toolchain/hello.wasm
 - `exit`、`args`、stdout 尚未逐项固化成测试；hello 的 stdout 正确。
 - wasm 产物 970,744 字节；WAMR 退出码 0。
 
-**W-3（26/27 通过，1 个原语义跳过）**：
+**W-3（27/27 通过，无 skip）**：
 
 ```bash
-# 逐文件：build-wasm → iwasm；与 `-t c2` 原生输出逐字节比较
-wasm conformance: pass=26 fail=0 skip=1
+# scripts/wasm-conformance.sh：build-wasm → wrun/iwasm；与 expect 行比较
+wasm conformance: PASS=27 FAIL=0 SKIP=0
 ```
 
-- 唯一 skip：`26_file_io` 由批量 wasm 脚本跳过；文件 IO 由
-  `tests/security/wasm_file.ws` 的 preopen 用例覆盖。
-- WASI 文件 IO：`/data/wsconf.txt`，`--map-dir=/data::target/wasi-data`
-  下输出 `10`、`10`，通过；无 preopen 时 `-1`/空。
-- 26 个通过用例里包含 HOF（`13_times`/`14_map_fold`/`15_each_filter`/
+- `26_file_io` 在 `wrun --dir /::临时目录` 的 root preopen 下跑，
+  输出 `10|10|0`。
+- WASI 文件 IO：`/data/wsconf.txt`，`--dir /data::...` 下输出
+  `10`、`10`，通过；无 preopen 时 `-1`/空。
+- 27 个用例里包含 HOF（`13_times`/`14_map_fold`/`15_each_filter`/
   `24_nested_structures`/`25_import`/`s4_both_strlist`），现在直接由
   cgen 顶层函数编译，不依赖 `lift-nested.py`。
 
@@ -207,8 +207,8 @@ W-1..W-7 7/7——默认无 preopen/env，`--dir`/`--env` 显式放行，
 
 ### 结论
 
-M1 **打通**：`hello.ws → wd c → Zig cc → .wasm → iwasm`，
-核心 conformance 26/27（1 个原语义 skip；可运行子集 26/26）通过，
-文件 IO 在 preopen 下通过；安全门禁 S-1..S-20 20/20（含 symlink/import/ro 拒绝）。
-仍未完成：路径逃逸/FFI/未知 import 负向、W2.5（cgen 顶层化）、
-`-t wasm` CLI、性能基线。因此**还不能**把 WASM 宣称为生产安全边界。
+M2 **部分打通**：`hello.ws → wd c/wd wasm → Zig cc → .wasm → iwasm`，
+核心 conformance **27/27**，文件 IO 在 preopen/root preopen 下通过；
+安全门禁 S-1..S-20 **20/20**（symlink/import/ro 拒绝）；fixedpoint
+`gen2 == gen3`，seed 已重建。仍未完成：host HTTP 代理。
+因此**还不能**把 WASM 宣称为生产安全边界。

@@ -486,7 +486,7 @@ trusted-only。
 （`target/toolchain`）。
 
 **状态（2026-10-21）**：M1 打通——hello 输出正确；core conformance
-26/27 通过（1 个原语义 skip）；preopen 文件/目录正负各例通过；
+27/27 通过（`26_file_io` 在 root preopen 下跑）；preopen 文件/目录正负各例通过；
 安全门禁 20/20；journal 10k list 0.63s vs native 0.24s（输出一致）。
 cgen 顶层化（W2.5）已实现，clang/macOS 不再需要 GNU 嵌套函数；
 fixedpoint 已验证 `gen2 == gen3`；seed 已用新编译器重建并通过
@@ -508,7 +508,7 @@ Step 3   (驱动 wd)      3-5 天    ✅ 已完成 2026-09-21（里程碑 A/B + 
 Step 4   (工具迁移)     1-2 周    🔄 fmt v1 已落地（2026-10-20，布局规范化 + 门禁）；其余未开始
 Step 5   (Whisper VM)   ?         ← 可选，前置是 call + 可变数组；**不是安全方案**（见 Step 7）
 Step 6   (C 降级为接口) 数天      ✅ 已完成 2026-09-21
-Step 7   (WASM/WASI)    4-6 周    🟡 M1 打通（hello + core 26/27；W2.5 待做）
+Step 7   (WASM/WASI)    4-6 周    🟡 M2 部分（hello + core 27/27；安全 20/20）
 ```
 
 **门禁基线（2026-09-21 收口战役后，本机实测，gcc = msys64 mingw 16.1.0）**：

@@ -50,5 +50,8 @@ jobs:
       - name: WASI security gate
         run: bash scripts/wasm-security-gate.sh
 
+      - name: WASM core conformance
+        run: bash scripts/wasm-conformance.sh
+
       - name: wrun policy gate
         run: bash scripts/wrun-gate.sh
