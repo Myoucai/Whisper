@@ -2,6 +2,7 @@
 # Build a Whisper source file to a WASI module, with a zero-Rust *runtime*.
 #
 #   bash scripts/build-wasm.sh hello.ws [hello.wasm]
+set -euo pipefail
 #
 # Compiler: Zig `cc` (bundled wasi-libc) or wasi-sdk clang.
 # Runtime:  WAMR iwasm / wasm3 / wasm2c (C only; wasmtime/wasmer rejected).
@@ -78,6 +79,7 @@ if [ -z "$CC" ]; then
 fi
 
 echo "[build-wasm] C: $C"
+rm -f "$OUT"
 case "$CC" in
     zig)
         command -v zig >/dev/null 2>&1 || { echo "build-wasm: zig not found" >&2; exit 1; }

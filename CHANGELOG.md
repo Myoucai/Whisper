@@ -63,7 +63,9 @@
   `build-wasm.sh` 加 `-mno-simd128`，避免 WAMR 的 SIMD 检查失败；
   `whisper_test/run_core.sh` 的 `=` 期望改为 `#t/#f`（与 spec/VM 一致）；
   `app-gate.sh` 增加 server readiness 轮询并保留启动日志，避免把
-  “还没起来”误报成 13 条路由全空。
+  “还没起来”误报成 13 条路由全空；
+  `build-wasm.sh` 加 `set -euo pipefail` 并在编译前删旧输出，
+  避免编译失败后误用上次的 stale `.wasm`。
 - WASM 核心 conformance 补齐 `26_file_io`：新增
   `scripts/wasm-conformance.sh`，用 root preopen 跑相对路径文件用例，
   **27/27 通过**；CI wasm job 增加该门禁。
