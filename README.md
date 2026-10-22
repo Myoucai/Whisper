@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.1.0-7cffc4" alt="version">
+  <img src="https://img.shields.io/badge/version-1.2.0-7cffc4" alt="version">
   <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2014%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
@@ -192,6 +192,10 @@ whisper run hello.ws
 | 网络 | `listen accept recv send serve-concurrent` |
 | KV | `kv-set kv-get kv-del kv-keys`（进程级 str→str 共享存储） |
 | 生成 | `range`（`start count → [start..start+count-1]`，预分配） |
+
+> native 目标的网络默认保持历史行为开启；启动器可设 `WHISPER_NET=0` 让
+> 本次进程拒绝所有网络 opcode。WASM v1 不走这个开关：guest 永远无网络，
+> 见 [docs/wasm-v1-release.md](docs/wasm-v1-release.md)。
 
 ## 自举
 

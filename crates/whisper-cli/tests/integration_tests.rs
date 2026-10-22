@@ -1361,7 +1361,10 @@ fn http_capabilities_match_across_chains() {
         } else {
             exe.with_extension(std::env::consts::EXE_EXTENSION)
         };
-        let c2 = std::process::Command::new(&artifact).output().unwrap();
+        let c2 = std::process::Command::new(&artifact)
+            .env("WHISPER_NET", "1")
+            .output()
+            .unwrap();
         assert!(
             c2.status.success(),
             "[{name}] native run failed: {}",
@@ -1462,7 +1465,10 @@ fn https_is_refused_and_never_sent_as_plaintext() {
     } else {
         exe.with_extension(std::env::consts::EXE_EXTENSION)
     };
-    let c2 = std::process::Command::new(&artifact).output().unwrap();
+    let c2 = std::process::Command::new(&artifact)
+        .env("WHISPER_NET", "1")
+        .output()
+        .unwrap();
     assert!(!c2.status.success(), "C chain must refuse https://");
     assert!(
         String::from_utf8_lossy(&c2.stderr).contains("HTTPS is not yet supported"),

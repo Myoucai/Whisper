@@ -48,7 +48,18 @@ else
         echo "FAIL: c2 build failed"; exit 1; }
 fi
 
-"$TMP/httpd.exe" >/dev/null 2>&1 &
+# Switch: native network must be explicitly disabled by WHISPER_NET=0.
+if WHISPER_NET=0 "$TMP/httpd.exe" >"$TMP/off.out" 2>"$TMP/off.err"; then
+    echo "FAIL: server ran with WHISPER_NET=0"
+    exit 1
+fi
+grep -q 'network disabled' "$TMP/off.err" || {
+    echo "FAIL: WHISPER_NET=0 did not explain the refusal"
+    cat "$TMP/off.err"
+    exit 1
+}
+
+WHISPER_NET=1 "$TMP/httpd.exe" >/dev/null 2>&1 &
 SRV_PID=$!
 sleep 2
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased (1.2.0) — native network switch
+
+- `whisperc/runtime.c`：native 网络 opcode（`@2/@3/@6`、`listen/accept/
+  recv/send`、`serve-concurrent`）统一经 `w_net_require`；`WHISPER_NET=0`
+  让本次进程整体拒绝网络并给出明确错误。默认保持历史开启，避免破坏
+  native 用户；WASM v1 仍恒无网络（host proxy 未实现）。
+- `scripts/net-gate.sh` 增加 `WHISPER_NET=0` 负向断言。
+- `crates/whisper-cli/tests/integration_tests.rs` 的 native HTTP 测试显式
+  设 `WHISPER_NET=1`，避免依赖宿主环境。
+
 ## v1.1.0 (2026-10-22) — WASM/WASI v1（无网络）
 
 ### 新增/修改

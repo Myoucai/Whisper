@@ -213,6 +213,10 @@ Rust 侧类型检查，不受影响。
 | `kv-keys` | 248 | → [keys] | 所有键的列表 |
 | `serve-concurrent` | 255 | port handler → | C 链：每连接一线程（永不返回）；Rust VM：串行 accept 循环（同源程序） |
 
+native 目标的网络默认开启（历史兼容）；启动器设 `WHISPER_NET=0` 后，
+`@2/@3/@6`、`listen/accept/recv/send`、`serve-concurrent` 全部显式失败。
+WASM v1 不受该开关影响：guest 始终无网络。
+
 KV 是 **进程级字符串→字符串存储**（1024 键上限，互斥保护），与栈上的 Map（函数式、
 按值复制）是两个层次：KV 用于跨请求/跨线程的共享状态。`serve-concurrent` 的 handler
 以词名引用（C 链 cgen 自动生成 w_find_word 注册表），接收 conn 句柄；handler 返回后由

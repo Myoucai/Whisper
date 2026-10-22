@@ -118,6 +118,24 @@ static void w_fail(const char *msg) {
 }
 #endif
 
+// Ambient network is opt-in for native programs too.  WASM stays hard-off:
+// its stubs fail before this check and there is no socket import.
+static int w_net_enabled(void) {
+    const char *v = getenv("WHISPER_NET");
+    // Native is the trusted target: keep historical network-on behavior.
+    // WHISPER_NET=0 lets a launcher turn it off for native too.
+    if (!v || !*v) return 1;
+    if (strcmp(v, "0") == 0 || strcmp(v, "false") == 0 ||
+        strcmp(v, "no") == 0 || strcmp(v, "off") == 0) return 0;
+    return 1;
+}
+static void w_net_require(const char *what) {
+    if (!w_net_enabled()) {
+        w_fail("network disabled (WHISPER_NET=0; WASM v1 has no network at all)");
+    }
+    (void)what;
+}
+
 static inline wval W_I64(int64_t x)  { wval r; r.v = (uint64_t)x; r.t = WT_I64; return r; }
 static inline wval W_F64(double d)   { wval r; memcpy(&r.v, &d, 8); r.t = WT_F64; return r; }
 static inline wval W_PTR(void *p)    { wval r; r.v = (uint64_t)p;  r.t = WT_PTR; return r; }
@@ -2028,6 +2046,7 @@ static void w_net_init(void) {
 
 // listen(port) -> server handle | -1
 static wval w_sock_listen(int64_t port) {
+    w_net_require("listen");
     w_socket_t s = socket(AF_INET, SOCK_STREAM, 0);
     if (s == W_BAD_SOCKET) return W_I64(-1);
     int opt = 1;
@@ -2044,6 +2063,7 @@ static wval w_sock_listen(int64_t port) {
 
 // accept(server) -> conn handle | -1 (blocking)
 static wval w_sock_accept(wval srv) {
+    w_net_require("accept");
     w_socket_t c = accept((w_socket_t)w_as_i64(srv), NULL, NULL);
     if (c == W_BAD_SOCKET) return W_I64(-1);
     return W_I64((int64_t)c);
@@ -2074,6 +2094,7 @@ static int w_hdr_content_length(const char *buf, size_t len) {
 }
 
 static wval w_sock_recv(wval h) {
+    w_net_require("recv");
     w_socket_t c = (w_socket_t)w_as_i64(h);
 #ifdef _WIN32
     DWORD ms = 2000;
@@ -2111,6 +2132,7 @@ static wval w_sock_recv(wval h) {
 
 // send(conn, data) -> bytes sent | -1
 static wval w_sock_send(wval h, const char *s) {
+    w_net_require("send");
     w_socket_t c = (w_socket_t)w_as_i64(h);
     int n = (int)send(c, s, w_str_len(s), 0);
     return W_I64((int64_t)n);
@@ -2265,6 +2287,7 @@ static char *w_http_read_all(w_socket_t s, char *err, size_t errlen) {
 // filled in.
 static char *w_http_request(const char *method, const char *url, const char *body,
                             char *err, size_t errlen) {
+    w_net_require("http");
     w_url u;
     w_socket_t s;
     char *req = NULL, *resp = NULL, *out = NULL;
@@ -2778,6 +2801,7 @@ static void *w_worker_main(void *arg) {
 }
 
 static void w_serve_concurrent(int64_t port, wfn handler) {
+    w_net_require("serve-concurrent");
     wval srv = w_sock_listen(port);
     if (w_as_i64(srv) < 0) { fprintf(stderr, "serve-concurrent: listen failed\n"); exit(1); }
     for (;;) {
