@@ -78,8 +78,8 @@ bash scripts/verify-fixedpoint.sh         # gen2 == gen3
 - [ ] 上述命令全绿（CI + 本地）
 - [ ] `README` / `spec` / `security-model` 与本文件一致
 - [ ] CHANGELOG 记录 v1 范围和限制
-- [ ] 确认是否需要打 tag（建议 `v1.0.8-wasm.1`；当前 release workflow
-      只处理 `v*` tag 的原生构建，不要误触发）
+- [ ] 确认是否需要打 tag（建议 `v1.1.0`；当前 release workflow
+      只处理 `v*` tag 的原生构建，已在本次收口中加入 WASM release body）
 - [ ] 若打 tag，附上本文件链接和已知限制
 
 ## 7. 不在 v1

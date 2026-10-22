@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (2026-10-22) — WASM/WASI v1（无网络）发布候选
+## v1.1.0 (2026-10-22) — WASM/WASI v1（无网络）
 
 ### 新增/修改
 
