@@ -53,6 +53,10 @@
   `build-wd.sh --fast`（Rust CLI 只负责发射 C，运行期仍是 C，生产默认
   仍是零 Rust 三段链）。fmt/wfmt 一并移到该 job；stage 3 的 gcc 优化
   从 `-O2` 降到 `-O1`。
+- `whisperc/runtime.c`：Linux/macOS 堆分配在 16GB 失败后按 1/2 降到
+  16MB（原为 256MB 下限），并支持 `WHISPER_HEAP_MB` 覆盖；
+  `app-gate` 以 128MB 启动 server，避免低 RLIMIT_AS runner 上
+  “mmap: Success” 启动失败。
 - 测试夹具跨平台修正（非运行时）：`-lws2_32` 只在 Windows 加；
   `@10` raw newline 期望值按 POSIX/Windows 区分；
   `wd-c-gate` C-4 兼容无 `.exe` 的 POSIX 产物；

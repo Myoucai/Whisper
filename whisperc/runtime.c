@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <errno.h>
 #include <math.h>
 #ifdef __wasi__
 #  define W_WASI 1
@@ -273,6 +274,15 @@ static void w_heap_init(void) {
     w_heap = (char *)malloc((size_t)w_heap_size);
     if (w_heap == NULL) { fprintf(stderr, "malloc failed for %lld bytes\n", w_heap_size); exit(1); }
 #else
+    if (w_heap_size == 0) {
+        // Allow constrained hosts (CI containers with a low RLIMIT_AS) to
+        // request a smaller heap without rebuilding the program.
+        const char *hm = getenv("WHISPER_HEAP_MB");
+        if (hm && *hm) {
+            long mb = strtol(hm, NULL, 10);
+            if (mb >= 4 && mb <= 16384) w_heap_size = (long long)mb * 1024LL * 1024LL;
+        }
+    }
     if (w_heap_size == 0) w_heap_size = HEAP_SIZE;
     {
         // GitHub Linux/macOS runners may cap virtual address space below the
@@ -286,14 +296,18 @@ static void w_heap_init(void) {
 #endif
         w_heap = MAP_FAILED;
         int got = 0;
-        while (want >= (size_t)(256LL * 1024 * 1024)) {
+        while (want >= (size_t)(16LL * 1024 * 1024)) {
             w_heap = mmap(NULL, want, PROT_READ | PROT_WRITE, flags, -1, 0);
             if (w_heap != MAP_FAILED) { got = 1; break; }
             w_heap = (char *)malloc(want);
             if (w_heap != NULL) { got = 1; break; }
-            want /= 4;
+            want /= 2;
         }
-        if (!got) { perror("mmap"); exit(1); }
+        if (!got) {
+            fprintf(stderr, "mmap failed: requested=%lld errno=%d\n", w_heap_size, errno);
+            perror("mmap");
+            exit(1);
+        }
         w_heap_size = (long long)want;
     }
 #endif

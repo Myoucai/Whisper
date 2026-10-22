@@ -218,6 +218,8 @@ KV 是 **进程级字符串→字符串存储**（1024 键上限，互斥保护�
 以词名引用（C 链 cgen 自动生成 w_find_word 注册表），接收 conn 句柄；handler 返回后由
 runtime 关闭连接——handler 内**不要** close（双重释放）。
 C 链每 worker 独立 64MB 堆 + 512K 栈（`__thread`），已通过 10 路并行负载全路由验证。
+普通 C 程序默认 16GB 懒提交堆；受限 runner 可用 `WHISPER_HEAP_MB` 覆盖，
+分配失败时会逐级降到 16MB 再报错。
 一致性由 app-gate 的 13 项路由断言强制（含 KV CRUD、404/405+Allow 头、%XX 多字节 URL 解码）。
 
 ## 8. 词汇附录 v1.0.3（交互与字符串 P0）

@@ -29,7 +29,7 @@ fi
 # reset the persistent counter for a deterministic check
 printf '0' > "$APP/data/visits.txt"
 
-(cd "$APP" && WS_PORT="$PORT" "$TMP/server.exe" >"$TMP/server.log" 2>&1) &
+(cd "$APP" && WS_PORT="$PORT" WHISPER_HEAP_MB=128 "$TMP/server.exe" >"$TMP/server.log" 2>&1) &
 SRV_PID=$!
 ready=0
 i=0
