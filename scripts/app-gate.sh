@@ -29,9 +29,22 @@ fi
 # reset the persistent counter for a deterministic check
 printf '0' > "$APP/data/visits.txt"
 
-(cd "$APP" && WS_PORT="$PORT" "$TMP/server.exe" >/dev/null 2>&1) &
+(cd "$APP" && WS_PORT="$PORT" "$TMP/server.exe" >"$TMP/server.log" 2>&1) &
 SRV_PID=$!
-sleep 2
+ready=0
+i=0
+while [ "$i" -lt 20 ]; do
+    if curl -s --max-time 1 "http://127.0.0.1:$PORT/api" >/dev/null 2>&1; then
+        ready=1; break
+    fi
+    sleep 0.5
+    i=$((i+1))
+done
+if [ "$ready" -eq 0 ]; then
+    echo "FAIL: app server did not become ready"
+    tail -20 "$TMP/server.log" 2>/dev/null
+    exit 1
+fi
 
 api="$(curl -s --max-time 5 "http://127.0.0.1:$PORT/api" 2>/dev/null)"
 idx="$(curl -s --max-time 5 "http://127.0.0.1:$PORT/f/about.html" 2>/dev/null | head -c 30)"
@@ -70,5 +83,6 @@ else
     echo "=== app gate: FAIL ==="
     echo "  api=[$api] idx=[$idx] nf=[$nf]"
     echo "  greet=[$greet] echo=[$echo] v1=[$v1] v2=[$v2]"
+    tail -20 "$TMP/server.log" 2>/dev/null
     exit 1
 fi
