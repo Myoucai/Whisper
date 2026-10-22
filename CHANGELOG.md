@@ -49,6 +49,9 @@
   修正 test 7/8 的错误期望；本地 C-emission 22/22。
 - `tests/cgen_toplevel_preregistered.md`：W2.5 G-1..G-8；cgen 已实现，
   fixedpoint 通过（`gen2 == gen3`）；seed 已用新编译器重建并通过冒烟。
+- CI 将零 Rust `wd` 构建从 selfhost 拆成独立 `wd-build` job
+  （避免 fixedpoint + wd 构建叠加触发 6h job timeout）；stage 3 的
+  gcc 优化从 `-O2` 降到 `-O1`（wd 是构建工具，不是热路径）。
 - 测试夹具跨平台修正（非运行时）：`-lws2_32` 只在 Windows 加；
   `@10` raw newline 期望值按 POSIX/Windows 区分；
   `wd-c-gate` C-4 兼容无 `.exe` 的 POSIX 产物；

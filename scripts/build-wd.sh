@@ -28,7 +28,8 @@ echo "[wd] 3/3 whisper1 compiles compiler+wd -> wd" >&2
 sed '$d' "$ROOT/whisperc/compiler.all.ws" > "$TMP/wd-src.ws"
 cat "$ROOT/whisperc/wd.ws" >> "$TMP/wd-src.ws"
 "$TMP/whisper1" -c < "$TMP/wd-src.ws" > "$TMP/wd.c" 2>/dev/null
-"$GCC" -O2 -w -o "$OUT/wd" "$TMP/wd.c" -I "$ROOT/whisperc" -lm $EXTRA_LIBS
+# wd is a build tool, not a hot path; -O1 keeps gcc memory/time down on CI.
+"$GCC" -O1 -w -o "$OUT/wd" "$TMP/wd.c" -I "$ROOT/whisperc" -lm $EXTRA_LIBS
 
 rm -rf "$TMP"
 echo "[wd] OK -> $OUT/wd" >&2

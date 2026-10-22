@@ -108,6 +108,7 @@ jobs:
   selfhost:
     name: Self-hosting chain (C seed)
     runs-on: ubuntu-latest
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
       - name: Build seed compiler
@@ -130,11 +131,6 @@ jobs:
         run: |
           cargo build -p whisper-cli
           bash scripts/stdlib-gate.sh
-      - name: Zero-Rust wd build + cache gate
-        run: |
-          bash scripts/build-wd.sh
-          bash scripts/wd-cache-gate.sh
-          bash scripts/wd-c-gate.sh
       - name: Step 4 fmt gate (Whisper formatter)
         run: |
           bash scripts/build-wfmt.sh
@@ -149,6 +145,19 @@ jobs:
         run: bash scripts/net-gate.sh
       - name: "App gate (Whisper web backend: JSON/static/404 routes)"
         run: bash scripts/app-gate.sh
+
+  wd-build:
+    name: Zero-Rust wd build
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build wd (seed -> whisper1 -> wd)
+        run: bash scripts/build-wd.sh
+      - name: wd cache gate
+        run: bash scripts/wd-cache-gate.sh
+      - name: wd c gate
+        run: bash scripts/wd-c-gate.sh
 
   lint:
     name: Lint
