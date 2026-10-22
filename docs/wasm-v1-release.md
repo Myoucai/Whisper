@@ -1,7 +1,8 @@
 # WASM v1（无网络）发布说明
 
-2026-10-22。状态：**功能冻结 / 发布候选**。本文件是 WASM v1 的支持矩阵、
-安全边界和验收记录；真正打 tag 前只需确认最后一节。
+2026-10-22。状态：**v1.1.0 已发布**。本文件是 WASM v1 的支持矩阵、
+安全边界和验收记录；后续版本见 [release-notes.md](release-notes.md) 和
+[roadmap.md](roadmap.md)。
 
 ## 1. 定位
 
@@ -75,12 +76,11 @@ bash scripts/verify-fixedpoint.sh         # gen2 == gen3
 
 ## 6. 发布前最后检查
 
-- [ ] 上述命令全绿（CI + 本地）
-- [ ] `README` / `spec` / `security-model` 与本文件一致
-- [ ] CHANGELOG 记录 v1 范围和限制
-- [ ] 确认是否需要打 tag（建议 `v1.1.0`；当前 release workflow
-      只处理 `v*` tag 的原生构建，已在本次收口中加入 WASM release body）
-- [ ] 若打 tag，附上本文件链接和已知限制
+- [x] 上述命令全绿（CI + 本地）
+- [x] `README` / `spec` / `security-model` 与本文件一致
+- [x] CHANGELOG 记录 v1 范围和限制
+- [x] 已打 tag `v1.1.0` 并生成 GitHub Release
+- [x] Release 附上本文件链接和已知限制
 
 ## 7. 不在 v1
 

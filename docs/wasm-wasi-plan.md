@@ -18,8 +18,9 @@
 
 ### 0.1 当前进展（2026-10-22）
 
-- **v1（无网络）发布候选**：支持矩阵/限制见
-  [`wasm-v1-release.md`](wasm-v1-release.md)。
+- **v1.1.0 已发布（无网络）**：支持矩阵/限制见
+  [`wasm-v1-release.md`](wasm-v1-release.md)，后续见
+  [`roadmap.md`](roadmap.md)。
 - **M1/M2 已打通**：`hello.ws → wd c/wd wasm → Zig cc → .wasm`，
   输出 `Hello, World!`。运行链路零 Rust（Zig 是 C 工具链，WAMR 是 C）。
 - `wd c` 只发射 C；`wd wasm` 直接调 zig（不经过 bash）；`wd c` 与

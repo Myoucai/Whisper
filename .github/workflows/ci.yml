@@ -189,8 +189,9 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          body_path: docs/wasm-v1-release.md
+          body_path: docs/release-notes.md
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             target/release/whisper
+            docs/release-notes.md
             docs/wasm-v1-release.md
