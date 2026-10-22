@@ -1,18 +1,23 @@
 # Changelog
 
-## Unreleased (2026-10-21) — WASM/WASI M1：零 Rust 运行链路打通
+## Unreleased (2026-10-22) — WASM/WASI v1（无网络）发布候选
 
 ### 新增/修改
 
+- 发布/支持矩阵：[`docs/wasm-v1-release.md`](docs/wasm-v1-release.md)；
+  core conformance 27/27、WASI 安全 20/20、fixedpoint/seed 已闭环。
+- 新增每日 `Zero-Rust wd build` workflow（`wd-zero-rust.yml`）：
+  独立跑完整 seed → whisper1 → wd 链路并缓存产物；普通 CI 的
+  `wd-build` 仍用 `--fast`，避免 42 分钟 stage 3 阻塞 PR。
 - `whisperc/runtime.c`：增加 `W_WASI` 条件编译——
   - 64MB `malloc` 堆（替代 16GB `mmap`）；
   - 文件/env/时间/core 保留；`@2`/`@3`/`@5`/`@10` 在 WASI 下显式
     `unsupported`；FFI/裸 socket/`serve-concurrent` 不编译；
   - `try` 在 WASI 下显式 unsupported（wasi-libc 无 setjmp/longjmp）；
   - 修复非 Windows FFI 分支的 `dlopen(p, ...)` 未定义变量。
-  - 非 WASI 堆 reserve 改为 `MAP_NORESERVE` + 16GB→4GB→1GB→256MB
-    回退（mmap 失败再试 malloc），并补 `<sys/time.h>`；修复
-    Ubuntu/macOS CI 上 C 程序启动即空输出的问题。
+  - 非 WASI 堆 reserve 改为 `MAP_NORESERVE` + 16GB→4GB→1GB→256MB→…
+    →16MB 回退（mmap 失败再试 malloc），并支持 `WHISPER_HEAP_MB`；补
+    `<sys/time.h>`；修复 Ubuntu/macOS CI 上 C 程序启动即空输出的问题。
 - `whisperc/wd.ws`：新增 `wd c <src> <out.c>`——只发射 C，不调 cc、
   不碰缓存；与 `whisper bootstrap` 的 hello C 输出逐字节一致。
 - `whisperc/wd.ws`：新增 `wd wasm <src> <out.wasm>`——发射 C 后直接调

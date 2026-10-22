@@ -1,0 +1,31 @@
+name: Zero-Rust wd build (nightly)
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  wd-zero-rust:
+    name: Full seed -> whisper1 -> wd
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache built wd
+        id: wd-cache
+        uses: actions/cache@v4
+        with:
+          path: target/wd/wd
+          key: wd-zero-rust-${{ hashFiles('whisperc/compiler.all.ws', 'whisperc/wd.ws', 'whisperc/seed/compiler_seed.c', 'whisperc/runtime.c', 'scripts/build-wd.sh') }}
+
+      - name: Build wd without Rust
+        if: steps.wd-cache.outputs.cache-hit != 'true'
+        run: bash scripts/build-wd.sh
+
+      - name: wd cache gate
+        run: bash scripts/wd-cache-gate.sh
+
+      - name: wd c gate
+        run: bash scripts/wd-c-gate.sh

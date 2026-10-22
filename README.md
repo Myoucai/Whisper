@@ -277,9 +277,9 @@ Whisper 的安全承诺**按执行路径分档**，不是所有产物都等价�
 - VM 默认配置下 `"msvcrt.dll" ffi-open .` 直接拿到 handle；
 - `-t c2` 产物无授权直接读文件、执行 `@5` 命令。
 
-**在 WASM v1 的完整负向安全门禁完成前，不可信代码仍需放在
-OS 沙箱/容器里运行；不要依赖 `whisper run` 或 native 产物做安全隔离。**
-完整威胁模型、缺口清单和整改不变量见
+**WASM v1（无网络）是发布候选，不是多租户生产沙箱**；不可信代码仍建议
+放在 OS 沙箱/容器里运行。支持矩阵、已知限制和验收记录见
+[docs/wasm-v1-release.md](docs/wasm-v1-release.md)；完整威胁模型见
 [docs/security-model.md](docs/security-model.md)。
 
 WASM/WASI 的详细计划与判据见 [docs/wasm-wasi-plan.md](docs/wasm-wasi-plan.md)
