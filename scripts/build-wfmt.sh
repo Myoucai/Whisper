@@ -7,7 +7,7 @@
 set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WD="${WD:-$ROOT/target/wd/wd}"
-[ -f "$WD" ] || WD="$WD.exe"
+if [ ! -f "$WD" ] && [ -f "$WD.exe" ]; then WD="$WD.exe"; fi
 OUT="${1:-$ROOT/target/wfmt/wfmt}"
 mkdir -p "$(dirname "$OUT")"
 if [ ! -f "$WD" ]; then

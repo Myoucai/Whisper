@@ -131,10 +131,6 @@ jobs:
         run: |
           cargo build -p whisper-cli
           bash scripts/stdlib-gate.sh
-      - name: Step 4 fmt gate (Whisper formatter)
-        run: |
-          bash scripts/build-wfmt.sh
-          bash scripts/fmt-gate.sh
       - name: Opcode coverage gate (VM vs self-hosted C chain, per-feature dual-run)
         run: bash tools/opcode_coverage.sh ./target/debug/whisper
       - name: Typecheck FP-ratchet gate (encoding/conformance; lexicon skipped on CI)
@@ -147,17 +143,24 @@ jobs:
         run: bash scripts/app-gate.sh
 
   wd-build:
-    name: Zero-Rust wd build
+    name: wd build (CI fast) + formatter
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
-      - name: Build wd (seed -> whisper1 -> wd)
-        run: bash scripts/build-wd.sh
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build CLI (C emission for the test-tool fast path)
+        run: cargo build -p whisper-cli
+      - name: Build wd via bootstrap C (test tool only)
+        run: bash scripts/build-wd.sh --fast
       - name: wd cache gate
         run: bash scripts/wd-cache-gate.sh
       - name: wd c gate
         run: bash scripts/wd-c-gate.sh
+      - name: Build wfmt
+        run: bash scripts/build-wfmt.sh
+      - name: fmt gate
+        run: bash scripts/fmt-gate.sh
 
   lint:
     name: Lint

@@ -70,6 +70,9 @@ bash scripts/build-wd.sh              # 全程无 cargo
 ./target/wd/wd run   hello.ws hello   # 编译并跑起来
 ```
 
+> CI 的 `wd-build` job 用 `bash scripts/build-wd.sh --fast`：Rust CLI 只把
+> `wd` 发射成 C，运行期仍是 C；生产/零 Rust 验证仍用不带 `--fast` 的三段链。
+
 **当前范围（如实说明）**：能编含 `import` 的程序（`std/core` 自动补、命名
 空间限定名按 `math.sq` 形式可用），与 `-t c2` 的 C 输出**逐字节一致**（自包含、
 带 import、多行定义四类程序由 `w2_wd_output_matches_c2_byte_for_byte` 常驻
