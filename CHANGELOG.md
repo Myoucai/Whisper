@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased (1.3.0) — native @6 HTTPS
+
+- C/native `@6`：HTTP/HTTPS status/headers/body；chunked 解码；TLS 通过
+  运行时动态加载 OpenSSL（无链接依赖）；证书链/hostname 校验；
+  `WHISPER_TLS_CA` 可指定 CA。
+- 新增 `scripts/https-gate.sh`：自签 CA、未信任 CA、hostname mismatch；
+  已接入 CI selfhost。
+- 已知待补：C 链 cookie jar、用户 headers、audit；`@7`-`@9` 仍未实现。
+- WASM v1 不变：guest 仍无网络。
+
 ## v1.2.0 (2026-10-22) — native network switch
 
 - 新增 [`docs/roadmap.md`](docs/roadmap.md) 与
