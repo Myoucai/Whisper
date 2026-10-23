@@ -4,7 +4,7 @@
 
 - C/native `@6`：HTTP/HTTPS status/headers/body；chunked 解码；TLS 通过
   运行时动态加载 OpenSSL（无链接依赖）；证书链/hostname 校验；
-  `WHISPER_TLS_CA` 可指定 CA。
+  `WHISPER_TLS_CA` 可指定 CA；cookie jar、用户 headers、基础 `@7` 审计。
 - 新增 `scripts/https-gate.sh`：自签 CA、未信任 CA、hostname mismatch；
   已接入 CI selfhost。
 - 已知待补：C 链 cookie jar、用户 headers、audit；`@7`-`@9` 仍未实现。

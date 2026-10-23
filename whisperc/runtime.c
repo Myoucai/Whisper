@@ -2567,6 +2567,148 @@ static char *w_headers_json(const char *p, size_t n) {
     return out;
 }
 
+static int w_ci_eq_n(const char *a, const char *b, size_t n) {
+    for (size_t i = 0; i < n; i++) {
+        unsigned char x = (unsigned char)a[i], y = (unsigned char)b[i];
+        if (x >= 'A' && x <= 'Z') x = (unsigned char)(x + 32);
+        if (y >= 'A' && y <= 'Z') y = (unsigned char)(y + 32);
+        if (x != y) return 0;
+    }
+    return 1;
+}
+
+// Parse a flat JSON object of string headers. Host/Content-Length/Cookie are
+// managed by the runtime; values containing CR/LF are rejected (injection).
+static char *w_user_headers(const char *json, char *err, size_t errlen) {
+    size_t cap = 256, len = 0;
+    char *out = (char *)malloc(cap);
+    if (!out) { snprintf(err, errlen, "out of memory"); return NULL; }
+    out[0] = 0;
+    const char *p = json;
+    if (!p || *p != '{') { snprintf(err, errlen, "headers-json must be an object"); free(out); return NULL; }
+    p++;
+    for (;;) {
+        while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+        if (*p == '}') break;
+        if (*p != '"') { snprintf(err, errlen, "bad headers-json key"); free(out); return NULL; }
+        p++;
+        const char *ks = p;
+        while (*p && *p != '"') p++;
+        if (!*p) { snprintf(err, errlen, "unterminated headers-json key"); free(out); return NULL; }
+        size_t klen = (size_t)(p - ks);
+        p++;
+        while (*p == ' ' || *p == '\t') p++;
+        if (*p != ':') { snprintf(err, errlen, "bad headers-json separator"); free(out); return NULL; }
+        p++;
+        while (*p == ' ' || *p == '\t') p++;
+        if (*p != '"') { snprintf(err, errlen, "headers-json values must be strings"); free(out); return NULL; }
+        p++;
+        const char *vs = p;
+        while (*p && *p != '"') {
+            if (*p == '\\' && p[1]) p += 2;
+            else if (*p == '\r' || *p == '\n') {
+                snprintf(err, errlen, "headers-json value contains CR/LF"); free(out); return NULL;
+            } else p++;
+        }
+        if (!*p) { snprintf(err, errlen, "unterminated headers-json value"); free(out); return NULL; }
+        size_t vlen = (size_t)(p - vs);
+        p++;
+        int skip = w_ci_eq_n(ks, "host", klen) || w_ci_eq_n(ks, "content-length", klen) ||
+                   w_ci_eq_n(ks, "cookie", klen);
+        if (!skip) {
+            size_t need = len + klen + vlen + 4;
+            if (need > cap) {
+                cap = need * 2;
+                char *nb = (char *)realloc(out, cap);
+                if (!nb) { snprintf(err, errlen, "out of memory"); free(out); return NULL; }
+                out = nb;
+            }
+            memcpy(out + len, ks, klen); len += klen;
+            out[len++] = ':'; out[len++] = ' ';
+            memcpy(out + len, vs, vlen); len += vlen;
+            out[len++] = '\r'; out[len++] = '\n'; out[len] = 0;
+        }
+        while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+        if (*p == ',') { p++; continue; }
+        if (*p == '}') break;
+        snprintf(err, errlen, "bad headers-json object"); free(out); return NULL;
+    }
+    return out;
+}
+
+static char *w_cookie_jar = NULL; // process-level @6 cookie jar, "k=v; ..."
+static char *w_audit_log = NULL;  // process-level @7 audit, one line per request
+
+static void w_audit_add(const char *method, const char *url, long status) {
+    char line[1024];
+    snprintf(line, sizeof(line), "%s %s %ld\n", method, url, status);
+    size_t n = (w_audit_log ? strlen(w_audit_log) : 0) + strlen(line) + 1;
+    char *p = (char *)realloc(w_audit_log, n);
+    if (!p) return;
+    if (!w_audit_log) p[0] = 0;
+    w_audit_log = p;
+    strcat(w_audit_log, line);
+}
+
+static void w_jar_update(const char *resp, size_t n) {
+    const char *line = resp, *end = resp + n;
+    while (line < end) {
+        const char *e = line;
+        while (e < end && *e != '\n') e++;
+        if ((size_t)(e - line) > 11 && w_ci_eq_n(line, "set-cookie:", 11)) {
+            const char *v = line + 11, *ve = e;
+            while (v < ve && (*v == ' ' || *v == '\t')) v++;
+            const char *semi = v;
+            while (semi < ve && *semi != ';') semi++;
+            while (semi > v && (semi[-1] == '\r' || semi[-1] == ' ' || semi[-1] == '\t')) semi--;
+            const char *eq = v;
+            while (eq < semi && *eq != '=') eq++;
+            if (eq < semi) {
+                size_t nlen = (size_t)(eq - v), vlen = (size_t)(semi - eq - 1);
+                char *newjar = (char *)malloc((w_cookie_jar ? strlen(w_cookie_jar) : 0) + nlen + vlen + 4);
+                if (newjar) {
+                    size_t k = 0;
+                    if (w_cookie_jar && *w_cookie_jar) {
+                        const char *q = w_cookie_jar;
+                        while (*q) {
+                            const char *qe = strchr(q, ';');
+                            size_t qn = qe ? (size_t)(qe - q) : strlen(q);
+                            const char *qeq = memchr(q, '=', qn);
+                            int same = qeq && (size_t)(qeq - q) == nlen && w_ci_eq_n(q, v, nlen);
+                            if (!same && qn > 0) {
+                                if (k) newjar[k++] = ';'; newjar[k++] = ' ';
+                                memcpy(newjar + k, q, qn); k += qn;
+                            }
+                            if (!qe) break;
+                            q = qe + 1;
+                            while (*q == ' ') q++;
+                        }
+                    }
+                    if (k) newjar[k++] = ';'; newjar[k++] = ' ';
+                    memcpy(newjar + k, v, nlen); k += nlen;
+                    newjar[k++] = '=';
+                    memcpy(newjar + k, eq + 1, vlen); k += vlen;
+                    newjar[k] = 0;
+                    free(w_cookie_jar);
+                    w_cookie_jar = newjar;
+                }
+            }
+        }
+        line = e < end ? e + 1 : end;
+    }
+}
+
+static char *w_jar_header(void) {
+    if (!w_cookie_jar || !*w_cookie_jar) {
+        char *e = (char *)malloc(1); if (e) e[0] = 0; return e;
+    }
+    size_t n = strlen(w_cookie_jar);
+    char *out = (char *)malloc(n + 10);
+    if (!out) return NULL;
+    sprintf(out, "Cookie: %s\r\n", w_cookie_jar);
+    return out;
+}
+
 typedef struct { long status; char *headers; char *body; } w_http_session_resp;
 
 static int w_ci_contains(const char *hay, const char *needle) {
@@ -2610,39 +2752,47 @@ static char *w_dechunk(const char *s, size_t *outlen) {
     return out;
 }
 
-static int w_http_session(const char *method, const char *url, const char *body,
-                          w_http_session_resp *out, char *err, size_t errlen) {
+static int w_http_session(const char *method, const char *url, const char *headers_json,
+                          const char *body, w_http_session_resp *out, char *err, size_t errlen) {
     w_net_require("http-session");
     w_url u;
     if (w_url_parse(url, &u) != 0) { snprintf(err, errlen, "Invalid URL: %s", url); return -1; }
+    char *uh = w_user_headers(headers_json ? headers_json : "{}", err, errlen);
+    if (!uh) { w_url_free(&u); return -1; }
+    char *ck = w_jar_header();
+    if (!ck) { free(uh); w_url_free(&u); snprintf(err, errlen, "out of memory"); return -1; }
     w_socket_t s = w_tcp_connect(u.host, u.port);
     if (s == W_BAD_SOCKET) {
         snprintf(err, errlen, "Connect to %s:%d failed", u.host, u.port);
-        w_url_free(&u); return -1;
+        free(uh); free(ck); w_url_free(&u); return -1;
     }
     w_tls tls;
     int use_tls = u.use_tls;
     if (use_tls) {
-        if (w_tls_load(&tls, err, errlen) != 0) { w_closesock(s); w_url_free(&u); return -1; }
+        if (w_tls_load(&tls, err, errlen) != 0) {
+            free(uh); free(ck); w_closesock(s); w_url_free(&u); return -1;
+        }
         if (w_tls_connect(&tls, u.host, s, err, errlen) != 0) {
-            w_tls_destroy(&tls); w_closesock(s); w_url_free(&u); return -1;
+            w_tls_destroy(&tls); free(uh); free(ck); w_closesock(s); w_url_free(&u); return -1;
         }
     }
     size_t bodylen = strlen(body);
-    size_t need = strlen(method) + strlen(u.path) + strlen(u.host) + bodylen + 256;
+    size_t need = strlen(method) + strlen(u.path) + strlen(u.host) + bodylen +
+                  strlen(uh) + strlen(ck) + 256;
     char *req = (char *)malloc(need);
     if (!req) {
         snprintf(err, errlen, "out of memory");
         if (use_tls) w_tls_destroy(&tls);
-        w_closesock(s); w_url_free(&u); return -1;
+        free(uh); free(ck); w_closesock(s); w_url_free(&u); return -1;
     }
     if (bodylen == 0)
-        snprintf(req, need, "%s %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n",
-                 method, u.path, u.host);
+        snprintf(req, need, "%s %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n%s%s\r\n",
+                 method, u.path, u.host, uh, ck);
     else
         snprintf(req, need, "%s %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n"
-                 "Content-Type: application/json\r\nContent-Length: %lu\r\n\r\n%s",
-                 method, u.path, u.host, (unsigned long)bodylen, body);
+                 "Content-Type: application/json\r\nContent-Length: %lu\r\n%s%s\r\n%s",
+                 method, u.path, u.host, (unsigned long)bodylen, uh, ck, body);
+    free(uh); free(ck);
     int off = 0;
     size_t reqlen = strlen(req);
     while (off < (int)reqlen) {
@@ -2663,6 +2813,7 @@ static int w_http_session(const char *method, const char *url, const char *body,
     if (!resp) return -1;
     char *hdr_end = strstr(resp, "\r\n\r\n");
     if (!hdr_end) { free(resp); snprintf(err, errlen, "invalid HTTP response"); return -1; }
+    w_jar_update(resp, (size_t)(hdr_end - resp));
     long status = 0;
     if (strncmp(resp, "HTTP/", 5) == 0) {
         char *sp = strchr(resp, ' ');
@@ -2671,6 +2822,7 @@ static int w_http_session(const char *method, const char *url, const char *body,
     out->headers = w_headers_json(resp, (size_t)(hdr_end - resp));
     out->body = w_dup_range(hdr_end + 4, strlen(hdr_end + 4));
     out->status = status;
+    w_audit_add(method, url, status);
     if (out->headers && w_ci_contains(out->headers, "chunked")) {
         size_t blen = 0;
         char *dec = w_dechunk(out->body ? out->body : "", &blen);
@@ -2848,11 +3000,10 @@ static void W__6(void) {                        // @6 http session
     const char *headers = (const char *)w_as_ptr(w_pop());
     const char *url = (const char *)w_as_ptr(w_pop());
     const char *method = (const char *)w_as_ptr(w_pop());
-    (void)headers; // TODO: parse user headers / cookie jar (P1 follow-up)
     char err[512];
     w_http_session_resp r;
     memset(&r, 0, sizeof(r));
-    if (w_http_session(method, url, body, &r, err, sizeof(err)) != 0) w_fail(err);
+    if (w_http_session(method, url, headers, body, &r, err, sizeof(err)) != 0) w_fail(err);
     w_push(W_I64(r.status));
     w_push(W_PTR(w_str_new(r.headers, (uint32_t)strlen(r.headers))));
     w_push(W_PTR(w_str_new(r.body, (uint32_t)strlen(r.body))));
@@ -2862,7 +3013,16 @@ static void W__6(void) {                        // @6 http session
 #else
 static void W__6(void) { w_fail("capability @6 (http-req (session)) is unsupported on wasm profile"); }
 #endif
-static void W__7(void) { w_cap_unimplemented(7, "http-audit"); }
+#ifndef W_WASI
+static void W__7(void) {                        // @7 http audit
+    const char *log = w_audit_log ? w_audit_log : "";
+    size_t n = strlen(log);
+    if (n > 0 && log[n - 1] == '\n') n--;
+    w_push(W_PTR(w_str_new(log, (uint32_t)n)));
+}
+#else
+static void W__7(void) { w_fail("capability @7 (http-audit) is unsupported on wasm profile"); }
+#endif
 static void W__8(void) { w_cap_unimplemented(8, "http-req-raw"); }
 static void W__9(void) { w_cap_unimplemented(9, "http-req-parallel"); }
 

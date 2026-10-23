@@ -1480,11 +1480,11 @@ fn https_never_falls_back_to_plaintext() {
     }
 }
 
-/// Step 2b, criterion S3: the HTTP *audit/raw/parallel* ids (7/8/9) are not
-/// implemented on the C chain, but a program that merely imports `std/http`
-/// must still build and run — so they cannot be rejected at compile time.
-/// They are defined as functions that fail loudly with the root cause.
-/// (@6 is now implemented as a basic HTTP(S) session.)
+/// Step 2b, criterion S3: raw/parallel ids (8/9) are not implemented on the
+/// C chain, but a program that merely imports `std/http` must still build and
+/// run — so they cannot be rejected at compile time. They are defined as
+/// functions that fail loudly with the root cause.
+/// (@6 is a basic HTTP(S) session; @7 exports its audit log.)
 #[test]
 fn unimplemented_capabilities_fail_loudly_not_at_compile_time() {
     if std::process::Command::new("gcc")
@@ -1518,7 +1518,6 @@ fn unimplemented_capabilities_fail_loudly_not_at_compile_time() {
     // Calling an unimplemented id must report the root cause, not a gcc
     // `implicit declaration`.
     for (name, source, needle) in [
-        ("audit", "\"\" @7 drop\n", "@7"),
         ("raw", "\"http://127.0.0.1:1/x\" @8 drop\n", "@8"),
         ("par", "\"http://127.0.0.1:1/x\" @9 drop\n", "@9"),
     ] {

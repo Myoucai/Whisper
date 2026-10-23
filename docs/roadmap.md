@@ -37,7 +37,8 @@ native/HTTP server 测试全绿；WASM 无网络不变。
 
 - [x] 选型文档：推荐 vendored mbedTLS；OpenSSL 仅开发备选
 - [x] 最小实现：C 链 `@6` HTTP/HTTPS（动态 OpenSSL、chunked、CA 校验）
-- [ ] cookie jar / 用户 headers / 审计（C 链与 VM 对齐）
+- [x] cookie jar / 用户 headers / 基础审计（`@7`）
+- [ ] cookie/audit 与 VM 的完整语义对拍
 - [ ] `@2/@3` 是否升级为 HTTPS，或继续显式拒绝
 - [ ] VM/C 链行为对拍
 - [ ] 负向测试：证书错误、过期、hostname mismatch、TLS 降级

@@ -18,7 +18,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.3.0-7cffc4" alt="version">
-  <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2015%20gates-brightgreen" alt="tests">
+  <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2016%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
   <img src="https://img.shields.io/badge/stdlib-20%20modules-blue" alt="stdlib">
@@ -335,16 +335,17 @@ bash scripts/wrun.sh --dir-ro /data::target/data app.wasm
 |------|----|------|---------|------------------------------|
 | `@2` | `http-get` | 仅 `http://` | ✅ | ✅（2026-09-21 起，逐行对拍一致） |
 | `@3` | `http-post` | 仅 `http://` | ✅ | ✅（同上） |
-| `@6` | `http-req` | `http://` + **`https://`**（VM: rustls；C: 动态 OpenSSL） | ✅ | 🟡 基本状态/headers/body；cookie jar/audit 待补 |
-| `@7` | `http-audit` | — | ✅ | ❌ 同上 |
+| `@6` | `http-req` | `http://` + **`https://`**（VM: rustls；C: 动态 OpenSSL） | ✅ | ✅ status/headers/body、cookie、用户 headers、chunked；audit 部分 |
+| `@7` | `http-audit` | 导出会话审计 | ✅ | ✅ 基础审计行 |
 | `@8` | `http-req-raw` | 同 `@6` | ✅ | ❌ 同上 |
 | `@9` | `http-req-parallel` | 同 `@6` | ✅ | ❌ 同上 |
 | `@10` | `exec-raw` | 同 `@5`，但两个流**不 trim** | ✅ | ✅（2026-09-21 起） |
 
 `@6` 家族另有 cookie 罐、每请求审计行、`Transfer-Encoding: chunked` 自动解码、
 host 白名单（零出域）、连接 10s/读写 15s 超时（挂死端点化为 status 0 无证据响应）。
-C 链 `@6` 已支持 HTTP/HTTPS 的 status/headers/body，并解码 chunked；
-cookie jar、用户 headers、audit 仍是 VM 侧完整，C 链待补。
+C 链 `@6` 已支持 HTTP/HTTPS 的 status/headers/body、cookie jar、用户
+headers、chunked 解码；`@7` 返回 `METHOD URL STATUS` 审计行。
+`@8`（raw）和 `@9`（parallel）仍是显式未实现。
 
 C 链 HTTPS 通过运行时动态加载 libssl（不增加链接依赖）：
 找不到 libssl 或没有受信任根时显式失败；可用
@@ -354,9 +355,9 @@ C 链 HTTPS 通过运行时动态加载 libssl（不增加链接依赖）：
 > 而不是把明文发到 443）。需要 HTTPS 请用 `@6`（C/VM 均已支持）。
 > `@2`/`@3` 的拒绝语义一致，并有测试断言**拒绝发生在建连之前**。
 
-> **c2 链未实现的 `@7`-`@9` 会显式失败**：程序照常构建（只 `import "std/http"`
+> **c2 链未实现的 `@8`-`@9` 会显式失败**：程序照常构建（只 `import "std/http"`
 > 而只用 `@2` 的程序不受影响），调用到未实现的 id 时打印
-> `capability @7 ... is not implemented on the C chain` 并退出。
+> `capability @8 ... is not implemented on the C chain` 并退出。
 > 其余能力——`@0` 文件读、`@1` 文件写、`@4` 环境变量、`@5` 执行命令、
 > `@10` 执行命令（原样流）——两条链均已实现并逐行对拍一致。详见
 > `docs/independence-design.md` Step 2a/2b 与 `tests/step2b_preregistered.md`。
@@ -481,6 +482,7 @@ bash scripts/wd-wasm-gate.sh                     # wd wasm 零 Rust C→wasm（W
 bash scripts/wasm-security-gate.sh               # WASI 安全 S-1..S-20（需 Zig/WAMR）
 bash scripts/wasm-conformance.sh                 # WASM core conformance 27/27
 bash scripts/https-gate.sh                       # native @6 HTTPS/CA/hostname（需 OpenSSL）
+bash scripts/http6-gate.sh                       # native @6 cookie/用户 header/audit
 bash scripts/wrun-gate.sh                        # wrun 策略 W-1..W-7（需 WAMR）
 bash scripts/build-wfmt.sh && bash scripts/fmt-gate.sh  # Whisper 写的 fmt（F-1..F-6）
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验

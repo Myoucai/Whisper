@@ -144,6 +144,8 @@ jobs:
         run: bash scripts/app-gate.sh
       - name: Native HTTPS gate (@6 + TLS verification)
         run: bash scripts/https-gate.sh
+      - name: "@6 cookie/header/audit gate"
+        run: bash scripts/http6-gate.sh
 
   wd-build:
     name: wd build (CI fast) + formatter
