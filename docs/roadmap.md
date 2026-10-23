@@ -36,8 +36,8 @@ native/HTTP server 测试全绿；WASM 无网络不变。
 设计见 [`native-https-plan.md`](native-https-plan.md)。
 
 - [x] 选型文档：推荐 vendored mbedTLS；OpenSSL 仅开发备选
-- [ ] vendor mbedTLS + `w_tls_*` 接口
-- [ ] C 链 `@6` HTTPS（证书校验、SNI、ALPN http/1.1）
+- [x] 最小实现：C 链 `@6` HTTP/HTTPS（动态 OpenSSL、chunked、CA 校验）
+- [ ] cookie jar / 用户 headers / 审计（C 链与 VM 对齐）
 - [ ] `@2/@3` 是否升级为 HTTPS，或继续显式拒绝
 - [ ] VM/C 链行为对拍
 - [ ] 负向测试：证书错误、过期、hostname mismatch、TLS 降级

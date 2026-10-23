@@ -1,7 +1,12 @@
 # native HTTPS 设计（P1）
 
-状态：设计/选型阶段。目标：让 C/native 目标实现与 VM 一致的 `@6`
-HTTPS，同时不把不可信 WASM 的网络边界重新打开。
+状态：**最小实现已落地（2026-10-23）**。当前 C 链 `@6` 已支持
+HTTP/HTTPS 的 status/headers/body 和 chunked 解码；TLS 通过运行时
+动态加载 OpenSSL，不增加链接依赖。cookie jar、用户 headers、audit
+仍是 VM 侧完整，C 链待补。
+
+目标：让 C/native 目标实现与 VM 一致的 `@6` HTTPS，同时不把不可信
+WASM 的网络边界重新打开。
 
 ## 1. 需求
 
@@ -21,6 +26,10 @@ HTTPS，同时不把不可信 WASM 的网络边界重新打开。
 | 静态 vendored mbedTLS | 无系统依赖、跨平台、体积可控 | 仓库增加源码、需维护升级 | **推荐** |
 | libtls/LibreSSL | API 简单 | Windows 支持差 | 否 |
 | 平台 TLS（SChannel/SecureTransport/OpenSSL） | 无第三方库 | 三套后端，测试矩阵大 | 远期 |
+
+**首次实现（2026-10-23）**：采用**运行时动态加载 OpenSSL**，因此不增加
+链接依赖；libssl 缺失时 `@6` 显式失败。vendored mbedTLS 仍是后续的
+可复现/免系统依赖方案，尚未替换。
 | libcurl | 功能全 | 依赖/证书/构建复杂；容易变成另一个网络栈 | 否 |
 | 调 `curl` 子进程 | 快速原型 | 进程/临时文件/注入面，不可作为安全实现 | 仅原型，不发布 |
 
@@ -83,11 +92,11 @@ void  w_tls_close(w_tls *);
 
 ## 7. 分阶段
 
-1. 选型定稿 + vendor mbedTLS（1–2 天）
-2. `w_tls_*` + 本地 HTTPS 往返（2–3 天）
-3. `@6` 状态/headers/body/cookie/audit（3–5 天）
-4. VM/C 对拍 + 负向测试（2–3 天）
-5. Windows/macOS 构建矩阵（2–3 天）
+1. 选型定稿 + vendor mbedTLS：选型完成，动态 OpenSSL 已先落地；mbedTLS 待定
+2. `w_tls_*` + 本地 HTTPS 往返：动态 OpenSSL 版完成
+3. `@6` 状态/headers/body：完成；cookie/audit 待补
+4. VM/C 对拍 + 负向测试：HTTPS 门禁 3/3；完整对拍待补
+5. Windows/macOS 构建矩阵：Windows 实测；Linux CI；macOS 待验证
 
 ## 8. 决策门
 

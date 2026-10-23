@@ -142,6 +142,8 @@ jobs:
         run: bash scripts/net-gate.sh
       - name: "App gate (Whisper web backend: JSON/static/404 routes)"
         run: bash scripts/app-gate.sh
+      - name: Native HTTPS gate (@6 + TLS verification)
+        run: bash scripts/https-gate.sh
 
   wd-build:
     name: wd build (CI fast) + formatter

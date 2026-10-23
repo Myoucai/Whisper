@@ -8,6 +8,9 @@
   写成可验收阶段。
 - 新增 [`docs/native-https-plan.md`](docs/native-https-plan.md)：P1 的 TLS
   选型、`w_tls_*` 接口、@6 响应/cookie/audit 和负向测试矩阵。
+- native `@6` 最小实现：HTTP/HTTPS status/headers/body，chunked 解码，
+  TLS 通过运行时动态加载 OpenSSL（无链接依赖），默认证书/hostname 校验；
+  新增 `scripts/https-gate.sh`（自签 CA、无 CA、hostname mismatch）。
 - `whisperc/runtime.c`：native 网络 opcode（`@2/@3/@6`、`listen/accept/
   recv/send`、`serve-concurrent`）统一经 `w_net_require`；`WHISPER_NET=0`
   让本次进程整体拒绝网络并给出明确错误。默认保持历史开启，避免破坏

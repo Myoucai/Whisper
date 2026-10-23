@@ -1416,7 +1416,7 @@ fn http_capabilities_match_across_chains() {
 /// before any connection is attempted: if either chain opened a socket, the
 /// accept below would find it.
 #[test]
-fn https_is_refused_and_never_sent_as_plaintext() {
+fn https_never_falls_back_to_plaintext() {
     use std::net::TcpListener;
 
     if std::process::Command::new("gcc")
@@ -1469,12 +1469,9 @@ fn https_is_refused_and_never_sent_as_plaintext() {
         .env("WHISPER_NET", "1")
         .output()
         .unwrap();
-    assert!(!c2.status.success(), "C chain must refuse https://");
-    assert!(
-        String::from_utf8_lossy(&c2.stderr).contains("HTTPS is not yet supported"),
-        "C chain error should name the cause: {}",
-        String::from_utf8_lossy(&c2.stderr)
-    );
+    // C may attempt TLS (and fail because no TLS server is listening); the
+    // invariant is that it never sends plaintext to the HTTPS port.
+    assert!(!c2.status.success(), "C chain must not fall back to plaintext");
 
     match listener.accept() {
         Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
@@ -1483,10 +1480,11 @@ fn https_is_refused_and_never_sent_as_plaintext() {
     }
 }
 
-/// Step 2b, criterion S3: the HTTP *session* ids (6/7/8/9) are not implemented
-/// on the C chain, but a program that merely imports `std/http` must still
-/// build and run — so they cannot be rejected at compile time. They are
-/// defined as functions that fail loudly with the root cause when called.
+/// Step 2b, criterion S3: the HTTP *audit/raw/parallel* ids (7/8/9) are not
+/// implemented on the C chain, but a program that merely imports `std/http`
+/// must still build and run — so they cannot be rejected at compile time.
+/// They are defined as functions that fail loudly with the root cause.
+/// (@6 is now implemented as a basic HTTP(S) session.)
 #[test]
 fn unimplemented_capabilities_fail_loudly_not_at_compile_time() {
     if std::process::Command::new("gcc")
@@ -1520,7 +1518,6 @@ fn unimplemented_capabilities_fail_loudly_not_at_compile_time() {
     // Calling an unimplemented id must report the root cause, not a gcc
     // `implicit declaration`.
     for (name, source, needle) in [
-        ("sess", "\"http://127.0.0.1:1/x\" @6 drop\n", "@6"),
         ("audit", "\"\" @7 drop\n", "@7"),
         ("raw", "\"http://127.0.0.1:1/x\" @8 drop\n", "@8"),
         ("par", "\"http://127.0.0.1:1/x\" @9 drop\n", "@9"),

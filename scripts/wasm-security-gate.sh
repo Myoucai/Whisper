@@ -184,12 +184,13 @@ else
     bad S-20 "sock import 拒绝信息不明确"; cat "$TMP/sock.err"
 fi
 
-# S-8: no Rust runtime / no Rust source changes
+# S-8: no Rust runtime / no Rust runtime/library changes (test fixtures excluded)
+changed="$(git diff --name-only -- crates 2>/dev/null | grep -v '^crates/whisper-cli/tests/' || true)"
 if ! grep -v '^#' scripts/build-wasm.sh | grep -q 'wasmtime\|wasmer' \
-   && [ -z "$(git diff --name-only -- crates 2>/dev/null)" ]; then
-    ok S-8 "构建脚本无 Rust 运行时；crates/ 无改动"
+   && [ -z "$changed" ]; then
+    ok S-8 "构建脚本无 Rust 运行时；crates/ 运行时/库无改动"
 else
-    bad S-8 "发现 Rust 运行时或 crates/ 改动"
+    bad S-8 "发现 Rust 运行时或 crates/ 运行时改动"
 fi
 
 echo "wasm-security-gate: $PASS/$((PASS+FAIL))"

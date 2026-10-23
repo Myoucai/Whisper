@@ -1691,7 +1691,7 @@ static void w_sb_put(w_sb *b, const char *s, size_t n) {
 }
 static void w_sb_c(w_sb *b, char c) { w_sb_put(b, &c, 1); }
 
-static void w_json_escape(w_sb *b, const char *s, uint32_t n) {
+static void w_tls_json_escape(w_sb *b, const char *s, uint32_t n) {
     w_sb_c(b, '"');
     for (uint32_t i = 0; i < n; i++) {
         unsigned char c = (unsigned char)s[i];
@@ -1749,7 +1749,7 @@ static void w_json_dump(w_sb *b, wval v) {
     if (v.t != WT_PTR) { w_sb_put(b, "null", 4); return; }
     if (wval_is_str(v)) {
         const char *s = (const char *)w_as_ptr(v);
-        w_json_escape(b, s, w_str_len(s));
+        w_tls_json_escape(b, s, w_str_len(s));
         return;
     }
     wval *l = (wval *)w_as_ptr(v);
@@ -1774,7 +1774,7 @@ static void w_json_dump(w_sb *b, wval v) {
         w_sb_c(b, '{');
         for (int64_t i = 0; i < m; i++) {
             if (i) w_sb_c(b, ',');
-            w_json_escape(b, ks[i], w_str_len(ks[i]));
+            w_tls_json_escape(b, ks[i], w_str_len(ks[i]));
             w_sb_c(b, ':');
             w_json_dump(b, vs[i]);
         }
@@ -2355,6 +2355,336 @@ static char *w_http_request(const char *method, const char *url, const char *bod
     if (!out) snprintf(err, errlen, "out of memory");
     return out;
 }
+
+// ── @6: native HTTP(S) session (OPTIONAL dynamic OpenSSL) ─────────────
+// No link-time OpenSSL dependency: ordinary builds still work without it.
+// If libssl is absent or lacks verification symbols, @6 fails explicitly.
+typedef void *(*w_tls_method_fn)(void);
+typedef void *(*w_tls_ctx_new_fn)(void *);
+typedef void (*w_tls_ctx_free_fn)(void *);
+typedef void (*w_tls_ctx_verify_fn)(void *, int, void *);
+typedef int (*w_tls_ctx_paths_fn)(void *);
+typedef int (*w_tls_ctx_ca_fn)(void *, const char *, const char *);
+typedef void *(*w_tls_ssl_new_fn)(void *);
+typedef void (*w_tls_ssl_free_fn)(void *);
+typedef int (*w_tls_ssl_fd_fn)(void *, int);
+typedef long (*w_tls_ctrl_fn)(void *, int, long, void *);
+typedef int (*w_tls_connect_fn)(void *);
+typedef int (*w_tls_write_fn)(void *, const void *, int);
+typedef int (*w_tls_read_fn)(void *, void *, int);
+typedef int (*w_tls_error_fn)(void *, int);
+typedef int (*w_tls_shutdown_fn)(void *);
+typedef int (*w_tls_set1_host_fn)(void *, const char *);
+
+typedef struct {
+    void *lib, *ctx, *ssl;
+    w_tls_ctx_free_fn ctx_free;
+    w_tls_ssl_free_fn ssl_free;
+    w_tls_write_fn write;
+    w_tls_read_fn read;
+    w_tls_error_fn get_error;
+} w_tls;
+
+static int w_tls_load(w_tls *t, char *err, size_t errlen) {
+    memset(t, 0, sizeof(*t));
+#ifdef _WIN32
+    const char *names[] = {"libssl-3-x64.dll", "libssl-3.dll",
+                           "libssl-1_1-x64.dll", "libssl-1_1.dll", "libssl.dll"};
+    for (size_t i = 0; i < sizeof(names)/sizeof(names[0]) && !t->lib; i++)
+        t->lib = (void *)LoadLibraryA(names[i]);
+#else
+#ifdef __APPLE__
+    const char *names[] = {"libssl.3.dylib", "libssl.dylib",
+                           "/opt/homebrew/opt/openssl@3/lib/libssl.3.dylib",
+                           "/usr/local/opt/openssl@3/lib/libssl.3.dylib"};
+#else
+    const char *names[] = {"libssl.so.3", "libssl.so.1.1", "libssl.so"};
+#endif
+    for (size_t i = 0; i < sizeof(names)/sizeof(names[0]) && !t->lib; i++)
+        t->lib = dlopen(names[i], RTLD_NOW | RTLD_GLOBAL);
+#endif
+    if (!t->lib) {
+        snprintf(err, errlen, "HTTPS unavailable: cannot load libssl");
+        return -1;
+    }
+#ifdef _WIN32
+#define W_TLS_SYM(n) ((void *)GetProcAddress((HMODULE)t->lib, n))
+#else
+#define W_TLS_SYM(n) dlsym(t->lib, n)
+#endif
+    w_tls_method_fn method = (w_tls_method_fn)W_TLS_SYM("TLS_client_method");
+    w_tls_ctx_new_fn ctx_new = (w_tls_ctx_new_fn)W_TLS_SYM("SSL_CTX_new");
+    w_tls_ctx_verify_fn ctx_verify = (w_tls_ctx_verify_fn)W_TLS_SYM("SSL_CTX_set_verify");
+    w_tls_ctx_paths_fn ctx_paths = (w_tls_ctx_paths_fn)W_TLS_SYM("SSL_CTX_set_default_verify_paths");
+    w_tls_ctx_ca_fn ctx_ca = (w_tls_ctx_ca_fn)W_TLS_SYM("SSL_CTX_load_verify_locations");
+    w_tls_ssl_new_fn ssl_new = (w_tls_ssl_new_fn)W_TLS_SYM("SSL_new");
+    w_tls_ssl_fd_fn ssl_fd = (w_tls_ssl_fd_fn)W_TLS_SYM("SSL_set_fd");
+    w_tls_ctrl_fn ctrl = (w_tls_ctrl_fn)W_TLS_SYM("SSL_ctrl");
+    w_tls_connect_fn connect = (w_tls_connect_fn)W_TLS_SYM("SSL_connect");
+    w_tls_set1_host_fn set1_host = (w_tls_set1_host_fn)W_TLS_SYM("SSL_set1_host");
+    t->ctx_free = (w_tls_ctx_free_fn)W_TLS_SYM("SSL_CTX_free");
+    t->ssl_free = (w_tls_ssl_free_fn)W_TLS_SYM("SSL_free");
+    t->write = (w_tls_write_fn)W_TLS_SYM("SSL_write");
+    t->read = (w_tls_read_fn)W_TLS_SYM("SSL_read");
+    t->get_error = (w_tls_error_fn)W_TLS_SYM("SSL_get_error");
+#undef W_TLS_SYM
+    if (!method || !ctx_new || !ctx_verify || !ssl_new || !ssl_fd || !ctrl ||
+        !connect || !set1_host || !t->ctx_free || !t->ssl_free ||
+        !t->write || !t->read || !t->get_error) {
+        snprintf(err, errlen, "HTTPS unavailable: libssl is missing required symbols");
+        return -1;
+    }
+    t->ctx = ctx_new(method());
+    if (!t->ctx) { snprintf(err, errlen, "HTTPS unavailable: SSL_CTX_new failed"); return -1; }
+    ctx_verify(t->ctx, 1 /*SSL_VERIFY_PEER*/, NULL);
+    const char *ca = getenv("WHISPER_TLS_CA");
+    if (ca && *ca) {
+        if (!ctx_ca || ctx_ca(t->ctx, ca, NULL) != 1) {
+            snprintf(err, errlen, "HTTPS: cannot load WHISPER_TLS_CA=%s", ca);
+            return -1;
+        }
+    } else if (!ctx_paths || ctx_paths(t->ctx) != 1) {
+        snprintf(err, errlen, "HTTPS: no system CA store (set WHISPER_TLS_CA)");
+        return -1;
+    }
+    return 0;
+}
+
+static void w_tls_destroy(w_tls *t) {
+    if (t->ssl && t->ssl_free) t->ssl_free(t->ssl);
+    if (t->ctx && t->ctx_free) t->ctx_free(t->ctx);
+    t->ssl = t->ctx = NULL;
+}
+
+static int w_tls_connect(w_tls *t, const char *host, w_socket_t s, char *err, size_t errlen) {
+#ifdef _WIN32
+#define W_TLS_SYM(n) ((void *)GetProcAddress((HMODULE)t->lib, n))
+#else
+#define W_TLS_SYM(n) dlsym(t->lib, n)
+#endif
+    w_tls_ssl_new_fn ssl_new = (w_tls_ssl_new_fn)W_TLS_SYM("SSL_new");
+    w_tls_ssl_fd_fn ssl_fd = (w_tls_ssl_fd_fn)W_TLS_SYM("SSL_set_fd");
+    w_tls_ctrl_fn ctrl = (w_tls_ctrl_fn)W_TLS_SYM("SSL_ctrl");
+    w_tls_connect_fn connect = (w_tls_connect_fn)W_TLS_SYM("SSL_connect");
+    w_tls_set1_host_fn set1_host = (w_tls_set1_host_fn)W_TLS_SYM("SSL_set1_host");
+#undef W_TLS_SYM
+    if (!ssl_new || !ssl_fd || !ctrl || !connect || !set1_host) return -1;
+    t->ssl = ssl_new(t->ctx);
+    if (!t->ssl) { snprintf(err, errlen, "HTTPS: SSL_new failed"); return -1; }
+    if (ssl_fd(t->ssl, (int)s) != 1) { snprintf(err, errlen, "HTTPS: SSL_set_fd failed"); return -1; }
+    if (ctrl(t->ssl, 55 /*SSL_CTRL_SET_TLSEXT_HOSTNAME*/,
+             0 /*TLSEXT_NAMETYPE_host_name*/, (void *)host) != 1) {
+        snprintf(err, errlen, "HTTPS: SNI setup failed"); return -1;
+    }
+    if (set1_host(t->ssl, host) != 1) {
+        snprintf(err, errlen, "HTTPS: hostname verification setup failed"); return -1;
+    }
+    if (connect(t->ssl) != 1) {
+        snprintf(err, errlen, "HTTPS: TLS handshake failed (certificate/hostname?)");
+        return -1;
+    }
+    return 0;
+}
+
+static char *w_tls_read_all(w_tls *t, char *err, size_t errlen) {
+    size_t cap = 65536, len = 0;
+    char *buf = (char *)malloc(cap);
+    if (!buf) { snprintf(err, errlen, "out of memory"); return NULL; }
+    for (;;) {
+        if (len + 16385 > cap) {
+            cap *= 2;
+            char *nb = (char *)realloc(buf, cap);
+            if (!nb) { free(buf); snprintf(err, errlen, "out of memory"); return NULL; }
+            buf = nb;
+        }
+        int n = t->read(t->ssl, buf + len, 16384);
+        if (n > 0) { len += (size_t)n; continue; }
+        if (n == 0) break;
+        int e = t->get_error ? t->get_error(t->ssl, n) : -1;
+        if (e == 2 /*SSL_ERROR_WANT_READ*/ || e == 3 /*WANT_WRITE*/) continue;
+        free(buf);
+        snprintf(err, errlen, "HTTPS: TLS read failed");
+        return NULL;
+    }
+    buf[len] = 0;
+    return buf;
+}
+
+static char *w_tls_json_escape_str(const char *s) {
+    size_t n = strlen(s), cap = n * 6 + 1, k = 0;
+    char *out = (char *)malloc(cap);
+    if (!out) return NULL;
+    for (size_t i = 0; i < n; i++) {
+        unsigned char c = (unsigned char)s[i];
+        if (c == '"' || c == '\\') { out[k++] = '\\'; out[k++] = (char)c; }
+        else if (c == '\n') { out[k++] = '\\'; out[k++] = 'n'; }
+        else if (c == '\r') { out[k++] = '\\'; out[k++] = 'r'; }
+        else if (c < 0x20) { out[k++] = '?'; }
+        else out[k++] = (char)c;
+    }
+    out[k] = 0;
+    return out;
+}
+
+static char *w_headers_json(const char *p, size_t n) {
+    size_t cap = n * 2 + 4, k = 1;
+    char *out = (char *)malloc(cap);
+    if (!out) return NULL;
+    out[0] = '{'; out[1] = 0;
+    const char *line = p, *end = p + n;
+    while (line < end) {
+        const char *e = line;
+        while (e < end && *e != '\n') e++;
+        const char *colon = line;
+        while (colon < e && *colon != ':') colon++;
+        if (colon < e) {
+            const char *a = line, *b = colon;
+            while (a < b && (*a == ' ' || *a == '\t')) a++;
+            while (b > a && (b[-1] == ' ' || b[-1] == '\t' || b[-1] == '\r')) b--;
+            const char *v = colon + 1, *ve = e;
+            while (v < ve && (*v == ' ' || *v == '\t')) v++;
+            while (ve > v && (ve[-1] == ' ' || ve[-1] == '\t' || ve[-1] == '\r')) ve--;
+            char *key = w_dup_range(a, (size_t)(b - a));
+            char *val = w_dup_range(v, (size_t)(ve - v));
+            char *ke = key ? w_tls_json_escape_str(key) : NULL;
+            char *ve2 = val ? w_tls_json_escape_str(val) : NULL;
+            if (ke && ve2) {
+                size_t need = k + strlen(ke) + strlen(ve2) + 8;
+                if (need > cap) {
+                    cap = need * 2;
+                    char *nb = (char *)realloc(out, cap);
+                    if (!nb) { free(ke); free(ve2); free(key); free(val); free(out); return NULL; }
+                    out = nb;
+                }
+                k += (size_t)sprintf(out + k, "%s\"%s\":\"%s\"",
+                                     k > 1 ? "," : "", ke, ve2);
+            }
+            free(ke); free(ve2); free(key); free(val);
+        }
+        line = e < end ? e + 1 : end;
+    }
+    out[k++] = '}'; out[k] = 0;
+    return out;
+}
+
+typedef struct { long status; char *headers; char *body; } w_http_session_resp;
+
+static int w_ci_contains(const char *hay, const char *needle) {
+    size_t n = strlen(needle);
+    for (const char *p = hay; *p; p++) {
+        size_t i = 0;
+        while (i < n && p[i] && (p[i] | 0x20) == (needle[i] | 0x20)) i++;
+        if (i == n) return 1;
+    }
+    return 0;
+}
+
+// Decode HTTP/1.1 chunked transfer coding. Returns NULL for malformed input.
+static char *w_dechunk(const char *s, size_t *outlen) {
+    size_t cap = 1024, n = 0;
+    char *out = (char *)malloc(cap);
+    if (!out) return NULL;
+    const char *p = s;
+    for (;;) {
+        char *end = NULL;
+        unsigned long sz = strtoul(p, &end, 16);
+        if (end == p) { free(out); return NULL; }
+        p = end;
+        while (*p == ';') { while (*p && *p != '\r' && *p != '\n') p++; }
+        while (*p == '\r' || *p == '\n') p++;
+        if (sz == 0) break;
+        if (strlen(p) < sz) { free(out); return NULL; }
+        if (n + sz + 1 > cap) {
+            cap = (n + sz + 1) * 2;
+            char *nb = (char *)realloc(out, cap);
+            if (!nb) { free(out); return NULL; }
+            out = nb;
+        }
+        memcpy(out + n, p, sz);
+        n += sz;
+        p += sz;
+        while (*p == '\r' || *p == '\n') p++;
+    }
+    out[n] = 0;
+    *outlen = n;
+    return out;
+}
+
+static int w_http_session(const char *method, const char *url, const char *body,
+                          w_http_session_resp *out, char *err, size_t errlen) {
+    w_net_require("http-session");
+    w_url u;
+    if (w_url_parse(url, &u) != 0) { snprintf(err, errlen, "Invalid URL: %s", url); return -1; }
+    w_socket_t s = w_tcp_connect(u.host, u.port);
+    if (s == W_BAD_SOCKET) {
+        snprintf(err, errlen, "Connect to %s:%d failed", u.host, u.port);
+        w_url_free(&u); return -1;
+    }
+    w_tls tls;
+    int use_tls = u.use_tls;
+    if (use_tls) {
+        if (w_tls_load(&tls, err, errlen) != 0) { w_closesock(s); w_url_free(&u); return -1; }
+        if (w_tls_connect(&tls, u.host, s, err, errlen) != 0) {
+            w_tls_destroy(&tls); w_closesock(s); w_url_free(&u); return -1;
+        }
+    }
+    size_t bodylen = strlen(body);
+    size_t need = strlen(method) + strlen(u.path) + strlen(u.host) + bodylen + 256;
+    char *req = (char *)malloc(need);
+    if (!req) {
+        snprintf(err, errlen, "out of memory");
+        if (use_tls) w_tls_destroy(&tls);
+        w_closesock(s); w_url_free(&u); return -1;
+    }
+    if (bodylen == 0)
+        snprintf(req, need, "%s %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n",
+                 method, u.path, u.host);
+    else
+        snprintf(req, need, "%s %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n"
+                 "Content-Type: application/json\r\nContent-Length: %lu\r\n\r\n%s",
+                 method, u.path, u.host, (unsigned long)bodylen, body);
+    int off = 0;
+    size_t reqlen = strlen(req);
+    while (off < (int)reqlen) {
+        int n = use_tls ? tls.write(tls.ssl, req + off, (int)(reqlen - (size_t)off))
+                        : (int)send(s, req + off, (int)(reqlen - (size_t)off), 0);
+        if (n <= 0) break;
+        off += n;
+    }
+    free(req);
+    if (off < (int)reqlen) {
+        snprintf(err, errlen, "send failed");
+        if (use_tls) w_tls_destroy(&tls);
+        w_closesock(s); w_url_free(&u); return -1;
+    }
+    char *resp = use_tls ? w_tls_read_all(&tls, err, errlen) : w_http_read_all(s, err, errlen);
+    if (use_tls) w_tls_destroy(&tls);
+    w_closesock(s); w_url_free(&u);
+    if (!resp) return -1;
+    char *hdr_end = strstr(resp, "\r\n\r\n");
+    if (!hdr_end) { free(resp); snprintf(err, errlen, "invalid HTTP response"); return -1; }
+    long status = 0;
+    if (strncmp(resp, "HTTP/", 5) == 0) {
+        char *sp = strchr(resp, ' ');
+        if (sp) status = strtol(sp + 1, NULL, 10);
+    }
+    out->headers = w_headers_json(resp, (size_t)(hdr_end - resp));
+    out->body = w_dup_range(hdr_end + 4, strlen(hdr_end + 4));
+    out->status = status;
+    if (out->headers && w_ci_contains(out->headers, "chunked")) {
+        size_t blen = 0;
+        char *dec = w_dechunk(out->body ? out->body : "", &blen);
+        if (dec) {
+            (void)blen;
+            free(out->body);
+            out->body = dec;
+        }
+    }
+    free(resp);
+    if (!out->headers || !out->body) { snprintf(err, errlen, "out of memory"); return -1; }
+    return 0;
+}
+
 #endif // !W_WASI
 
 #ifdef W_WASI
@@ -2512,7 +2842,26 @@ static void W__4(void) {                        // @4 env
     w_push(w_env_get(name));
 }
 
-static void W__6(void) { w_cap_unimplemented(6, "http-req (session)"); }
+#ifndef W_WASI
+static void W__6(void) {                        // @6 http session
+    const char *body = (const char *)w_as_ptr(w_pop());
+    const char *headers = (const char *)w_as_ptr(w_pop());
+    const char *url = (const char *)w_as_ptr(w_pop());
+    const char *method = (const char *)w_as_ptr(w_pop());
+    (void)headers; // TODO: parse user headers / cookie jar (P1 follow-up)
+    char err[512];
+    w_http_session_resp r;
+    memset(&r, 0, sizeof(r));
+    if (w_http_session(method, url, body, &r, err, sizeof(err)) != 0) w_fail(err);
+    w_push(W_I64(r.status));
+    w_push(W_PTR(w_str_new(r.headers, (uint32_t)strlen(r.headers))));
+    w_push(W_PTR(w_str_new(r.body, (uint32_t)strlen(r.body))));
+    free(r.headers);
+    free(r.body);
+}
+#else
+static void W__6(void) { w_fail("capability @6 (http-req (session)) is unsupported on wasm profile"); }
+#endif
 static void W__7(void) { w_cap_unimplemented(7, "http-audit"); }
 static void W__8(void) { w_cap_unimplemented(8, "http-req-raw"); }
 static void W__9(void) { w_cap_unimplemented(9, "http-req-parallel"); }
