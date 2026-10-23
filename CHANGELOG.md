@@ -6,6 +6,8 @@
   [`docs/release-notes.md`](docs/release-notes.md)：把 P0（1.2.0 收口）、
   P1（native HTTPS）、P2（网络白名单）、P3（WASM host proxy）等未尽事宜
   写成可验收阶段。
+- 新增 [`docs/native-https-plan.md`](docs/native-https-plan.md)：P1 的 TLS
+  选型、`w_tls_*` 接口、@6 响应/cookie/audit 和负向测试矩阵。
 - `whisperc/runtime.c`：native 网络 opcode（`@2/@3/@6`、`listen/accept/
   recv/send`、`serve-concurrent`）统一经 `w_net_require`；`WHISPER_NET=0`
   让本次进程整体拒绝网络并给出明确错误。默认保持历史开启，避免破坏

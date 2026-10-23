@@ -33,7 +33,10 @@ native/HTTP server 测试全绿；WASM 无网络不变。
 问题：`@2/@3` 只支持 `http://`；`@6` 的 HTTPS 只在 VM，C/native 未实现。
 真实应用几乎都需要 HTTPS。
 
-- [ ] 选型：系统 TLS / libtls / mbedTLS / 静态依赖，明确 Windows/Linux/macOS
+设计见 [`native-https-plan.md`](native-https-plan.md)。
+
+- [x] 选型文档：推荐 vendored mbedTLS；OpenSSL 仅开发备选
+- [ ] vendor mbedTLS + `w_tls_*` 接口
 - [ ] C 链 `@6` HTTPS（证书校验、SNI、ALPN http/1.1）
 - [ ] `@2/@3` 是否升级为 HTTPS，或继续显式拒绝
 - [ ] VM/C 链行为对拍
