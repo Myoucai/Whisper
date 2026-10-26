@@ -35,4 +35,16 @@ fi
 grep -q 'Connect to 127.0.0.1:1 failed' "$TMP/allow.err" \
     || { echo "net-allow-gate: allowed host did not reach connect"; cat "$TMP/allow.err"; exit 1; }
 
-echo "net-allow-gate: PASS (deny before connect; private denied; override reaches connect)"
+if WHISPER_NET_METHODS=POST "$TMP/app.exe" >"$TMP/method.out" 2>"$TMP/method.err"; then
+    echo "net-allow-gate: disallowed method succeeded"; exit 1
+fi
+grep -q 'method not allowed by WHISPER_NET_METHODS' "$TMP/method.err" \
+    || { echo "net-allow-gate: missing method rejection"; cat "$TMP/method.err"; exit 1; }
+
+if WHISPER_NET_PORTS=443 "$TMP/app.exe" >"$TMP/port.out" 2>"$TMP/port.err"; then
+    echo "net-allow-gate: disallowed port succeeded"; exit 1
+fi
+grep -q 'port not allowed by WHISPER_NET_PORTS' "$TMP/port.err" \
+    || { echo "net-allow-gate: missing port rejection"; cat "$TMP/port.err"; exit 1; }
+
+echo "net-allow-gate: PASS (host/private/method/port policy; override reaches connect)"

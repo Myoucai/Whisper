@@ -176,6 +176,45 @@ static int w_net_allow_guard(const char *host, char *err, size_t errlen) {
     return -1;
 }
 
+static int w_method_allowed(const char *method) {
+    const char *e = getenv("WHISPER_NET_METHODS");
+    if (!e || !*e) return 1;
+    size_t mn = strlen(method);
+    const char *p = e;
+    while (*p) {
+        while (*p == ',' || *p == ' ' || *p == '\t') p++;
+        const char *s = p;
+        while (*p && *p != ',' && *p != ' ' && *p != '\t') p++;
+        if (w_host_ci_eq(method, mn, s, (size_t)(p - s))) return 1;
+    }
+    return 0;
+}
+
+static int w_port_allowed(int port) {
+    const char *e = getenv("WHISPER_NET_PORTS");
+    if (!e || !*e) return 1;
+    const char *p = e;
+    while (*p) {
+        while (*p == ',' || *p == ' ' || *p == '\t') p++;
+        if (*p >= '0' && *p <= '9') {
+            long v = strtol(p, (char **)&p, 10);
+            if (v == port) return 1;
+        } else {
+            while (*p && *p != ',' && *p != ' ' && *p != '\t') p++;
+        }
+    }
+    return 0;
+}
+
+static size_t w_response_max(void) {
+    const char *e = getenv("WHISPER_NET_MAX_RESPONSE");
+    if (!e || !*e) return (size_t)16 * 1024 * 1024;
+    unsigned long long v = strtoull(e, NULL, 10);
+    if (v == 0) return (size_t)16 * 1024 * 1024;
+    if (v > (unsigned long long)(256ULL * 1024 * 1024)) v = 256ULL * 1024 * 1024;
+    return (size_t)v;
+}
+
 static inline wval W_I64(int64_t x)  { wval r; r.v = (uint64_t)x; r.t = WT_I64; return r; }
 static inline wval W_F64(double d)   { wval r; memcpy(&r.v, &d, 8); r.t = WT_F64; return r; }
 static inline wval W_PTR(void *p)    { wval r; r.v = (uint64_t)p;  r.t = WT_PTR; return r; }
@@ -2374,8 +2413,11 @@ static w_socket_t w_tcp_connect(const char *host, int port, char *err, size_t er
 // Read until the peer closes (the request asks for `Connection: close`, and
 // the VM's read_to_string behaves the same). Returns a malloc'd NUL-terminated
 // buffer, or NULL with `err` filled in.
-static char *w_http_read_all(w_socket_t s, char *err, size_t errlen) {
+static char *w_http_read_all(w_socket_t s, char *err, size_t errlen, size_t max) {
     size_t cap = 65536, len = 0;
+    if (max == 0) max = 16 * 1024 * 1024;
+    if (cap > max) cap = max;
+    if (cap == 0) cap = 1;
     char *buf = (char *)malloc(cap);
     if (!buf) {
         snprintf(err, errlen, "out of memory");
@@ -2385,18 +2427,20 @@ static char *w_http_read_all(w_socket_t s, char *err, size_t errlen) {
         int n;
         if (len + 1 >= cap) {
             char *nb;
-            if (cap >= (size_t)16 * 1024 * 1024) {
-                snprintf(err, errlen, "response larger than 16MB");
+            if (cap >= max) {
+                snprintf(err, errlen, "response exceeds WHISPER_NET_MAX_RESPONSE");
                 free(buf);
                 return NULL;
             }
-            cap *= 2;
-            nb = (char *)realloc(buf, cap);
+            size_t ncap = cap * 2;
+            if (ncap > max) ncap = max;
+            nb = (char *)realloc(buf, ncap);
             if (!nb) {
                 snprintf(err, errlen, "out of memory");
                 free(buf);
                 return NULL;
             }
+            cap = ncap;
             buf = nb;
         }
         n = (int)recv(s, buf + len, (int)(cap - 1 - len), 0);
@@ -2422,6 +2466,16 @@ static char *w_http_request(const char *method, const char *url, const char *bod
         return NULL;
     }
     if (w_net_allow_guard(u.host, err, errlen) != 0) {
+        w_url_free(&u);
+        return NULL;
+    }
+    if (!w_method_allowed(method)) {
+        snprintf(err, errlen, "method not allowed by WHISPER_NET_METHODS: %s", method);
+        w_url_free(&u);
+        return NULL;
+    }
+    if (!w_port_allowed(u.port)) {
+        snprintf(err, errlen, "port not allowed by WHISPER_NET_PORTS: %d", u.port);
         w_url_free(&u);
         return NULL;
     }
@@ -2471,7 +2525,7 @@ static char *w_http_request(const char *method, const char *url, const char *bod
         }
     }
     free(req);
-    resp = w_http_read_all(s, err, errlen);
+    resp = w_http_read_all(s, err, errlen, w_response_max());
     w_closesock(s);
     if (!resp) return NULL;
     {
@@ -2613,18 +2667,30 @@ static int w_tls_connect(w_tls *t, const char *host, w_socket_t s, char *err, si
     return 0;
 }
 
-static char *w_tls_read_all(w_tls *t, char *err, size_t errlen) {
+static char *w_tls_read_all(w_tls *t, char *err, size_t errlen, size_t max) {
     size_t cap = 65536, len = 0;
+    if (max == 0) max = 16 * 1024 * 1024;
+    if (cap > max) cap = max;
+    if (cap == 0) cap = 1;
     char *buf = (char *)malloc(cap);
     if (!buf) { snprintf(err, errlen, "out of memory"); return NULL; }
     for (;;) {
-        if (len + 16385 > cap) {
-            cap *= 2;
-            char *nb = (char *)realloc(buf, cap);
+        if (len + 1 >= cap) {
+            if (cap >= max) {
+                free(buf);
+                snprintf(err, errlen, "response exceeds WHISPER_NET_MAX_RESPONSE");
+                return NULL;
+            }
+            size_t ncap = cap * 2;
+            if (ncap > max) ncap = max;
+            char *nb = (char *)realloc(buf, ncap);
             if (!nb) { free(buf); snprintf(err, errlen, "out of memory"); return NULL; }
+            cap = ncap;
             buf = nb;
         }
-        int n = t->read(t->ssl, buf + len, 16384);
+        int want = (int)(cap - 1 - len);
+        if (want > 16384) want = 16384;
+        int n = t->read(t->ssl, buf + len, want);
         if (n > 0) { len += (size_t)n; continue; }
         if (n == 0) break;
         int e = t->get_error ? t->get_error(t->ssl, n) : -1;
@@ -2908,6 +2974,14 @@ static int w_http_session(const char *method, const char *url, const char *heade
     w_url u;
     if (w_url_parse(url, &u) != 0) { snprintf(err, errlen, "Invalid URL: %s", url); return -1; }
     if (w_net_allow_guard(u.host, err, errlen) != 0) { w_url_free(&u); return -1; }
+    if (!w_method_allowed(method)) {
+        snprintf(err, errlen, "method not allowed by WHISPER_NET_METHODS: %s", method);
+        w_url_free(&u); return -1;
+    }
+    if (!w_port_allowed(u.port)) {
+        snprintf(err, errlen, "port not allowed by WHISPER_NET_PORTS: %d", u.port);
+        w_url_free(&u); return -1;
+    }
     char *uh = w_user_headers(headers_json ? headers_json : "{}", err, errlen);
     if (!uh) { w_url_free(&u); return -1; }
     char *ck = w_jar_header();
@@ -2977,7 +3051,8 @@ static int w_http_session(const char *method, const char *url, const char *heade
         if (use_tls) w_tls_destroy(&tls);
         w_closesock(s); w_url_free(&u); return -1;
     }
-    char *resp = use_tls ? w_tls_read_all(&tls, err, errlen) : w_http_read_all(s, err, errlen);
+    char *resp = use_tls ? w_tls_read_all(&tls, err, errlen, w_response_max())
+                         : w_http_read_all(s, err, errlen, w_response_max());
     if (use_tls) w_tls_destroy(&tls);
     w_closesock(s); w_url_free(&u);
     if (!resp) return -1;

@@ -36,6 +36,11 @@ fi
 if ! grep -q 'GET http://127.0.0.1:.*/set 200' "$TMP/out"; then
     echo "http6-gate: missing audit line"; cat "$TMP/out"; exit 1
 fi
+if WHISPER_NET=1 WHISPER_NET_MAX_RESPONSE=2 "$TMP/app.exe" >"$TMP/max.out" 2>"$TMP/max.err"; then
+    echo "http6-gate: response cap ignored"; exit 1
+fi
+grep -q 'response exceeds WHISPER_NET_MAX_RESPONSE' "$TMP/max.err" \
+    || { echo "http6-gate: missing response cap error"; cat "$TMP/max.err"; exit 1; }
 cat > "$TMP/raw.ws" <<EOF
 "POST" "http://127.0.0.1:$PORT/echo" "{\\"Content-Type\\":\\"application/octet-stream\\"}" "6869" @8 . drop drop
 EOF

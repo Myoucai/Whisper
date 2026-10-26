@@ -197,8 +197,10 @@ whisper run hello.ws
 > 本次进程拒绝所有网络 opcode。`WHISPER_NET_ALLOW=host1,*.example.com`
 > 可把 HTTP/HTTPS 目标限制到白名单；配置白名单后默认拒绝
 > loopback/私网/link-local/云元数据，可用 `WHISPER_NET_ALLOW_PRIVATE=1`
-> 显式放行本地测试目标。未设置 allowlist 时保持全放行兼容。WASM v1
-> 不走这些开关：guest 永远无网络，
+> 显式放行本地测试目标。`WHISPER_NET_METHODS=GET,POST`、
+> `WHISPER_NET_PORTS=80,443`、`WHISPER_NET_MAX_RESPONSE=1048576`
+> 可进一步限制方法、端口和响应大小。未设置 allowlist 时保持全放行兼容。
+> WASM v1 不走这些开关：guest 永远无网络，
 > 见 [docs/wasm-v1-release.md](docs/wasm-v1-release.md)。
 
 ## 自举

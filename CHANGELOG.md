@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (1.3.0) — native @6 HTTPS
+## v1.3.0 (2026-10-26) — native HTTP(S) session + network policy
 
 - C/native `@6`：HTTP/HTTPS status/headers/body；chunked 解码；TLS 通过
   运行时动态加载 OpenSSL（无链接依赖）；证书链/hostname 校验；
@@ -9,6 +9,8 @@
 - native `WHISPER_NET_ALLOW=host1,*.example.com`：HTTP/HTTPS 建连前
   域名白名单；配置后默认拒绝 loopback/私网/link-local/云元数据，
   `WHISPER_NET_ALLOW_PRIVATE=1` 可放行本地测试。新增 `net-allow-gate.sh`。
+- native `WHISPER_NET_METHODS` / `WHISPER_NET_PORTS` /
+  `WHISPER_NET_MAX_RESPONSE`：方法、端口和响应大小策略；默认保持兼容。
 - 新增 `scripts/https-gate.sh`：自签 CA、未信任 CA、hostname mismatch；
   新增 `scripts/http6-gate.sh`：cookie/header/audit/raw；均已接入 CI。
 - 已知待补：`@9` parallel、完整 VM/C 语义对拍、macOS TLS 验证。
