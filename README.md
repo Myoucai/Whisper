@@ -18,7 +18,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.3.0-7cffc4" alt="version">
-  <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2016%20gates-brightgreen" alt="tests">
+  <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2017%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
   <img src="https://img.shields.io/badge/stdlib-20%20modules-blue" alt="stdlib">
@@ -194,7 +194,9 @@ whisper run hello.ws
 | 生成 | `range`（`start count → [start..start+count-1]`，预分配） |
 
 > native 目标的网络默认保持历史行为开启；启动器可设 `WHISPER_NET=0` 让
-> 本次进程拒绝所有网络 opcode。WASM v1 不走这个开关：guest 永远无网络，
+> 本次进程拒绝所有网络 opcode。`WHISPER_NET_ALLOW=host1,*.example.com`
+> 可把 HTTP/HTTPS 目标限制到白名单；未设置时保持全放行兼容。WASM v1
+> 不走这些开关：guest 永远无网络，
 > 见 [docs/wasm-v1-release.md](docs/wasm-v1-release.md)。
 
 ## 自举
@@ -483,6 +485,7 @@ bash scripts/wasm-security-gate.sh               # WASI 安全 S-1..S-20（需 Z
 bash scripts/wasm-conformance.sh                 # WASM core conformance 27/27
 bash scripts/https-gate.sh                       # native @6 HTTPS/CA/hostname（需 OpenSSL）
 bash scripts/http6-gate.sh                       # native @6 cookie/用户 header/audit
+bash scripts/net-allow-gate.sh                   # native WHISPER_NET_ALLOW 白名单
 bash scripts/wrun-gate.sh                        # wrun 策略 W-1..W-7（需 WAMR）
 bash scripts/build-wfmt.sh && bash scripts/fmt-gate.sh  # Whisper 写的 fmt（F-1..F-6）
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验

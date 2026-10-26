@@ -1363,6 +1363,7 @@ fn http_capabilities_match_across_chains() {
         };
         let c2 = std::process::Command::new(&artifact)
             .env("WHISPER_NET", "1")
+            .env_remove("WHISPER_NET_ALLOW")
             .output()
             .unwrap();
         assert!(
@@ -1467,6 +1468,7 @@ fn https_never_falls_back_to_plaintext() {
     };
     let c2 = std::process::Command::new(&artifact)
         .env("WHISPER_NET", "1")
+        .env_remove("WHISPER_NET_ALLOW")
         .output()
         .unwrap();
     // C may attempt TLS (and fail because no TLS server is listening); the

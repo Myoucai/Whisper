@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # @6 HTTP gate: cookie jar + user headers + @7 audit, no TLS required.
 set -u
+unset WHISPER_NET_ALLOW
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT" || exit 1
 export PATH="/mingw64/bin:/usr/bin:/c/msys64/clang64/bin:$PATH"

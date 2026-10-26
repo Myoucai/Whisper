@@ -215,7 +215,8 @@ Rust 侧类型检查，不受影响。
 
 native 目标的网络默认开启（历史兼容）；启动器设 `WHISPER_NET=0` 后，
 `@2/@3/@6`、`listen/accept/recv/send`、`serve-concurrent` 全部显式失败。
-WASM v1 不受该开关影响：guest 始终无网络。
+`WHISPER_NET_ALLOW=host1,*.example.com` 还会在 HTTP/HTTPS 建连前限制
+目标域名；未设置时全放行。WASM v1 不受这些开关影响：guest 始终无网络。
 
 KV 是 **进程级字符串→字符串存储**（1024 键上限，互斥保护），与栈上的 Map（函数式、
 按值复制）是两个层次：KV 用于跨请求/跨线程的共享状态。`serve-concurrent` 的 handler

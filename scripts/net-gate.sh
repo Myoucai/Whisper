@@ -2,6 +2,7 @@
 # Net gate: compile and RUN a real HTTP server through the self-hosted
 # c2 chain, then fetch it with curl. Requires gcc + curl.
 set -u
+unset WHISPER_NET_ALLOW
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BIN="${BIN:-}"
 if [ -z "$BIN" ]; then

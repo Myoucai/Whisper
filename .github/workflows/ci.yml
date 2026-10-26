@@ -146,6 +146,8 @@ jobs:
         run: bash scripts/https-gate.sh
       - name: "@6 cookie/header/audit gate"
         run: bash scripts/http6-gate.sh
+      - name: native network allowlist gate
+        run: bash scripts/net-allow-gate.sh
 
   wd-build:
     name: wd build (CI fast) + formatter

@@ -136,6 +136,46 @@ static void w_net_require(const char *what) {
     (void)what;
 }
 
+static int w_host_ci_eq(const char *a, size_t an, const char *b, size_t bn) {
+    if (an != bn) return 0;
+    for (size_t i = 0; i < an; i++) {
+        unsigned char x = (unsigned char)a[i], y = (unsigned char)b[i];
+        if (x >= 'A' && x <= 'Z') x = (unsigned char)(x + 32);
+        if (y >= 'A' && y <= 'Z') y = (unsigned char)(y + 32);
+        if (x != y) return 0;
+    }
+    return 1;
+}
+
+static int w_host_allowed(const char *host) {
+    const char *e = getenv("WHISPER_NET_ALLOW");
+    if (!e || !*e) return 1; // backward-compatible: no allowlist configured
+    size_t hn = strlen(host);
+    const char *p = e;
+    while (*p) {
+        while (*p == ',' || *p == ' ' || *p == '\t') p++;
+        const char *s = p;
+        while (*p && *p != ',' && *p != ' ' && *p != '\t') p++;
+        size_t n = (size_t)(p - s);
+        if (n == 1 && s[0] == '*') return 1;
+        if (n > 2 && s[0] == '*' && s[1] == '.') {
+            const char *suf = s + 2;
+            size_t sn = n - 2;
+            if (hn > sn && host[hn - sn - 1] == '.' &&
+                w_host_ci_eq(host + hn - sn, sn, suf, sn)) return 1;
+        } else if (w_host_ci_eq(host, hn, s, n)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int w_net_allow_guard(const char *host, char *err, size_t errlen) {
+    if (w_host_allowed(host)) return 0;
+    snprintf(err, errlen, "host not allowed by WHISPER_NET_ALLOW: %s", host);
+    return -1;
+}
+
 static inline wval W_I64(int64_t x)  { wval r; r.v = (uint64_t)x; r.t = WT_I64; return r; }
 static inline wval W_F64(double d)   { wval r; memcpy(&r.v, &d, 8); r.t = WT_F64; return r; }
 static inline wval W_PTR(void *p)    { wval r; r.v = (uint64_t)p;  r.t = WT_PTR; return r; }
@@ -2297,6 +2337,10 @@ static char *w_http_request(const char *method, const char *url, const char *bod
         snprintf(err, errlen, "Invalid URL: %s", url);
         return NULL;
     }
+    if (w_net_allow_guard(u.host, err, errlen) != 0) {
+        w_url_free(&u);
+        return NULL;
+    }
     if (u.use_tls) {
         snprintf(err, errlen,
                  "HTTPS is not yet supported by @2/@3 (http-get/http-post). Use an http:// URL, "
@@ -2780,6 +2824,7 @@ static int w_http_session(const char *method, const char *url, const char *heade
     w_net_require("http-session");
     w_url u;
     if (w_url_parse(url, &u) != 0) { snprintf(err, errlen, "Invalid URL: %s", url); return -1; }
+    if (w_net_allow_guard(u.host, err, errlen) != 0) { w_url_free(&u); return -1; }
     char *uh = w_user_headers(headers_json ? headers_json : "{}", err, errlen);
     if (!uh) { w_url_free(&u); return -1; }
     char *ck = w_jar_header();

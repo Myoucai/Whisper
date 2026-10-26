@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # P1 native HTTPS gate: @6 via dynamically loaded OpenSSL.
 set -u
+unset WHISPER_NET_ALLOW
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT" || exit 1
 export PATH="/mingw64/bin:/usr/bin:/c/msys64/clang64/bin:$PATH"

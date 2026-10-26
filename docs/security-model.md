@@ -124,7 +124,7 @@ stdlib 文档里的安全承诺以本文为准。
 | F-1 | `ffi-*` 在 VM 与 C 链均无授权门 | **Critical** | 可加载任意 native 库并调用任意函数 |
 | F-2 | `read-file`/`write-file`/`getenv` 等 ambient opcode 绕过 `CapabilityTable` | **High** | VM 的“默认无 IO”不成立 |
 | F-3 | C 链 `@0`-`@5`/`@10` 无任何检查 | **High** | 原生产物=当前用户权限 |
-| F-4 | `listen`/`accept`/`serve-concurrent` 等网络 opcode 无逐主机授权 | **High** | native 可用 `WHISPER_NET=0` 整体关闭；WASM 恒无网络；host 白名单未实现 |
+| F-4 | `listen`/`accept`/`serve-concurrent` 等网络 opcode 无逐主机授权 | **High** | native 可用 `WHISPER_NET=0` 整体关闭；`WHISPER_NET_ALLOW` 只覆盖 HTTP/HTTPS；WASM 恒无网络 |
 | F-5 | 没有“负向安全测试”；现有能力测试只测正向/ABI | **Medium** | 漏洞不会被 CI 发现 |
 | F-6 | spec/stdlib/README 与实现不一致 | **Medium** | 会误导安全评估 |
 | F-7 | `wd` 构建期调用 gcc 并执行产物 | **Medium** | 编译不可信源码本身是特权操作 |
@@ -161,8 +161,8 @@ stdlib 文档里的安全承诺以本文为准。
   不能静默变成 no-op。
 - **I-11 import 白名单**：guest 只能 import `wasi_snapshot_preview1` 的
   显式函数白名单；未知模块/函数（含 WAMR `sock_*` 扩展）在加载前拒绝。
-- **I-12 只读 preopen**：`--dir-ro` 用临时副本快照，guest 写入只落快照；
-  宿主树不暴露，退出时删除。它提供“宿主不被修改”的保证，不是 EROFS。
+- **I-13 native host allowlist**：`WHISPER_NET_ALLOW` 在 HTTP/HTTPS
+  建连前按 host 拒绝；未配置时保持兼容全放行。它不覆盖 raw listen/accept。
 
 ---
 
