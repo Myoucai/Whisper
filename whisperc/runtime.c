@@ -2752,8 +2752,31 @@ static char *w_dechunk(const char *s, size_t *outlen) {
     return out;
 }
 
+static int w_hex_decode(const char *s, unsigned char **out, size_t *outlen,
+                        char *err, size_t errlen) {
+    size_t n = strlen(s);
+    if (n % 2) { snprintf(err, errlen, "http-req-raw: odd hex length"); return -1; }
+    unsigned char *p = (unsigned char *)malloc(n / 2 + 1);
+    if (!p) { snprintf(err, errlen, "out of memory"); return -1; }
+    for (size_t i = 0; i < n; i += 2) {
+        int hi = s[i] >= '0' && s[i] <= '9' ? s[i] - '0' :
+                 s[i] >= 'a' && s[i] <= 'f' ? s[i] - 'a' + 10 :
+                 s[i] >= 'A' && s[i] <= 'F' ? s[i] - 'A' + 10 : -1;
+        int lo = s[i+1] >= '0' && s[i+1] <= '9' ? s[i+1] - '0' :
+                 s[i+1] >= 'a' && s[i+1] <= 'f' ? s[i+1] - 'a' + 10 :
+                 s[i+1] >= 'A' && s[i+1] <= 'F' ? s[i+1] - 'A' + 10 : -1;
+        if (hi < 0 || lo < 0) { free(p); snprintf(err, errlen, "http-req-raw: bad hex"); return -1; }
+        p[i/2] = (unsigned char)((hi << 4) | lo);
+    }
+    p[n/2] = 0;
+    *out = p;
+    *outlen = n / 2;
+    return 0;
+}
+
 static int w_http_session(const char *method, const char *url, const char *headers_json,
-                          const char *body, w_http_session_resp *out, char *err, size_t errlen) {
+                          const char *body, int raw_body, w_http_session_resp *out,
+                          char *err, size_t errlen) {
     w_net_require("http-session");
     w_url u;
     if (w_url_parse(url, &u) != 0) { snprintf(err, errlen, "Invalid URL: %s", url); return -1; }
@@ -2761,31 +2784,39 @@ static int w_http_session(const char *method, const char *url, const char *heade
     if (!uh) { w_url_free(&u); return -1; }
     char *ck = w_jar_header();
     if (!ck) { free(uh); w_url_free(&u); snprintf(err, errlen, "out of memory"); return -1; }
+    unsigned char *raw = NULL;
+    size_t bodylen = raw_body ? 0 : strlen(body);
+    if (raw_body && w_hex_decode(body, &raw, &bodylen, err, errlen) != 0) {
+        free(uh); free(ck); w_url_free(&u); return -1;
+    }
     w_socket_t s = w_tcp_connect(u.host, u.port);
     if (s == W_BAD_SOCKET) {
         snprintf(err, errlen, "Connect to %s:%d failed", u.host, u.port);
-        free(uh); free(ck); w_url_free(&u); return -1;
+        free(uh); free(ck); free(raw); w_url_free(&u); return -1;
     }
     w_tls tls;
     int use_tls = u.use_tls;
     if (use_tls) {
         if (w_tls_load(&tls, err, errlen) != 0) {
-            free(uh); free(ck); w_closesock(s); w_url_free(&u); return -1;
+            free(uh); free(ck); free(raw); w_closesock(s); w_url_free(&u); return -1;
         }
         if (w_tls_connect(&tls, u.host, s, err, errlen) != 0) {
-            w_tls_destroy(&tls); free(uh); free(ck); w_closesock(s); w_url_free(&u); return -1;
+            w_tls_destroy(&tls); free(uh); free(ck); free(raw); w_closesock(s); w_url_free(&u); return -1;
         }
     }
-    size_t bodylen = strlen(body);
     size_t need = strlen(method) + strlen(u.path) + strlen(u.host) + bodylen +
                   strlen(uh) + strlen(ck) + 256;
     char *req = (char *)malloc(need);
     if (!req) {
         snprintf(err, errlen, "out of memory");
         if (use_tls) w_tls_destroy(&tls);
-        free(uh); free(ck); w_closesock(s); w_url_free(&u); return -1;
+        free(uh); free(ck); free(raw); w_closesock(s); w_url_free(&u); return -1;
     }
-    if (bodylen == 0)
+    if (raw_body)
+        snprintf(req, need, "%s %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n"
+                 "Content-Length: %lu\r\n%s%s\r\n",
+                 method, u.path, u.host, (unsigned long)bodylen, uh, ck);
+    else if (bodylen == 0)
         snprintf(req, need, "%s %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n%s%s\r\n",
                  method, u.path, u.host, uh, ck);
     else
@@ -2793,8 +2824,8 @@ static int w_http_session(const char *method, const char *url, const char *heade
                  "Content-Type: application/json\r\nContent-Length: %lu\r\n%s%s\r\n%s",
                  method, u.path, u.host, (unsigned long)bodylen, uh, ck, body);
     free(uh); free(ck);
-    int off = 0;
     size_t reqlen = strlen(req);
+    int off = 0;
     while (off < (int)reqlen) {
         int n = use_tls ? tls.write(tls.ssl, req + off, (int)(reqlen - (size_t)off))
                         : (int)send(s, req + off, (int)(reqlen - (size_t)off), 0);
@@ -2802,6 +2833,18 @@ static int w_http_session(const char *method, const char *url, const char *heade
         off += n;
     }
     free(req);
+    if (off == (int)reqlen && raw_body && bodylen > 0) {
+        size_t woff = 0;
+        while (woff < bodylen) {
+            int n = use_tls ? tls.write(tls.ssl, raw + woff, (int)(bodylen - woff))
+                            : (int)send(s, (const char *)raw + woff, (int)(bodylen - woff), 0);
+            if (n <= 0) break;
+            woff += (size_t)n;
+        }
+        if (woff < bodylen) off = 0;
+        else off = (int)reqlen;
+    }
+    free(raw);
     if (off < (int)reqlen) {
         snprintf(err, errlen, "send failed");
         if (use_tls) w_tls_destroy(&tls);
@@ -3003,7 +3046,7 @@ static void W__6(void) {                        // @6 http session
     char err[512];
     w_http_session_resp r;
     memset(&r, 0, sizeof(r));
-    if (w_http_session(method, url, headers, body, &r, err, sizeof(err)) != 0) w_fail(err);
+    if (w_http_session(method, url, headers, body, 0, &r, err, sizeof(err)) != 0) w_fail(err);
     w_push(W_I64(r.status));
     w_push(W_PTR(w_str_new(r.headers, (uint32_t)strlen(r.headers))));
     w_push(W_PTR(w_str_new(r.body, (uint32_t)strlen(r.body))));
@@ -3023,7 +3066,25 @@ static void W__7(void) {                        // @7 http audit
 #else
 static void W__7(void) { w_fail("capability @7 (http-audit) is unsupported on wasm profile"); }
 #endif
-static void W__8(void) { w_cap_unimplemented(8, "http-req-raw"); }
+#ifndef W_WASI
+static void W__8(void) {                        // @8 http session with raw hex body
+    const char *body = (const char *)w_as_ptr(w_pop());
+    const char *headers = (const char *)w_as_ptr(w_pop());
+    const char *url = (const char *)w_as_ptr(w_pop());
+    const char *method = (const char *)w_as_ptr(w_pop());
+    char err[512];
+    w_http_session_resp r;
+    memset(&r, 0, sizeof(r));
+    if (w_http_session(method, url, headers, body, 1, &r, err, sizeof(err)) != 0) w_fail(err);
+    w_push(W_I64(r.status));
+    w_push(W_PTR(w_str_new(r.headers, (uint32_t)strlen(r.headers))));
+    w_push(W_PTR(w_str_new(r.body, (uint32_t)strlen(r.body))));
+    free(r.headers);
+    free(r.body);
+}
+#else
+static void W__8(void) { w_fail("capability @8 (http-req-raw) is unsupported on wasm profile"); }
+#endif
 static void W__9(void) { w_cap_unimplemented(9, "http-req-parallel"); }
 
 #ifndef W_WASI

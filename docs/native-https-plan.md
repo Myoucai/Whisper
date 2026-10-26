@@ -1,9 +1,9 @@
 # native HTTPS 设计（P1）
 
 状态：**C 链 `@6` 基本完成（2026-10-23）**。支持 HTTP/HTTPS 的
-status/headers/body、cookie jar、用户 headers、chunked 解码和基础
-`@7` 审计；TLS 通过运行时动态加载 OpenSSL，不增加链接依赖。
-`@8`/`@9` 未实现；完整 VM/C 对拍和 macOS 验证待补。
+status/headers/body、cookie jar、用户 headers、chunked 解码、`@8`
+raw hex body 和基础 `@7` 审计；TLS 通过运行时动态加载 OpenSSL，
+不增加链接依赖。`@9` 未实现；完整 VM/C 对拍和 macOS 验证待补。
 
 目标：让 C/native 目标实现与 VM 一致的 `@6` HTTPS，同时不把不可信
 WASM 的网络边界重新打开。
@@ -94,7 +94,7 @@ void  w_tls_close(w_tls *);
 
 1. 选型定稿 + vendor mbedTLS：选型完成，动态 OpenSSL 已先落地；mbedTLS 待定
 2. `w_tls_*` + 本地 HTTPS 往返：动态 OpenSSL 版完成
-3. `@6` 状态/headers/body/cookie/audit：完成（`@7` 基础审计）
+3. `@6` 状态/headers/body/cookie/audit：完成（`@7` 基础审计，`@8` raw）
 4. VM/C 对拍 + 负向测试：HTTPS 门禁 3/3；完整对拍待补
 5. Windows/macOS 构建矩阵：Windows 实测；Linux CI；macOS 待验证
 

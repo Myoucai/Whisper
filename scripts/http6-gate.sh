@@ -35,4 +35,15 @@ fi
 if ! grep -q 'GET http://127.0.0.1:.*/set 200' "$TMP/out"; then
     echo "http6-gate: missing audit line"; cat "$TMP/out"; exit 1
 fi
-echo "http6-gate: PASS (cookie + user header + audit)"
+cat > "$TMP/raw.ws" <<EOF
+"POST" "http://127.0.0.1:$PORT/echo" "{\\"Content-Type\\":\\"application/octet-stream\\"}" "6869" @8 . drop drop
+EOF
+"$BIN" build "$(winpath "$TMP/raw.ws")" -t c2 -o "$(winpath "$TMP/raw.exe")" >/dev/null 2>"$TMP/raw-build.err" || {
+    echo "http6-gate: raw build failed"; cat "$TMP/raw-build.err"; exit 1; }
+WHISPER_NET=1 "$TMP/raw.exe" >"$TMP/raw.out" 2>"$TMP/raw.err" || {
+    echo "http6-gate: raw run failed"; cat "$TMP/raw.err"; exit 1; }
+rawbody="$(head -1 "$TMP/raw.out" | tr -d '\r')"
+if [ "$rawbody" != "len=2 hex=6869" ]; then
+    echo "http6-gate: bad raw body [$rawbody]"; cat "$TMP/raw.out"; exit 1
+fi
+echo "http6-gate: PASS (cookie + user header + audit + raw body)"

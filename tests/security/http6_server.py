@@ -16,6 +16,16 @@ class H(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/plain")
             self.end_headers()
             self.wfile.write(body)
+
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        data = self.rfile.read(n)
+        body = ("len=%d hex=%s" % (len(data), data.hex())).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.end_headers()
+        self.wfile.write(body)
+
     def log_message(self, *a):
         pass
 
