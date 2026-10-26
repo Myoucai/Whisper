@@ -2742,7 +2742,7 @@ static char *w_headers_json(const char *p, size_t n) {
             char *ke = key ? w_tls_json_escape_str(key) : NULL;
             char *ve2 = val ? w_tls_json_escape_str(val) : NULL;
             if (ke && ve2) {
-                size_t need = k + strlen(ke) + strlen(ve2) + 8;
+                size_t need = k + strlen(ke) + strlen(ve2) + 9;
                 if (need > cap) {
                     cap = need * 2;
                     char *nb = (char *)realloc(out, cap);
@@ -2809,7 +2809,7 @@ static char *w_user_headers(const char *json, char *err, size_t errlen) {
         int skip = w_ci_eq_n(ks, "host", klen) || w_ci_eq_n(ks, "content-length", klen) ||
                    w_ci_eq_n(ks, "cookie", klen);
         if (!skip) {
-            size_t need = len + klen + vlen + 4;
+            size_t need = len + klen + vlen + 5;
             if (need > cap) {
                 cap = need * 2;
                 char *nb = (char *)realloc(out, cap);
@@ -2896,7 +2896,7 @@ static char *w_jar_header(void) {
         char *e = (char *)malloc(1); if (e) e[0] = 0; return e;
     }
     size_t n = strlen(w_cookie_jar);
-    char *out = (char *)malloc(n + 10);
+    char *out = (char *)malloc(n + 12);
     if (!out) return NULL;
     sprintf(out, "Cookie: %s\r\n", w_cookie_jar);
     return out;
