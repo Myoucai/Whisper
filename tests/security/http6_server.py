@@ -1,7 +1,10 @@
 import http.server
 import socketserver
 
+
 class H(http.server.BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.0"
+
     def do_GET(self):
         if self.path == "/set":
             self.send_response(200)
@@ -16,6 +19,7 @@ class H(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/plain")
             self.end_headers()
             self.wfile.write(body)
+        self.close_connection = True
 
     def do_POST(self):
         n = int(self.headers.get("Content-Length") or 0)
@@ -25,9 +29,11 @@ class H(http.server.BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/plain")
         self.end_headers()
         self.wfile.write(body)
+        self.close_connection = True
 
     def log_message(self, *a):
         pass
+
 
 with socketserver.TCPServer(("127.0.0.1", 18081), H) as s:
     s.serve_forever()

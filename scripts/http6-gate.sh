@@ -50,6 +50,7 @@ EOF
     echo "http6-gate: build failed"; cat "$TMP/build.err"; exit 1; }
 stage=run
 WHISPER_NET=1 $RUN "$TMP/app.exe" >"$TMP/out" 2>"$TMP/err" || {
+    echo "::error::http6 run failed: $(tr '\n' ' ' < "$TMP/err") server=$(tr '\n' ' ' < "$TMP/server.log")"
     echo "http6-gate: run failed"; cat "$TMP/err"; echo "--- server ---"; cat "$TMP/server.log"; exit 1; }
 stage=body
 body="$(head -1 "$TMP/out" | tr -d '\r')"
