@@ -42,7 +42,7 @@ native/HTTP server 测试全绿；WASM 无网络不变。
 - [x] `@6/@7/@8` VM/C 输出对拍（http-parity-gate）
   - 已知 VM `@7` 当前需要额外 dummy 实参（typechecker 声明 arity 0）；
     parity gate 用 `"" @7` 绕过该 VM 缺陷
-- [ ] `@9` parallel
+- [x] `@9` parallel（1..16 并发、按请求序聚合）
 - [ ] cookie/audit 与 VM 的完整语义对拍
 - [ ] `@2/@3` 是否升级为 HTTPS，或继续显式拒绝
 - [ ] VM/C 链行为对拍

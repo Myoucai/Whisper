@@ -18,7 +18,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.3.1-7cffc4" alt="version">
-  <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2018%20gates-brightgreen" alt="tests">
+  <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2019%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
   <img src="https://img.shields.io/badge/stdlib-20%20modules-blue" alt="stdlib">
@@ -347,7 +347,7 @@ bash scripts/wrun.sh --dir-ro /data::target/data app.wasm
 | `@6` | `http-req` | `http://` + **`https://`**（VM: rustls；C: 动态 OpenSSL） | ✅ | ✅ status/headers/body、cookie、用户 headers、chunked；audit 部分 |
 | `@7` | `http-audit` | 导出会话审计 | ✅ | ✅ 文本行；`WHISPER_NET_AUDIT=json` 输出 host/status/bytes |
 | `@8` | `http-req-raw` | 同 `@6`，body 为 hex 原始字节 | ✅ | ✅ 二进制 body（Content-Type 由 user headers 提供） |
-| `@9` | `http-req-parallel` | 同 `@6` | ✅ | ❌ 同上 |
+| `@9` | `http-req-parallel` | 同 `@6`，count 份并发 | ✅ | ✅ count 1..16，按请求序聚合 |
 | `@10` | `exec-raw` | 同 `@5`，但两个流**不 trim** | ✅ | ✅（2026-09-21 起） |
 
 `@6` 家族另有 cookie 罐、每请求审计行、`Transfer-Encoding: chunked` 自动解码、
@@ -355,7 +355,7 @@ host 白名单（零出域）、连接 10s/读写 15s 超时（挂死端点化�
 C 链 `@6` 已支持 HTTP/HTTPS 的 status/headers/body、cookie jar、用户
 headers、chunked 解码；`@7` 默认返回 `METHOD URL STATUS` 文本行，
 设置 `WHISPER_NET_AUDIT=json` 返回含 `method/url/host/status/bytes` 的
-JSON 数组；`@8` 支持 hex 原始 body。`@9`（parallel）仍是显式未实现。
+JSON 数组；`@8` 支持 hex 原始 body；`@9` 支持 1..16 份并发请求。
 
 C 链 HTTPS 通过运行时动态加载 libssl（不增加链接依赖）：
 找不到 libssl 或没有受信任根时显式失败；可用
@@ -365,11 +365,9 @@ C 链 HTTPS 通过运行时动态加载 libssl（不增加链接依赖）：
 > 而不是把明文发到 443）。需要 HTTPS 请用 `@6`（C/VM 均已支持）。
 > `@2`/`@3` 的拒绝语义一致，并有测试断言**拒绝发生在建连之前**。
 
-> **c2 链未实现的 `@9` 会显式失败**：程序照常构建（只 `import "std/http"`
-> 而只用 `@2` 的程序不受影响），调用到未实现的 id 时打印
-> `capability @9 ... is not implemented on the C chain` 并退出。
-> 其余能力——`@0` 文件读、`@1` 文件写、`@4` 环境变量、`@5` 执行命令、
-> `@10` 执行命令（原样流）——两条链均已实现并逐行对拍一致。详见
+> c2 链的 HTTP 会话能力已覆盖 `@6`-`@9`；其余能力——`@0` 文件读、
+> `@1` 文件写、`@4` 环境变量、`@5` 执行命令、`@10` 执行命令（原样流）
+> ——两条链均已实现并逐行对拍一致。详见
 > `docs/independence-design.md` Step 2a/2b 与 `tests/step2b_preregistered.md`。
 > **这里的“实现”指语义/输出对拍，不是授权**：C 链没有 `CapabilityTable`，
 > 也没有 policy；`@0`/`@5` 在 native 里直接调用宿主。
@@ -495,6 +493,7 @@ bash scripts/https-gate.sh                       # native @6 HTTPS/CA/hostname�
 bash scripts/http6-gate.sh                       # native @6 cookie/用户 header/audit
 bash scripts/net-allow-gate.sh                   # native WHISPER_NET_ALLOW 白名单
 bash scripts/http-parity-gate.sh                 # @6/@7/@8 VM/C 输出对拍
+bash scripts/http9-gate.sh                       # native @9 并发扇出
 bash scripts/wrun-gate.sh                        # wrun 策略 W-1..W-7（需 WAMR）
 bash scripts/build-wfmt.sh && bash scripts/fmt-gate.sh  # Whisper 写的 fmt（F-1..F-6）
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验

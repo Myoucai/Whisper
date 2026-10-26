@@ -1485,13 +1485,11 @@ fn https_never_falls_back_to_plaintext() {
     }
 }
 
-/// Step 2b, criterion S3: parallel id (9) is not implemented on the
-/// C chain, but a program that merely imports `std/http` must still build and
-/// run — so it cannot be rejected at compile time. It is defined as a
-/// function that fails loudly with the root cause.
-/// (@6 is a basic HTTP(S) session; @7 audit; @8 raw body.)
+/// Step 2b, criterion S3: importing `std/http` must still build, and an
+/// out-of-range `@9` count must fail loudly at run time rather than at
+/// compile time. (`@6`-`@9` are implemented on the C chain.)
 #[test]
-fn unimplemented_capabilities_fail_loudly_not_at_compile_time() {
+fn parallel_range_fails_loudly_not_at_compile_time() {
     if std::process::Command::new("gcc")
         .arg("--version")
         .output()
@@ -1520,12 +1518,15 @@ fn unimplemented_capabilities_fail_loudly_not_at_compile_time() {
         String::from_utf8_lossy(&build.stderr)
     );
 
-    // Calling an unimplemented id must report the root cause, not a gcc
-    // `implicit declaration`.
-    for (name, source, needle) in [("par", "\"http://127.0.0.1:1/x\" @9 drop\n", "@9")] {
-        let src = dir.join(format!("{name}.ws"));
-        std::fs::write(&src, source).unwrap();
-        let exe = dir.join(format!("{name}_exe"));
+    // @9 is implemented; an out-of-range count must fail loudly.
+    {
+        let src = dir.join("par.ws");
+        std::fs::write(
+            &src,
+            "0 \"GET\" \"http://127.0.0.1:1/x\" \"{}\" \"\" @9 drop\n",
+        )
+        .unwrap();
+        let exe = dir.join("par_exe");
         let build = std::process::Command::new(env!("CARGO_BIN_EXE_whisper"))
             .args(["build", "-t", "c2", "-o"])
             .arg(&exe)
@@ -1534,7 +1535,7 @@ fn unimplemented_capabilities_fail_loudly_not_at_compile_time() {
             .unwrap();
         assert!(
             build.status.success(),
-            "[{name}] must build (only the call fails): {}",
+            "[par] must build (only the call fails): {}",
             String::from_utf8_lossy(&build.stderr)
         );
         let artifact = if exe.exists() {
@@ -1543,11 +1544,11 @@ fn unimplemented_capabilities_fail_loudly_not_at_compile_time() {
             exe.with_extension(std::env::consts::EXE_EXTENSION)
         };
         let run = std::process::Command::new(&artifact).output().unwrap();
-        assert!(!run.status.success(), "[{name}] should fail at run time");
+        assert!(!run.status.success(), "[par] should fail at run time");
         let stderr = String::from_utf8_lossy(&run.stderr);
         assert!(
-            stderr.contains(needle) && stderr.contains("not implemented on the C chain"),
-            "[{name}] unhelpful error: {stderr}"
+            stderr.contains("@9 count must be in 1..16"),
+            "[par] unhelpful error: {stderr}"
         );
     }
 }

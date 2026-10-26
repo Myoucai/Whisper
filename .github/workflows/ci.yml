@@ -148,6 +148,8 @@ jobs:
         run: bash scripts/http6-gate.sh
       - name: VM/C HTTP session parity
         run: bash scripts/http-parity-gate.sh
+      - name: "@9 parallel gate"
+        run: bash scripts/http9-gate.sh
       - name: native network allowlist gate
         run: bash scripts/net-allow-gate.sh
 

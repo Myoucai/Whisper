@@ -33,6 +33,7 @@
 #    include <sys/mman.h>
 #    include <sys/time.h> // struct timeval for socket timeouts (musl needs this)
 #    include <netdb.h>  // getaddrinfo / freeaddrinfo for the HTTP client
+#    include <pthread.h> // @9 parallel fan-out
 #  endif
 #endif
 
@@ -135,6 +136,27 @@ static void w_net_require(const char *what) {
     }
     (void)what;
 }
+
+#ifndef W_WASI
+#ifdef _WIN32
+static CRITICAL_SECTION w_net_cs;
+static INIT_ONCE w_net_cs_once = INIT_ONCE_STATIC_INIT;
+static BOOL CALLBACK w_net_cs_init(PINIT_ONCE once, PVOID param, PVOID *ctx) {
+    (void)once; (void)param; (void)ctx;
+    InitializeCriticalSection(&w_net_cs);
+    return TRUE;
+}
+static void w_net_global_lock(void) {
+    InitOnceExecuteOnce(&w_net_cs_once, w_net_cs_init, NULL, NULL);
+    EnterCriticalSection(&w_net_cs);
+}
+static void w_net_global_unlock(void) { LeaveCriticalSection(&w_net_cs); }
+#else
+static pthread_mutex_t w_net_mutex = PTHREAD_MUTEX_INITIALIZER;
+static void w_net_global_lock(void) { pthread_mutex_lock(&w_net_mutex); }
+static void w_net_global_unlock(void) { pthread_mutex_unlock(&w_net_mutex); }
+#endif
+#endif
 
 static int w_host_ci_eq(const char *a, size_t an, const char *b, size_t bn) {
     if (an != bn) return 0;
@@ -2937,6 +2959,7 @@ static char *w_audit_json = NULL; // entries (no surrounding brackets) for JSON 
 
 static void w_audit_add(const char *method, const char *url, const char *host,
                         long status, size_t bytes) {
+    w_net_global_lock();
     char line[1024];
     snprintf(line, sizeof(line), "%s %s %ld\n", method, url, status);
     size_t n = (w_audit_log ? strlen(w_audit_log) : 0) + strlen(line) + 1;
@@ -2949,7 +2972,11 @@ static void w_audit_add(const char *method, const char *url, const char *host,
     char *em = w_tls_json_escape_str(method);
     char *eu = w_tls_json_escape_str(url);
     char *eh = w_tls_json_escape_str(host);
-    if (!em || !eu || !eh) { free(em); free(eu); free(eh); return; }
+    if (!em || !eu || !eh) {
+        free(em); free(eu); free(eh);
+        w_net_global_unlock();
+        return;
+    }
     size_t need = strlen(em) + strlen(eu) + strlen(eh) + 128;
     char *entry = (char *)malloc(need);
     if (entry) {
@@ -2968,9 +2995,11 @@ static void w_audit_add(const char *method, const char *url, const char *host,
         free(entry);
     }
     free(em); free(eu); free(eh);
+    w_net_global_unlock();
 }
 
 static void w_jar_update(const char *resp, size_t n) {
+    w_net_global_lock();
     const char *line = resp, *end = resp + n;
     while (line < end) {
         const char *e = line;
@@ -3016,16 +3045,21 @@ static void w_jar_update(const char *resp, size_t n) {
         }
         line = e < end ? e + 1 : end;
     }
+    w_net_global_unlock();
 }
 
 static char *w_jar_header(void) {
+    w_net_global_lock();
     if (!w_cookie_jar || !*w_cookie_jar) {
-        char *e = (char *)malloc(1); if (e) e[0] = 0; return e;
+        char *e = (char *)malloc(1); if (e) e[0] = 0;
+        w_net_global_unlock();
+        return e;
     }
     size_t n = strlen(w_cookie_jar);
     char *out = (char *)malloc(n + 12);
-    if (!out) return NULL;
+    if (!out) { w_net_global_unlock(); return NULL; }
     sprintf(out, "Cookie: %s\r\n", w_cookie_jar);
+    w_net_global_unlock();
     return out;
 }
 
@@ -3407,6 +3441,7 @@ static void W__6(void) { w_fail("capability @6 (http-req (session)) is unsupport
 #endif
 #ifndef W_WASI
 static void W__7(void) {                        // @7 http audit
+    w_net_global_lock();
     const char *mode = getenv("WHISPER_NET_AUDIT");
     if (mode && strcmp(mode, "json") == 0) {
         const char *entries = w_audit_json ? w_audit_json : "";
@@ -3419,12 +3454,14 @@ static void W__7(void) {                        // @7 http audit
         } else {
             w_push(W_PTR(w_str_new("[]", 2)));
         }
+        w_net_global_unlock();
         return;
     }
     const char *log = w_audit_log ? w_audit_log : "";
     size_t n = strlen(log);
     if (n > 0 && log[n - 1] == '\n') n--;
     w_push(W_PTR(w_str_new(log, (uint32_t)n)));
+    w_net_global_unlock();
 }
 #else
 static void W__7(void) { w_fail("capability @7 (http-audit) is unsupported on wasm profile"); }
@@ -3448,7 +3485,117 @@ static void W__8(void) {                        // @8 http session with raw hex 
 #else
 static void W__8(void) { w_fail("capability @8 (http-req-raw) is unsupported on wasm profile"); }
 #endif
-static void W__9(void) { w_cap_unimplemented(9, "http-req-parallel"); }
+
+#ifndef W_WASI
+typedef struct {
+    const char *method;
+    const char *url;
+    const char *headers;
+    const char *body;
+    w_http_session_resp r;
+    int rc;
+    char err[256];
+} w_par_job;
+
+#ifdef _WIN32
+static DWORD WINAPI w_par_worker(LPVOID p) {
+    w_par_job *j = (w_par_job *)p;
+    j->rc = w_http_session(j->method, j->url, j->headers, j->body, 0,
+                           &j->r, j->err, sizeof(j->err));
+    return 0;
+}
+#else
+static void *w_par_worker(void *p) {
+    w_par_job *j = (w_par_job *)p;
+    j->rc = w_http_session(j->method, j->url, j->headers, j->body, 0,
+                           &j->r, j->err, sizeof(j->err));
+    return NULL;
+}
+#endif
+
+static void W__9(void) {                        // @9 parallel fan-out
+    const char *body = (const char *)w_as_ptr(w_pop());
+    const char *headers = (const char *)w_as_ptr(w_pop());
+    const char *url = (const char *)w_as_ptr(w_pop());
+    const char *method = (const char *)w_as_ptr(w_pop());
+    int64_t count = w_as_i64(w_pop());
+    if (count < 1 || count > 16) w_fail("@9 count must be in 1..16");
+    w_par_job *jobs = (w_par_job *)calloc((size_t)count, sizeof(w_par_job));
+    if (!jobs) w_fail("out of memory");
+#ifdef _WIN32
+    HANDLE *threads = (HANDLE *)calloc((size_t)count, sizeof(HANDLE));
+#else
+    pthread_t *threads = (pthread_t *)calloc((size_t)count, sizeof(pthread_t));
+#endif
+    if (!threads) { free(jobs); w_fail("out of memory"); }
+    int *started = (int *)calloc((size_t)count, sizeof(int));
+    if (!started) { free(jobs); free(threads); w_fail("out of memory"); }
+    for (int64_t i = 0; i < count; i++) {
+        jobs[i].method = method;
+        jobs[i].url = url;
+        jobs[i].headers = headers;
+        jobs[i].body = body;
+        jobs[i].r.status = 0;
+#ifdef _WIN32
+        threads[i] = CreateThread(NULL, 0, w_par_worker, &jobs[i], 0, NULL);
+        started[i] = threads[i] != NULL;
+#else
+        started[i] = pthread_create(&threads[i], NULL, w_par_worker, &jobs[i]) == 0;
+#endif
+    }
+    for (int64_t i = 0; i < count; i++) {
+        if (!started[i]) continue;
+#ifdef _WIN32
+        WaitForSingleObject(threads[i], INFINITE);
+        CloseHandle(threads[i]);
+#else
+        pthread_join(threads[i], NULL);
+#endif
+    }
+    for (int64_t i = 0; i < count; i++) {
+        if (!started[i]) {
+            free(jobs[i].r.headers); free(jobs[i].r.body);
+            free(jobs); free(threads); free(started);
+            w_fail("thread create failed");
+        }
+        if (jobs[i].rc != 0) {
+            for (int64_t k = 0; k < count; k++) {
+                free(jobs[k].r.headers); free(jobs[k].r.body);
+            }
+            free(jobs); free(threads); free(started);
+            w_fail(jobs[i].err[0] ? jobs[i].err : "@9 request failed");
+        }
+    }
+    size_t cap = 256, len = 0;
+    char *out = (char *)malloc(cap);
+    if (!out) { free(jobs); free(threads); free(started); w_fail("out of memory"); }
+    out[len++] = '[';
+    for (int64_t i = 0; i < count; i++) {
+        const char *esc = jobs[i].r.body ? jobs[i].r.body : "";
+        char *eb = w_tls_json_escape_str(esc);
+        const char *h = jobs[i].r.headers ? jobs[i].r.headers : "{}";
+        size_t need = len + strlen(eb ? eb : "") + strlen(h) + 96;
+        if (need > cap) {
+            cap = need * 2;
+            char *nb = (char *)realloc(out, cap);
+            if (!nb) { free(eb); free(out); free(jobs); free(threads); free(started); w_fail("out of memory"); }
+            out = nb;
+        }
+        len += (size_t)sprintf(out + len,
+                              "%s{\"status\":%ld,\"headers\":%s,\"body\":\"%s\"}",
+                              i ? "," : "", jobs[i].r.status, h, eb ? eb : "");
+        free(eb);
+        free(jobs[i].r.headers); jobs[i].r.headers = NULL;
+        free(jobs[i].r.body); jobs[i].r.body = NULL;
+    }
+    out[len++] = ']';
+    out[len] = 0;
+    w_push(W_PTR(w_str_new(out, (uint32_t)len)));
+    free(out); free(jobs); free(threads); free(started);
+}
+#else
+static void W__9(void) { w_fail("capability @9 (http-req-parallel) is unsupported on wasm profile"); }
+#endif
 
 #ifndef W_WASI
 // exec (@5). popen() captures one stream only, so stderr is redirected to a

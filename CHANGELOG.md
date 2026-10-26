@@ -10,6 +10,8 @@
   deny 拒绝；follow 显式未实现，不静默跟随。
 - 新增 `http-parity-gate.sh`：`@6/@7/@8` VM/C 输出对拍；发现 VM `@7`
   当前需要一个 dummy 实参（typechecker 声明 arity 0），gate 中已标注。
+- native `@9` parallel：count 1..16 并发、共享 cookie/audit、按请求序
+  JSON 聚合；新增 `http9-gate.sh`。
 
 ## v1.3.0 (2026-10-26) — native HTTP(S) session + network policy
 
