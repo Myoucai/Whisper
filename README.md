@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.0-7cffc4" alt="version">
+  <img src="https://img.shields.io/badge/version-1.3.1-7cffc4" alt="version">
   <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2017%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
@@ -199,7 +199,7 @@ whisper run hello.ws
 > loopback/私网/link-local/云元数据，可用 `WHISPER_NET_ALLOW_PRIVATE=1`
 > 显式放行本地测试目标。`WHISPER_NET_METHODS=GET,POST`、
 > `WHISPER_NET_PORTS=80,443`、`WHISPER_NET_MAX_RESPONSE=1048576`、
-> `WHISPER_NET_TIMEOUT=30` 可进一步限制方法、端口、响应大小和读写超时。
+> `WHISPER_NET_TIMEOUT=30` 可进一步限制方法、端口、响应大小和连接/读写超时。
 > 未设置 allowlist 时保持全放行兼容。
 > WASM v1 不走这些开关：guest 永远无网络，
 > 见 [docs/wasm-v1-release.md](docs/wasm-v1-release.md)。

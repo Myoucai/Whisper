@@ -2111,6 +2111,7 @@ typedef SOCKET w_socket_t;
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <fcntl.h>
 typedef int w_socket_t;
 #define W_BAD_SOCKET (-1)
 #define w_closesock close
@@ -2396,6 +2397,61 @@ static void w_set_socket_timeout(w_socket_t s) {
 #endif
 }
 
+static int w_set_nonblocking(w_socket_t fd, int on) {
+#ifdef _WIN32
+    u_long mode = on ? 1 : 0;
+    return ioctlsocket(fd, FIONBIO, &mode) == 0 ? 0 : -1;
+#else
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags < 0) return -1;
+    if (on) flags |= O_NONBLOCK;
+    else flags &= ~O_NONBLOCK;
+    return fcntl(fd, F_SETFL, flags) == 0 ? 0 : -1;
+#endif
+}
+
+static int w_connect_timeout(w_socket_t fd, const struct sockaddr *addr, int len) {
+    int sec = w_net_timeout_sec();
+    if (sec <= 0) return connect(fd, addr, len);
+    if (w_set_nonblocking(fd, 1) != 0) return connect(fd, addr, len);
+    int r = connect(fd, addr, len);
+    if (r == 0) {
+        w_set_nonblocking(fd, 0);
+        return 0;
+    }
+#ifdef _WIN32
+    int pending = WSAGetLastError() == WSAEWOULDBLOCK ||
+                  WSAGetLastError() == WSAEINPROGRESS;
+#else
+    int pending = errno == EINPROGRESS;
+#endif
+    if (!pending) {
+        w_set_nonblocking(fd, 0);
+        return -1;
+    }
+    fd_set wf;
+    FD_ZERO(&wf);
+    FD_SET(fd, &wf);
+    struct timeval tv;
+    tv.tv_sec = sec;
+    tv.tv_usec = 0;
+#ifdef _WIN32
+    int sel = select(0, NULL, &wf, NULL, &tv);
+#else
+    int sel = select(fd + 1, NULL, &wf, NULL, &tv);
+#endif
+    w_set_nonblocking(fd, 0);
+    if (sel <= 0) return -1;
+    int soerr = 0;
+#ifdef _WIN32
+    int elen = sizeof(soerr);
+#else
+    socklen_t elen = sizeof(soerr);
+#endif
+    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, (char *)&soerr, &elen) != 0) return -1;
+    return soerr == 0 ? 0 : -1;
+}
+
 static w_socket_t w_tcp_connect(const char *host, int port, char *err, size_t errlen) {
     struct addrinfo hints, *res = NULL, *p;
     char portstr[16];
@@ -2426,7 +2482,7 @@ static w_socket_t w_tcp_connect(const char *host, int port, char *err, size_t er
     for (p = res; p; p = p->ai_next) {
         fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
         if (fd == W_BAD_SOCKET) continue;
-        if (connect(fd, p->ai_addr, (int)p->ai_addrlen) == 0) {
+        if (w_connect_timeout(fd, p->ai_addr, (int)p->ai_addrlen) == 0) {
             w_set_socket_timeout(fd);
             break;
         }
