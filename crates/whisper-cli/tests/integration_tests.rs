@@ -1473,7 +1473,10 @@ fn https_never_falls_back_to_plaintext() {
         .unwrap();
     // C may attempt TLS (and fail because no TLS server is listening); the
     // invariant is that it never sends plaintext to the HTTPS port.
-    assert!(!c2.status.success(), "C chain must not fall back to plaintext");
+    assert!(
+        !c2.status.success(),
+        "C chain must not fall back to plaintext"
+    );
 
     match listener.accept() {
         Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
@@ -1519,9 +1522,7 @@ fn unimplemented_capabilities_fail_loudly_not_at_compile_time() {
 
     // Calling an unimplemented id must report the root cause, not a gcc
     // `implicit declaration`.
-    for (name, source, needle) in [
-        ("par", "\"http://127.0.0.1:1/x\" @9 drop\n", "@9"),
-    ] {
+    for (name, source, needle) in [("par", "\"http://127.0.0.1:1/x\" @9 drop\n", "@9")] {
         let src = dir.join(format!("{name}.ws"));
         std::fs::write(&src, source).unwrap();
         let exe = dir.join(format!("{name}_exe"));

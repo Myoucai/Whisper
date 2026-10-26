@@ -16,10 +16,18 @@ for p in python3 python; do command -v "$p" >/dev/null 2>&1 && { PY="$p"; break;
 TMP="$ROOT/target/http6-gate"
 rm -rf "$TMP"; mkdir -p "$TMP"
 PORT="${HTTP6_GATE_PORT:-18081}"
-"$PY" "$(winpath "$ROOT/tests/security/http6_server.py")" >"$TMP/server.log" 2>&1 &
+"$PY" -u "$(winpath "$ROOT/tests/security/http6_server.py")" >"$TMP/server.log" 2>&1 &
 SRV=$!
 trap 'kill "$SRV" 2>/dev/null; rm -rf "$TMP"' EXIT
-sleep 1
+for _ in $(seq 1 50); do
+    if (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; then
+        exec 3<&- 3>&-
+        break
+    fi
+    sleep 0.1
+done
+RUN=""
+if command -v timeout >/dev/null 2>&1; then RUN="timeout 20"; fi
 cat > "$TMP/app.ws" <<EOF
 "GET" "http://127.0.0.1:$PORT/set" "{}" "" @6 drop drop drop
 "GET" "http://127.0.0.1:$PORT/echo" "{\\"X-Test\\":\\"yes\\"}" "" @6 . drop drop
@@ -27,8 +35,8 @@ cat > "$TMP/app.ws" <<EOF
 EOF
 "$BIN" build "$(winpath "$TMP/app.ws")" -t c2 -o "$(winpath "$TMP/app.exe")" >/dev/null 2>"$TMP/build.err" || {
     echo "http6-gate: build failed"; cat "$TMP/build.err"; exit 1; }
-WHISPER_NET=1 "$TMP/app.exe" >"$TMP/out" 2>"$TMP/err" || {
-    echo "http6-gate: run failed"; cat "$TMP/err"; exit 1; }
+WHISPER_NET=1 $RUN "$TMP/app.exe" >"$TMP/out" 2>"$TMP/err" || {
+    echo "http6-gate: run failed"; cat "$TMP/err"; echo "--- server ---"; cat "$TMP/server.log"; exit 1; }
 body="$(head -1 "$TMP/out" | tr -d '\r')"
 if [ "$body" != "cookie=sid=abc;xtest=yes" ]; then
     echo "http6-gate: bad body [$body]"; cat "$TMP/out"; exit 1
@@ -36,7 +44,7 @@ fi
 if ! grep -q 'GET http://127.0.0.1:.*/set 200' "$TMP/out"; then
     echo "http6-gate: missing audit line"; cat "$TMP/out"; exit 1
 fi
-if WHISPER_NET=1 WHISPER_NET_MAX_RESPONSE=2 "$TMP/app.exe" >"$TMP/max.out" 2>"$TMP/max.err"; then
+if WHISPER_NET=1 WHISPER_NET_MAX_RESPONSE=2 $RUN "$TMP/app.exe" >"$TMP/max.out" 2>"$TMP/max.err"; then
     echo "http6-gate: response cap ignored"; exit 1
 fi
 grep -q 'response exceeds WHISPER_NET_MAX_RESPONSE' "$TMP/max.err" \
@@ -46,8 +54,8 @@ cat > "$TMP/raw.ws" <<EOF
 EOF
 "$BIN" build "$(winpath "$TMP/raw.ws")" -t c2 -o "$(winpath "$TMP/raw.exe")" >/dev/null 2>"$TMP/raw-build.err" || {
     echo "http6-gate: raw build failed"; cat "$TMP/raw-build.err"; exit 1; }
-WHISPER_NET=1 "$TMP/raw.exe" >"$TMP/raw.out" 2>"$TMP/raw.err" || {
-    echo "http6-gate: raw run failed"; cat "$TMP/raw.err"; exit 1; }
+WHISPER_NET=1 $RUN "$TMP/raw.exe" >"$TMP/raw.out" 2>"$TMP/raw.err" || {
+    echo "http6-gate: raw run failed"; cat "$TMP/raw.err"; echo "--- server ---"; cat "$TMP/server.log"; exit 1; }
 rawbody="$(head -1 "$TMP/raw.out" | tr -d '\r')"
 if [ "$rawbody" != "len=2 hex=6869" ]; then
     echo "http6-gate: bad raw body [$rawbody]"; cat "$TMP/raw.out"; exit 1
