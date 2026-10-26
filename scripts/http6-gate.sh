@@ -80,4 +80,16 @@ rawbody="$(head -1 "$TMP/raw.out" | tr -d '\r')"
 if [ "$rawbody" != "len=2 hex=6869" ]; then
     echo "http6-gate: bad raw body [$rawbody]"; cat "$TMP/raw.out"; exit 1
 fi
-echo "http6-gate: PASS (cookie + user header + audit + raw body)"
+stage=timeout-build
+cat > "$TMP/slow.ws" <<EOF
+"GET" "http://127.0.0.1:$PORT/slow" "{}" "" @6 .
+EOF
+"$BIN" build "$(winpath "$TMP/slow.ws")" -t c2 -o "$(winpath "$TMP/slow.exe")" >/dev/null 2>"$TMP/slow-build.err" || {
+    echo "http6-gate: slow build failed"; cat "$TMP/slow-build.err"; exit 1; }
+stage=timeout-run
+if WHISPER_NET=1 WHISPER_NET_TIMEOUT=1 $RUN "$TMP/slow.exe" >"$TMP/slow.out" 2>"$TMP/slow.err"; then
+    echo "http6-gate: timeout was not enforced"; exit 1
+fi
+grep -q 'network read timeout' "$TMP/slow.err" \
+    || { echo "http6-gate: missing timeout error"; cat "$TMP/slow.err"; exit 1; }
+echo "http6-gate: PASS (cookie + user header + audit + raw body + timeout)"

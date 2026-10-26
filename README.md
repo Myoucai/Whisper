@@ -198,8 +198,9 @@ whisper run hello.ws
 > 可把 HTTP/HTTPS 目标限制到白名单；配置白名单后默认拒绝
 > loopback/私网/link-local/云元数据，可用 `WHISPER_NET_ALLOW_PRIVATE=1`
 > 显式放行本地测试目标。`WHISPER_NET_METHODS=GET,POST`、
-> `WHISPER_NET_PORTS=80,443`、`WHISPER_NET_MAX_RESPONSE=1048576`
-> 可进一步限制方法、端口和响应大小。未设置 allowlist 时保持全放行兼容。
+> `WHISPER_NET_PORTS=80,443`、`WHISPER_NET_MAX_RESPONSE=1048576`、
+> `WHISPER_NET_TIMEOUT=30` 可进一步限制方法、端口、响应大小和读写超时。
+> 未设置 allowlist 时保持全放行兼容。
 > WASM v1 不走这些开关：guest 永远无网络，
 > 见 [docs/wasm-v1-release.md](docs/wasm-v1-release.md)。
 

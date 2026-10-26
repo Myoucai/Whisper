@@ -165,7 +165,8 @@ stdlib 文档里的安全承诺以本文为准。
   建连前按 host 拒绝；配置 allowlist 后默认拒绝私网/loopback/link-local，
   `WHISPER_NET_ALLOW_PRIVATE=1` 可显式放行本地测试。未配置 allowlist 时
   保持兼容全放行。它不覆盖 raw listen/accept；方法/端口/响应大小由
-  `WHISPER_NET_METHODS`/`WHISPER_NET_PORTS`/`WHISPER_NET_MAX_RESPONSE` 控制。
+  `WHISPER_NET_METHODS`/`WHISPER_NET_PORTS`/`WHISPER_NET_MAX_RESPONSE` 控制；
+  `WHISPER_NET_TIMEOUT` 控制读写超时（默认 30s，0 关闭）。
 
 ---
 

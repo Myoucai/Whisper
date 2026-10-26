@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- native `WHISPER_NET_TIMEOUT`：HTTP/HTTPS 读写 socket 超时，默认 30s，0 关闭；
+  超时返回明确错误而不是挂死。
+
 ## v1.3.0 (2026-10-26) — native HTTP(S) session + network policy
 
 - C/native `@6`：HTTP/HTTPS status/headers/body；chunked 解码；TLS 通过

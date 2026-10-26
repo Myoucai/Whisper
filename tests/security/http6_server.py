@@ -1,5 +1,6 @@
 import http.server
 import socketserver
+import time
 
 
 class H(http.server.BaseHTTPRequestHandler):
@@ -12,6 +13,12 @@ class H(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/plain")
             self.end_headers()
             self.wfile.write(b"set")
+        elif self.path == "/slow":
+            time.sleep(2)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"slow")
         else:
             body = ("cookie=" + (self.headers.get("Cookie") or "") +
                     ";xtest=" + (self.headers.get("X-Test") or "")).encode()

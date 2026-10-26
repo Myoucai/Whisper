@@ -2371,6 +2371,31 @@ static int w_host_is_local(const char *host) {
     return 0;
 }
 
+static int w_net_timeout_sec(void) {
+    const char *e = getenv("WHISPER_NET_TIMEOUT");
+    if (!e || !*e) return 30;
+    long v = strtol(e, NULL, 10);
+    if (v <= 0) return 0; // 0 disables the socket timeout
+    if (v > 300) v = 300;
+    return (int)v;
+}
+
+static void w_set_socket_timeout(w_socket_t s) {
+    int sec = w_net_timeout_sec();
+    if (sec == 0) return;
+#ifdef _WIN32
+    DWORD ms = (DWORD)sec * 1000;
+    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, (const char *)&ms, sizeof(ms));
+    setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, (const char *)&ms, sizeof(ms));
+#else
+    struct timeval tv;
+    tv.tv_sec = sec;
+    tv.tv_usec = 0;
+    setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+#endif
+}
+
 static w_socket_t w_tcp_connect(const char *host, int port, char *err, size_t errlen) {
     struct addrinfo hints, *res = NULL, *p;
     char portstr[16];
@@ -2401,7 +2426,10 @@ static w_socket_t w_tcp_connect(const char *host, int port, char *err, size_t er
     for (p = res; p; p = p->ai_next) {
         fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
         if (fd == W_BAD_SOCKET) continue;
-        if (connect(fd, p->ai_addr, (int)p->ai_addrlen) == 0) break;
+        if (connect(fd, p->ai_addr, (int)p->ai_addrlen) == 0) {
+            w_set_socket_timeout(fd);
+            break;
+        }
         w_closesock(fd);
         fd = W_BAD_SOCKET;
     }
@@ -2444,7 +2472,21 @@ static char *w_http_read_all(w_socket_t s, char *err, size_t errlen, size_t max)
             buf = nb;
         }
         n = (int)recv(s, buf + len, (int)(cap - 1 - len), 0);
-        if (n <= 0) break;
+        if (n == 0) break;
+        if (n < 0) {
+#ifdef _WIN32
+            int e = WSAGetLastError();
+            if (e == WSAETIMEDOUT || e == WSAEWOULDBLOCK) {
+                free(buf); snprintf(err, errlen, "network read timeout"); return NULL;
+            }
+#else
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                free(buf); snprintf(err, errlen, "network read timeout"); return NULL;
+            }
+            if (errno == EINTR) continue;
+#endif
+            break;
+        }
         len += (size_t)n;
     }
     buf[len] = 0;
@@ -2694,7 +2736,11 @@ static char *w_tls_read_all(w_tls *t, char *err, size_t errlen, size_t max) {
         if (n > 0) { len += (size_t)n; continue; }
         if (n == 0) break;
         int e = t->get_error ? t->get_error(t->ssl, n) : -1;
-        if (e == 2 /*SSL_ERROR_WANT_READ*/ || e == 3 /*WANT_WRITE*/) continue;
+        if (e == 2 /*SSL_ERROR_WANT_READ*/ || e == 3 /*WANT_WRITE*/) {
+            free(buf);
+            snprintf(err, errlen, "network read timeout");
+            return NULL;
+        }
         free(buf);
         snprintf(err, errlen, "HTTPS: TLS read failed");
         return NULL;
