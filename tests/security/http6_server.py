@@ -1,4 +1,5 @@
 import http.server
+import os
 import socketserver
 import time
 
@@ -47,5 +48,5 @@ class H(http.server.BaseHTTPRequestHandler):
         pass
 
 
-with socketserver.TCPServer(("127.0.0.1", 18081), H) as s:
+with socketserver.TCPServer(("127.0.0.1", int(os.environ.get("HTTP6_PORT", "18081"))), H) as s:
     s.serve_forever()

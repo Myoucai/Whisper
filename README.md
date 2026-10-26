@@ -18,7 +18,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-1.3.1-7cffc4" alt="version">
-  <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2017%20gates-brightgreen" alt="tests">
+  <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2018%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
   <img src="https://img.shields.io/badge/stdlib-20%20modules-blue" alt="stdlib">
@@ -494,6 +494,7 @@ bash scripts/wasm-conformance.sh                 # WASM core conformance 27/27
 bash scripts/https-gate.sh                       # native @6 HTTPS/CA/hostname（需 OpenSSL）
 bash scripts/http6-gate.sh                       # native @6 cookie/用户 header/audit
 bash scripts/net-allow-gate.sh                   # native WHISPER_NET_ALLOW 白名单
+bash scripts/http-parity-gate.sh                 # @6/@7/@8 VM/C 输出对拍
 bash scripts/wrun-gate.sh                        # wrun 策略 W-1..W-7（需 WAMR）
 bash scripts/build-wfmt.sh && bash scripts/fmt-gate.sh  # Whisper 写的 fmt（F-1..F-6）
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验

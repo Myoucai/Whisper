@@ -39,6 +39,9 @@ native/HTTP server 测试全绿；WASM 无网络不变。
 - [x] 最小实现：C 链 `@6` HTTP/HTTPS（动态 OpenSSL、chunked、CA 校验）
 - [x] cookie jar / 用户 headers / 基础审计（`@7`）
 - [x] `@8` raw hex body
+- [x] `@6/@7/@8` VM/C 输出对拍（http-parity-gate）
+  - 已知 VM `@7` 当前需要额外 dummy 实参（typechecker 声明 arity 0）；
+    parity gate 用 `"" @7` 绕过该 VM 缺陷
 - [ ] `@9` parallel
 - [ ] cookie/audit 与 VM 的完整语义对拍
 - [ ] `@2/@3` 是否升级为 HTTPS，或继续显式拒绝
