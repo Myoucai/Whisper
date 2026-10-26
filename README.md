@@ -195,7 +195,9 @@ whisper run hello.ws
 
 > native 目标的网络默认保持历史行为开启；启动器可设 `WHISPER_NET=0` 让
 > 本次进程拒绝所有网络 opcode。`WHISPER_NET_ALLOW=host1,*.example.com`
-> 可把 HTTP/HTTPS 目标限制到白名单；未设置时保持全放行兼容。WASM v1
+> 可把 HTTP/HTTPS 目标限制到白名单；配置白名单后默认拒绝
+> loopback/私网/link-local/云元数据，可用 `WHISPER_NET_ALLOW_PRIVATE=1`
+> 显式放行本地测试目标。未设置 allowlist 时保持全放行兼容。WASM v1
 > 不走这些开关：guest 永远无网络，
 > 见 [docs/wasm-v1-release.md](docs/wasm-v1-release.md)。
 

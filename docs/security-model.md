@@ -162,7 +162,9 @@ stdlib 文档里的安全承诺以本文为准。
 - **I-11 import 白名单**：guest 只能 import `wasi_snapshot_preview1` 的
   显式函数白名单；未知模块/函数（含 WAMR `sock_*` 扩展）在加载前拒绝。
 - **I-13 native host allowlist**：`WHISPER_NET_ALLOW` 在 HTTP/HTTPS
-  建连前按 host 拒绝；未配置时保持兼容全放行。它不覆盖 raw listen/accept。
+  建连前按 host 拒绝；配置 allowlist 后默认拒绝私网/loopback/link-local，
+  `WHISPER_NET_ALLOW_PRIVATE=1` 可显式放行本地测试。未配置 allowlist 时
+  保持兼容全放行。它不覆盖 raw listen/accept。
 
 ---
 

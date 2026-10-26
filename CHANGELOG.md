@@ -7,7 +7,8 @@
   `WHISPER_TLS_CA` 可指定 CA；cookie jar、用户 headers、基础 `@7` 审计；
   `@8` raw hex body。
 - native `WHISPER_NET_ALLOW=host1,*.example.com`：HTTP/HTTPS 建连前
-  域名白名单；未设置时保持全放行兼容。新增 `net-allow-gate.sh`。
+  域名白名单；配置后默认拒绝 loopback/私网/link-local/云元数据，
+  `WHISPER_NET_ALLOW_PRIVATE=1` 可放行本地测试。新增 `net-allow-gate.sh`。
 - 新增 `scripts/https-gate.sh`：自签 CA、未信任 CA、hostname mismatch；
   新增 `scripts/http6-gate.sh`：cookie/header/audit/raw；均已接入 CI。
 - 已知待补：`@9` parallel、完整 VM/C 语义对拍、macOS TLS 验证。

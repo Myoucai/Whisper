@@ -52,7 +52,8 @@ native/HTTP server 测试全绿；WASM 无网络不变。
 当前 `WHISPER_NET=0` 是整体开关，没有按目标授权。
 
 - [x] `WHISPER_NET_ALLOW=host1,*.example.com` 域名白名单（HTTP/HTTPS 建连前）
-- [ ] 禁止私网/loopback/link-local/云元数据（默认）
+- [x] allowlist 下默认拒绝私网/loopback/link-local/云元数据；
+  `WHISPER_NET_ALLOW_PRIVATE=1` 显式放行本地测试
 - [ ] 方法、端口、请求/响应大小、超时、重定向策略
 - [ ] 结构化审计日志
 - [ ] 与 `@2/@3/@6/listen/accept/recv/send` 对齐

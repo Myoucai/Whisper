@@ -2267,15 +2267,98 @@ static void w_url_free(w_url *u) {
     u->path = NULL;
 }
 
-static w_socket_t w_tcp_connect(const char *host, int port) {
+static int w_net_private_strict(void) {
+    const char *v = getenv("WHISPER_NET_ALLOW_PRIVATE");
+    if (v && (strcmp(v, "1") == 0 || strcmp(v, "true") == 0 || strcmp(v, "on") == 0)) return 0;
+    v = getenv("WHISPER_NET_DENY_PRIVATE");
+    if (v && (strcmp(v, "1") == 0 || strcmp(v, "true") == 0 || strcmp(v, "on") == 0)) return 1;
+    // An allowlist is a security boundary: private destinations are denied by
+    // default unless the launcher explicitly opts back in.
+    v = getenv("WHISPER_NET_ALLOW");
+    return v && *v;
+}
+
+static int w_ip4_private(uint32_t ip) {
+    uint32_t a = ip >> 24, b = (ip >> 16) & 0xff;
+    if (a == 10 || a == 127 || a == 0) return 1;
+    if (a == 169 && b == 254) return 1;
+    if (a == 172 && b >= 16 && b <= 31) return 1;
+    if (a == 192 && b == 168) return 1;
+    if (a == 100 && b >= 64 && b <= 127) return 1;
+    if (a == 198 && (b == 18 || b == 19)) return 1;
+    if (a >= 224) return 1;
+    return 0;
+}
+
+static int w_ip6_private(const unsigned char *b) {
+    static const unsigned char loop[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
+    static const unsigned char any[16] = {0};
+    if (memcmp(b, loop, 16) == 0 || memcmp(b, any, 16) == 0) return 1;
+    if ((b[0] & 0xfe) == 0xfc) return 1;          // fc00::/7 ULA
+    if (b[0] == 0xfe && (b[1] & 0xc0) == 0x80) return 1; // fe80::/10
+    if (b[0] == 0xff) return 1;                    // multicast
+    // IPv4-mapped ::ffff:a.b.c.d
+    int mapped = 1;
+    for (int i = 0; i < 10; i++) if (b[i] != 0) mapped = 0;
+    if (b[10] != 0xff || b[11] != 0xff) mapped = 0;
+    if (mapped) {
+        uint32_t ip = ((uint32_t)b[12] << 24) | ((uint32_t)b[13] << 16) |
+                      ((uint32_t)b[14] << 8) | b[15];
+        return w_ip4_private(ip);
+    }
+    return 0;
+}
+
+static int w_addr_private(const struct addrinfo *p) {
+    if (p->ai_family == AF_INET) {
+        const struct sockaddr_in *s = (const struct sockaddr_in *)p->ai_addr;
+        return w_ip4_private(ntohl(s->sin_addr.s_addr));
+    }
+    if (p->ai_family == AF_INET6) {
+        const struct sockaddr_in6 *s = (const struct sockaddr_in6 *)p->ai_addr;
+        return w_ip6_private((const unsigned char *)&s->sin6_addr);
+    }
+    return 1;
+}
+
+static int w_host_is_local(const char *host) {
+    size_t n = strlen(host);
+    if (w_host_ci_eq(host, n, "localhost", 9)) return 1;
+    const char *suffixes[] = {".localhost", ".local", ".internal"};
+    for (size_t i = 0; i < 3; i++) {
+        size_t sn = strlen(suffixes[i]);
+        if (n > sn && w_host_ci_eq(host + n - sn, sn, suffixes[i], sn)) return 1;
+    }
+    return 0;
+}
+
+static w_socket_t w_tcp_connect(const char *host, int port, char *err, size_t errlen) {
     struct addrinfo hints, *res = NULL, *p;
     char portstr[16];
     w_socket_t fd = W_BAD_SOCKET;
+    if (err && errlen) err[0] = 0;
+    int strict = w_net_private_strict();
+    if (strict && w_host_is_local(host)) {
+        snprintf(err, errlen, "destination %s is local/private (WHISPER_NET_ALLOW_PRIVATE=1 to override)", host);
+        return W_BAD_SOCKET;
+    }
     memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
+    hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     snprintf(portstr, sizeof(portstr), "%d", port);
-    if (getaddrinfo(host, portstr, &hints, &res) != 0) return W_BAD_SOCKET;
+    if (getaddrinfo(host, portstr, &hints, &res) != 0) {
+        snprintf(err, errlen, "DNS resolve failed: %s", host);
+        return W_BAD_SOCKET;
+    }
+    if (strict) {
+        for (p = res; p; p = p->ai_next) {
+            if (w_addr_private(p)) {
+                snprintf(err, errlen, "destination %s resolves to a private/link-local address", host);
+                freeaddrinfo(res);
+                return W_BAD_SOCKET;
+            }
+        }
+    }
     for (p = res; p; p = p->ai_next) {
         fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
         if (fd == W_BAD_SOCKET) continue;
@@ -2284,6 +2367,7 @@ static w_socket_t w_tcp_connect(const char *host, int port) {
         fd = W_BAD_SOCKET;
     }
     freeaddrinfo(res);
+    if (fd == W_BAD_SOCKET) snprintf(err, errlen, "Connect to %s:%d failed", host, port);
     return fd;
 }
 
@@ -2349,9 +2433,8 @@ static char *w_http_request(const char *method, const char *url, const char *bod
         w_url_free(&u);
         return NULL;
     }
-    s = w_tcp_connect(u.host, u.port);
+    s = w_tcp_connect(u.host, u.port, err, errlen);
     if (s == W_BAD_SOCKET) {
-        snprintf(err, errlen, "Connect to %s:%d failed", u.host, u.port);
         w_url_free(&u);
         return NULL;
     }
@@ -2834,9 +2917,8 @@ static int w_http_session(const char *method, const char *url, const char *heade
     if (raw_body && w_hex_decode(body, &raw, &bodylen, err, errlen) != 0) {
         free(uh); free(ck); w_url_free(&u); return -1;
     }
-    w_socket_t s = w_tcp_connect(u.host, u.port);
+    w_socket_t s = w_tcp_connect(u.host, u.port, err, errlen);
     if (s == W_BAD_SOCKET) {
-        snprintf(err, errlen, "Connect to %s:%d failed", u.host, u.port);
         free(uh); free(ck); free(raw); w_url_free(&u); return -1;
     }
     w_tls tls;

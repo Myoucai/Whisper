@@ -22,10 +22,17 @@ fi
 grep -q 'not allowed by WHISPER_NET_ALLOW' "$TMP/deny.err" \
     || { echo "net-allow-gate: missing policy error"; cat "$TMP/deny.err"; exit 1; }
 
-if WHISPER_NET_ALLOW=127.0.0.1 "$TMP/app.exe" >"$TMP/allow.out" 2>"$TMP/allow.err"; then
+if WHISPER_NET_ALLOW=127.0.0.1 "$TMP/app.exe" >"$TMP/private.out" 2>"$TMP/private.err"; then
+    echo "net-allow-gate: private destination unexpectedly allowed"; exit 1
+fi
+grep -q 'local/private\|private/link-local' "$TMP/private.err" \
+    || { echo "net-allow-gate: missing private-IP rejection"; cat "$TMP/private.err"; exit 1; }
+
+if WHISPER_NET_ALLOW=127.0.0.1 WHISPER_NET_ALLOW_PRIVATE=1 \
+   "$TMP/app.exe" >"$TMP/allow.out" 2>"$TMP/allow.err"; then
     echo "net-allow-gate: connection unexpectedly succeeded"; exit 1
 fi
 grep -q 'Connect to 127.0.0.1:1 failed' "$TMP/allow.err" \
     || { echo "net-allow-gate: allowed host did not reach connect"; cat "$TMP/allow.err"; exit 1; }
 
-echo "net-allow-gate: PASS (deny before connect; allow reaches connect)"
+echo "net-allow-gate: PASS (deny before connect; private denied; override reaches connect)"
