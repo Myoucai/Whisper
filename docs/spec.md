@@ -221,6 +221,10 @@ native 目标的网络默认开启（历史兼容）；启动器设 `WHISPER_NET
 全放行。`WHISPER_NET_METHODS` / `WHISPER_NET_PORTS` /
 `WHISPER_NET_MAX_RESPONSE` 可分别限制方法、端口、响应字节数和
 读写超时（`WHISPER_NET_TIMEOUT` 秒，默认 30，0 关闭），连接同样受该超时约束。
+`WHISPER_NET_AUDIT=json` 时 `@7` 返回
+`[{"method","url","host","status","bytes"}]`；默认仍是文本行。
+`WHISPER_NET_REDIRECT=manual`（默认）返回 3xx；`deny` 拒绝带 Location 的 3xx；
+`follow` 当前显式未实现。
 WASM v1 不受这些开关影响：guest 始终无网络。
 
 KV 是 **进程级字符串→字符串存储**（1024 键上限，互斥保护），与栈上的 Map（函数式、

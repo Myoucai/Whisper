@@ -2933,16 +2933,41 @@ static char *w_user_headers(const char *json, char *err, size_t errlen) {
 
 static char *w_cookie_jar = NULL; // process-level @6 cookie jar, "k=v; ..."
 static char *w_audit_log = NULL;  // process-level @7 audit, one line per request
+static char *w_audit_json = NULL; // entries (no surrounding brackets) for JSON mode
 
-static void w_audit_add(const char *method, const char *url, long status) {
+static void w_audit_add(const char *method, const char *url, const char *host,
+                        long status, size_t bytes) {
     char line[1024];
     snprintf(line, sizeof(line), "%s %s %ld\n", method, url, status);
     size_t n = (w_audit_log ? strlen(w_audit_log) : 0) + strlen(line) + 1;
     char *p = (char *)realloc(w_audit_log, n);
-    if (!p) return;
-    if (!w_audit_log) p[0] = 0;
-    w_audit_log = p;
-    strcat(w_audit_log, line);
+    if (p) {
+        if (!w_audit_log) p[0] = 0;
+        w_audit_log = p;
+        strcat(w_audit_log, line);
+    }
+    char *em = w_tls_json_escape_str(method);
+    char *eu = w_tls_json_escape_str(url);
+    char *eh = w_tls_json_escape_str(host);
+    if (!em || !eu || !eh) { free(em); free(eu); free(eh); return; }
+    size_t need = strlen(em) + strlen(eu) + strlen(eh) + 128;
+    char *entry = (char *)malloc(need);
+    if (entry) {
+        snprintf(entry, need,
+                 "{\"method\":\"%s\",\"url\":\"%s\",\"host\":\"%s\","
+                 "\"status\":%ld,\"bytes\":%lu}",
+                 em, eu, eh, status, (unsigned long)bytes);
+        size_t jn = (w_audit_json ? strlen(w_audit_json) : 0) + strlen(entry) + 2;
+        char *jp = (char *)realloc(w_audit_json, jn);
+        if (jp) {
+            if (!w_audit_json) jp[0] = 0;
+            w_audit_json = jp;
+            if (w_audit_json[0]) strcat(w_audit_json, ",");
+            strcat(w_audit_json, entry);
+        }
+        free(entry);
+    }
+    free(em); free(eu); free(eh);
 }
 
 static void w_jar_update(const char *resp, size_t n) {
@@ -3155,11 +3180,12 @@ static int w_http_session(const char *method, const char *url, const char *heade
     }
     char *resp = use_tls ? w_tls_read_all(&tls, err, errlen, w_response_max())
                          : w_http_read_all(s, err, errlen, w_response_max());
+    char *audit_host = w_dup_range(u.host, strlen(u.host));
     if (use_tls) w_tls_destroy(&tls);
     w_closesock(s); w_url_free(&u);
-    if (!resp) return -1;
+    if (!resp) { free(audit_host); return -1; }
     char *hdr_end = strstr(resp, "\r\n\r\n");
-    if (!hdr_end) { free(resp); snprintf(err, errlen, "invalid HTTP response"); return -1; }
+    if (!hdr_end) { free(resp); free(audit_host); snprintf(err, errlen, "invalid HTTP response"); return -1; }
     w_jar_update(resp, (size_t)(hdr_end - resp));
     long status = 0;
     if (strncmp(resp, "HTTP/", 5) == 0) {
@@ -3169,7 +3195,23 @@ static int w_http_session(const char *method, const char *url, const char *heade
     out->headers = w_headers_json(resp, (size_t)(hdr_end - resp));
     out->body = w_dup_range(hdr_end + 4, strlen(hdr_end + 4));
     out->status = status;
-    w_audit_add(method, url, status);
+    if (out->headers && (status == 301 || status == 302 || status == 303 ||
+                         status == 307 || status == 308) &&
+        w_ci_contains(out->headers, "\"location\":")) {
+        const char *rm = getenv("WHISPER_NET_REDIRECT");
+        if (rm && strcmp(rm, "follow") == 0) {
+            snprintf(err, errlen, "redirect follow is not implemented; use manual/deny");
+            free(out->headers); free(out->body); free(resp);
+            free(audit_host);
+            return -1;
+        }
+        if (rm && strcmp(rm, "deny") == 0) {
+            snprintf(err, errlen, "redirect denied by WHISPER_NET_REDIRECT=deny");
+            free(out->headers); free(out->body); free(resp);
+            free(audit_host);
+            return -1;
+        }
+    }
     if (out->headers && w_ci_contains(out->headers, "chunked")) {
         size_t blen = 0;
         char *dec = w_dechunk(out->body ? out->body : "", &blen);
@@ -3179,6 +3221,9 @@ static int w_http_session(const char *method, const char *url, const char *heade
             out->body = dec;
         }
     }
+    w_audit_add(method, url, audit_host ? audit_host : "",
+                status, out->body ? strlen(out->body) : 0);
+    free(audit_host);
     free(resp);
     if (!out->headers || !out->body) { snprintf(err, errlen, "out of memory"); return -1; }
     return 0;
@@ -3362,6 +3407,20 @@ static void W__6(void) { w_fail("capability @6 (http-req (session)) is unsupport
 #endif
 #ifndef W_WASI
 static void W__7(void) {                        // @7 http audit
+    const char *mode = getenv("WHISPER_NET_AUDIT");
+    if (mode && strcmp(mode, "json") == 0) {
+        const char *entries = w_audit_json ? w_audit_json : "";
+        size_t n = strlen(entries);
+        char *out = (char *)malloc(n + 3);
+        if (out) {
+            sprintf(out, "[%s]", entries);
+            w_push(W_PTR(w_str_new(out, (uint32_t)strlen(out))));
+            free(out);
+        } else {
+            w_push(W_PTR(w_str_new("[]", 2)));
+        }
+        return;
+    }
     const char *log = w_audit_log ? w_audit_log : "";
     size_t n = strlen(log);
     if (n > 0 && log[n - 1] == '\n') n--;

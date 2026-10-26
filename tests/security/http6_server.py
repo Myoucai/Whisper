@@ -19,6 +19,11 @@ class H(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/plain")
             self.end_headers()
             self.wfile.write(b"slow")
+        elif self.path == "/redirect":
+            self.send_response(302)
+            self.send_header("Location", "/set")
+            self.end_headers()
+            self.wfile.write(b"")
         else:
             body = ("cookie=" + (self.headers.get("Cookie") or "") +
                     ";xtest=" + (self.headers.get("X-Test") or "")).encode()

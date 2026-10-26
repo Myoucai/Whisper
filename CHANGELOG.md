@@ -4,6 +4,10 @@
 
 - native `WHISPER_NET_TIMEOUT`：HTTP/HTTPS 连接和读写 socket 超时，默认 30s，
   0 关闭；超时返回明确错误而不是挂死。
+- native `WHISPER_NET_AUDIT=json`：`@7` 返回
+  `method/url/host/status/bytes` JSON 数组；默认仍是文本行。
+- native `WHISPER_NET_REDIRECT=manual|deny`：默认 manual 原样返回 3xx，
+  deny 拒绝；follow 显式未实现，不静默跟随。
 
 ## v1.3.0 (2026-10-26) — native HTTP(S) session + network policy
 

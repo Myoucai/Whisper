@@ -200,6 +200,8 @@ whisper run hello.ws
 > 显式放行本地测试目标。`WHISPER_NET_METHODS=GET,POST`、
 > `WHISPER_NET_PORTS=80,443`、`WHISPER_NET_MAX_RESPONSE=1048576`、
 > `WHISPER_NET_TIMEOUT=30` 可进一步限制方法、端口、响应大小和连接/读写超时。
+> `WHISPER_NET_REDIRECT=manual`（默认）原样返回 3xx；`=deny` 拒绝带
+> `Location` 的 3xx；`=follow` 目前显式未实现（不做静默跟随）。
 > 未设置 allowlist 时保持全放行兼容。
 > WASM v1 不走这些开关：guest 永远无网络，
 > 见 [docs/wasm-v1-release.md](docs/wasm-v1-release.md)。
@@ -343,7 +345,7 @@ bash scripts/wrun.sh --dir-ro /data::target/data app.wasm
 | `@2` | `http-get` | 仅 `http://` | ✅ | ✅（2026-09-21 起，逐行对拍一致） |
 | `@3` | `http-post` | 仅 `http://` | ✅ | ✅（同上） |
 | `@6` | `http-req` | `http://` + **`https://`**（VM: rustls；C: 动态 OpenSSL） | ✅ | ✅ status/headers/body、cookie、用户 headers、chunked；audit 部分 |
-| `@7` | `http-audit` | 导出会话审计 | ✅ | ✅ 基础审计行 |
+| `@7` | `http-audit` | 导出会话审计 | ✅ | ✅ 文本行；`WHISPER_NET_AUDIT=json` 输出 host/status/bytes |
 | `@8` | `http-req-raw` | 同 `@6`，body 为 hex 原始字节 | ✅ | ✅ 二进制 body（Content-Type 由 user headers 提供） |
 | `@9` | `http-req-parallel` | 同 `@6` | ✅ | ❌ 同上 |
 | `@10` | `exec-raw` | 同 `@5`，但两个流**不 trim** | ✅ | ✅（2026-09-21 起） |
@@ -351,8 +353,9 @@ bash scripts/wrun.sh --dir-ro /data::target/data app.wasm
 `@6` 家族另有 cookie 罐、每请求审计行、`Transfer-Encoding: chunked` 自动解码、
 host 白名单（零出域）、连接 10s/读写 15s 超时（挂死端点化为 status 0 无证据响应）。
 C 链 `@6` 已支持 HTTP/HTTPS 的 status/headers/body、cookie jar、用户
-headers、chunked 解码；`@7` 返回 `METHOD URL STATUS` 审计行；`@8`
-支持 hex 原始 body。`@9`（parallel）仍是显式未实现。
+headers、chunked 解码；`@7` 默认返回 `METHOD URL STATUS` 文本行，
+设置 `WHISPER_NET_AUDIT=json` 返回含 `method/url/host/status/bytes` 的
+JSON 数组；`@8` 支持 hex 原始 body。`@9`（parallel）仍是显式未实现。
 
 C 链 HTTPS 通过运行时动态加载 libssl（不增加链接依赖）：
 找不到 libssl 或没有受信任根时显式失败；可用

@@ -61,6 +61,11 @@ stage=audit
 if ! grep -q 'GET http://127.0.0.1:.*/set 200' "$TMP/out"; then
     echo "http6-gate: missing audit line"; cat "$TMP/out"; exit 1
 fi
+stage=audit-json
+WHISPER_NET=1 WHISPER_NET_AUDIT=json $RUN "$TMP/app.exe" >"$TMP/audit-json.out" 2>"$TMP/audit-json.err" || {
+    echo "http6-gate: json audit run failed"; cat "$TMP/audit-json.err"; exit 1; }
+grep -q '"method":"GET".*"host":"127.0.0.1".*"status":200.*"bytes":' "$TMP/audit-json.out" \
+    || { echo "http6-gate: bad JSON audit"; cat "$TMP/audit-json.out"; exit 1; }
 stage=max-response
 if WHISPER_NET=1 WHISPER_NET_MAX_RESPONSE=2 $RUN "$TMP/app.exe" >"$TMP/max.out" 2>"$TMP/max.err"; then
     echo "http6-gate: response cap ignored"; exit 1
@@ -92,4 +97,25 @@ if WHISPER_NET=1 WHISPER_NET_TIMEOUT=1 $RUN "$TMP/slow.exe" >"$TMP/slow.out" 2>"
 fi
 grep -q 'network read timeout' "$TMP/slow.err" \
     || { echo "http6-gate: missing timeout error"; cat "$TMP/slow.err"; exit 1; }
-echo "http6-gate: PASS (cookie + user header + audit + raw body + timeout)"
+stage=redirect-build
+cat > "$TMP/redir.ws" <<EOF
+"GET" "http://127.0.0.1:$PORT/redirect" "{}" "" @6 drop drop drop
+EOF
+"$BIN" build "$(winpath "$TMP/redir.ws")" -t c2 -o "$(winpath "$TMP/redir.exe")" >/dev/null 2>"$TMP/redir-build.err" || {
+    echo "http6-gate: redirect build failed"; cat "$TMP/redir-build.err"; exit 1; }
+stage=redirect-manual
+WHISPER_NET=1 $RUN "$TMP/redir.exe" >"$TMP/redir.out" 2>"$TMP/redir.err" \
+    || { echo "http6-gate: manual redirect failed"; cat "$TMP/redir.err"; exit 1; }
+stage=redirect-deny
+if WHISPER_NET=1 WHISPER_NET_REDIRECT=deny $RUN "$TMP/redir.exe" >"$TMP/deny.out" 2>"$TMP/deny.err"; then
+    echo "http6-gate: redirect deny ignored"; exit 1
+fi
+grep -q 'redirect denied by WHISPER_NET_REDIRECT=deny' "$TMP/deny.err" \
+    || { echo "http6-gate: missing redirect deny error"; cat "$TMP/deny.err"; exit 1; }
+stage=redirect-follow
+if WHISPER_NET=1 WHISPER_NET_REDIRECT=follow $RUN "$TMP/redir.exe" >"$TMP/follow.out" 2>"$TMP/follow.err"; then
+    echo "http6-gate: redirect follow unexpectedly succeeded"; exit 1
+fi
+grep -q 'redirect follow is not implemented' "$TMP/follow.err" \
+    || { echo "http6-gate: missing redirect follow error"; cat "$TMP/follow.err"; exit 1; }
+echo "http6-gate: PASS (cookie/header/audit-json/raw/timeout/redirect policy)"
