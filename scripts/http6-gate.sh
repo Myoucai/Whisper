@@ -18,7 +18,17 @@ rm -rf "$TMP"; mkdir -p "$TMP"
 PORT="${HTTP6_GATE_PORT:-18081}"
 "$PY" -u "$(winpath "$ROOT/tests/security/http6_server.py")" >"$TMP/server.log" 2>&1 &
 SRV=$!
-trap 'kill "$SRV" 2>/dev/null; rm -rf "$TMP"' EXIT
+cleanup() {
+    rc=$?
+    trap - EXIT
+    kill "$SRV" 2>/dev/null
+    rm -rf "$TMP"
+    if [ "$rc" -ne 0 ]; then
+        echo "::error::http6-gate failed rc=$rc at [$BASH_COMMAND]" >&2
+    fi
+    exit "$rc"
+}
+trap cleanup EXIT
 for _ in $(seq 1 50); do
     if (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null; then
         exec 3<&- 3>&-
