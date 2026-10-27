@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (1.3.3)
+## v1.3.3 (2026-10-27) — response header parity
 
 - C/native HTTP 响应 headers 与 VM 对齐：只暴露 `Location` / `Content-Type`；
   `Set-Cookie` 只进 cookie jar；`http-parity-gate` 增加 @6 header、@9 header
