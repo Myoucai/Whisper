@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.8 (2026-10-27) — total connect budget
+
+- native 连接超时改为所有候选地址共享一个总预算；不再按地址累加，
+  超时错误明确为 `Connect to host:port timed out`。
+
 ## v1.3.7 (2026-10-27) — VM @7 arity fix
 
 - VM `@7`（http-audit）arity 修正为 0：不再需要 dummy 实参；C/native 与 VM

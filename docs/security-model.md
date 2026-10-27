@@ -172,7 +172,8 @@ stdlib 文档里的安全承诺以本文为准。
   `WHISPER_NET_RAW=1` 显式开启，`WHISPER_NET_LISTEN_PORTS` 限制监听端口；
   方法/端口/响应大小由
   `WHISPER_NET_METHODS`/`WHISPER_NET_PORTS`/`WHISPER_NET_MAX_RESPONSE` 控制；
-  `WHISPER_NET_TIMEOUT` 控制连接/读写超时（默认 30s，0 关闭）；
+  `WHISPER_NET_TIMEOUT` 控制连接/读写超时（默认 30s，0 关闭；多地址
+  共享连接总预算，不按地址累加）；
   `WHISPER_NET_AUDIT=json` 提供 host/status/bytes 结构化审计；
   `WHISPER_NET_REDIRECT=deny` 拒绝 3xx；`follow` 只跟随同源、最多 5 次，
   301/302/303 改 GET 并丢弃原 headers/body，307/308 保留方法/body。

@@ -2508,9 +2508,19 @@ static int w_set_nonblocking(w_socket_t fd, int on) {
 #endif
 }
 
-static int w_connect_timeout(w_socket_t fd, const struct sockaddr *addr, int len) {
-    int sec = w_net_timeout_sec();
-    if (sec <= 0) return connect(fd, addr, len);
+static uint64_t w_now_ms(void) {
+#ifdef _WIN32
+    return (uint64_t)GetTickCount64();
+#else
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (uint64_t)tv.tv_sec * 1000ULL + (uint64_t)(tv.tv_usec / 1000);
+#endif
+}
+
+static int w_connect_timeout(w_socket_t fd, const struct sockaddr *addr, int len, int timeout_ms) {
+    if (timeout_ms < 0) return connect(fd, addr, len);
+    if (timeout_ms == 0) return -1;
     if (w_set_nonblocking(fd, 1) != 0) return connect(fd, addr, len);
     int r = connect(fd, addr, len);
     if (r == 0) {
@@ -2531,8 +2541,8 @@ static int w_connect_timeout(w_socket_t fd, const struct sockaddr *addr, int len
     FD_ZERO(&wf);
     FD_SET(fd, &wf);
     struct timeval tv;
-    tv.tv_sec = sec;
-    tv.tv_usec = 0;
+    tv.tv_sec = timeout_ms / 1000;
+    tv.tv_usec = (timeout_ms % 1000) * 1000;
 #ifdef _WIN32
     int sel = select(0, NULL, &wf, NULL, &tv);
 #else
@@ -2556,6 +2566,9 @@ static w_socket_t w_tcp_connect(const char *host, int port, char *err, size_t er
     w_socket_t fd = W_BAD_SOCKET;
     if (err && errlen) err[0] = 0;
     int strict = w_net_private_strict();
+    int sec = w_net_timeout_sec();
+    uint64_t deadline = sec > 0 ? w_now_ms() + (uint64_t)sec * 1000ULL : 0;
+    int timed_out = 0;
     if (strict && w_host_is_local(host)) {
         snprintf(err, errlen, "destination %s is local/private (WHISPER_NET_ALLOW_PRIVATE=1 to override)", host);
         return W_BAD_SOCKET;
@@ -2578,17 +2591,29 @@ static w_socket_t w_tcp_connect(const char *host, int port, char *err, size_t er
         }
     }
     for (p = res; p; p = p->ai_next) {
+        int timeout_ms = -1;
+        if (sec > 0) {
+            uint64_t now = w_now_ms();
+            if (now >= deadline) { timed_out = 1; break; }
+            timeout_ms = (int)(deadline - now);
+        }
         fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
         if (fd == W_BAD_SOCKET) continue;
-        if (w_connect_timeout(fd, p->ai_addr, (int)p->ai_addrlen) == 0) {
+        if (w_connect_timeout(fd, p->ai_addr, (int)p->ai_addrlen, timeout_ms) == 0) {
             w_set_socket_timeout(fd);
             break;
         }
         w_closesock(fd);
         fd = W_BAD_SOCKET;
+        if (sec > 0 && w_now_ms() >= deadline) timed_out = 1;
     }
     freeaddrinfo(res);
-    if (fd == W_BAD_SOCKET) snprintf(err, errlen, "Connect to %s:%d failed", host, port);
+    if (fd == W_BAD_SOCKET) {
+        if (timed_out)
+            snprintf(err, errlen, "Connect to %s:%d timed out", host, port);
+        else
+            snprintf(err, errlen, "Connect to %s:%d failed", host, port);
+    }
     return fd;
 }
 
