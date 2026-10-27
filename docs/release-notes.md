@@ -1,66 +1,66 @@
-# Whisper 1.3.4 发布说明
+# Whisper 1.3.5 发布说明
 
 ## 主题
 
-**native 同源重定向跟随：最多 5 次，严格方法/header 规则，跨源不跟随。**
+**native 资源配额：内存、请求数、请求/响应大小、并发连接。**
 
 ## 新增
 
-`WHISPER_NET_REDIRECT=follow`：
-
-- 只跟随同源（scheme + host + port）重定向
-- 最多 5 次，超过明确失败
-- 301/302/303：
-  - 改为 GET
-  - 丢弃原 headers/body
-- 307/308：
-  - 保留 method 和 body
-- 跨源重定向：
-  - 不跟随
-  - 原样返回 3xx
-  - 不转发 Cookie / Authorization
-- 每一跳重新经过 allowlist、私网、方法、端口、超时策略
-- @6/@8/@9 均使用同一跟随逻辑
-
-手动/拒绝模式不变：
+### 内存
 
 ```bash
-WHISPER_NET_REDIRECT=manual   # 默认，返回 3xx
-WHISPER_NET_REDIRECT=deny     # 拒绝带 Location 的 3xx
+WHISPER_MAX_MEMORY_MB=128
 ```
 
-## 测试
+等价于 `WHISPER_HEAP_MB`，覆盖 native/WASI heap 初始化。
 
-`http6-gate` 覆盖：
+### HTTP
 
-- `/redirect` → `/set`：follow 得到 200
-- `/loop`：follow 触发 redirect limit
-- `/cross`：跨源不跟随，保留 302
-- deny / manual 行为不变
+```bash
+WHISPER_NET_MAX_REQUESTS=1000
+WHISPER_NET_MAX_BODY=1048576
+WHISPER_NET_MAX_HEADERS=65536
+WHISPER_NET_MAX_RESPONSE=8388608
+WHISPER_NET_MAX_CONNECTIONS=8
+```
 
-结果：
+- 请求计数覆盖 `@2/@3/@6/@8/@9`，重定向每一跳计数
+- body 限制文本 body 和 `@8` 解码后的二进制 body
+- header 限制请求用户 headers 和响应 header 区
+- connection 限制 `@9` 单次并发
+- 超限均返回明确错误，不 OOM/挂死
+
+## 验证
 
 ```text
-http6-gate: PASS (cookie/header/audit-json/raw/timeout/redirect follow)
+http6-gate:
+  - response cap
+  - header quota
+  - request quota
+http9-gate:
+  - connection quota
+net-allow-gate:
+  - body quota
+integration tests: 123/123
 ```
 
 ## 兼容性
 
-- 默认仍是 manual，不改变旧行为
-- follow 是 opt-in
-- 跨源不跟随是安全边界，不是 bug
+- 未设置配额时保持旧行为
+- 配额是进程级 opt-in
+- 未设置 allowlist 时网络仍兼容
 - WASM v1 仍无网络
 
 ## 已知限制
 
-- 不跟随跨源重定向
-- `Location` 只支持绝对 URL、`/path`、`//host/path` 和相对路径
-- 连接超时仍按地址逐个计时
+- 内存配额是 heap 上限，不是 RSS 硬隔离
+- 文件描述符/线程总数尚未全局配额
+- WASM CPU/文件数配额仍在后续
 - VM `@7` dummy 实参缺陷仍记录
+- 多地址连接超时仍逐个计时
 
-## 验证
+## 升级建议
 
-- integration tests: 123/123
-- http6-gate: PASS
-- http-parity-gate: PASS
-- CI: `5a411d5` success
+- 长生命周期服务设置 `WHISPER_NET_MAX_REQUESTS` 和 `MAX_RESPONSE`
+- 处理不可信 body 时设置 `WHISPER_NET_MAX_BODY`
+- `@9` 并发服务设置 `WHISPER_NET_MAX_CONNECTIONS`

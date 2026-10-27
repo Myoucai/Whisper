@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (1.3.5)
+## v1.3.5 (2026-10-27) — resource quotas
 
 - native 资源配额：`WHISPER_MAX_MEMORY_MB`（等价 `WHISPER_HEAP_MB`）、
   `WHISPER_NET_MAX_REQUESTS`、`WHISPER_NET_MAX_BODY`、
