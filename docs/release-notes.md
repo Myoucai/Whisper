@@ -1,55 +1,49 @@
-# Whisper 1.3.8 发布说明
+# Whisper 1.3.9 发布说明
 
 ## 主题
 
-**native 多地址连接共享超时预算。**
+**WASI 文件描述符配额：限制 guest 打开的文件和 socket 数量。**
 
-## 修复
-
-此前 `WHISPER_NET_TIMEOUT` 按每个候选地址单独计时；一个主机解析出
-多个地址时，总耗时可能达到 `N × timeout`。
-
-现在连接在所有候选地址之间共享一个总预算：
+## 新增
 
 ```bash
-WHISPER_NET_TIMEOUT=10 ./app
+WHISPER_WASM_MAX_FDS=64 bash scripts/wrun.sh app.wasm
 ```
 
-- 总预算固定为 10 秒
-- 地址之间不会重置计时
-- 预算耗尽立即停止尝试
-- 错误明确为：
+行为：
+
+- 通过 POSIX `ulimit -n` 限制 guest 进程 fd 上限
+- 文件、管道、socket 都计入
+- 范围 3..65535
+- 无法应用时 fail closed
+- 与 heap/stack/threads/timeout、preopen/env/import 白名单叠加
+
+## 测试
+
+`wrun-gate` 新增 W-10：
 
 ```text
-Connect to host:port timed out
-```
-
-DNS 解析仍可能占用预算；解析完成后剩余时间才是连接可用时间。
-
-## 验证
-
-```text
-不可路由地址 + timeout=1:
-  实际约 1.1s 返回 Connect ... timed out
-http6-gate: PASS
-http-parity-gate: PASS
-integration tests: 123/123
+W-9  ✅ WASM heap/stack/threads 配额参数接受
+W-10 ✅ WASM fd 配额（ulimit -n）生效
+wrun-gate: 10/10
 ```
 
 ## 兼容性
 
-- 未设置 `WHISPER_NET_TIMEOUT` 时仍默认 30s
-- `0` 仍关闭超时
-- 读写超时不受影响
+- 未设置 `WHISPER_WASM_MAX_FDS` 时保持旧行为
+- `WHISPER_WASM_TIMEOUT` 仍依赖 `timeout` 命令
+- `--dir-ro` 仍是快照；`--dir-ro-strict` 才是 Linux EROFS
 - WASM v1 仍无网络
 
 ## 已知限制
 
-- DNS 解析本身不能被中断；预算从解析前开始计算
-- 不包含 TLS handshake 的独立预算（受连接/读写超时影响）
-- WASM 文件数/连接数配额仍需 OS/容器层
+- `ulimit -n` 是进程级软限制，不是 cgroup 聚合隔离
+- 文件系统总容量、inode 数仍需 OS/容器层
+- macOS 的 `ulimit -n` 上限可能受系统限制
+- WASM 连接数无独立配额（guest 无网络）
 
 ## 升级建议
 
-- 多 A/AAAA 记录的服务建议显式设置 `WHISPER_NET_TIMEOUT`
-- 需要更严格的总请求预算时叠加 `WHISPER_NET_MAX_REQUESTS`
+- 多租户 WASI 执行至少设置 heap/stack/fd/timeout
+- 宿主绝对不被修改时使用 `--dir-ro-strict`
+- 更严格的隔离叠加容器/cgroup

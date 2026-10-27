@@ -28,7 +28,8 @@ usage: wrun [options] app.wasm [args...]
   --env NAME          pass host env NAME (repeatable)
   --iwasm PATH        runtime path (default: $WRUN_IWASM or iwasm in PATH)
   env quotas: WHISPER_WASM_MAX_MEMORY_MB, WHISPER_WASM_STACK_KB,
-              WHISPER_WASM_MAX_THREADS, WHISPER_WASM_TIMEOUT (seconds)
+              WHISPER_WASM_MAX_THREADS, WHISPER_WASM_MAX_FDS,
+              WHISPER_WASM_TIMEOUT (seconds)
   --no-network        accepted no-op (default)
   --no-exec           accepted no-op (default)
   --no-ffi            accepted no-op (default)
@@ -212,6 +213,15 @@ if [ -n "${WHISPER_WASM_MAX_THREADS:-}" ]; then
     [ "$WHISPER_WASM_MAX_THREADS" -ge 1 ] && [ "$WHISPER_WASM_MAX_THREADS" -le 64 ] \
         || die "WHISPER_WASM_MAX_THREADS out of range (1..64)"
     ARGS+=("--max-threads=$WHISPER_WASM_MAX_THREADS")
+fi
+if [ -n "${WHISPER_WASM_MAX_FDS:-}" ]; then
+    case "$WHISPER_WASM_MAX_FDS" in
+        ''|*[!0-9]*) die "WHISPER_WASM_MAX_FDS must be an integer" ;;
+    esac
+    [ "$WHISPER_WASM_MAX_FDS" -ge 3 ] && [ "$WHISPER_WASM_MAX_FDS" -le 65535 ] \
+        || die "WHISPER_WASM_MAX_FDS out of range (3..65535)"
+    ulimit -n "$WHISPER_WASM_MAX_FDS" 2>/dev/null \
+        || die "cannot apply WHISPER_WASM_MAX_FDS in this environment"
 fi
 
 RUNNER=()

@@ -251,6 +251,7 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
 - WASI 资源配额（WAMR 参数）：`WHISPER_WASM_MAX_MEMORY_MB` 映射
   `--heap-size`，`WHISPER_WASM_STACK_KB` 映射 `--stack-size`，
   `WHISPER_WASM_MAX_THREADS` 映射 `--max-threads`；
+  `WHISPER_WASM_MAX_FDS` 通过 `ulimit -n` 限制进程 fd；
   `WHISPER_WASM_TIMEOUT` 用 `timeout` 做 wall-clock 上限，缺少
   `timeout` 时 fail closed。
 - `--env NAME` 白名单；只透传显式列出的变量。

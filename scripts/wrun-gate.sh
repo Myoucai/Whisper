@@ -96,5 +96,16 @@ else
     bad W-9 "WASM 配额参数导致运行失败"; cat "$TMP/quota.err"
 fi
 
+if WHISPER_WASM_MAX_FDS=64 bash scripts/wrun.sh "$TMP/hello.wasm" \
+   >"$TMP/fds.out" 2>"$TMP/fds.err"; then
+    if grep -q 'Hello, World!' "$TMP/fds.out"; then
+        ok W-10 "WASM fd 配额（ulimit -n）生效"
+    else
+        bad W-10 "fd 配额运行输出异常"; cat "$TMP/fds.out"
+    fi
+else
+    bad W-10 "fd 配额运行失败"; cat "$TMP/fds.err"
+fi
+
 echo "wrun-gate: $PASS/$((PASS+FAIL))"
 [ "$FAIL" -eq 0 ]

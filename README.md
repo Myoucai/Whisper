@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.8-7cffc4" alt="version">
+  <img src="https://img.shields.io/badge/version-1.3.9-7cffc4" alt="version">
   <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2019%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
@@ -338,6 +338,7 @@ bash scripts/wrun.sh --dir-ro-strict /data::target/data app.wasm
 WHISPER_WASM_MAX_MEMORY_MB=64 \
 WHISPER_WASM_STACK_KB=256 \
 WHISPER_WASM_MAX_THREADS=4 \
+WHISPER_WASM_MAX_FDS=64 \
 WHISPER_WASM_TIMEOUT=30 \
 bash scripts/wrun.sh app.wasm
 ```

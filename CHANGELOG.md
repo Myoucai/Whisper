@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.9 (2026-10-27) — WASI fd quota
+
+- WASI `WHISPER_WASM_MAX_FDS`：通过 `ulimit -n` 限制 guest 进程文件描述符/
+  socket 数；`wrun-gate` 增加 W-10。
+
 ## v1.3.8 (2026-10-27) — total connect budget
 
 - native 连接超时改为所有候选地址共享一个总预算；不再按地址累加，
