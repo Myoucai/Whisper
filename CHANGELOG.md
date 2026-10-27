@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased (1.3.5)
+
+- native 资源配额：`WHISPER_MAX_MEMORY_MB`（等价 `WHISPER_HEAP_MB`）、
+  `WHISPER_NET_MAX_REQUESTS`、`WHISPER_NET_MAX_BODY`、
+  `WHISPER_NET_MAX_HEADERS`、`WHISPER_NET_MAX_CONNECTIONS`（@9）；
+  超限明确失败。
+
 ## v1.3.4 (2026-10-27) — same-origin redirect follow
 
 - native `WHISPER_NET_REDIRECT=follow`：同源最多 5 次；301/302/303 改为

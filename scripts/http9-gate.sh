@@ -47,6 +47,12 @@ if [ "$(grep -o '"status":200' "$TMP/out" | wc -l | tr -d ' ')" != "2" ]; then
 fi
 grep -q '"body":"cookie=;xtest="' "$TMP/out" \
     || { echo "http9-gate: unexpected body"; cat "$TMP/out"; exit 1; }
+stage=connections
+if WHISPER_NET=1 WHISPER_NET_MAX_CONNECTIONS=1 "$TMP/app.exe" >"$TMP/cq.out" 2>"$TMP/cq.err"; then
+    echo "http9-gate: connection quota ignored"; exit 1
+fi
+grep -q 'parallel connection quota exceeded' "$TMP/cq.err" \
+    || { echo "http9-gate: missing connection quota error"; cat "$TMP/cq.err"; exit 1; }
 stage=range
 cat > "$TMP/bad.ws" <<EOF
 0 "GET" "http://127.0.0.1:$PORT/echo" "{}" "" @9 .

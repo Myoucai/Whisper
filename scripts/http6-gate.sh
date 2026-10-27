@@ -72,6 +72,18 @@ if WHISPER_NET=1 WHISPER_NET_MAX_RESPONSE=2 $RUN "$TMP/app.exe" >"$TMP/max.out" 
 fi
 grep -q 'response exceeds WHISPER_NET_MAX_RESPONSE' "$TMP/max.err" \
     || { echo "http6-gate: missing response cap error"; cat "$TMP/max.err"; exit 1; }
+stage=quota-headers
+if WHISPER_NET=1 WHISPER_NET_MAX_HEADERS=1 $RUN "$TMP/app.exe" >"$TMP/qh.out" 2>"$TMP/qh.err"; then
+    echo "http6-gate: header quota ignored"; exit 1
+fi
+grep -q 'response header quota exceeded' "$TMP/qh.err" \
+    || { echo "http6-gate: missing header quota error"; cat "$TMP/qh.err"; exit 1; }
+stage=quota-requests
+if WHISPER_NET=1 WHISPER_NET_MAX_REQUESTS=1 $RUN "$TMP/app.exe" >"$TMP/qr.out" 2>"$TMP/qr.err"; then
+    echo "http6-gate: request quota ignored"; exit 1
+fi
+grep -q 'request quota exceeded' "$TMP/qr.err" \
+    || { echo "http6-gate: missing request quota error"; cat "$TMP/qr.err"; exit 1; }
 stage=raw-build
 cat > "$TMP/raw.ws" <<EOF
 "POST" "http://127.0.0.1:$PORT/echo" "{\\"Content-Type\\":\\"application/octet-stream\\"}" "6869" @8 . drop drop

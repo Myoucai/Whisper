@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.4-7cffc4" alt="version">
+  <img src="https://img.shields.io/badge/version-1.3.5-7cffc4" alt="version">
   <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2019%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
@@ -209,6 +209,19 @@ whisper run hello.ws
 > 未设置 allowlist 时保持全放行兼容。
 > WASM v1 不走这些开关：guest 永远无网络，
 > 见 [docs/wasm-v1-release.md](docs/wasm-v1-release.md)。
+
+资源配额：
+
+```bash
+WHISPER_MAX_MEMORY_MB=128       # 等价于 WHISPER_HEAP_MB
+WHISPER_NET_MAX_REQUESTS=1000   # 进程级 HTTP 请求数
+WHISPER_NET_MAX_BODY=1048576    # 请求 body 字节
+WHISPER_NET_MAX_HEADERS=65536   # 请求/响应 header 字节
+WHISPER_NET_MAX_RESPONSE=...    # 响应 body 字节
+WHISPER_NET_MAX_CONNECTIONS=8   # @9 并发上限
+```
+
+未设置时不额外限制。
 
 ## 自举
 

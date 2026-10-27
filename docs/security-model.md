@@ -176,6 +176,9 @@ stdlib 文档里的安全承诺以本文为准。
   `WHISPER_NET_AUDIT=json` 提供 host/status/bytes 结构化审计；
   `WHISPER_NET_REDIRECT=deny` 拒绝 3xx；`follow` 只跟随同源、最多 5 次，
   301/302/303 改 GET 并丢弃原 headers/body，307/308 保留方法/body。
+  配额：`WHISPER_MAX_MEMORY_MB`、`WHISPER_NET_MAX_REQUESTS`、
+  `WHISPER_NET_MAX_BODY`、`WHISPER_NET_MAX_HEADERS`、
+  `WHISPER_NET_MAX_CONNECTIONS`；超限明确失败。
 
 ---
 

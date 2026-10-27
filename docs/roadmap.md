@@ -85,7 +85,8 @@ native/HTTP server 测试全绿；WASM 无网络不变。
 
 - [x] `--dir-ro-strict`：Linux 私有 user/mount namespace + ro bind mount
 - [ ] 容器/EROFS/无特权环境 fallback 的严格只读方案
-- [ ] 内存/CPU/文件数/连接数配额
+- [x] native 内存/HTTP 请求/body/header/@9 连接配额
+- [ ] WASM CPU/文件数/连接数配额
 - [ ] WAMR 版本升级策略与 CVE 跟踪
 - [ ] 多租户隔离评审
 

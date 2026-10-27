@@ -188,6 +188,28 @@ static pthread_mutex_t w_net_mutex = PTHREAD_MUTEX_INITIALIZER;
 static void w_net_global_lock(void) { pthread_mutex_lock(&w_net_mutex); }
 static void w_net_global_unlock(void) { pthread_mutex_unlock(&w_net_mutex); }
 #endif
+
+static long long w_quota_limit(const char *name) {
+    const char *v = getenv(name);
+    if (!v || !*v) return 0;
+    long long n = strtoll(v, NULL, 10);
+    return n > 0 ? n : 0;
+}
+
+static long long w_net_requests = 0;
+
+static int w_net_request_begin(char *err, size_t errlen) {
+    long long max = w_quota_limit("WHISPER_NET_MAX_REQUESTS");
+    w_net_global_lock();
+    if (max > 0 && w_net_requests >= max) {
+        w_net_global_unlock();
+        snprintf(err, errlen, "request quota exceeded (WHISPER_NET_MAX_REQUESTS=%lld)", max);
+        return -1;
+    }
+    w_net_requests++;
+    w_net_global_unlock();
+    return 0;
+}
 #endif
 
 static int w_host_ci_eq(const char *a, size_t an, const char *b, size_t bn) {
@@ -415,24 +437,39 @@ static void w_heap_commit_through(char *end_a, char *list_front) {
 #endif
 }
 
+static long long w_heap_env_mb(void) {
+    const char *names[] = {"WHISPER_HEAP_MB", "WHISPER_MAX_MEMORY_MB"};
+    for (size_t i = 0; i < 2; i++) {
+        const char *v = getenv(names[i]);
+        if (v && *v) {
+            long mb = strtol(v, NULL, 10);
+            if (mb >= 4 && mb <= 16384) return (long long)mb;
+        }
+    }
+    return 0;
+}
+
 static void w_heap_init(void) {
 #ifdef _WIN32
-    if (w_heap_size == 0) w_heap_size = HEAP_SIZE;
+    if (w_heap_size == 0) {
+        long long mb = w_heap_env_mb();
+        w_heap_size = mb > 0 ? mb * 1024LL * 1024LL : HEAP_SIZE;
+    }
     w_heap = (char *)VirtualAlloc(NULL, (SIZE_T)w_heap_size, MEM_RESERVE, PAGE_READWRITE);
     if (w_heap == NULL) { fprintf(stderr, "VirtualAlloc failed for %lld bytes\n", w_heap_size); exit(1); }
 #elif defined(W_WASI)
-    if (w_heap_size == 0) w_heap_size = HEAP_SIZE;
+    if (w_heap_size == 0) {
+        long long mb = w_heap_env_mb();
+        w_heap_size = mb > 0 ? mb * 1024LL * 1024LL : HEAP_SIZE;
+    }
     w_heap = (char *)malloc((size_t)w_heap_size);
     if (w_heap == NULL) { fprintf(stderr, "malloc failed for %lld bytes\n", w_heap_size); exit(1); }
 #else
     if (w_heap_size == 0) {
         // Allow constrained hosts (CI containers with a low RLIMIT_AS) to
         // request a smaller heap without rebuilding the program.
-        const char *hm = getenv("WHISPER_HEAP_MB");
-        if (hm && *hm) {
-            long mb = strtol(hm, NULL, 10);
-            if (mb >= 4 && mb <= 16384) w_heap_size = (long long)mb * 1024LL * 1024LL;
-        }
+        long long mb = w_heap_env_mb();
+        if (mb > 0) w_heap_size = mb * 1024LL * 1024LL;
     }
     if (w_heap_size == 0) w_heap_size = HEAP_SIZE;
     {
@@ -2615,11 +2652,19 @@ static char *w_http_read_all(w_socket_t s, char *err, size_t errlen, size_t max)
 static char *w_http_request(const char *method, const char *url, const char *body,
                             char *err, size_t errlen) {
     w_net_require("http");
+    if (w_net_request_begin(err, errlen) != 0) return NULL;
     w_url u;
     w_socket_t s;
     char *req = NULL, *resp = NULL, *out = NULL;
     size_t need, bodylen = strlen(body);
     int sent = 0, off = 0;
+    {
+        long long mb = w_quota_limit("WHISPER_NET_MAX_BODY");
+        if (mb > 0 && bodylen > (size_t)mb) {
+            snprintf(err, errlen, "request body quota exceeded (WHISPER_NET_MAX_BODY=%lld)", mb);
+            return NULL;
+        }
+    }
     if (w_url_parse(url, &u) != 0) {
         snprintf(err, errlen, "Invalid URL: %s", url);
         return NULL;
@@ -2689,6 +2734,12 @@ static char *w_http_request(const char *method, const char *url, const char *bod
     if (!resp) return NULL;
     {
         char *sep = strstr(resp, "\r\n\r\n");
+        long long mh = w_quota_limit("WHISPER_NET_MAX_HEADERS");
+        if (sep && mh > 0 && (size_t)(sep - resp) > (size_t)mh) {
+            free(resp);
+            snprintf(err, errlen, "response header quota exceeded (WHISPER_NET_MAX_HEADERS=%lld)", mh);
+            return NULL;
+        }
         out = w_dup_range(sep ? sep + 4 : resp, strlen(sep ? sep + 4 : resp));
     }
     free(resp);
@@ -3180,6 +3231,7 @@ static int w_http_session(const char *method, const char *url, const char *heade
                           const char *body, int raw_body, w_http_session_resp *out,
                           char *err, size_t errlen) {
     w_net_require("http-session");
+    if (w_net_request_begin(err, errlen) != 0) return -1;
     w_url u;
     if (w_url_parse(url, &u) != 0) { snprintf(err, errlen, "Invalid URL: %s", url); return -1; }
     if (w_net_allow_guard(u.host, err, errlen) != 0) { w_url_free(&u); return -1; }
@@ -3193,12 +3245,26 @@ static int w_http_session(const char *method, const char *url, const char *heade
     }
     char *uh = w_user_headers(headers_json ? headers_json : "{}", err, errlen);
     if (!uh) { w_url_free(&u); return -1; }
+    {
+        long long mh = w_quota_limit("WHISPER_NET_MAX_HEADERS");
+        if (mh > 0 && strlen(uh) > (size_t)mh) {
+            snprintf(err, errlen, "request header quota exceeded (WHISPER_NET_MAX_HEADERS=%lld)", mh);
+            free(uh); w_url_free(&u); return -1;
+        }
+    }
     char *ck = w_jar_header();
     if (!ck) { free(uh); w_url_free(&u); snprintf(err, errlen, "out of memory"); return -1; }
     unsigned char *raw = NULL;
     size_t bodylen = raw_body ? 0 : strlen(body);
     if (raw_body && w_hex_decode(body, &raw, &bodylen, err, errlen) != 0) {
         free(uh); free(ck); w_url_free(&u); return -1;
+    }
+    {
+        long long mb = w_quota_limit("WHISPER_NET_MAX_BODY");
+        if (mb > 0 && bodylen > (size_t)mb) {
+            snprintf(err, errlen, "request body quota exceeded (WHISPER_NET_MAX_BODY=%lld)", mb);
+            free(uh); free(ck); free(raw); w_url_free(&u); return -1;
+        }
     }
     w_socket_t s = w_tcp_connect(u.host, u.port, err, errlen);
     if (s == W_BAD_SOCKET) {
@@ -3268,6 +3334,14 @@ static int w_http_session(const char *method, const char *url, const char *heade
     if (!resp) { free(audit_host); return -1; }
     char *hdr_end = strstr(resp, "\r\n\r\n");
     if (!hdr_end) { free(resp); free(audit_host); snprintf(err, errlen, "invalid HTTP response"); return -1; }
+    {
+        long long mh = w_quota_limit("WHISPER_NET_MAX_HEADERS");
+        if (mh > 0 && (size_t)(hdr_end - resp) > (size_t)mh) {
+            free(resp); free(audit_host);
+            snprintf(err, errlen, "response header quota exceeded (WHISPER_NET_MAX_HEADERS=%lld)", mh);
+            return -1;
+        }
+    }
     w_jar_update(resp, (size_t)(hdr_end - resp));
     long status = 0;
     if (strncmp(resp, "HTTP/", 5) == 0) {
@@ -3691,6 +3765,10 @@ static void W__9(void) {                        // @9 parallel fan-out
     const char *method = (const char *)w_as_ptr(w_pop());
     int64_t count = w_as_i64(w_pop());
     if (count < 1 || count > 16) w_fail("@9 count must be in 1..16");
+    {
+        long long mc = w_quota_limit("WHISPER_NET_MAX_CONNECTIONS");
+        if (mc > 0 && count > mc) w_fail("parallel connection quota exceeded (WHISPER_NET_MAX_CONNECTIONS)");
+    }
     w_par_job *jobs = (w_par_job *)calloc((size_t)count, sizeof(w_par_job));
     if (!jobs) w_fail("out of memory");
 #ifdef _WIN32

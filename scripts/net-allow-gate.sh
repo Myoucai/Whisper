@@ -65,4 +65,15 @@ fi
 grep -q 'listen port not allowed by WHISPER_NET_LISTEN_PORTS' "$TMP/raw3.err" \
     || { echo "net-allow-gate: missing listen port error"; cat "$TMP/raw3.err"; exit 1; }
 
-echo "net-allow-gate: PASS (host/private/method/port/raw-listen policy; override reaches connect)"
+cat > "$TMP/post.ws" <<'EOF'
+"http://127.0.0.1:1/x" "{\"a\":1}" @3 drop
+EOF
+"$BIN" build "$(winpath "$TMP/post.ws")" -t c2 -o "$(winpath "$TMP/post.exe")" >/dev/null 2>&1 \
+    || { echo "net-allow-gate: post build failed"; exit 1; }
+if WHISPER_NET_MAX_BODY=1 "$TMP/post.exe" >"$TMP/body.out" 2>"$TMP/body.err"; then
+    echo "net-allow-gate: body quota ignored"; exit 1
+fi
+grep -q 'request body quota exceeded' "$TMP/body.err" \
+    || { echo "net-allow-gate: missing body quota error"; cat "$TMP/body.err"; exit 1; }
+
+echo "net-allow-gate: PASS (host/private/method/port/raw-listen/body quota policy; override reaches connect)"
