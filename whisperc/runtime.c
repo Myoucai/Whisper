@@ -2695,9 +2695,9 @@ static int w_tls_load(w_tls *t, char *err, size_t errlen) {
         t->lib = (void *)LoadLibraryA(names[i]);
 #else
 #ifdef __APPLE__
-    const char *names[] = {"libssl.3.dylib", "libssl.dylib",
-                           "/opt/homebrew/opt/openssl@3/lib/libssl.3.dylib",
-                           "/usr/local/opt/openssl@3/lib/libssl.3.dylib"};
+    const char *names[] = {"/opt/homebrew/opt/openssl@3/lib/libssl.3.dylib",
+                           "/usr/local/opt/openssl@3/lib/libssl.3.dylib",
+                           "libssl.3.dylib", "libssl.dylib"};
 #else
     const char *names[] = {"libssl.so.3", "libssl.so.1.1", "libssl.so"};
 #endif
