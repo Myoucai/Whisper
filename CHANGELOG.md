@@ -13,6 +13,8 @@
   （typechecker 声明 arity 0），gate 中已标注。
 - native `@9` parallel：count 1..16 并发、共享 cookie/audit、按请求序
   JSON 聚合；新增 `http9-gate.sh`。
+- CI：macOS job 增加 Homebrew OpenSSL + native HTTPS 门禁；`https-gate.sh`
+  支持 `OPENSSL_BIN` 指定 OpenSSL 3。
 
 ## v1.3.0 (2026-10-26) — native HTTP(S) session + network policy
 

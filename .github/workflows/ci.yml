@@ -39,6 +39,15 @@ jobs:
       - name: Build CLI
         run: cargo build --release -p whisper-cli
 
+      - name: macOS native HTTPS gate
+        if: runner.os == 'macOS'
+        run: |
+          brew install openssl@3
+          export PATH="$(brew --prefix openssl@3)/bin:$PATH"
+          BIN="$PWD/target/release/whisper" \
+          OPENSSL_BIN="$(command -v openssl)" \
+          bash scripts/https-gate.sh
+
       - name: Test examples
         run: |
           ./target/release/whisper run docs/examples/hello.ws

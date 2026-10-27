@@ -9,7 +9,8 @@ export MSYS2_ARG_CONV_EXCL='*'
 BIN="${BIN:-$ROOT/target/debug/whisper}"
 [ -f "$BIN" ] || BIN="$BIN.exe"
 [ -f "$BIN" ] || { echo "https-gate: missing $BIN" >&2; exit 1; }
-command -v openssl >/dev/null 2>&1 || { echo "https-gate: openssl not found" >&2; exit 1; }
+OPENSSL="${OPENSSL_BIN:-openssl}"
+command -v "$OPENSSL" >/dev/null 2>&1 || { echo "https-gate: openssl not found ($OPENSSL)" >&2; exit 1; }
 command -v gcc >/dev/null 2>&1 || { echo "https-gate: gcc not found" >&2; exit 1; }
 TMP="$ROOT/target/https-gate"
 TMPREL="target/https-gate"
@@ -20,12 +21,12 @@ winpath() { cygpath -w "$1" 2>/dev/null || echo "$1"; }
 ok()  { PASS=$((PASS+1)); printf '  %-6s ✅ %s\n' "$1" "$2"; }
 bad() { FAIL=$((FAIL+1)); printf '  %-6s ❌ %s\n' "$1" "$2"; }
 
-openssl req -x509 -newkey rsa:2048 -nodes \
+"$OPENSSL" req -x509 -newkey rsa:2048 -nodes \
   -keyout "$TMPREL/key.pem" -out "$TMPREL/cert.pem" -days 1 \
   -subj "/CN=127.0.0.1" -addext "subjectAltName=IP:127.0.0.1" \
   >/dev/null 2>&1 || { echo "https-gate: cert generation failed" >&2; exit 1; }
 CA="$(cygpath -w "$TMP/cert.pem" 2>/dev/null || echo "$TMP/cert.pem")"
-openssl s_server -accept "$PORT" -cert "$TMPREL/cert.pem" -key "$TMPREL/key.pem" -www -quiet \
+"$OPENSSL" s_server -accept "$PORT" -cert "$TMPREL/cert.pem" -key "$TMPREL/key.pem" -www -quiet \
   >"$TMP/server.log" 2>&1 &
 SRV=$!
 trap 'kill "$SRV" 2>/dev/null; rm -rf "$TMP"' EXIT
