@@ -8,8 +8,9 @@
   `method/url/host/status/bytes` JSON 数组；默认仍是文本行。
 - native `WHISPER_NET_REDIRECT=manual|deny`：默认 manual 原样返回 3xx，
   deny 拒绝；follow 显式未实现，不静默跟随。
-- 新增 `http-parity-gate.sh`：`@6/@7/@8` VM/C 输出对拍；发现 VM `@7`
-  当前需要一个 dummy 实参（typechecker 声明 arity 0），gate 中已标注。
+- 新增 `http-parity-gate.sh`：`@6/@7/@8` 输出、`@9` status/body、
+  302 状态 VM/C 对拍；发现 VM `@7` 当前需要一个 dummy 实参
+  （typechecker 声明 arity 0），gate 中已标注。
 - native `@9` parallel：count 1..16 并发、共享 cookie/audit、按请求序
   JSON 聚合；新增 `http9-gate.sh`。
 

@@ -73,6 +73,52 @@ run_case() {
     fi
 }
 
+run_parallel_case() {
+    name="$1"; src="$2"
+    stage="$name-vm"
+    "$BIN" run --no-strict-types --allow-http "$(winpath "$src")" >"$TMP/$name.vm" 2>"$TMP/$name.vm.err" \
+        || { echo "http-parity-gate: $name VM failed"; cat "$TMP/$name.vm.err"; exit 1; }
+    stage="$name-c2-build"
+    "$BIN" build "$(winpath "$src")" -t c2 -o "$(winpath "$TMP/$name.exe")" >/dev/null 2>"$TMP/$name.build.err" \
+        || { echo "http-parity-gate: $name c2 build failed"; cat "$TMP/$name.build.err"; exit 1; }
+    stage="$name-c2-run"
+    WHISPER_NET=1 "$TMP/$name.exe" >"$TMP/$name.c2" 2>"$TMP/$name.c2.err" \
+        || { echo "http-parity-gate: $name c2 failed"; cat "$TMP/$name.c2.err"; exit 1; }
+    stage="$name-compare"
+    vmjson="$(tr -d '\r' < "$TMP/$name.vm")"
+    c2json="$(tr -d '\r' < "$TMP/$name.c2")"
+    vmjson="${vmjson#\"}"; vmjson="${vmjson%\"}"
+    printf '%s' "$vmjson" >"$TMP/$name.vm.json"
+    printf '%s' "$c2json" >"$TMP/$name.c2.json"
+    "$PY" - "$(winpath "$TMP/$name.vm.json")" "$(winpath "$TMP/$name.c2.json")" <<'PY'
+import json
+import sys
+
+def load(path):
+    text = open(path, encoding="utf-8").read().strip()
+    value = json.loads(text)
+    if isinstance(value, str):
+        value = json.loads(value)
+    return value
+
+vm = load(sys.argv[1])
+c2 = load(sys.argv[2])
+if len(vm) != len(c2):
+    raise SystemExit("length differs: VM=%d C2=%d" % (len(vm), len(c2)))
+for i, (a, b) in enumerate(zip(vm, c2)):
+    if a.get("status") != b.get("status"):
+        raise SystemExit("item %d status differs: %r vs %r" % (i, a.get("status"), b.get("status")))
+    if a.get("body") != b.get("body"):
+        raise SystemExit("item %d body differs: %r vs %r" % (i, a.get("body"), b.get("body")))
+print("parallel status/body parity: %d items" % len(vm))
+PY
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        echo "http-parity-gate: $name JSON parity failed"
+        exit 1
+    fi
+}
+
 cat > "$TMP/session.ws" <<EOF
 "GET" "http://127.0.0.1:$PORT/set" "{}" "" @6 drop drop drop
 "GET" "http://127.0.0.1:$PORT/echo" "{\\"X-Test\\":\\"yes\\"}" "" @6 . drop drop
@@ -80,9 +126,19 @@ cat > "$TMP/session.ws" <<EOF
 EOF
 run_case session "$TMP/session.ws" 'cookie=sid=abc;xtest=yes'
 
+cat > "$TMP/redirect.ws" <<EOF
+"GET" "http://127.0.0.1:$PORT/redirect" "{}" "" @6 drop drop .
+EOF
+run_case redirect "$TMP/redirect.ws" '302'
+
 cat > "$TMP/raw.ws" <<EOF
 "POST" "http://127.0.0.1:$PORT/echo" "{\\"Content-Type\\":\\"application/octet-stream\\"}" "6869" @8 . drop drop
 EOF
 run_case raw "$TMP/raw.ws" 'len=2 hex=6869'
 
-echo "http-parity-gate: PASS (@6/@7 + @8 VM/C output parity)"
+cat > "$TMP/parallel.ws" <<EOF
+2 "GET" "http://127.0.0.1:$PORT/echo" "{}" "" @9 .
+EOF
+run_parallel_case parallel "$TMP/parallel.ws"
+
+echo "http-parity-gate: PASS (@6/@7 + @8 + @9 status/body + redirect 302 parity)"

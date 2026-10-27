@@ -492,7 +492,7 @@ bash scripts/wasm-conformance.sh                 # WASM core conformance 27/27
 bash scripts/https-gate.sh                       # native @6 HTTPS/CA/hostname（需 OpenSSL）
 bash scripts/http6-gate.sh                       # native @6 cookie/用户 header/audit
 bash scripts/net-allow-gate.sh                   # native WHISPER_NET_ALLOW 白名单
-bash scripts/http-parity-gate.sh                 # @6/@7/@8 VM/C 输出对拍
+bash scripts/http-parity-gate.sh                 # @6/@7/@8 + @9/302 VM/C 对拍
 bash scripts/http9-gate.sh                       # native @9 并发扇出
 bash scripts/wrun-gate.sh                        # wrun 策略 W-1..W-7（需 WAMR）
 bash scripts/build-wfmt.sh && bash scripts/fmt-gate.sh  # Whisper 写的 fmt（F-1..F-6）
