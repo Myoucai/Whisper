@@ -415,6 +415,11 @@ impl Capability for HttpAuditCap {
     fn description(&self) -> &str {
         "Export HTTP session audit log"
     }
+    // @7 takes no operand; the default arity of 1 made the VM consume a
+    // spurious stack item that the native chain never required.
+    fn arity(&self) -> usize {
+        0
+    }
     fn call(&self, data_stack: &mut Vec<Value>, _args: &[Value]) -> Result<(), VmError> {
         let log = self.audit.lock().unwrap().join("\n");
         data_stack.push(Value::Str(Rc::new(log)));

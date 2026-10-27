@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 # VM/C parity for native HTTP session words (@6/@7/@8).
-# Note: this VM revision currently wants a dummy argument before @7 even
-# though the typechecker declares @7 arity 0; both chains are fed "" below so
-# the comparison measures output, not that VM quirk.
 set -u
 unset WHISPER_NET_ALLOW
 unset WHISPER_NET_AUDIT
@@ -170,7 +167,7 @@ PY
 cat > "$TMP/session.ws" <<EOF
 "GET" "http://127.0.0.1:$PORT/set" "{}" "" @6 drop drop drop
 "GET" "http://127.0.0.1:$PORT/echo" "{\\"X-Test\\":\\"yes\\"}" "" @6 . drop drop
-"" @7 .
+@7 .
 EOF
 run_case session "$TMP/session.ws" 'cookie=sid=abc;xtest=yes'
 

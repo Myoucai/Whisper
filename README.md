@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.6-7cffc4" alt="version">
+  <img src="https://img.shields.io/badge/version-1.3.7-7cffc4" alt="version">
   <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2019%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">

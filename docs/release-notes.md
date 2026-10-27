@@ -1,65 +1,56 @@
-# Whisper 1.3.6 发布说明
+# Whisper 1.3.7 发布说明
 
 ## 主题
 
-**WASI 资源配额：heap、stack、线程数和 wall-clock 超时。**
+**VM `@7` arity 修正：http-audit 不再需要 dummy 实参。**
 
-## 新增
+## 修复
 
-`wrun` 支持：
+此前 VM 的 `HttpAuditCap` 使用默认 arity 1，导致：
 
-```bash
-WHISPER_WASM_MAX_MEMORY_MB=64 \
-WHISPER_WASM_STACK_KB=256 \
-WHISPER_WASM_MAX_THREADS=4 \
-WHISPER_WASM_TIMEOUT=30 \
-bash scripts/wrun.sh app.wasm
+```whisper
+@7 .
 ```
 
-映射：
+栈下溢，必须写成：
 
-- `WHISPER_WASM_MAX_MEMORY_MB` → WAMR `--heap-size`
-- `WHISPER_WASM_STACK_KB` → WAMR `--stack-size`
-- `WHISPER_WASM_MAX_THREADS` → WAMR `--max-threads`
-- `WHISPER_WASM_TIMEOUT` → `timeout` wall-clock 上限
+```whisper
+"" @7 .
+```
 
-安全语义：
+现在 `HttpAuditCap::arity()` 返回 0，标准写法恢复：
 
-- 数值只接受整数并检查范围
-- 缺少 `timeout` 命令时，设置 `WHISPER_WASM_TIMEOUT` 会 fail closed
-- 与 `--dir-ro-strict` 可同时使用
-- 与 preopen/env/import 白名单叠加
+```whisper
+@7 .
+```
+
+C/native 一直按 arity 0 实现，因此这次修正让 VM 与 C 链真正对齐。
 
 ## 测试
 
-`wrun-gate` 新增 W-9：
-
-- 设置 heap/stack/threads 配额后运行 hello
-- 输出仍为 `Hello, World!`
-
-结果：
+- `http-parity-gate` 移除 `"" @7` 绕过
+- VM/C 的 @7 使用标准 `@7`
+- 全量测试通过
 
 ```text
-W-9 ✅ WASM heap/stack/threads 配额参数接受
-wrun-gate: 9/9
+http-parity-gate: PASS (@6/@7 + @8 + @9 status/body/header + redirect 302/Location parity)
+cargo test --workspace: pass
 ```
 
 ## 兼容性
 
-- 未设置配额时保持旧行为
-- 配额是 host launcher 的 opt-in
-- WASM v1 仍无网络
-- `--dir-ro` 仍是快照；`--dir-ro-strict` 才是 Linux EROFS
+- 旧写法 `"" @7 .` 会留下一个多余栈值，建议移除
+- 标准 `@7 .` 现在在 VM/C 都正确
+- 其他 capability 的 arity 不变
 
 ## 已知限制
 
-- heap/stack 是 WAMR 参数上限，不是 cgroup RSS 隔离
-- 文件数/连接数配额仍需 OS/容器层
-- `timeout` 是 wall-clock，不是 CPU 时间
-- macOS 默认缺少 GNU `timeout`，设置超时会明确失败
+- WASM 文件数/连接数配额仍需 OS/容器层
+- 多地址连接超时仍逐个计时
+- 严格只读 preopen 仅 Linux
 
 ## 验证
 
-- wrun-gate: 9/9
-- WASM CI: success
+- CI（待推送后确认）
 - integration tests: 123/123
+- http-parity-gate: PASS

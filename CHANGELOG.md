@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.7 (2026-10-27) — VM @7 arity fix
+
+- VM `@7`（http-audit）arity 修正为 0：不再需要 dummy 实参；C/native 与 VM
+  的 `"" @7` 兼容写法移除，parity gate 使用标准 `@7`。
+
 ## v1.3.6 (2026-10-27) — WASI quotas
 
 - WASI `wrun` 资源配额：`WHISPER_WASM_MAX_MEMORY_MB`、
