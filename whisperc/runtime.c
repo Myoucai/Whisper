@@ -2702,7 +2702,7 @@ static int w_tls_load(w_tls *t, char *err, size_t errlen) {
     const char *names[] = {"libssl.so.3", "libssl.so.1.1", "libssl.so"};
 #endif
     for (size_t i = 0; i < sizeof(names)/sizeof(names[0]) && !t->lib; i++)
-        t->lib = dlopen(names[i], RTLD_NOW | RTLD_GLOBAL);
+        t->lib = dlopen(names[i], RTLD_NOW);
 #endif
     if (!t->lib) {
         snprintf(err, errlen, "HTTPS unavailable: cannot load libssl");
