@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.2-7cffc4" alt="version">
+  <img src="https://img.shields.io/badge/version-1.3.3-7cffc4" alt="version">
   <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2019%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
@@ -363,6 +363,8 @@ headers、chunked 解码；`@7` 默认返回 `METHOD URL STATUS` 文本行，
 设置 `WHISPER_NET_AUDIT=json` 返回含 `method/url/host/status/bytes` 的
 JSON 数组；`@8` 支持 hex 原始 body；`@9` 支持 1..16 份并发请求。
 
+C 链响应 headers 与 VM 对齐：只暴露 `Location` 和 `Content-Type`；
+`Set-Cookie` 只进 cookie jar，不暴露；其余响应头（Date/Server 等）隐藏。
 C 链 HTTPS 通过运行时动态加载 libssl（不增加链接依赖）：
 找不到 libssl 或没有受信任根时显式失败；可用
 `WHISPER_TLS_CA=/path/ca.pem` 指定 CA。证书链和 hostname 校验默认开启。

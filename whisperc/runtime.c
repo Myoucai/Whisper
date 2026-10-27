@@ -2882,6 +2882,10 @@ static char *w_tls_json_escape_str(const char *s) {
     return out;
 }
 
+static int w_ci_eq_n(const char *a, const char *b, size_t n);
+
+// VM parity: only Location and Content-Type are exposed as response headers;
+// Set-Cookie is consumed by the cookie jar and all other headers are hidden.
 static char *w_headers_json(const char *p, size_t n) {
     size_t cap = n * 2 + 4, k = 1;
     char *out = (char *)malloc(cap);
@@ -2900,6 +2904,11 @@ static char *w_headers_json(const char *p, size_t n) {
             const char *v = colon + 1, *ve = e;
             while (v < ve && (*v == ' ' || *v == '\t')) v++;
             while (ve > v && (ve[-1] == ' ' || ve[-1] == '\t' || ve[-1] == '\r')) ve--;
+            if (!w_ci_eq_n(a, "content-type", (size_t)(b - a)) &&
+                !w_ci_eq_n(a, "location", (size_t)(b - a))) {
+                line = e < end ? e + 1 : end;
+                continue;
+            }
             char *key = w_dup_range(a, (size_t)(b - a));
             char *val = w_dup_range(v, (size_t)(ve - v));
             char *ke = key ? w_tls_json_escape_str(key) : NULL;

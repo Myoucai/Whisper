@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased (1.3.3)
+
+- C/native HTTP 响应 headers 与 VM 对齐：只暴露 `Location` / `Content-Type`；
+  `Set-Cookie` 只进 cookie jar；`http-parity-gate` 增加 @6 header、@9 header
+  和 302 `Location` 对拍。
+
 ## v1.3.2 (2026-10-27) — strict read-only preopen
 
 - WASI `wrun --dir-ro-strict`（Linux）：私有 user/mount namespace 内对

@@ -73,6 +73,50 @@ run_case() {
     fi
 }
 
+run_header_case() {
+    name="$1"; src="$2"; expect_key="${3:-}"
+    stage="$name-vm"
+    "$BIN" run --no-strict-types --allow-http "$(winpath "$src")" >"$TMP/$name.vm" 2>"$TMP/$name.vm.err" \
+        || { echo "http-parity-gate: $name VM failed"; cat "$TMP/$name.vm.err"; exit 1; }
+    stage="$name-c2-build"
+    "$BIN" build "$(winpath "$src")" -t c2 -o "$(winpath "$TMP/$name.exe")" >/dev/null 2>"$TMP/$name.build.err" \
+        || { echo "http-parity-gate: $name c2 build failed"; cat "$TMP/$name.build.err"; exit 1; }
+    stage="$name-c2-run"
+    WHISPER_NET=1 "$TMP/$name.exe" >"$TMP/$name.c2" 2>"$TMP/$name.c2.err" \
+        || { echo "http-parity-gate: $name c2 failed"; cat "$TMP/$name.c2.err"; exit 1; }
+    stage="$name-compare"
+    vmjson="$(tr -d '\r' < "$TMP/$name.vm")"
+    c2json="$(tr -d '\r' < "$TMP/$name.c2")"
+    vmjson="${vmjson#\"}"; vmjson="${vmjson%\"}"
+    printf '%s' "$vmjson" >"$TMP/$name.vm.json"
+    printf '%s' "$c2json" >"$TMP/$name.c2.json"
+    "$PY" - "$(winpath "$TMP/$name.vm.json")" "$(winpath "$TMP/$name.c2.json")" "$expect_key" <<'PY'
+import json
+import sys
+
+def load(path):
+    text = open(path, encoding="utf-8").read().strip()
+    value = json.loads(text)
+    if isinstance(value, str):
+        value = json.loads(value)
+    return {k.lower(): v for k, v in value.items()}
+
+vm = load(sys.argv[1])
+c2 = load(sys.argv[2])
+if vm != c2:
+    raise SystemExit("headers differ: VM=%r C2=%r" % (vm, c2))
+expected = sys.argv[3]
+if expected and expected not in vm:
+    raise SystemExit("expected header %r missing: %r" % (expected, vm))
+print("header parity: %s" % ", ".join(sorted(vm)))
+PY
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        echo "http-parity-gate: $name header JSON parity failed"
+        exit 1
+    fi
+}
+
 run_parallel_case() {
     name="$1"; src="$2"
     stage="$name-vm"
@@ -110,7 +154,11 @@ for i, (a, b) in enumerate(zip(vm, c2)):
         raise SystemExit("item %d status differs: %r vs %r" % (i, a.get("status"), b.get("status")))
     if a.get("body") != b.get("body"):
         raise SystemExit("item %d body differs: %r vs %r" % (i, a.get("body"), b.get("body")))
-print("parallel status/body parity: %d items" % len(vm))
+    ah = {k.lower(): v for k, v in (a.get("headers") or {}).items()}
+    bh = {k.lower(): v for k, v in (b.get("headers") or {}).items()}
+    if ah != bh:
+        raise SystemExit("item %d headers differ: %r vs %r" % (i, ah, bh))
+print("parallel status/body/header parity: %d items" % len(vm))
 PY
     rc=$?
     if [ "$rc" -ne 0 ]; then
@@ -126,10 +174,20 @@ cat > "$TMP/session.ws" <<EOF
 EOF
 run_case session "$TMP/session.ws" 'cookie=sid=abc;xtest=yes'
 
+cat > "$TMP/headers.ws" <<EOF
+"GET" "http://127.0.0.1:$PORT/echo" "{}" "" @6 drop . drop
+EOF
+run_header_case headers "$TMP/headers.ws" content-type
+
 cat > "$TMP/redirect.ws" <<EOF
 "GET" "http://127.0.0.1:$PORT/redirect" "{}" "" @6 drop drop .
 EOF
 run_case redirect "$TMP/redirect.ws" '302'
+
+cat > "$TMP/redirect_headers.ws" <<EOF
+"GET" "http://127.0.0.1:$PORT/redirect" "{}" "" @6 drop . drop
+EOF
+run_header_case redirect_headers "$TMP/redirect_headers.ws" location
 
 cat > "$TMP/raw.ws" <<EOF
 "POST" "http://127.0.0.1:$PORT/echo" "{\\"Content-Type\\":\\"application/octet-stream\\"}" "6869" @8 . drop drop
@@ -141,4 +199,4 @@ cat > "$TMP/parallel.ws" <<EOF
 EOF
 run_parallel_case parallel "$TMP/parallel.ws"
 
-echo "http-parity-gate: PASS (@6/@7 + @8 + @9 status/body + redirect 302 parity)"
+echo "http-parity-gate: PASS (@6/@7 + @8 + @9 status/body/header + redirect 302/Location parity)"
