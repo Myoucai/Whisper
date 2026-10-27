@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (1.3.6)
+## v1.3.6 (2026-10-27) — WASI quotas
 
 - WASI `wrun` 资源配额：`WHISPER_WASM_MAX_MEMORY_MB`、
   `WHISPER_WASM_STACK_KB`、`WHISPER_WASM_MAX_THREADS` 映射 WAMR

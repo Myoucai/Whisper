@@ -1,66 +1,65 @@
-# Whisper 1.3.5 发布说明
+# Whisper 1.3.6 发布说明
 
 ## 主题
 
-**native 资源配额：内存、请求数、请求/响应大小、并发连接。**
+**WASI 资源配额：heap、stack、线程数和 wall-clock 超时。**
 
 ## 新增
 
-### 内存
+`wrun` 支持：
 
 ```bash
-WHISPER_MAX_MEMORY_MB=128
+WHISPER_WASM_MAX_MEMORY_MB=64 \
+WHISPER_WASM_STACK_KB=256 \
+WHISPER_WASM_MAX_THREADS=4 \
+WHISPER_WASM_TIMEOUT=30 \
+bash scripts/wrun.sh app.wasm
 ```
 
-等价于 `WHISPER_HEAP_MB`，覆盖 native/WASI heap 初始化。
+映射：
 
-### HTTP
+- `WHISPER_WASM_MAX_MEMORY_MB` → WAMR `--heap-size`
+- `WHISPER_WASM_STACK_KB` → WAMR `--stack-size`
+- `WHISPER_WASM_MAX_THREADS` → WAMR `--max-threads`
+- `WHISPER_WASM_TIMEOUT` → `timeout` wall-clock 上限
 
-```bash
-WHISPER_NET_MAX_REQUESTS=1000
-WHISPER_NET_MAX_BODY=1048576
-WHISPER_NET_MAX_HEADERS=65536
-WHISPER_NET_MAX_RESPONSE=8388608
-WHISPER_NET_MAX_CONNECTIONS=8
-```
+安全语义：
 
-- 请求计数覆盖 `@2/@3/@6/@8/@9`，重定向每一跳计数
-- body 限制文本 body 和 `@8` 解码后的二进制 body
-- header 限制请求用户 headers 和响应 header 区
-- connection 限制 `@9` 单次并发
-- 超限均返回明确错误，不 OOM/挂死
+- 数值只接受整数并检查范围
+- 缺少 `timeout` 命令时，设置 `WHISPER_WASM_TIMEOUT` 会 fail closed
+- 与 `--dir-ro-strict` 可同时使用
+- 与 preopen/env/import 白名单叠加
 
-## 验证
+## 测试
+
+`wrun-gate` 新增 W-9：
+
+- 设置 heap/stack/threads 配额后运行 hello
+- 输出仍为 `Hello, World!`
+
+结果：
 
 ```text
-http6-gate:
-  - response cap
-  - header quota
-  - request quota
-http9-gate:
-  - connection quota
-net-allow-gate:
-  - body quota
-integration tests: 123/123
+W-9 ✅ WASM heap/stack/threads 配额参数接受
+wrun-gate: 9/9
 ```
 
 ## 兼容性
 
 - 未设置配额时保持旧行为
-- 配额是进程级 opt-in
-- 未设置 allowlist 时网络仍兼容
+- 配额是 host launcher 的 opt-in
 - WASM v1 仍无网络
+- `--dir-ro` 仍是快照；`--dir-ro-strict` 才是 Linux EROFS
 
 ## 已知限制
 
-- 内存配额是 heap 上限，不是 RSS 硬隔离
-- 文件描述符/线程总数尚未全局配额
-- WASM CPU/文件数配额仍在后续
-- VM `@7` dummy 实参缺陷仍记录
-- 多地址连接超时仍逐个计时
+- heap/stack 是 WAMR 参数上限，不是 cgroup RSS 隔离
+- 文件数/连接数配额仍需 OS/容器层
+- `timeout` 是 wall-clock，不是 CPU 时间
+- macOS 默认缺少 GNU `timeout`，设置超时会明确失败
 
-## 升级建议
+## 验证
 
-- 长生命周期服务设置 `WHISPER_NET_MAX_REQUESTS` 和 `MAX_RESPONSE`
-- 处理不可信 body 时设置 `WHISPER_NET_MAX_BODY`
-- `@9` 并发服务设置 `WHISPER_NET_MAX_CONNECTIONS`
+- wrun-gate: 9/9
+- WASM CI: success
+- integration tests: 123/123
