@@ -163,7 +163,8 @@ stdlib 文档里的安全承诺以本文为准。
   显式函数白名单；未知模块/函数（含 WAMR `sock_*` 扩展）在加载前拒绝。
 - **I-12 只读 preopen**：`--dir-ro` 是副本快照，宿主不被修改但不是 EROFS；
   `--dir-ro-strict`（Linux）在私有 user/mount namespace 内 bind mount 为
-  read-only，无法提供时 fail closed，不静默回退到快照。
+  read-only，无法提供时 fail closed，不静默回退到快照；已在
+  OpenCloudOS 8.8 + WAMR 2.4.5 上验证 EROFS 与宿主 mtime 不变。
 - **I-13 native host allowlist**：`WHISPER_NET_ALLOW` 在 HTTP/HTTPS
   建连前按 host 拒绝；配置 allowlist 后默认拒绝私网/loopback/link-local，
   `WHISPER_NET_ALLOW_PRIVATE=1` 可显式放行本地测试。未配置 allowlist 时

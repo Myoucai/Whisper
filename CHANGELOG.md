@@ -1,10 +1,12 @@
 # Changelog
 
-## Unreleased (1.3.2)
+## v1.3.2 (2026-10-27) — strict read-only preopen
 
 - WASI `wrun --dir-ro-strict`（Linux）：私有 user/mount namespace 内对
   preopen 做 read-only bind mount；`unshare`/mount 不可用时 fail closed，
   不再把快照当作 EROFS。
+- 2026-10-27 实机验证（OpenCloudOS 8.8, glibc 2.28, WAMR 2.4.5）：
+  guest 写入返回 `-1`，已有文件读取正常，宿主内容/mtime 不变。
 
 ## v1.3.1 (2026-10-27) — HTTP 会话补齐
 

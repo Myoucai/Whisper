@@ -246,6 +246,8 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
 - `--dir-ro-strict GUEST::HOST`（Linux）：在私有 user/mount namespace 内
   对 HOST 做 bind mount 后 remount read-only，guest 看到真实 EROFS；
   `unshare`/mount 不可用时 fail closed，不回退到快照。
+  2026-10-27 在 OpenCloudOS 8.8 / glibc 2.28 / WAMR 2.4.5 上验证：
+  写入返回 `-1`，已有文件读取正常，宿主内容与 mtime 不变。
 - `--env NAME` 白名单；只透传显式列出的变量。
 - `--http-allow`/`--exec`/`--ffi` **显式拒绝**（“not implemented in
   wasm v1”），不静默忽略；host 代理/exec 留到 Phase 4。
