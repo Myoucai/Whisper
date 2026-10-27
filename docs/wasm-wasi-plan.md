@@ -243,6 +243,9 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
 - `--dir-ro GUEST::HOST` 把 HOST 复制到 `target/wrun-ro.*` 快照再 preopen；
   guest 写入只落在快照，退出时删除，宿主树不变（S-19）。这不是 EROFS：
   guest 可能看到写入成功，但不会持久化到宿主。
+- `--dir-ro-strict GUEST::HOST`（Linux）：在私有 user/mount namespace 内
+  对 HOST 做 bind mount 后 remount read-only，guest 看到真实 EROFS；
+  `unshare`/mount 不可用时 fail closed，不回退到快照。
 - `--env NAME` 白名单；只透传显式列出的变量。
 - `--http-allow`/`--exec`/`--ffi` **显式拒绝**（“not implemented in
   wasm v1”），不静默忽略；host 代理/exec 留到 Phase 4。
@@ -389,6 +392,7 @@ python3（host 工具，不是 runtime）。
       search 0.70s vs 0.19s（输出逐字节一致）。
 - [x] 零 Rust `wd wasm` 入口可用（W-1..W-4 4/4）。
 - [x] `--dir-ro` 副本快照：guest 写入只落在临时副本，宿主树不变（S-19）。
+- [x] `--dir-ro-strict`（Linux）：真实 read-only bind mount，失败不回退。
 - [ ] host HTTP 代理。
 - [x] 不改 Rust 运行时/库；仅测试夹具跨平台修正（已记录）。
 

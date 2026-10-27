@@ -82,7 +82,8 @@ native/HTTP server 测试全绿；WASM 无网络不变。
 
 ## P4 — 严格沙箱与资源边界
 
-- [ ] 真只读 preopen：OS bind mount / 容器 / EROFS（替代快照）
+- [x] `--dir-ro-strict`：Linux 私有 user/mount namespace + ro bind mount
+- [ ] 容器/EROFS/无特权环境 fallback 的严格只读方案
 - [ ] 内存/CPU/文件数/连接数配额
 - [ ] WAMR 版本升级策略与 CVE 跟踪
 - [ ] 多租户隔离评审

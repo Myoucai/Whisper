@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased (1.3.2)
+
+- WASI `wrun --dir-ro-strict`（Linux）：私有 user/mount namespace 内对
+  preopen 做 read-only bind mount；`unshare`/mount 不可用时 fail closed，
+  不再把快照当作 EROFS。
+
 ## v1.3.1 (2026-10-27) — HTTP 会话补齐
 
 - native `WHISPER_NET_TIMEOUT`：HTTP/HTTPS 连接和读写 socket 超时，默认 30s，
