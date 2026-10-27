@@ -16,10 +16,20 @@ TMP="$ROOT/target/https-gate"
 TMPREL="target/https-gate"
 rm -rf "$TMP"; mkdir -p "$TMP"
 PORT="${HTTPS_GATE_PORT:-18443}"
-PASS=0; FAIL=0
+PASS=0; FAIL=0; LAST_FAIL=""; SRV=""
 winpath() { cygpath -w "$1" 2>/dev/null || echo "$1"; }
 ok()  { PASS=$((PASS+1)); printf '  %-6s ✅ %s\n' "$1" "$2"; }
-bad() { FAIL=$((FAIL+1)); printf '  %-6s ❌ %s\n' "$1" "$2"; }
+bad() { FAIL=$((FAIL+1)); LAST_FAIL="$1 $2"; printf '  %-6s ❌ %s\n' "$1" "$2"; }
+cleanup() {
+    rc=$?
+    kill "$SRV" 2>/dev/null || true
+    rm -rf "$TMP"
+    if [ "$rc" -ne 0 ] || [ "$FAIL" -ne 0 ]; then
+        echo "::error::https-gate failed (rc=$rc fail=$FAIL) $LAST_FAIL" >&2
+    fi
+    exit "$rc"
+}
+trap cleanup EXIT
 
 "$OPENSSL" req -x509 -newkey rsa:2048 -nodes \
   -keyout "$TMPREL/key.pem" -out "$TMPREL/cert.pem" -days 1 \
@@ -29,7 +39,6 @@ CA="$(cygpath -w "$TMP/cert.pem" 2>/dev/null || echo "$TMP/cert.pem")"
 "$OPENSSL" s_server -accept "$PORT" -cert "$TMPREL/cert.pem" -key "$TMPREL/key.pem" -www -quiet \
   >"$TMP/server.log" 2>&1 &
 SRV=$!
-trap 'kill "$SRV" 2>/dev/null; rm -rf "$TMP"' EXIT
 sleep 1
 
 cat > "$TMP/get.ws" <<EOF
