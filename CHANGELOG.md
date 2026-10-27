@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (1.3.1)
+## v1.3.1 (2026-10-27) — HTTP 会话补齐
 
 - native `WHISPER_NET_TIMEOUT`：HTTP/HTTPS 连接和读写 socket 超时，默认 30s，
   0 关闭；超时返回明确错误而不是挂死。
