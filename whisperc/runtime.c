@@ -137,6 +137,38 @@ static void w_net_require(const char *what) {
     (void)what;
 }
 
+static int w_net_raw_enabled(void) {
+    const char *v = getenv("WHISPER_NET_RAW");
+    if (v && (strcmp(v, "0") == 0 || strcmp(v, "false") == 0 || strcmp(v, "off") == 0)) return 0;
+    if (v && (strcmp(v, "1") == 0 || strcmp(v, "true") == 0 || strcmp(v, "on") == 0)) return 1;
+    // An HTTP allowlist is a security boundary; do not leave raw sockets open.
+    const char *allow = getenv("WHISPER_NET_ALLOW");
+    return !(allow && *allow);
+}
+
+static void w_net_raw_require(const char *what) {
+    if (!w_net_raw_enabled()) {
+        w_fail("raw sockets disabled by network policy (set WHISPER_NET_RAW=1 to opt in)");
+    }
+    (void)what;
+}
+
+static int w_listen_port_allowed(int port) {
+    const char *e = getenv("WHISPER_NET_LISTEN_PORTS");
+    if (!e || !*e) return 1;
+    const char *p = e;
+    while (*p) {
+        while (*p == ',' || *p == ' ' || *p == '\t') p++;
+        if (*p >= '0' && *p <= '9') {
+            long v = strtol(p, (char **)&p, 10);
+            if (v == port) return 1;
+        } else {
+            while (*p && *p != ',' && *p != ' ' && *p != '\t') p++;
+        }
+    }
+    return 0;
+}
+
 #ifndef W_WASI
 #ifdef _WIN32
 static CRITICAL_SECTION w_net_cs;
@@ -2149,6 +2181,10 @@ static void w_net_init(void) {
 // listen(port) -> server handle | -1
 static wval w_sock_listen(int64_t port) {
     w_net_require("listen");
+    w_net_raw_require("listen");
+    if (!w_listen_port_allowed((int)port)) {
+        w_fail("listen port not allowed by WHISPER_NET_LISTEN_PORTS");
+    }
     w_socket_t s = socket(AF_INET, SOCK_STREAM, 0);
     if (s == W_BAD_SOCKET) return W_I64(-1);
     int opt = 1;
@@ -2166,6 +2202,7 @@ static wval w_sock_listen(int64_t port) {
 // accept(server) -> conn handle | -1 (blocking)
 static wval w_sock_accept(wval srv) {
     w_net_require("accept");
+    w_net_raw_require("accept");
     w_socket_t c = accept((w_socket_t)w_as_i64(srv), NULL, NULL);
     if (c == W_BAD_SOCKET) return W_I64(-1);
     return W_I64((int64_t)c);
@@ -2197,6 +2234,7 @@ static int w_hdr_content_length(const char *buf, size_t len) {
 
 static wval w_sock_recv(wval h) {
     w_net_require("recv");
+    w_net_raw_require("recv");
     w_socket_t c = (w_socket_t)w_as_i64(h);
 #ifdef _WIN32
     DWORD ms = 2000;
@@ -2235,6 +2273,7 @@ static wval w_sock_recv(wval h) {
 // send(conn, data) -> bytes sent | -1
 static wval w_sock_send(wval h, const char *s) {
     w_net_require("send");
+    w_net_raw_require("send");
     w_socket_t c = (w_socket_t)w_as_i64(h);
     int n = (int)send(c, s, w_str_len(s), 0);
     return W_I64((int64_t)n);

@@ -62,7 +62,8 @@ native/HTTP server 测试全绿；WASM 无网络不变。
 - [x] 连接/读写超时（`WHISPER_NET_TIMEOUT`，默认 30s）
 - [x] 重定向策略（manual 默认 / deny；follow 显式未实现）
 - [x] 结构化审计日志（`WHISPER_NET_AUDIT=json`，host/status/bytes）
-- [ ] 与 `@2/@3/@6/listen/accept/recv/send` 对齐
+- [x] 与 `@2/@3/@6` HTTP 策略对齐；raw `listen/accept/recv/send` 增加
+  `WHISPER_NET_RAW`/`WHISPER_NET_LISTEN_PORTS`
 
 验收：未授权目标在连接前拒绝；DNS rebinding/重定向不能逃逸；日志可追踪。
 

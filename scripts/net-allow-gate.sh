@@ -47,4 +47,22 @@ fi
 grep -q 'port not allowed by WHISPER_NET_PORTS' "$TMP/port.err" \
     || { echo "net-allow-gate: missing port rejection"; cat "$TMP/port.err"; exit 1; }
 
-echo "net-allow-gate: PASS (host/private/method/port policy; override reaches connect)"
+cat > "$TMP/raw.ws" <<'EOF'
+0 listen drop
+EOF
+"$BIN" build "$(winpath "$TMP/raw.ws")" -t c2 -o "$(winpath "$TMP/raw.exe")" >/dev/null 2>&1 \
+    || { echo "net-allow-gate: raw build failed"; exit 1; }
+if WHISPER_NET_ALLOW=127.0.0.1 "$TMP/raw.exe" >"$TMP/raw.out" 2>"$TMP/raw.err"; then
+    echo "net-allow-gate: raw listen bypassed allowlist"; exit 1
+fi
+grep -q 'raw sockets disabled by network policy' "$TMP/raw.err" \
+    || { echo "net-allow-gate: missing raw policy error"; cat "$TMP/raw.err"; exit 1; }
+WHISPER_NET_RAW=1 "$TMP/raw.exe" >"$TMP/raw2.out" 2>"$TMP/raw2.err" \
+    || { echo "net-allow-gate: WHISPER_NET_RAW=1 rejected"; cat "$TMP/raw2.err"; exit 1; }
+if WHISPER_NET_RAW=1 WHISPER_NET_LISTEN_PORTS=8080 "$TMP/raw.exe" >"$TMP/raw3.out" 2>"$TMP/raw3.err"; then
+    echo "net-allow-gate: listen port allowlist ignored"; exit 1
+fi
+grep -q 'listen port not allowed by WHISPER_NET_LISTEN_PORTS' "$TMP/raw3.err" \
+    || { echo "net-allow-gate: missing listen port error"; cat "$TMP/raw3.err"; exit 1; }
+
+echo "net-allow-gate: PASS (host/private/method/port/raw-listen policy; override reaches connect)"

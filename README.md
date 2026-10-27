@@ -202,6 +202,9 @@ whisper run hello.ws
 > `WHISPER_NET_TIMEOUT=30` 可进一步限制方法、端口、响应大小和连接/读写超时。
 > `WHISPER_NET_REDIRECT=manual`（默认）原样返回 3xx；`=deny` 拒绝带
 > `Location` 的 3xx；`=follow` 目前显式未实现（不做静默跟随）。
+> `WHISPER_NET_RAW=0` 禁止 raw listen/accept/recv/send；allowlist 模式默认
+> 关闭 raw，需 `WHISPER_NET_RAW=1` 显式开启，可用
+> `WHISPER_NET_LISTEN_PORTS=8080` 限制监听端口。
 > 未设置 allowlist 时保持全放行兼容。
 > WASM v1 不走这些开关：guest 永远无网络，
 > 见 [docs/wasm-v1-release.md](docs/wasm-v1-release.md)。

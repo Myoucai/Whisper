@@ -16,6 +16,9 @@
 - CI：macOS job 增加 Homebrew OpenSSL + native HTTPS 门禁；`https-gate.sh`
   支持 `OPENSSL_BIN` 指定 OpenSSL 3；macOS 绝对 Homebrew libssl 路径 +
   `RTLD_LOCAL` 已通过 CI。
+- native raw socket 策略：`WHISPER_NET_RAW=0` 禁用 listen/accept/recv/send；
+  allowlist 模式默认关闭，`WHISPER_NET_RAW=1` 开启，
+  `WHISPER_NET_LISTEN_PORTS` 限制端口。
 
 ## v1.3.0 (2026-10-26) — native HTTP(S) session + network policy
 
