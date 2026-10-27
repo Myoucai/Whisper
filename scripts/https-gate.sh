@@ -51,7 +51,9 @@ if WHISPER_NET=1 WHISPER_TLS_CA="$CA" "$TMP/get.exe" >"$TMP/ok.out" 2>"$TMP/ok.e
    && [ "$(tr -d '\r' < "$TMP/ok.out")" = "200" ]; then
     ok H-1 "自签 CA：状态 200"
 else
-    bad H-1 "自签 CA HTTPS 失败"; cat "$TMP/ok.err"
+    bad H-1 "自签 CA HTTPS 失败"
+    LAST_FAIL="$LAST_FAIL out=$(tr '\n' ' ' < "$TMP/ok.out" 2>/dev/null) err=$(tr '\n' ' ' < "$TMP/ok.err" 2>/dev/null) server=$(tr '\n' ' ' < "$TMP/server.log" 2>/dev/null)"
+    cat "$TMP/ok.err"
 fi
 
 if WHISPER_NET=1 "$TMP/get.exe" >"$TMP/noca.out" 2>"$TMP/noca.err"; then
