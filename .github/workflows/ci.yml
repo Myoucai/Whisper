@@ -42,8 +42,12 @@ jobs:
       - name: macOS native HTTPS gate
         if: runner.os == 'macOS'
         run: |
-          brew install openssl@3
-          export PATH="$(brew --prefix openssl@3)/bin:$PATH"
+          set -euxo pipefail
+          brew list openssl@3 >/dev/null 2>&1 || brew install openssl@3
+          OPENSSL_PREFIX="$(brew --prefix openssl@3)"
+          export PATH="$OPENSSL_PREFIX/bin:$PATH"
+          command -v gcc
+          command -v openssl
           BIN="$PWD/target/release/whisper" \
           OPENSSL_BIN="$(command -v openssl)" \
           bash scripts/https-gate.sh
