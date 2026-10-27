@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.9-7cffc4" alt="version">
+  <img src="https://img.shields.io/badge/version-1.3.10-7cffc4" alt="version">
   <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2019%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
@@ -313,7 +313,8 @@ Whisper 的安全承诺**按执行路径分档**，不是所有产物都等价�
 [docs/wasm-v1-release.md](docs/wasm-v1-release.md)，当前版本说明见
 [docs/release-notes.md](docs/release-notes.md)，后续优先级见
 [docs/roadmap.md](docs/roadmap.md)；完整威胁模型见
-[docs/security-model.md](docs/security-model.md)。
+[docs/security-model.md](docs/security-model.md)，多租户部署清单见
+[docs/multi-tenant.md](docs/multi-tenant.md)。
 
 WASM/WASI 的详细计划与判据见 [docs/wasm-wasi-plan.md](docs/wasm-wasi-plan.md)
 和 [tests/wasm_preregistered.md](tests/wasm_preregistered.md)。当前 M2 部分已打通：
@@ -526,6 +527,7 @@ bash scripts/http6-gate.sh                       # native @6 cookie/用户 heade
 bash scripts/net-allow-gate.sh                   # native WHISPER_NET_ALLOW 白名单
 bash scripts/http-parity-gate.sh                 # @6/@7/@8 + @9/302 VM/C 对拍
 bash scripts/http9-gate.sh                       # native @9 并发扇出
+bash scripts/sbom-gate.sh                        # SBOM 生成/校验
 bash scripts/wrun-gate.sh                        # wrun 策略 W-1..W-7（需 WAMR）
 bash scripts/build-wfmt.sh && bash scripts/fmt-gate.sh  # Whisper 写的 fmt（F-1..F-6）
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验

@@ -168,6 +168,8 @@ jobs:
         run: bash scripts/http9-gate.sh
       - name: native network allowlist gate
         run: bash scripts/net-allow-gate.sh
+      - name: SBOM generation/validation
+        run: bash scripts/sbom-gate.sh
 
   wd-build:
     name: wd build (CI fast) + formatter

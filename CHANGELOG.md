@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.10 (2026-10-27) — multi-tenant review + SBOM
+
+- 新增 `docs/multi-tenant.md` 多租户隔离评审与部署清单。
+- 新增 `scripts/sbom.sh` / `scripts/sbom-gate.sh`：生成并校验
+  CycloneDX 风格 SBOM（workspace、WAMR、可选 OpenSSL）；CI 接入。
+
 ## v1.3.9 (2026-10-27) — WASI fd quota
 
 - WASI `WHISPER_WASM_MAX_FDS`：通过 `ulimit -n` 限制 guest 进程文件描述符/

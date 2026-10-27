@@ -87,7 +87,7 @@ native/HTTP server 测试全绿；WASM 无网络不变。
 - [x] WASM heap/stack/threads/fd/wall-clock 超时配额
 - [ ] OS/容器级聚合配额（cgroup/文件系统）
 - [ ] WAMR 版本升级策略与 CVE 跟踪
-- [ ] 多租户隔离评审
+- [x] 多租户隔离评审（docs/multi-tenant.md）
 
 验收：`--dir-ro` 不再只是快照；资源耗尽只影响单个 guest。
 
@@ -105,7 +105,8 @@ native/HTTP server 测试全绿；WASM 无网络不变。
 
 - [ ] WASM AOT/wasm2c 性能路线评估
 - [ ] HTTP/WASM/preopen fuzz
-- [ ] 安全审计与依赖 SBOM
+- [x] 依赖 SBOM（scripts/sbom.sh + sbom-gate）
+- [ ] 完整安全审计
 - [ ] CI 零 Rust `wd` 全链 nightly 稳定（已有 workflow）
 - [ ] macOS/Linux/Windows 发布矩阵
 
