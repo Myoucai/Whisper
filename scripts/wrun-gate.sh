@@ -85,5 +85,16 @@ else
     ok W-8 "SKIP：当前环境无 unprivileged user namespace"
 fi
 
+if WHISPER_WASM_MAX_MEMORY_MB=4 WHISPER_WASM_STACK_KB=64 WHISPER_WASM_MAX_THREADS=2 \
+   bash scripts/wrun.sh "$TMP/hello.wasm" >"$TMP/quota.out" 2>"$TMP/quota.err"; then
+    if grep -q 'Hello, World!' "$TMP/quota.out"; then
+        ok W-9 "WASM heap/stack/threads 配额参数接受"
+    else
+        bad W-9 "配额运行输出异常"; cat "$TMP/quota.out"
+    fi
+else
+    bad W-9 "WASM 配额参数导致运行失败"; cat "$TMP/quota.err"
+fi
+
 echo "wrun-gate: $PASS/$((PASS+FAIL))"
 [ "$FAIL" -eq 0 ]

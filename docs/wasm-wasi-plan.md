@@ -248,6 +248,11 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
   `unshare`/mount 不可用时 fail closed，不回退到快照。
   2026-10-27 在 OpenCloudOS 8.8 / glibc 2.28 / WAMR 2.4.5 上验证：
   写入返回 `-1`，已有文件读取正常，宿主内容与 mtime 不变。
+- WASI 资源配额（WAMR 参数）：`WHISPER_WASM_MAX_MEMORY_MB` 映射
+  `--heap-size`，`WHISPER_WASM_STACK_KB` 映射 `--stack-size`，
+  `WHISPER_WASM_MAX_THREADS` 映射 `--max-threads`；
+  `WHISPER_WASM_TIMEOUT` 用 `timeout` 做 wall-clock 上限，缺少
+  `timeout` 时 fail closed。
 - `--env NAME` 白名单；只透传显式列出的变量。
 - `--http-allow`/`--exec`/`--ffi` **显式拒绝**（“not implemented in
   wasm v1”），不静默忽略；host 代理/exec 留到 Phase 4。

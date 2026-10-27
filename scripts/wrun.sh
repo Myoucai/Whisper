@@ -27,6 +27,8 @@ usage: wrun [options] app.wasm [args...]
                        namespace; fails if the OS cannot provide a real RO mount
   --env NAME          pass host env NAME (repeatable)
   --iwasm PATH        runtime path (default: $WRUN_IWASM or iwasm in PATH)
+  env quotas: WHISPER_WASM_MAX_MEMORY_MB, WHISPER_WASM_STACK_KB,
+              WHISPER_WASM_MAX_THREADS, WHISPER_WASM_TIMEOUT (seconds)
   --no-network        accepted no-op (default)
   --no-exec           accepted no-op (default)
   --no-ffi            accepted no-op (default)
@@ -186,8 +188,42 @@ for e in "${ENVS[@]:-}"; do
     ARGS+=("--env=$e=$val")
 done
 
-# Run from the module's directory: WAMR on Windows drops --env when the
-# module argument is an MSYS absolute /d/... path.
+# Optional WASI runtime quotas (WAMR flags). Numeric-only to avoid injection.
+if [ -n "${WHISPER_WASM_MAX_MEMORY_MB:-}" ]; then
+    case "$WHISPER_WASM_MAX_MEMORY_MB" in
+        ''|*[!0-9]*) die "WHISPER_WASM_MAX_MEMORY_MB must be an integer" ;;
+    esac
+    [ "$WHISPER_WASM_MAX_MEMORY_MB" -ge 1 ] && [ "$WHISPER_WASM_MAX_MEMORY_MB" -le 16384 ] \
+        || die "WHISPER_WASM_MAX_MEMORY_MB out of range (1..16384)"
+    ARGS+=("--heap-size=$((WHISPER_WASM_MAX_MEMORY_MB * 1024 * 1024))")
+fi
+if [ -n "${WHISPER_WASM_STACK_KB:-}" ]; then
+    case "$WHISPER_WASM_STACK_KB" in
+        ''|*[!0-9]*) die "WHISPER_WASM_STACK_KB must be an integer" ;;
+    esac
+    [ "$WHISPER_WASM_STACK_KB" -ge 16 ] && [ "$WHISPER_WASM_STACK_KB" -le 8192 ] \
+        || die "WHISPER_WASM_STACK_KB out of range (16..8192)"
+    ARGS+=("--stack-size=$((WHISPER_WASM_STACK_KB * 1024))")
+fi
+if [ -n "${WHISPER_WASM_MAX_THREADS:-}" ]; then
+    case "$WHISPER_WASM_MAX_THREADS" in
+        ''|*[!0-9]*) die "WHISPER_WASM_MAX_THREADS must be an integer" ;;
+    esac
+    [ "$WHISPER_WASM_MAX_THREADS" -ge 1 ] && [ "$WHISPER_WASM_MAX_THREADS" -le 64 ] \
+        || die "WHISPER_WASM_MAX_THREADS out of range (1..64)"
+    ARGS+=("--max-threads=$WHISPER_WASM_MAX_THREADS")
+fi
+
+RUNNER=()
+if [ -n "${WHISPER_WASM_TIMEOUT:-}" ]; then
+    case "$WHISPER_WASM_TIMEOUT" in
+        ''|*[!0-9]*) die "WHISPER_WASM_TIMEOUT must be an integer" ;;
+    esac
+    [ "$WHISPER_WASM_TIMEOUT" -ge 1 ] && [ "$WHISPER_WASM_TIMEOUT" -le 3600 ] \
+        || die "WHISPER_WASM_TIMEOUT out of range (1..3600)"
+    command -v timeout >/dev/null 2>&1 || die "WHISPER_WASM_TIMEOUT requires the timeout command"
+    RUNNER=(timeout "$WHISPER_WASM_TIMEOUT")
+fi
 if [ "${#STRICT_MNTS[@]}" -gt 0 ]; then
     HELPER="$RO_TMP/strict-ro.sh"
     {
@@ -203,11 +239,11 @@ if [ "${#STRICT_MNTS[@]}" -gt 0 ]; then
         echo 'exec "$@"'
     } > "$HELPER" || die "cannot write strict ro helper"
     chmod +x "$HELPER" || die "cannot chmod strict ro helper"
-    unshare -r -m --propagation private bash "$HELPER" "$RT" "${ARGS[@]}" "$APPBASE" "$@"
+    "${RUNNER[@]}" unshare -r -m --propagation private bash "$HELPER" "$RT" "${ARGS[@]}" "$APPBASE" "$@"
     status=$?
 else
     cd "$APPDIR"
-    "$RT" "${ARGS[@]}" "$APPBASE" "$@"
+    "${RUNNER[@]}" "$RT" "${ARGS[@]}" "$APPBASE" "$@"
     status=$?
 fi
 exit "$status"

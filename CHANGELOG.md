@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased (1.3.6)
+
+- WASI `wrun` 资源配额：`WHISPER_WASM_MAX_MEMORY_MB`、
+  `WHISPER_WASM_STACK_KB`、`WHISPER_WASM_MAX_THREADS` 映射 WAMR
+  `--heap-size`/`--stack-size`/`--max-threads`；`WHISPER_WASM_TIMEOUT`
+  用 `timeout` 做 wall-clock 上限，缺少命令时 fail closed。
+
 ## v1.3.5 (2026-10-27) — resource quotas
 
 - native 资源配额：`WHISPER_MAX_MEMORY_MB`（等价 `WHISPER_HEAP_MB`）、

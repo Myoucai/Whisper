@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.5-7cffc4" alt="version">
+  <img src="https://img.shields.io/badge/version-1.3.6-7cffc4" alt="version">
   <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2019%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
@@ -332,6 +332,13 @@ bash scripts/wrun.sh --dir-ro /data::target/data app.wasm
 
 # 真正只读（Linux）：私有 user/mount namespace + ro bind mount
 bash scripts/wrun.sh --dir-ro-strict /data::target/data app.wasm
+
+# WASI 资源配额
+WHISPER_WASM_MAX_MEMORY_MB=64 \
+WHISPER_WASM_STACK_KB=256 \
+WHISPER_WASM_MAX_THREADS=4 \
+WHISPER_WASM_TIMEOUT=30 \
+bash scripts/wrun.sh app.wasm
 ```
 
 > **不要用裸 `iwasm --map-dir` 跑不可信代码**：WAMR 会跟随 preopen 里的
