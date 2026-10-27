@@ -360,6 +360,7 @@ JSON 数组；`@8` 支持 hex 原始 body；`@9` 支持 1..16 份并发请求。
 C 链 HTTPS 通过运行时动态加载 libssl（不增加链接依赖）：
 找不到 libssl 或没有受信任根时显式失败；可用
 `WHISPER_TLS_CA=/path/ca.pem` 指定 CA。证书链和 hostname 校验默认开启。
+macOS 使用 Homebrew `openssl@3` 的绝对路径，CI 已覆盖。
 
 > **`@2`/`@3` 不支持 HTTPS**——VM 侧同样拒绝（`https://` 会直接报错，
 > 而不是把明文发到 443）。需要 HTTPS 请用 `@6`（C/VM 均已支持）。

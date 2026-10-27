@@ -4,7 +4,7 @@
 status/headers/body、cookie jar、用户 headers、chunked 解码、`@8`
 raw hex body 和基础 `@7` 审计；TLS 通过运行时动态加载 OpenSSL，
 不增加链接依赖。`@9` 并发扇出已实现；VM/C 对拍已扩展；
-macOS CI HTTPS 门禁已接入，等待 runner 验证。
+macOS CI HTTPS 门禁已通过（Homebrew OpenSSL 3）。
 
 目标：让 C/native 目标实现与 VM 一致的 `@6` HTTPS，同时不把不可信
 WASM 的网络边界重新打开。
@@ -97,7 +97,7 @@ void  w_tls_close(w_tls *);
 2. `w_tls_*` + 本地 HTTPS 往返：动态 OpenSSL 版完成
 3. `@6` 状态/headers/body/cookie/audit：完成（`@7` 基础审计，`@8` raw，`@9` 并发）
 4. VM/C 对拍 + 负向测试：HTTPS 门禁 3/3；完整对拍待补
-5. Windows/macOS 构建矩阵：Windows 实测；Linux CI；macOS CI HTTPS 门禁已接入
+5. Windows/macOS 构建矩阵：Windows 实测；Linux CI；macOS CI HTTPS 门禁通过
 
 ## 8. 决策门
 
