@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.3-7cffc4" alt="version">
+  <img src="https://img.shields.io/badge/version-1.3.4-7cffc4" alt="version">
   <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2019%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
@@ -201,7 +201,8 @@ whisper run hello.ws
 > `WHISPER_NET_PORTS=80,443`、`WHISPER_NET_MAX_RESPONSE=1048576`、
 > `WHISPER_NET_TIMEOUT=30` 可进一步限制方法、端口、响应大小和连接/读写超时。
 > `WHISPER_NET_REDIRECT=manual`（默认）原样返回 3xx；`=deny` 拒绝带
-> `Location` 的 3xx；`=follow` 目前显式未实现（不做静默跟随）。
+> `Location` 的 3xx；`=follow` 最多跟随 5 次同源重定向，跨源返回原 3xx，
+> 301/302/303 改为 GET 并丢弃原 headers/body，307/308 保留方法和 body。
 > `WHISPER_NET_RAW=0` 禁止 raw listen/accept/recv/send；allowlist 模式默认
 > 关闭 raw，需 `WHISPER_NET_RAW=1` 显式开启，可用
 > `WHISPER_NET_LISTEN_PORTS=8080` 限制监听端口。

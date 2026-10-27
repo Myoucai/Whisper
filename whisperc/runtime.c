@@ -3281,12 +3281,6 @@ static int w_http_session(const char *method, const char *url, const char *heade
                          status == 307 || status == 308) &&
         w_ci_contains(out->headers, "\"location\":")) {
         const char *rm = getenv("WHISPER_NET_REDIRECT");
-        if (rm && strcmp(rm, "follow") == 0) {
-            snprintf(err, errlen, "redirect follow is not implemented; use manual/deny");
-            free(out->headers); free(out->body); free(resp);
-            free(audit_host);
-            return -1;
-        }
         if (rm && strcmp(rm, "deny") == 0) {
             snprintf(err, errlen, "redirect denied by WHISPER_NET_REDIRECT=deny");
             free(out->headers); free(out->body); free(resp);
@@ -3309,6 +3303,135 @@ static int w_http_session(const char *method, const char *url, const char *heade
     free(resp);
     if (!out->headers || !out->body) { snprintf(err, errlen, "out of memory"); return -1; }
     return 0;
+}
+
+static char *w_header_location(const char *json) {
+    if (!json) return NULL;
+    const char *p = json;
+    while ((p = strchr(p, '"')) != NULL) {
+        const char *q = strchr(p + 1, '"');
+        if (!q) return NULL;
+        if (w_ci_eq_n(p + 1, "location", (size_t)(q - p - 1))) {
+            const char *colon = strchr(q, ':');
+            if (!colon) return NULL;
+            const char *v = strchr(colon, '"');
+            if (!v) return NULL;
+            const char *e = strchr(v + 1, '"');
+            if (!e) return NULL;
+            return w_dup_range(v + 1, (size_t)(e - v - 1));
+        }
+        p = q + 1;
+    }
+    return NULL;
+}
+
+static char *w_origin_of(const w_url *u) {
+    const char *scheme = u->use_tls ? "https" : "http";
+    int defport = u->use_tls ? 443 : 80;
+    size_t n = strlen(scheme) + strlen(u->host) + 32;
+    char *out = (char *)malloc(n);
+    if (!out) return NULL;
+    if (u->port == defport)
+        snprintf(out, n, "%s://%s", scheme, u->host);
+    else
+        snprintf(out, n, "%s://%s:%d", scheme, u->host, u->port);
+    return out;
+}
+
+static char *w_resolve_location(const char *base_url, const char *loc) {
+    w_url base;
+    if (w_url_parse(base_url, &base) != 0) return NULL;
+    char *origin = w_origin_of(&base);
+    if (!origin) { w_url_free(&base); return NULL; }
+    char *out = NULL;
+    if (strncmp(loc, "http://", 7) == 0 || strncmp(loc, "https://", 8) == 0) {
+        out = w_dup_range(loc, strlen(loc));
+    } else if (loc[0] == '/' && loc[1] == '/') {
+        size_t n = strlen(origin) + strlen(loc) + 2;
+        out = (char *)malloc(n);
+        if (out) {
+            const char *colon = strchr(origin, ':');
+            size_t sl = colon ? (size_t)(colon - origin) : 0;
+            snprintf(out, n, "%.*s:%s", (int)sl, origin, loc);
+        }
+    } else if (loc[0] == '/') {
+        size_t n = strlen(origin) + strlen(loc) + 1;
+        out = (char *)malloc(n);
+        if (out) snprintf(out, n, "%s%s", origin, loc);
+    } else {
+        const char *slash = strrchr(base.path, '/');
+        size_t dirlen = slash ? (size_t)(slash - base.path + 1) : 1;
+        size_t n = strlen(origin) + dirlen + strlen(loc) + 2;
+        out = (char *)malloc(n);
+        if (out) {
+            if (loc[0] == '?') snprintf(out, n, "%s%s%s", origin, base.path, loc);
+            else snprintf(out, n, "%s%.*s%s", origin, (int)dirlen, base.path, loc);
+        }
+    }
+    free(origin);
+    w_url_free(&base);
+    return out;
+}
+
+static int w_same_origin(const w_url *a, const w_url *b) {
+    return a->use_tls == b->use_tls && a->port == b->port &&
+           w_host_ci_eq(a->host, strlen(a->host), b->host, strlen(b->host));
+}
+
+static int w_http_session_follow(const char *method, const char *url,
+                                 const char *headers, const char *body, int raw,
+                                 w_http_session_resp *out, char *err, size_t errlen) {
+    const char *mode = getenv("WHISPER_NET_REDIRECT");
+    int follow = mode && strcmp(mode, "follow") == 0;
+    char *cur = w_dup_range(url, strlen(url));
+    char *m = w_dup_range(method, strlen(method));
+    char *h = w_dup_range(headers ? headers : "{}", strlen(headers ? headers : "{}"));
+    char *b = w_dup_range(body ? body : "", strlen(body ? body : ""));
+    int raw_cur = raw;
+    int rc = -1;
+    if (!cur || !m || !h || !b) { snprintf(err, errlen, "out of memory"); goto done; }
+    for (int hop = 0;; hop++) {
+        memset(out, 0, sizeof(*out));
+        rc = w_http_session(m, cur, h, b, raw_cur, out, err, errlen);
+        if (rc != 0 || !follow) break;
+        long st = out->status;
+        if (st != 301 && st != 302 && st != 303 && st != 307 && st != 308) break;
+        char *loc = w_header_location(out->headers);
+        if (!loc) break;
+        if (hop >= 5) {
+            snprintf(err, errlen, "redirect limit exceeded (max 5)");
+            free(loc); free(out->headers); free(out->body);
+            memset(out, 0, sizeof(*out));
+            rc = -1;
+            break;
+        }
+        char *next = w_resolve_location(cur, loc);
+        free(loc);
+        if (!next) { snprintf(err, errlen, "invalid redirect Location"); break; }
+        w_url a, z;
+        int pa = w_url_parse(cur, &a);
+        int pz = w_url_parse(next, &z);
+        int ok = pa == 0 && pz == 0 && w_same_origin(&a, &z);
+        if (pa == 0) w_url_free(&a);
+        if (pz == 0) w_url_free(&z);
+        if (!ok) {
+            // Cross-origin redirects are returned as-is; never forward cookies
+            // or authorization headers to a different origin.
+            free(next);
+            break;
+        }
+        if (st == 301 || st == 302 || st == 303) {
+            free(m); m = w_dup_range("GET", 3);
+            free(h); h = w_dup_range("{}", 2);
+            free(b); b = w_dup_range("", 0);
+            raw_cur = 0;
+        }
+        free(out->headers); free(out->body);
+        free(cur); cur = next;
+    }
+done:
+    free(cur); free(m); free(h); free(b);
+    return rc;
 }
 
 #endif // !W_WASI
@@ -3477,7 +3600,7 @@ static void W__6(void) {                        // @6 http session
     char err[512];
     w_http_session_resp r;
     memset(&r, 0, sizeof(r));
-    if (w_http_session(method, url, headers, body, 0, &r, err, sizeof(err)) != 0) w_fail(err);
+    if (w_http_session_follow(method, url, headers, body, 0, &r, err, sizeof(err)) != 0) w_fail(err);
     w_push(W_I64(r.status));
     w_push(W_PTR(w_str_new(r.headers, (uint32_t)strlen(r.headers))));
     w_push(W_PTR(w_str_new(r.body, (uint32_t)strlen(r.body))));
@@ -3523,7 +3646,7 @@ static void W__8(void) {                        // @8 http session with raw hex 
     char err[512];
     w_http_session_resp r;
     memset(&r, 0, sizeof(r));
-    if (w_http_session(method, url, headers, body, 1, &r, err, sizeof(err)) != 0) w_fail(err);
+    if (w_http_session_follow(method, url, headers, body, 1, &r, err, sizeof(err)) != 0) w_fail(err);
     w_push(W_I64(r.status));
     w_push(W_PTR(w_str_new(r.headers, (uint32_t)strlen(r.headers))));
     w_push(W_PTR(w_str_new(r.body, (uint32_t)strlen(r.body))));
@@ -3548,15 +3671,15 @@ typedef struct {
 #ifdef _WIN32
 static DWORD WINAPI w_par_worker(LPVOID p) {
     w_par_job *j = (w_par_job *)p;
-    j->rc = w_http_session(j->method, j->url, j->headers, j->body, 0,
-                           &j->r, j->err, sizeof(j->err));
+    j->rc = w_http_session_follow(j->method, j->url, j->headers, j->body, 0,
+                                  &j->r, j->err, sizeof(j->err));
     return 0;
 }
 #else
 static void *w_par_worker(void *p) {
     w_par_job *j = (w_par_job *)p;
-    j->rc = w_http_session(j->method, j->url, j->headers, j->body, 0,
-                           &j->r, j->err, sizeof(j->err));
+    j->rc = w_http_session_follow(j->method, j->url, j->headers, j->body, 0,
+                                  &j->r, j->err, sizeof(j->err));
     return NULL;
 }
 #endif

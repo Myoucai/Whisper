@@ -99,7 +99,7 @@ grep -q 'network read timeout' "$TMP/slow.err" \
     || { echo "http6-gate: missing timeout error"; cat "$TMP/slow.err"; exit 1; }
 stage=redirect-build
 cat > "$TMP/redir.ws" <<EOF
-"GET" "http://127.0.0.1:$PORT/redirect" "{}" "" @6 drop drop drop
+"GET" "http://127.0.0.1:$PORT/redirect" "{}" "" @6 drop drop .
 EOF
 "$BIN" build "$(winpath "$TMP/redir.ws")" -t c2 -o "$(winpath "$TMP/redir.exe")" >/dev/null 2>"$TMP/redir-build.err" || {
     echo "http6-gate: redirect build failed"; cat "$TMP/redir-build.err"; exit 1; }
@@ -113,9 +113,29 @@ fi
 grep -q 'redirect denied by WHISPER_NET_REDIRECT=deny' "$TMP/deny.err" \
     || { echo "http6-gate: missing redirect deny error"; cat "$TMP/deny.err"; exit 1; }
 stage=redirect-follow
-if WHISPER_NET=1 WHISPER_NET_REDIRECT=follow $RUN "$TMP/redir.exe" >"$TMP/follow.out" 2>"$TMP/follow.err"; then
-    echo "http6-gate: redirect follow unexpectedly succeeded"; exit 1
+WHISPER_NET=1 WHISPER_NET_REDIRECT=follow $RUN "$TMP/redir.exe" >"$TMP/follow.out" 2>"$TMP/follow.err" \
+    || { echo "http6-gate: redirect follow failed"; cat "$TMP/follow.err"; exit 1; }
+[ "$(tr -d '\r' < "$TMP/follow.out")" = "200" ] \
+    || { echo "http6-gate: follow did not reach /set"; cat "$TMP/follow.out"; exit 1; }
+
+cat > "$TMP/loop.ws" <<EOF
+"GET" "http://127.0.0.1:$PORT/loop" "{}" "" @6 drop drop .
+EOF
+"$BIN" build "$(winpath "$TMP/loop.ws")" -t c2 -o "$(winpath "$TMP/loop.exe")" >/dev/null 2>&1
+stage=redirect-loop
+if WHISPER_NET=1 WHISPER_NET_REDIRECT=follow $RUN "$TMP/loop.exe" >"$TMP/loop.out" 2>"$TMP/loop.err"; then
+    echo "http6-gate: redirect loop was not limited"; exit 1
 fi
-grep -q 'redirect follow is not implemented' "$TMP/follow.err" \
-    || { echo "http6-gate: missing redirect follow error"; cat "$TMP/follow.err"; exit 1; }
-echo "http6-gate: PASS (cookie/header/audit-json/raw/timeout/redirect policy)"
+grep -q 'redirect limit exceeded' "$TMP/loop.err" \
+    || { echo "http6-gate: missing redirect limit"; cat "$TMP/loop.err"; exit 1; }
+
+cat > "$TMP/cross.ws" <<EOF
+"GET" "http://127.0.0.1:$PORT/cross" "{}" "" @6 drop drop .
+EOF
+"$BIN" build "$(winpath "$TMP/cross.ws")" -t c2 -o "$(winpath "$TMP/cross.exe")" >/dev/null 2>&1
+stage=redirect-cross
+WHISPER_NET=1 WHISPER_NET_REDIRECT=follow $RUN "$TMP/cross.exe" >"$TMP/cross.out" 2>"$TMP/cross.err" \
+    || { echo "http6-gate: cross-origin redirect failed"; cat "$TMP/cross.err"; exit 1; }
+[ "$(tr -d '\r' < "$TMP/cross.out")" = "302" ] \
+    || { echo "http6-gate: cross-origin redirect was followed"; cat "$TMP/cross.out"; exit 1; }
+echo "http6-gate: PASS (cookie/header/audit-json/raw/timeout/redirect follow)"

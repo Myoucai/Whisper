@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased (1.3.4)
+
+- native `WHISPER_NET_REDIRECT=follow`：同源最多 5 次；301/302/303 改为
+  GET 并丢弃原 headers/body，307/308 保留方法和 body；跨源返回原 3xx。
+
 ## v1.3.3 (2026-10-27) — response header parity
 
 - C/native HTTP 响应 headers 与 VM 对齐：只暴露 `Location` / `Content-Type`；

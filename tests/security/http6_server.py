@@ -25,6 +25,17 @@ class H(http.server.BaseHTTPRequestHandler):
             self.send_header("Location", "/set")
             self.end_headers()
             self.wfile.write(b"")
+        elif self.path == "/loop":
+            self.send_response(302)
+            self.send_header("Location", "/loop")
+            self.end_headers()
+            self.wfile.write(b"")
+        elif self.path == "/cross":
+            port = self.server.server_address[1]
+            self.send_response(302)
+            self.send_header("Location", "http://localhost:%d/set" % port)
+            self.end_headers()
+            self.wfile.write(b"")
         else:
             body = ("cookie=" + (self.headers.get("Cookie") or "") +
                     ";xtest=" + (self.headers.get("X-Test") or "")).encode()

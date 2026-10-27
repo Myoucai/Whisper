@@ -227,7 +227,8 @@ native 目标的网络默认开启（历史兼容）；启动器设 `WHISPER_NET
 关闭 raw，需 `WHISPER_NET_RAW=1` 显式开启；`WHISPER_NET_LISTEN_PORTS`
 可限制监听端口。
 `WHISPER_NET_REDIRECT=manual`（默认）返回 3xx；`deny` 拒绝带 Location 的 3xx；
-`follow` 当前显式未实现。
+`follow` 最多 5 次同源重定向（跨源不跟随），301/302/303 改为 GET，
+307/308 保留方法和 body。
 WASM v1 不受这些开关影响：guest 始终无网络。
 
 KV 是 **进程级字符串→字符串存储**（1024 键上限，互斥保护），与栈上的 Map（函数式、
