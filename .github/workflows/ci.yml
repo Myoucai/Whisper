@@ -43,11 +43,14 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           set -euxo pipefail
-          brew list openssl@3 >/dev/null 2>&1 || brew install openssl@3
-          OPENSSL_PREFIX="$(brew --prefix openssl@3)"
+          command -v brew || { echo "::error::brew not found" >&2; exit 1; }
+          if ! brew list openssl@3 >/dev/null 2>&1; then
+            brew install openssl@3 || { echo "::error::brew install openssl@3 failed" >&2; exit 1; }
+          fi
+          OPENSSL_PREFIX="$(brew --prefix openssl@3)" || { echo "::error::openssl prefix missing" >&2; exit 1; }
           export PATH="$OPENSSL_PREFIX/bin:$PATH"
-          command -v gcc
-          command -v openssl
+          command -v gcc || { echo "::error::gcc not found" >&2; exit 1; }
+          command -v openssl || { echo "::error::openssl not found" >&2; exit 1; }
           BIN="$PWD/target/release/whisper" \
           OPENSSL_BIN="$(command -v openssl)" \
           bash scripts/https-gate.sh
