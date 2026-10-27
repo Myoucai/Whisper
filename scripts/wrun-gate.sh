@@ -66,5 +66,24 @@ for opt in --http-allow --exec --ffi; do
     fi
 done
 
+# W-8: strict read-only preopen (Linux user/mount namespace).
+if [ "$(uname -s 2>/dev/null)" = "Linux" ] && command -v unshare >/dev/null 2>&1 \
+   && unshare -r -m true >/dev/null 2>&1; then
+    rm -rf "$TMP/rodata"; mkdir -p "$TMP/rodata"
+    if bash scripts/wrun.sh --dir-ro-strict "/data::$TMP/rodata" "$TMP/file.wasm" \
+         >"$TMP/ro-strict.out" 2>"$TMP/ro-strict.err"; then
+        if [ ! -e "$TMP/rodata/wsconf.txt" ] \
+           && [ "$(tr -d '\r' < "$TMP/ro-strict.out" | tr '\n' '|')" = "-1|0|" ]; then
+            ok W-8 "--dir-ro-strict：写入 EROFS，宿主无文件"
+        else
+            bad W-8 "--dir-ro-strict 写入了宿主或输出异常"; cat "$TMP/ro-strict.out"
+        fi
+    else
+        bad W-8 "--dir-ro-strict 运行失败"; cat "$TMP/ro-strict.err"
+    fi
+else
+    ok W-8 "SKIP：当前环境无 unprivileged user namespace"
+fi
+
 echo "wrun-gate: $PASS/$((PASS+FAIL))"
 [ "$FAIL" -eq 0 ]
