@@ -3010,6 +3010,7 @@ static char *w_headers_json(const char *p, size_t n) {
 
 static int w_ci_eq_n(const char *a, const char *b, size_t n) {
     for (size_t i = 0; i < n; i++) {
+        if (a[i] == '\0' || b[i] == '\0') return 0;
         unsigned char x = (unsigned char)a[i], y = (unsigned char)b[i];
         if (x >= 'A' && x <= 'Z') x = (unsigned char)(x + 32);
         if (y >= 'A' && y <= 'Z') y = (unsigned char)(y + 32);
