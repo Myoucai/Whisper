@@ -3,6 +3,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT" || exit 1
+mkdir -p "$ROOT/target"
 CLANG="${CLANG:-clang}"
 command -v "$CLANG" >/dev/null 2>&1 || { echo "fuzz-gate: clang not found" >&2; exit 1; }
 OUT="$ROOT/target/fuzz-http"
