@@ -107,7 +107,8 @@ native/HTTP server 测试全绿；WASM 无网络不变。
 - [x] C HTTP/URL parser fuzz（libFuzzer/ASAN，20k CI）
 - [x] WASM import mutation smoke（300 CI）
 - [x] preopen/symlink 路径 property gate（W-11）
-- [ ] preopen 随机路径 / WASM import/`wd` 二进制覆盖引导 fuzz
+- [x] `.wbin` 解码 property fuzz（4096 + malformed）
+- [ ] preopen 随机路径 / WASM import/`.wbin` 覆盖引导 fuzz
 - [x] 依赖 SBOM（scripts/sbom.sh + sbom-gate）
 - [ ] 完整安全审计
 - [ ] CI 零 Rust `wd` 全链 nightly 稳定（已有 workflow）

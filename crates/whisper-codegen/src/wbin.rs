@@ -120,6 +120,21 @@ impl WbinUnit {
     }
 }
 
+const MAX_DECODE_DEPTH: u32 = 128;
+const MAX_DECODE_ALLOC: u64 = 64 * 1024 * 1024;
+
+fn read_len(cursor: &mut Cursor<&[u8]>, what: &str) -> std::io::Result<usize> {
+    let n = read_leb(cursor)?;
+    let remaining = (cursor.get_ref().len() as u64).saturating_sub(cursor.position());
+    if n > remaining || n > MAX_DECODE_ALLOC {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("{what} length {n} exceeds remaining input"),
+        ));
+    }
+    Ok(n as usize)
+}
+
 impl WbinWriter {
     /// Serialize a v2 unit: main + defs as block programs.
     /// Jump offsets never appear on disk — the loader linearizes.
@@ -231,9 +246,9 @@ impl WbinReader {
                 Ok(WbinUnit::V1(opcodes))
             }
             WBIN_VERSION_V2 => {
-                let count = read_leb(&mut cursor)?;
+                let count = read_len(&mut cursor, "program count")?;
                 let mut programs: Vec<(String, crate::block_ir::BlockProgram)> =
-                    Vec::with_capacity(count.min(4096) as usize);
+                    Vec::with_capacity(count.min(4096));
                 for _ in 0..count {
                     programs.push(Self::decode_block_program(&mut cursor)?);
                 }
@@ -260,17 +275,23 @@ impl WbinReader {
         cursor: &mut Cursor<&[u8]>,
     ) -> std::io::Result<(String, crate::block_ir::BlockProgram)> {
         use crate::block_ir::{Block, BlockProgram, Terminator};
-        let name_len = read_leb(cursor)? as usize;
+        let name_len = read_len(cursor, "program name")?;
         let mut name_buf = vec![0u8; name_len];
         cursor.read_exact(&mut name_buf)?;
         let name = String::from_utf8(name_buf)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
 
         let entry = read_leb(cursor)? as usize;
-        let block_count = read_leb(cursor)? as usize;
+        let block_count = read_len(cursor, "block count")?;
+        if entry >= block_count {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "v2 entry block is out of range",
+            ));
+        }
         let mut blocks = Vec::with_capacity(block_count.min(1 << 20));
         for id in 0..block_count {
-            let instr_count = read_leb(cursor)? as usize;
+            let instr_count = read_len(cursor, "instruction count")?;
             let mut instructions = Vec::with_capacity(instr_count.min(1 << 20));
             for _ in 0..instr_count {
                 let mut byte_buf = [0u8; 1];
@@ -282,10 +303,25 @@ impl WbinReader {
             let terminator = match term_buf[0] {
                 0 => Terminator::Halt,
                 1 => Terminator::Return,
-                2 => Terminator::Jump(read_leb(cursor)? as usize),
+                2 => {
+                    let target = read_leb(cursor)? as usize;
+                    if target >= block_count {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "v2 jump target is out of range",
+                        ));
+                    }
+                    Terminator::Jump(target)
+                }
                 3 => {
                     let then = read_leb(cursor)? as usize;
                     let els = read_leb(cursor)? as usize;
+                    if then >= block_count || els >= block_count {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "v2 branch target is out of range",
+                        ));
+                    }
                     Terminator::Branch { then, els }
                 }
                 other => {
@@ -308,6 +344,20 @@ impl WbinReader {
     }
 
     fn decode_opcode(byte: u8, cursor: &mut Cursor<&[u8]>) -> std::io::Result<Opcode> {
+        Self::decode_opcode_at(byte, cursor, 0)
+    }
+
+    fn decode_opcode_at(
+        byte: u8,
+        cursor: &mut Cursor<&[u8]>,
+        depth: u32,
+    ) -> std::io::Result<Opcode> {
+        if depth > MAX_DECODE_DEPTH {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "nested reference depth exceeded",
+            ));
+        }
         match byte {
             // Stack ops
             0x00 => Ok(Opcode::Dup),
@@ -360,9 +410,7 @@ impl WbinReader {
                 Ok(Opcode::PushF64(n))
             }
             0x32 => {
-                let len = leb128::read::unsigned(cursor)
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
-                    as usize;
+                let len = read_len(cursor, "string")?;
                 let mut buf = vec![0u8; len];
                 cursor.read_exact(&mut buf)?;
                 let s = String::from_utf8(buf)
@@ -376,14 +424,12 @@ impl WbinReader {
             }
             0x34 => Ok(Opcode::PushList),
             0x35 => {
-                let count = leb128::read::unsigned(cursor)
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
-                    as usize;
-                let mut inner = Vec::with_capacity(count);
+                let count = read_len(cursor, "reference count")?;
+                let mut inner = Vec::with_capacity(count.min(1 << 20));
                 for _ in 0..count {
                     let mut byte_buf = [0u8; 1];
                     cursor.read_exact(&mut byte_buf)?;
-                    inner.push(Self::decode_opcode(byte_buf[0], cursor)?);
+                    inner.push(Self::decode_opcode_at(byte_buf[0], cursor, depth + 1)?);
                 }
                 Ok(Opcode::PushRef(inner))
             }
@@ -514,9 +560,7 @@ impl WbinReader {
 
             // Call/Return
             0x60 => {
-                let len = leb128::read::unsigned(cursor)
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
-                    as usize;
+                let len = read_len(cursor, "call name")?;
                 let mut name_buf = vec![0u8; len];
                 cursor.read_exact(&mut name_buf)?;
                 let name = String::from_utf8(name_buf)
@@ -704,6 +748,45 @@ mod tests {
         match WbinReader::decode_unit(&data).unwrap() {
             WbinUnit::V1(flat) => assert_eq!(flat, ops),
             _ => panic!("expected v1"),
+        }
+    }
+
+    #[test]
+    fn test_wbin_malformed_lengths_are_rejected() {
+        // v2, one program, name length claims 4 GiB: must not allocate it.
+        let data = b"WHSP\x02\0\0\0\x01\xff\xff\xff\xff\x0f";
+        assert!(WbinReader::decode_unit(data).is_err());
+
+        // Nested PushRef deeper than the decode limit: must not recurse
+        // until the stack overflows.
+        let mut nested = Vec::new();
+        for _ in 0..200 {
+            nested.push(0x35);
+            nested.push(1);
+        }
+        nested.push(0x00);
+        let mut v1 = b"WHSP\x01\0\0\0".to_vec();
+        v1.extend_from_slice(&nested);
+        assert!(WbinReader::decode_unit(&v1).is_err());
+    }
+
+    #[test]
+    fn fuzz_wbin_decode_never_panics() {
+        let mut state: u64 = 0x9E3779B97F4A7C15;
+        for i in 0..4096u32 {
+            state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let len = (state as usize) % 256;
+            let mut data = vec![0u8; len];
+            for b in &mut data {
+                state = state.wrapping_mul(6364136223846793005).wrapping_add(1);
+                *b = (state >> 33) as u8;
+            }
+            if data.len() >= 8 {
+                data[0..4].copy_from_slice(b"WHSP");
+                let version = if i % 2 == 0 { 1u32 } else { 2u32 };
+                data[4..8].copy_from_slice(&version.to_le_bytes());
+            }
+            let _ = WbinReader::decode_unit(&data);
         }
     }
 }

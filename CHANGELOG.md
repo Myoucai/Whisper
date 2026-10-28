@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.14 (2026-10-28) — wbin decode hardening
+
+- `.wbin` 解码加固：长度必须 ≤ 剩余输入，分配上限 64 MiB，PushRef
+  深度上限 128，v2 entry/jump/branch 目标校验；新增 4096 输入 property fuzz
+  与恶意长度/深嵌套回归测试。
+
 ## v1.3.13 (2026-10-28) — preopen path hardening
 
 - preopen 加固：guest 路径必须是绝对路径，拒绝 `.`/`..`/`//`/`:`/换行；

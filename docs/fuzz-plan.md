@@ -61,6 +61,24 @@ w_ci_eq_n(ks, "host", n)         // n > 4
 
 这不是随机路径 fuzz；它是确定性的 fail-closed 回归，symlink 不可创建时 SKIP。
 
+## `.wbin` 解码 property fuzz
+
+`crates/whisper-codegen/src/wbin.rs` 单元测试：
+
+- `fuzz_wbin_decode_never_panics`：4096 个随机/带 magic 的输入
+- `test_wbin_malformed_lengths_are_rejected`：
+  - v2 name length 声称 4 GiB，不分配
+  - 200 层嵌套 PushRef，在深度上限处失败
+
+同时加固：
+
+- 所有 name/string/count 长度必须 ≤ 剩余字节
+- 单个分配上限 64 MiB
+- PushRef 嵌套深度上限 128
+- v2 entry/jump/branch 目标必须 < block_count
+
+这不是覆盖引导 fuzz；CI 由 `cargo test --workspace` 执行。
+
 回归：
 
 ```text
@@ -73,7 +91,8 @@ fuzz-gate: PASS (20000 runs)
 - [ ] preopen 随机路径 fuzz
 - [x] WASM import 白名单 mutation smoke
 - [ ] WASM import 覆盖引导 fuzz（atheris/libFuzzer）
-- [ ] `wd` 二进制/`.wbin` 解码 fuzz
+- [x] `wd` `.wbin` mutation/property fuzz（4096 + malformed）
+- [ ] `.wbin` 覆盖引导 fuzz / fuzz target
 - [ ] 更长 corpus + 定期 nightly
 - [ ] OSS-Fuzz 集成评估
 
