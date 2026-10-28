@@ -20,6 +20,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang
       - name: Run fuzz gate
         run: bash scripts/fuzz-gate.sh
+      - name: WASM import mutation gate
+        run: bash scripts/wasm-fuzz-gate.sh
 
   test:
     name: Test (${{ matrix.os }})

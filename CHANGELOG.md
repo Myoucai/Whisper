@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.12 (2026-10-28) — WASM import mutation smoke
+
+- 新增 WASM import mutation smoke：随机变异合法 import section，
+  验证 `wasm-imports.py` 只返回 0/1、不崩溃/不挂起；CI 300 次。
+
 ## v1.3.11 (2026-10-28) — HTTP parser fuzz
 
 - 新增 C HTTP/URL parser libFuzzer harness（headers/chunked/user headers/
