@@ -104,7 +104,8 @@ native/HTTP server 测试全绿；WASM 无网络不变。
 ## P6 — 质量与性能
 
 - [ ] WASM AOT/wasm2c 性能路线评估
-- [ ] HTTP/WASM/preopen fuzz
+- [x] C HTTP/URL parser fuzz（libFuzzer/ASAN，20k CI）
+- [ ] WASM import/preopen/`wd` 二进制 fuzz
 - [x] 依赖 SBOM（scripts/sbom.sh + sbom-gate）
 - [ ] 完整安全审计
 - [ ] CI 零 Rust `wd` 全链 nightly 稳定（已有 workflow）

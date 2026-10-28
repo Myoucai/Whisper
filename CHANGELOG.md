@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.11 (2026-10-28) — HTTP parser fuzz
+
+- 新增 C HTTP/URL parser libFuzzer harness（headers/chunked/user headers/
+  hex/url）与 CI job；修复 fuzz 发现的 `w_ci_eq_n` 字面量越界读。
+- 新增 `docs/fuzz-plan.md`。
+
 ## v1.3.10 (2026-10-27) — multi-tenant review + SBOM
 
 - 新增 `docs/multi-tenant.md` 多租户隔离评审与部署清单。

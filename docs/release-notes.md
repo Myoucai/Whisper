@@ -1,67 +1,56 @@
-# Whisper 1.3.10 发布说明
+# Whisper 1.3.11 发布说明
 
 ## 主题
 
-**多租户隔离评审 + 依赖 SBOM。**
+**C HTTP/URL 解析器 libFuzzer + ASAN 首次接入；fuzz 发现并修复越界读。**
 
 ## 新增
 
-### 多租户隔离评审
+- `fuzz/http_fuzz.c`：一个输入同时覆盖
+  - 响应 header 解析
+  - chunked 解码
+  - 用户 headers JSON
+  - hex body 解码
+  - URL 解析
+- `scripts/fuzz-gate.sh`：clang + `-fsanitize=fuzzer,address`
+- CI job `HTTP parser fuzz (libFuzzer)`，20k runs
+- 种子目录 `fuzz/corpus/http/`
+- 文档 [fuzz-plan.md](fuzz-plan.md)
 
-[docs/multi-tenant.md](multi-tenant.md)：
+## 修复
 
-- native / VM / WASM 信任模型
-- 每租户推荐启动参数
-- 文件、环境、网络、FFI、资源、侧信道隔离矩阵
-- 部署层要求：独立 UID、cgroup、网络命名空间、只读根
-- 评审清单
-
-结论：
-
-- native C **不是**多租户边界
-- WASM 租户使用 `--dir-ro-strict` + 配额 + 独立进程
-- userns 不可用时 fail closed，不回退快照
-
-### SBOM
-
-```bash
-bash scripts/sbom.sh target/sbom.json
-bash scripts/sbom-gate.sh
-```
-
-- CycloneDX 1.4 风格
-- workspace crates
-- WAMR iwasm 固定版本
-- 动态可选 OpenSSL
-- `cargo metadata --locked`，离线时降级为 workspace-only
-- CI 校验 bomFormat/specVersion/whisper 版本/WAMR 组件
+libFuzzer 发现 `w_ci_eq_n` 在 key 长度超过字面量时越界读：
 
 ```text
-sbom-gate: PASS (9 components, whisper 1.3.10)
+w_ci_eq_n(a, "content-type", n)  // n > 12
+w_ci_eq_n(ks, "host", n)         // n > 4
 ```
+
+修复：任一侧遇到 NUL 立即返回不匹配，不再越过字符串结尾。
 
 ## 验证
 
-- SBOM gate: PASS
-- CI YAML: valid
-- cargo check --workspace: pass
-- 既有 HTTP/WASM/配额门禁保持不变
+```text
+fuzz-gate: PASS (20000 runs)
+CI: 1c8791d success
+```
 
 ## 兼容性
 
-- 无运行时行为变化
-- 仅新增文档、脚本和 CI 步骤
+- 无正常路径行为变化
+- 仅修复非法/恶意 header 的越界读
 - WASM v1 仍无网络
 
 ## 已知限制
 
-- SBOM 离线 fallback 只含 workspace，不含完整 Rust 依赖图
-- WAMR CVE 跟踪仍是流程项，不是自动告警
-- 多租户强隔离仍需 cgroup/容器/独立节点
-- 完整安全审计与 fuzz 仍待做
+- 只覆盖 native C HTTP/URL 解析器
+- 不覆盖 VM Rust 解析器、WAMR 内部
+- 20k runs 是烟雾级，不是完整覆盖证明
+- WASM import/preopen/`wd` 二进制 fuzz 尚未接入
 
-## 升级建议
+## 下一步
 
-- 多租户部署前按 [multi-tenant.md](multi-tenant.md) 清单执行
-- 每次发布归档 `target/sbom.json`
-- 生产环境叠加 cgroup v2 和独立 UID
+- preopen/symlink 路径 fuzz
+- WASM import 白名单 fuzz
+- `wd` `.wbin` 解码 fuzz
+- nightly 长跑 / OSS-Fuzz 评估
