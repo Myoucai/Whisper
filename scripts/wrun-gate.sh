@@ -107,5 +107,62 @@ else
     bad W-10 "fd 配额运行失败"; cat "$TMP/fds.err"
 fi
 
+mkdir -p "$TMP/preopen"
+if bash scripts/wrun.sh --dir "data::$TMP/preopen" "$TMP/hello.wasm" \
+   >"$TMP/guest.out" 2>"$TMP/guest.err"; then
+    bad W-11 "相对 guest preopen 路径未被拒绝"
+else
+    if grep -q 'guest preopen path must be absolute' "$TMP/guest.err"; then
+        ok W-11 "相对 guest preopen 路径拒绝"
+    else
+        bad W-11 "缺少 guest 路径错误"; cat "$TMP/guest.err"
+    fi
+fi
+
+if ln -s /etc "$TMP/preopen/esc" 2>/dev/null && [ -L "$TMP/preopen/esc" ]; then
+    if bash scripts/wrun.sh --dir "/data::$TMP/preopen" "$TMP/hello.wasm" \
+       >"$TMP/link.out" 2>"$TMP/link.err"; then
+        bad W-11 "preopen 内部 symlink 未被拒绝"
+    else
+        if grep -q 'preopen contains a symlink' "$TMP/link.err"; then
+            ok W-11 "preopen 内部 symlink 拒绝"
+        else
+            bad W-11 "缺少内部 symlink 错误"; cat "$TMP/link.err"
+        fi
+    fi
+    rm -rf "$TMP/preopen/esc"
+else
+    rm -rf "$TMP/preopen/esc"
+    ok W-11 "SKIP：当前环境不能创建 symlink"
+fi
+
+if ln -s "$TMP/preopen" "$TMP/preopen-link" 2>/dev/null && [ -L "$TMP/preopen-link" ]; then
+    if bash scripts/wrun.sh --dir "/data::$TMP/preopen-link" "$TMP/hello.wasm" \
+       >"$TMP/rootlink.out" 2>"$TMP/rootlink.err"; then
+        bad W-11 "preopen 根 symlink 未被拒绝"
+    else
+        if grep -q 'preopen dir is a symlink' "$TMP/rootlink.err"; then
+            ok W-11 "preopen 根 symlink 拒绝"
+        else
+            bad W-11 "缺少根 symlink 错误"; cat "$TMP/rootlink.err"
+        fi
+    fi
+    rm -f "$TMP/preopen-link"
+else
+    rm -rf "$TMP/preopen-link"
+    ok W-11 "SKIP：当前环境不能创建 symlink"
+fi
+
+if bash scripts/wrun.sh --dir "/data::$TMP/preopen" "$TMP/hello.wasm" \
+   >"$TMP/preopen-ok.out" 2>"$TMP/preopen-ok.err"; then
+    if grep -q 'Hello, World!' "$TMP/preopen-ok.out"; then
+        ok W-11 "绝对 guest preopen 路径接受"
+    else
+        bad W-11 "合法 preopen 输出异常"; cat "$TMP/preopen-ok.out"
+    fi
+else
+    bad W-11 "合法 preopen 运行失败"; cat "$TMP/preopen-ok.err"
+fi
+
 echo "wrun-gate: $PASS/$((PASS+FAIL))"
 [ "$FAIL" -eq 0 ]

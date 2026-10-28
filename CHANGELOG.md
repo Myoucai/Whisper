@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.13 (2026-10-28) — preopen path hardening
+
+- preopen 加固：guest 路径必须是绝对路径，拒绝 `.`/`..`/`//`/`:`/换行；
+  宿主 preopen 根/内部 symlink 拒绝；`wrun-gate` 增加 W-11。
+
 ## v1.3.12 (2026-10-28) — WASM import mutation smoke
 
 - 新增 WASM import mutation smoke：随机变异合法 import section，

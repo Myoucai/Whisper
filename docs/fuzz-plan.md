@@ -49,6 +49,18 @@ w_ci_eq_n(ks, "host", n)         // n > 4
 
 这不是覆盖引导 fuzz；下一步可接 atheris/libFuzzer。
 
+## preopen 路径 property gate
+
+`wrun-gate` W-11 覆盖：
+
+- guest preopen 必须是绝对路径
+- 拒绝 `.`/`..`/`//`/`:`/换行
+- 拒绝宿主 preopen 根 symlink
+- 拒绝 preopen 内部 symlink
+- 合法绝对路径仍可运行
+
+这不是随机路径 fuzz；它是确定性的 fail-closed 回归，symlink 不可创建时 SKIP。
+
 回归：
 
 ```text
@@ -57,7 +69,8 @@ fuzz-gate: PASS (20000 runs)
 
 ## 下一阶段
 
-- [ ] preopen/symlink 路径 fuzz（wrun 前置检查）
+- [x] preopen/symlink 路径 property gate（W-11）
+- [ ] preopen 随机路径 fuzz
 - [x] WASM import 白名单 mutation smoke
 - [ ] WASM import 覆盖引导 fuzz（atheris/libFuzzer）
 - [ ] `wd` 二进制/`.wbin` 解码 fuzz

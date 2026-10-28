@@ -1,54 +1,56 @@
-# Whisper 1.3.12 发布说明
+# Whisper 1.3.13 发布说明
 
 ## 主题
 
-**WASM import 白名单 mutation smoke。**
+**preopen 路径加固：绝对 guest 路径、拒绝 `.`/`..`/symlink 逃逸。**
 
-## 新增
+## 修复/加固
 
-```bash
-bash scripts/wasm-fuzz-gate.sh
-WASM_FUZZ_ITERS=1000 bash scripts/wasm-fuzz-gate.sh
-```
+`wrun` 现在对每个 preopen 校验：
 
-做三件事：
+- guest 路径必须非空且绝对（`/data`）
+- 拒绝 `.`、`..`、`//` 组件
+- 拒绝 `:`、换行、回车
+- 宿主 preopen 根路径不能是 symlink
+- preopen 内部不能含 symlink
+- 合法绝对路径仍正常映射
 
-1. 构造合法 import section：
-   `wasi_snapshot_preview1.fd_write`
-2. 随机翻转/截断/插入/覆盖
-3. 调用 `scripts/wasm-imports.py`
+覆盖：
 
-验收：
+- `--dir`
+- `--dir-ro`
+- `--dir-ro-strict`
 
-- 退出码只能是 0 或 1
-- 2 秒内必须结束
-- 崩溃、其他退出码、超时都失败
+## 测试
 
-CI 默认 300 次。
-
-## 验证
+`wrun-gate` 新增 W-11：
 
 ```text
-wasm-fuzz-gate: PASS (300 mutations)
-cargo check --workspace: pass
+W-11 ✅ 相对 guest preopen 路径拒绝
+W-11 ✅ preopen 内部 symlink 拒绝（Linux）
+W-11 ✅ preopen 根 symlink 拒绝（Linux）
+W-11 ✅ 绝对 guest preopen 路径接受
+wrun-gate: 14/14
 ```
+
+Windows 本机无法创建真实 symlink 时，symlink 子项明确 SKIP；Linux CI 会实际执行。
 
 ## 兼容性
 
-- 无运行时行为变化
-- 只新增 fuzz 工具与 CI 步骤
-- WASM v1 仍无网络
+- 正常绝对路径 preopen 不变
+- 相对 guest 路径从“依赖 WAMR 行为”改为明确拒绝
+- symlink 拒绝更严格；这是安全边界
+- `--dir-ro` 仍是快照，`--dir-ro-strict` 仍是 Linux EROFS
 
 ## 已知限制
 
-- 这是 mutation smoke，不是覆盖引导 fuzz
-- 不覆盖 WAMR 内部
-- 不覆盖 preopen/symlink 或 `.wbin` 解码
-- 300 次是烟雾级
+- 检查与实际挂载之间仍存在 TOCTOU 窗口
+- 需要宿主目录在执行期间不被替换
+- symlink 检查依赖 `find`
+- 不覆盖 Windows junction/reparse point
 
-## 下一步
+## 验证
 
-- preopen/symlink 路径 fuzz
-- atheris/libFuzzer 覆盖引导 WASM import
-- `wd` `.wbin` 解码 fuzz
-- 完整安全审计
+- wrun-gate: 14/14（本机）
+- cargo check --workspace: pass
+- Linux CI 将执行真实 symlink 用例

@@ -42,6 +42,22 @@ EOF
 
 die() { echo "wrun: $*" >&2; exit 2; }
 
+validate_guest() {
+    local g="$1"
+    [ -n "$g" ] || die "guest preopen path must not be empty"
+    case "$g" in
+        /*) ;;
+        *) die "guest preopen path must be absolute: $g" ;;
+    esac
+    case "$g" in
+        *:*|*$'\n'*|*$'\r'*) die "guest preopen path contains a forbidden character: $g" ;;
+    esac
+    g="$g/"
+    case "$g" in
+        *"/../"*|*"/./"*|*"//"*) die "guest preopen path must not contain . or .. components: $1" ;;
+    esac
+}
+
 DIRS=()
 RODIRS=()
 ROSTRICT=()
@@ -106,7 +122,9 @@ for d in "${DIRS[@]:-}"; do
     esac
     guest="${d%%::*}"
     host="${d#*::}"
+    validate_guest "$guest"
     [ -d "$host" ] || die "no such preopen dir: $host"
+    [ ! -L "$host" ] || die "preopen dir is a symlink; refusing (escape risk): $host"
     command -v find >/dev/null 2>&1 || die "find is required for the preopen symlink check"
     badlink="$(find "$host" -type l -print -quit 2>/dev/null || true)"
     [ -z "$badlink" ] || die "preopen contains a symlink; refusing (escape risk): $badlink"
@@ -125,7 +143,9 @@ for d in "${RODIRS[@]:-}"; do
     esac
     guest="${d%%::*}"
     host="${d#*::}"
+    validate_guest "$guest"
     [ -d "$host" ] || die "no such preopen dir: $host"
+    [ ! -L "$host" ] || die "ro preopen dir is a symlink; refusing: $host"
     badlink="$(find "$host" -type l -print -quit 2>/dev/null || true)"
     [ -z "$badlink" ] || die "ro preopen contains a symlink; refusing: $badlink"
     if [ -z "$RO_TMP" ]; then
@@ -167,7 +187,9 @@ if [ "${#ROSTRICT[@]}" -gt 0 ]; then
         esac
         guest="${d%%::*}"
         host="${d#*::}"
+        validate_guest "$guest"
         [ -d "$host" ] || die "no such strict ro preopen dir: $host"
+        [ ! -L "$host" ] || die "strict ro preopen dir is a symlink; refusing: $host"
         badlink="$(find "$host" -type l -print -quit 2>/dev/null || true)"
         [ -z "$badlink" ] || die "strict ro preopen contains a symlink; refusing: $badlink"
         host_abs="$(cd "$host" && pwd)"

@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.12-7cffc4" alt="version">
+  <img src="https://img.shields.io/badge/version-1.3.13-7cffc4" alt="version">
   <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2019%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
@@ -531,7 +531,7 @@ bash scripts/http9-gate.sh                       # native @9 并发扇出
 bash scripts/sbom-gate.sh                        # SBOM 生成/校验
 bash scripts/fuzz-gate.sh                        # C HTTP/URL parser libFuzzer
 bash scripts/wasm-fuzz-gate.sh                   # WASM import mutation smoke
-bash scripts/wrun-gate.sh                        # wrun 策略 W-1..W-10（需 WAMR）
+bash scripts/wrun-gate.sh                        # wrun 策略 W-1..W-11（需 WAMR）
 bash scripts/build-wfmt.sh && bash scripts/fmt-gate.sh  # Whisper 写的 fmt（F-1..F-6）
 bash scripts/verify-fixedpoint.sh                # 自举固定点字节级复验
 ```
