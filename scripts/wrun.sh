@@ -49,6 +49,7 @@ validate_guest() {
         /*) ;;
         *) die "guest preopen path must be absolute: $g" ;;
     esac
+    [ "$g" = "/" ] && return 0
     case "$g" in
         *:*|*$'\n'*|*$'\r'*) die "guest preopen path contains a forbidden character: $g" ;;
     esac
