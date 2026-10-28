@@ -1,0 +1,7 @@
+HTTP/1.1 200 OK
+Content-Type: text/plain
+Location: /next
+Set-Cookie: a=b; Path=/
+Content-Length: 3
+
+abc

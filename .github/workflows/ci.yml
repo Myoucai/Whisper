@@ -11,6 +11,16 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  fuzz:
+    name: HTTP parser fuzz (libFuzzer)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: Run fuzz gate
+        run: bash scripts/fuzz-gate.sh
+
   test:
     name: Test (${{ matrix.os }})
     strategy:
