@@ -3127,6 +3127,7 @@ typedef struct {
     char *path;
     int secure;
     int http_only;
+    time_t expires; // 0 = session
 } w_cookie;
 
 static w_cookie *w_cookies = NULL;
@@ -3187,6 +3188,64 @@ static void w_cookie_remove_at(size_t i) {
     w_cookie_count--;
 }
 
+static int w_public_suffix(const char *domain) {
+    // Conservative multi-label public-suffix guard. This is not the full PSL;
+    // it blocks the common delegated suffixes that would otherwise turn a
+    // Domain cookie into a cross-site cookie.
+    static const char *suffixes[] = {
+        "co.uk", "org.uk", "ac.uk", "gov.uk", "com.au", "net.au", "org.au",
+        "co.nz", "co.jp", "ne.jp", "or.jp", "com.br", "com.cn", "net.cn",
+        "org.cn", "com.hk", "com.sg", "com.tw", "co.in", "co.kr", "com.mx",
+        "com.ar", "com.tr", "com.ru", "co.za", "com.ua", "com.pl", "co.il",
+        "com.sa", "com.eg", "github.io", "appspot.com", "herokuapp.com",
+        "pages.dev", "vercel.app", "netlify.app", "cloudfront.net",
+        "s3.amazonaws.com",
+    };
+    for (size_t i = 0; i < sizeof(suffixes) / sizeof(suffixes[0]); i++)
+        if (w_host_ci_eq(domain, strlen(domain), suffixes[i], strlen(suffixes[i])))
+            return 1;
+    return 0;
+}
+
+static time_t w_http_date(const char *s, size_t n, int *valid) {
+    *valid = 0;
+    if (!s || n == 0 || n >= 80) return 0;
+    char buf[80];
+    memcpy(buf, s, n);
+    buf[n] = 0;
+    const char *p = buf;
+    while (*p && *p != ',') p++;
+    if (*p == ',') p++;
+    int day = 0, year = 0, hh = 0, mm = 0, ss = 0;
+    char mon[4] = {0};
+    if (sscanf(p, " %d %3s %d %d:%d:%d", &day, mon, &year, &hh, &mm, &ss) != 6) {
+        if (sscanf(buf, "%d %3s %d %d:%d:%d", &day, mon, &year, &hh, &mm, &ss) != 6)
+            return 0;
+    }
+    static const char *months[] = {"Jan","Feb","Mar","Apr","May","Jun",
+                                   "Jul","Aug","Sep","Oct","Nov","Dec"};
+    int mo = -1;
+    for (int i = 0; i < 12; i++)
+        if (w_ci_eq_n(mon, months[i], 3)) { mo = i; break; }
+    if (mo < 0 || day < 1 || day > 31 || year < 1970 || hh > 23 || mm > 59 || ss > 60)
+        return 0;
+    struct tm tm;
+    memset(&tm, 0, sizeof(tm));
+    tm.tm_year = year - 1900;
+    tm.tm_mon = mo;
+    tm.tm_mday = day;
+    tm.tm_hour = hh;
+    tm.tm_min = mm;
+    tm.tm_sec = ss;
+#ifdef _WIN32
+    time_t t = _mkgmtime(&tm);
+#else
+    time_t t = timegm(&tm);
+#endif
+    *valid = 1;
+    return t;
+}
+
 static int w_cookie_domain_ok(const char *host, const char *domain) {
     if (!host || !domain || !*host || !*domain) return 0;
     if (w_host_ci_eq(host, strlen(host), domain, strlen(domain))) return 1;
@@ -3216,7 +3275,7 @@ static char *w_cookie_default_path(const char *req) {
 
 static void w_cookie_put(const char *name, size_t nlen, const char *value,
                          size_t vlen, const char *domain, const char *path,
-                         int secure, int http_only) {
+                         int secure, int http_only, time_t expires) {
     for (size_t i = 0; i < w_cookie_count; i++) {
         w_cookie *c = &w_cookies[i];
         if (strlen(c->name) == nlen && memcmp(c->name, name, nlen) == 0 &&
@@ -3235,6 +3294,7 @@ static void w_cookie_put(const char *name, size_t nlen, const char *value,
     c.path = w_dup_range(path, strlen(path));
     c.secure = secure;
     c.http_only = http_only;
+    c.expires = expires;
     if (!c.name || !c.value || !c.domain || !c.path) {
         w_cookie_free_fields(&c);
         return;
@@ -3243,6 +3303,23 @@ static void w_cookie_put(const char *name, size_t nlen, const char *value,
     if (!n) { w_cookie_free_fields(&c); return; }
     w_cookies = n;
     w_cookies[w_cookie_count++] = c;
+}
+
+static void w_cookie_delete(const char *name, size_t nlen, const char *domain,
+                            const char *path) {
+    for (size_t i = 0; i < w_cookie_count; i++) {
+        w_cookie *c = &w_cookies[i];
+        if (strlen(c->name) == nlen && memcmp(c->name, name, nlen) == 0 &&
+            w_host_ci_eq(c->domain, strlen(c->domain), domain, strlen(domain)) &&
+            strcmp(c->path, path) == 0) {
+            w_cookie_remove_at(i);
+            return;
+        }
+    }
+}
+
+static int w_cookie_expired(const w_cookie *c) {
+    return c->expires != 0 && c->expires <= time(NULL);
 }
 
 static void w_jar_update(const char *resp, size_t n, const char *host,
@@ -3272,6 +3349,9 @@ static void w_jar_update(const char *resp, size_t n, const char *host,
                 if (w_header_name_valid(name, (size_t)(name_end - name)) && !value_bad) {
                     char *domain = NULL, *cpath = NULL;
                     int secure_attr = 0, http_only = 0, bad = 0;
+                    long max_age = -1;
+                    int has_max = 0, has_exp = 0;
+                    time_t expires_attr = 0;
                     const char *a = semi;
                     while (a < ve) {
                         if (*a == ';') a++;
@@ -3294,7 +3374,8 @@ static void w_jar_update(const char *resp, size_t n, const char *host,
                                 bad = 1;
                             } else {
                                 char *tmp = w_dup_range(d, (size_t)(vend - d));
-                                if (!tmp || !w_cookie_domain_ok(host, tmp)) {
+                                if (!tmp || !w_cookie_domain_ok(host, tmp) ||
+                                    w_public_suffix(tmp)) {
                                     free(tmp); bad = 1;
                                 } else {
                                     free(domain); domain = tmp;
@@ -3310,6 +3391,17 @@ static void w_jar_update(const char *resp, size_t n, const char *host,
                             secure_attr = 1;
                         } else if (w_ci_eq_n(ks, "httponly", klen)) {
                             http_only = 1;
+                        } else if (w_ci_eq_n(ks, "max-age", klen)) {
+                            char *endp = NULL;
+                            long v = strtol(vs, &endp, 10);
+                            if (endp && endp != vs) {
+                                max_age = v;
+                                has_max = 1;
+                            }
+                        } else if (w_ci_eq_n(ks, "expires", klen)) {
+                            int ok = 0;
+                            time_t t = w_http_date(vs, (size_t)(vend - vs), &ok);
+                            if (ok) { expires_attr = t; has_exp = 1; }
                         }
                         a = ae;
                     }
@@ -3317,12 +3409,22 @@ static void w_jar_update(const char *resp, size_t n, const char *host,
                     if (!bad) {
                         if (!domain) domain = w_dup_range(host, strlen(host));
                         if (!cpath) cpath = w_cookie_default_path(req_path);
-                        if (domain && cpath)
-                            w_cookie_put(name, (size_t)(name_end - name),
-                                         value, (size_t)(value_end - value),
-                                         domain, cpath, secure_attr, http_only);
-                        else
+                        if (domain && cpath) {
+                            if (has_max && max_age <= 0) {
+                                w_cookie_delete(name, (size_t)(name_end - name), domain, cpath);
+                            } else {
+                                time_t expires = has_max ? time(NULL) + max_age
+                                                         : (has_exp ? (expires_attr ? expires_attr : 1) : 0);
+                                if (expires && expires <= time(NULL))
+                                    w_cookie_delete(name, (size_t)(name_end - name), domain, cpath);
+                                else
+                                    w_cookie_put(name, (size_t)(name_end - name),
+                                                 value, (size_t)(value_end - value),
+                                                 domain, cpath, secure_attr, http_only, expires);
+                            }
+                        } else {
                             bad = 1;
+                        }
                     }
                     free(domain); free(cpath);
                     (void)bad;
@@ -3339,7 +3441,7 @@ static char *w_jar_header(const char *host, const char *req_path, int is_tls) {
     size_t need = 1;
     for (size_t i = 0; i < w_cookie_count; i++) {
         w_cookie *c = &w_cookies[i];
-        if (w_cookie_domain_ok(host, c->domain) &&
+        if (!w_cookie_expired(c) && w_cookie_domain_ok(host, c->domain) &&
             w_cookie_path_ok(req_path ? req_path : "/", c->path) &&
             (!c->secure || is_tls))
             need += strlen(c->name) + strlen(c->value) + 3;
@@ -3355,7 +3457,8 @@ static char *w_jar_header(const char *host, const char *req_path, int is_tls) {
     int first = 1;
     for (size_t i = 0; i < w_cookie_count; i++) {
         w_cookie *c = &w_cookies[i];
-        if (!w_cookie_domain_ok(host, c->domain) ||
+        if (w_cookie_expired(c) ||
+            !w_cookie_domain_ok(host, c->domain) ||
             !w_cookie_path_ok(req_path ? req_path : "/", c->path) ||
             (c->secure && !is_tls)) continue;
         if (!first) { out[k++] = ';'; out[k++] = ' '; }

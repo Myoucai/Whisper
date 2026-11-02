@@ -50,8 +50,8 @@ GET https://b.example  (Cookie: sid=secret)   ← 泄露
 
 ### 残余
 
-- 未实现 `Max-Age`/`Expires` 过期删除
-- 未实现完整公共后缀列表（PSL）
+- `Max-Age`/`Expires` 已实现；`Max-Age=0` 删除
+- PSL 只有保守的常见多标签后缀表，不是完整 Public Suffix List
 - 最多 128 个 cookie；超出时拒绝新 cookie
 - `@9` 并发写 cookie 有锁，但不同 host 的 cookie 会共存
 
@@ -140,7 +140,7 @@ net-allow-gate: Invalid URL
 
 | 风险 | 严重性 | 建议 |
 |---|---|---|
-| Cookie 过期/PSL 未实现 | 低 | 需要完整 cookie 语义时补 Max-Age/Expires + PSL |
+| PSL 不完整（保守表） | 低 | 需要完整 cookie 语义时引入完整 PSL |
 | preopen TOCTOU | 中 | 生产用不可变挂载/独立租户目录 |
 | WAMR CVE | 高 | 固定版本 + reviewed watchlist CI（docs/wamr-cve.md） |
 | 无 cgroup 聚合配额 | 中 | 部署层 cgroup v2 |
@@ -168,7 +168,8 @@ wrun-gate: 14/14
 - [x] 跨源重定向不跟随
 - [x] 网络 allowlist / 私网拒绝 / 配额
 - [x] Cookie Domain/Path/Secure/HttpOnly
-- [ ] Cookie Max-Age/Expires + PSL
+- [x] Cookie Max-Age/Expires
+- [ ] 完整 PSL
 - [ ] cgroup 聚合配额模板
 - [ ] WAMR CVE 自动告警
 - [ ] 外部安全审计

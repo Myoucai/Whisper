@@ -49,6 +49,24 @@ class H(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/plain")
             self.end_headers()
             self.wfile.write(b"setdomaingood")
+        elif self.path == "/setmax":
+            self.send_response(200)
+            self.send_header("Set-Cookie", "m=1; Max-Age=3600; Path=/")
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"setmax")
+        elif self.path == "/delmax":
+            self.send_response(200)
+            self.send_header("Set-Cookie", "m=0; Max-Age=0; Path=/")
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"delmax")
+        elif self.path == "/setexpired":
+            self.send_response(200)
+            self.send_header("Set-Cookie", "e=1; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/")
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"setexpired")
         elif self.path == "/loop":
             self.send_response(302)
             self.send_header("Location", "/loop")

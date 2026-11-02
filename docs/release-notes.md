@@ -1,59 +1,66 @@
-# Whisper 1.3.18 发布说明
+# Whisper 1.3.19 发布说明
 
 ## 主题
 
-**Cookie 属性语义：Domain / Path / Secure / HttpOnly。**
+**Cookie 过期与公共后缀防护。**
 
 ## 新增
 
-`@6` cookie jar 从单个字符串改为 per-cookie 结构：
+### Max-Age / Expires
 
-- 每个 cookie 记录 name/value/domain/path/secure/http_only
-- `Domain` 必须等于 host 或是 host 的父域
-  - 拒绝无点域
-  - 拒绝 IP 的宽域
-  - 拒绝 `evil-example.com` 冒充 `example.com`
-- `Path` 按 RFC 前缀规则匹配
-- `Secure` 只通过 TLS 发送
-- HTTP 响应里的 `Secure` cookie 被拒绝
-- `HttpOnly` 记录（无 JS 运行时，不影响发送）
-- 最多 128 个 cookie
+- cookie 记录 `expires`
+- `Max-Age` 优先于 `Expires`
+- `Max-Age=0` 或负数删除同名/同域/同路径 cookie
+- `Expires` 支持 RFC 1123 日期（`Thu, 01 Jan 1970 00:00:00 GMT`）
+- 过期 cookie 不进入 `Cookie` 请求头
+- 无过期时间的 cookie 仍是 session cookie
+
+### 公共后缀防护
+
+`Domain` 属性现在额外拒绝常见多标签 public suffix：
+
+```text
+co.uk, com.au, co.jp, com.cn, github.io, vercel.app, ...
+```
+
+这不是完整 PSL，但阻止了最常见的“把 public suffix 当 Domain”攻击。
 
 ## 测试
 
 `http6-gate` 增加：
 
 ```text
-cookie-path     ✅ Path=/echo 的 cookie 只在 /echo 发送
-cookie-secure   ✅ Secure cookie 不通过 HTTP 发送
-cookie-domain   ✅ 外部 Domain 被拒绝，合法 Domain 生效
+cookie-maxage          ✅ Max-Age=3600 发送
+cookie-maxage-delete   ✅ Max-Age=0 删除
+cookie-expired         ✅ Expires=1970 不发送
 ```
 
 完整结果：
 
 ```text
-http6-gate: PASS (cookie/header/audit-json/raw/timeout/redirect follow)
+http6-gate: PASS
 http-parity-gate: PASS
 net-allow-gate: PASS
+integration tests: 123/123
 ```
 
 ## 兼容性
 
-- 普通 host-only cookie 行为不变
-- 以前跨 host 共享的 cookie 不再共享（安全修复）
-- 以前忽略的 Domain/Path/Secure 现在生效
-- 旧的无属性 cookie 默认 host-only、path=目录、非 secure
+- 原有 cookie 行为不变
+- 带 Max-Age/Expires 的 cookie 现在会过期
+- `Domain=co.uk` 等 public suffix 被拒绝
+- 无过期时间的 cookie 仍为 session
 
 ## 已知限制
 
-- 未实现 `Max-Age`/`Expires` 过期删除
-- 未实现完整公共后缀列表（PSL）
+- PSL 是保守的常见后缀表，不是完整 Public Suffix List
+- Expires 解析覆盖 RFC 1123 常见格式，不覆盖所有历史格式
 - 最多 128 个 cookie
-- 无 JS 运行时，`HttpOnly` 只记录不产生额外效果
+- `HttpOnly` 仍只记录（无 JS 运行时）
 
 ## 下一步
 
-- Cookie Max-Age/Expires + PSL
+- 完整 PSL
 - 覆盖引导 fuzz / nightly
 - 外部安全审计
 - 容器/EROFS fallback

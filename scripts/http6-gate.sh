@@ -108,6 +108,46 @@ dgbody="$(head -1 "$TMP/domaingood.out" | tr -d '\r')"
 if [ "$dgbody" != "cookie=d=1;xtest=" ]; then
     echo "http6-gate: valid Domain missing [$dgbody]"; cat "$TMP/domaingood.out"; exit 1
 fi
+stage=cookie-maxage
+cat > "$TMP/maxage.ws" <<EOF
+"GET" "http://127.0.0.1:$PORT/setmax" "{}" "" @6 drop drop drop
+"GET" "http://127.0.0.1:$PORT/echo" "{}" "" @6 . drop drop
+EOF
+"$BIN" build "$(winpath "$TMP/maxage.ws")" -t c2 -o "$(winpath "$TMP/maxage.exe")" >/dev/null 2>&1 \
+    || { echo "http6-gate: max-age build failed"; exit 1; }
+WHISPER_NET=1 $RUN "$TMP/maxage.exe" >"$TMP/maxage.out" 2>"$TMP/maxage.err" \
+    || { echo "http6-gate: max-age run failed"; cat "$TMP/maxage.err"; exit 1; }
+mabody="$(head -1 "$TMP/maxage.out" | tr -d '\r')"
+if [ "$mabody" != "cookie=m=1;xtest=" ]; then
+    echo "http6-gate: Max-Age cookie missing [$mabody]"; cat "$TMP/maxage.out"; exit 1
+fi
+stage=cookie-maxage-delete
+cat > "$TMP/delmax.ws" <<EOF
+"GET" "http://127.0.0.1:$PORT/setmax" "{}" "" @6 drop drop drop
+"GET" "http://127.0.0.1:$PORT/delmax" "{}" "" @6 drop drop drop
+"GET" "http://127.0.0.1:$PORT/echo" "{}" "" @6 . drop drop
+EOF
+"$BIN" build "$(winpath "$TMP/delmax.ws")" -t c2 -o "$(winpath "$TMP/delmax.exe")" >/dev/null 2>&1 \
+    || { echo "http6-gate: max-age delete build failed"; exit 1; }
+WHISPER_NET=1 $RUN "$TMP/delmax.exe" >"$TMP/delmax.out" 2>"$TMP/delmax.err" \
+    || { echo "http6-gate: max-age delete run failed"; cat "$TMP/delmax.err"; exit 1; }
+dmbody="$(head -1 "$TMP/delmax.out" | tr -d '\r')"
+if [ "$dmbody" != "cookie=;xtest=" ]; then
+    echo "http6-gate: Max-Age=0 did not delete [$dmbody]"; cat "$TMP/delmax.out"; exit 1
+fi
+stage=cookie-expired
+cat > "$TMP/expired.ws" <<EOF
+"GET" "http://127.0.0.1:$PORT/setexpired" "{}" "" @6 drop drop drop
+"GET" "http://127.0.0.1:$PORT/echo" "{}" "" @6 . drop drop
+EOF
+"$BIN" build "$(winpath "$TMP/expired.ws")" -t c2 -o "$(winpath "$TMP/expired.exe")" >/dev/null 2>&1 \
+    || { echo "http6-gate: expired build failed"; exit 1; }
+WHISPER_NET=1 $RUN "$TMP/expired.exe" >"$TMP/expired.out" 2>"$TMP/expired.err" \
+    || { echo "http6-gate: expired run failed"; cat "$TMP/expired.err"; exit 1; }
+ebody="$(head -1 "$TMP/expired.out" | tr -d '\r')"
+if [ "$ebody" != "cookie=;xtest=" ]; then
+    echo "http6-gate: expired cookie accepted [$ebody]"; cat "$TMP/expired.out"; exit 1
+fi
 stage=audit
 if ! grep -q 'GET http://127.0.0.1:.*/set 200' "$TMP/out"; then
     echo "http6-gate: missing audit line"; cat "$TMP/out"; exit 1

@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.19 (2026-11-02) — cookie expiry + suffix guard
+
+- cookie 支持 Max-Age/Expires；Max-Age=0 删除；过期 cookie 不发送。
+- Domain 增加保守多标签公共后缀表（co.uk/github.io 等），拒绝把
+  public suffix 当 Domain；完整 PSL 仍待补。
+
 ## v1.3.18 (2026-11-02) — cookie attributes
 
 - cookie jar 改为 per-cookie 结构：Domain/Path/Secure/HttpOnly 匹配；

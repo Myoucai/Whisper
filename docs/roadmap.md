@@ -114,7 +114,8 @@ native/HTTP server 测试全绿；WASM 无网络不变。
 - [x] 依赖 SBOM（scripts/sbom.sh + sbom-gate）
 - [x] 安全自审（docs/security-audit.md）
 - [x] Cookie host/domain/path/secure/httpOnly 语义
-- [ ] Cookie Max-Age/Expires + PSL
+- [x] Cookie Max-Age/Expires
+- [ ] 完整 Public Suffix List
 - [ ] 外部安全审计 / cgroup 模板
 - [ ] CI 零 Rust `wd` 全链 nightly 稳定（已有 workflow）
 - [ ] macOS/Linux/Windows 发布矩阵
