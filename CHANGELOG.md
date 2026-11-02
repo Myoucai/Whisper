@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.18 (2026-11-02) — cookie attributes
+
+- cookie jar 改为 per-cookie 结构：Domain/Path/Secure/HttpOnly 匹配；
+  拒绝跨 host/父域、非 TLS Secure；`http6-gate` 增加 path/secure/domain
+  回归。
+
 ## v1.3.17 (2026-11-02) — WAMR CVE watch
 
 - 新增 WAMR CVE reviewed watchlist（security/wamr-cve-watch.json）与

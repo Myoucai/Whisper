@@ -40,17 +40,20 @@ GET https://b.example  (Cookie: sid=secret)   ← 泄露
 
 ### 修复
 
-- 增加 `w_cookie_host`，记录 jar 所属 host
-- `w_jar_header(host)` 仅在 host 匹配时返回 Cookie
-- host 变化且新响应带 Set-Cookie 时清空旧 jar
+- cookie 改为 per-cookie 结构，记录 name/value/host/domain/path/secure/http_only
+- `Domain` 校验：必须与 host 相同或是 host 的父域，且拒绝无点域/IP 的宽域
+- `Path` 按 RFC 前缀规则匹配
+- `Secure` 只通过 TLS 发送；HTTP 响应的 Secure cookie 被拒绝
+- `HttpOnly` 记录（无 JS 运行时，不影响发送）
 - 跨源重定向仍不跟随
-- 锁保护 `w_cookie_host` / jar
+- 锁保护 cookie 列表
 
 ### 残余
 
-- 未实现 `Domain`/`Path`/`Secure`/`HttpOnly` 语义
-- 同一进程同时活跃多个 host 时只保留一个 host 的 jar（安全优先，可能丢 cookie）
-- `@9` 跨 host 并发会安全地重置/丢弃 cookie，不泄露
+- 未实现 `Max-Age`/`Expires` 过期删除
+- 未实现完整公共后缀列表（PSL）
+- 最多 128 个 cookie；超出时拒绝新 cookie
+- `@9` 并发写 cookie 有锁，但不同 host 的 cookie 会共存
 
 ## 4. A-02 请求注入
 
@@ -137,7 +140,7 @@ net-allow-gate: Invalid URL
 
 | 风险 | 严重性 | 建议 |
 |---|---|---|
-| Cookie 属性未实现 | 中 | 需要完整 cookie 语义时引入 host-only 明确实现 |
+| Cookie 过期/PSL 未实现 | 低 | 需要完整 cookie 语义时补 Max-Age/Expires + PSL |
 | preopen TOCTOU | 中 | 生产用不可变挂载/独立租户目录 |
 | WAMR CVE | 高 | 固定版本 + reviewed watchlist CI（docs/wamr-cve.md） |
 | 无 cgroup 聚合配额 | 中 | 部署层 cgroup v2 |
@@ -164,7 +167,8 @@ wrun-gate: 14/14
 - [x] preopen 绝对路径 + symlink 拒绝
 - [x] 跨源重定向不跟随
 - [x] 网络 allowlist / 私网拒绝 / 配额
-- [ ] Cookie Domain/Path/Secure/HttpOnly
+- [x] Cookie Domain/Path/Secure/HttpOnly
+- [ ] Cookie Max-Age/Expires + PSL
 - [ ] cgroup 聚合配额模板
 - [ ] WAMR CVE 自动告警
 - [ ] 外部安全审计

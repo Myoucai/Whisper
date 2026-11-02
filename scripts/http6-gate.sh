@@ -57,6 +57,57 @@ body="$(head -1 "$TMP/out" | tr -d '\r')"
 if [ "$body" != "cookie=sid=abc;xtest=yes" ]; then
     echo "http6-gate: bad body [$body]"; cat "$TMP/out"; exit 1
 fi
+stage=cookie-path
+cat > "$TMP/path.ws" <<EOF
+"GET" "http://127.0.0.1:$PORT/setpath" "{}" "" @6 drop drop drop
+"GET" "http://127.0.0.1:$PORT/echo" "{}" "" @6 . drop drop
+EOF
+"$BIN" build "$(winpath "$TMP/path.ws")" -t c2 -o "$(winpath "$TMP/path.exe")" >/dev/null 2>&1 \
+    || { echo "http6-gate: cookie path build failed"; exit 1; }
+WHISPER_NET=1 $RUN "$TMP/path.exe" >"$TMP/path.out" 2>"$TMP/path.err" \
+    || { echo "http6-gate: cookie path run failed"; cat "$TMP/path.err"; exit 1; }
+pbody="$(head -1 "$TMP/path.out" | tr -d '\r')"
+if [ "$pbody" != "cookie=p=1;xtest=" ]; then
+    echo "http6-gate: cookie path mismatch [$pbody]"; cat "$TMP/path.out"; exit 1
+fi
+stage=cookie-secure
+cat > "$TMP/secure.ws" <<EOF
+"GET" "http://127.0.0.1:$PORT/setsecure" "{}" "" @6 drop drop drop
+"GET" "http://127.0.0.1:$PORT/echo" "{}" "" @6 . drop drop
+EOF
+"$BIN" build "$(winpath "$TMP/secure.ws")" -t c2 -o "$(winpath "$TMP/secure.exe")" >/dev/null 2>&1 \
+    || { echo "http6-gate: cookie secure build failed"; exit 1; }
+WHISPER_NET=1 $RUN "$TMP/secure.exe" >"$TMP/secure.out" 2>"$TMP/secure.err" \
+    || { echo "http6-gate: cookie secure run failed"; cat "$TMP/secure.err"; exit 1; }
+sbody="$(head -1 "$TMP/secure.out" | tr -d '\r')"
+if [ "$sbody" != "cookie=;xtest=" ]; then
+    echo "http6-gate: Secure cookie sent over HTTP [$sbody]"; cat "$TMP/secure.out"; exit 1
+fi
+stage=cookie-domain
+cat > "$TMP/domainbad.ws" <<EOF
+"GET" "http://127.0.0.1:$PORT/setdomainbad" "{}" "" @6 drop drop drop
+"GET" "http://127.0.0.1:$PORT/echo" "{}" "" @6 . drop drop
+EOF
+"$BIN" build "$(winpath "$TMP/domainbad.ws")" -t c2 -o "$(winpath "$TMP/domainbad.exe")" >/dev/null 2>&1 \
+    || { echo "http6-gate: bad domain build failed"; exit 1; }
+WHISPER_NET=1 $RUN "$TMP/domainbad.exe" >"$TMP/domainbad.out" 2>"$TMP/domainbad.err" \
+    || { echo "http6-gate: bad domain run failed"; cat "$TMP/domainbad.err"; exit 1; }
+dbbody="$(head -1 "$TMP/domainbad.out" | tr -d '\r')"
+if [ "$dbbody" != "cookie=;xtest=" ]; then
+    echo "http6-gate: foreign Domain accepted [$dbbody]"; cat "$TMP/domainbad.out"; exit 1
+fi
+cat > "$TMP/domaingood.ws" <<EOF
+"GET" "http://127.0.0.1:$PORT/setdomaingood" "{}" "" @6 drop drop drop
+"GET" "http://127.0.0.1:$PORT/echo" "{}" "" @6 . drop drop
+EOF
+"$BIN" build "$(winpath "$TMP/domaingood.ws")" -t c2 -o "$(winpath "$TMP/domaingood.exe")" >/dev/null 2>&1 \
+    || { echo "http6-gate: good domain build failed"; exit 1; }
+WHISPER_NET=1 $RUN "$TMP/domaingood.exe" >"$TMP/domaingood.out" 2>"$TMP/domaingood.err" \
+    || { echo "http6-gate: good domain run failed"; cat "$TMP/domaingood.err"; exit 1; }
+dgbody="$(head -1 "$TMP/domaingood.out" | tr -d '\r')"
+if [ "$dgbody" != "cookie=d=1;xtest=" ]; then
+    echo "http6-gate: valid Domain missing [$dgbody]"; cat "$TMP/domaingood.out"; exit 1
+fi
 stage=audit
 if ! grep -q 'GET http://127.0.0.1:.*/set 200' "$TMP/out"; then
     echo "http6-gate: missing audit line"; cat "$TMP/out"; exit 1

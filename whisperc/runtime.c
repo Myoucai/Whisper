@@ -3118,8 +3118,19 @@ static char *w_user_headers(const char *json, char *err, size_t errlen) {
     return out;
 }
 
-static char *w_cookie_jar = NULL; // process-level @6 cookie jar, "k=v; ..."
-static char *w_cookie_host = NULL; // host that owns w_cookie_jar (no cross-host leak)
+#define W_COOKIE_MAX 128
+
+typedef struct {
+    char *name;
+    char *value;
+    char *domain;
+    char *path;
+    int secure;
+    int http_only;
+} w_cookie;
+
+static w_cookie *w_cookies = NULL;
+static size_t w_cookie_count = 0;
 static char *w_audit_log = NULL;  // process-level @7 audit, one line per request
 static char *w_audit_json = NULL; // entries (no surrounding brackets) for JSON mode
 
@@ -3164,7 +3175,78 @@ static void w_audit_add(const char *method, const char *url, const char *host,
     w_net_global_unlock();
 }
 
-static void w_jar_update(const char *resp, size_t n, const char *host) {
+static void w_cookie_free_fields(w_cookie *c) {
+    free(c->name); free(c->value); free(c->domain); free(c->path);
+}
+
+static void w_cookie_remove_at(size_t i) {
+    w_cookie_free_fields(&w_cookies[i]);
+    if (i + 1 < w_cookie_count)
+        memmove(&w_cookies[i], &w_cookies[i + 1],
+                (w_cookie_count - i - 1) * sizeof(w_cookie));
+    w_cookie_count--;
+}
+
+static int w_cookie_domain_ok(const char *host, const char *domain) {
+    if (!host || !domain || !*host || !*domain) return 0;
+    if (w_host_ci_eq(host, strlen(host), domain, strlen(domain))) return 1;
+    int numeric = 1;
+    for (const char *p = host; *p; p++)
+        if (!((*p >= '0' && *p <= '9') || *p == '.')) { numeric = 0; break; }
+    if (numeric) return 0;
+    if (!strchr(domain, '.')) return 0;
+    size_t hl = strlen(host), dl = strlen(domain);
+    if (hl <= dl || host[hl - dl - 1] != '.') return 0;
+    return w_host_ci_eq(host + hl - dl, dl, domain, dl);
+}
+
+static int w_cookie_path_ok(const char *req, const char *cpath) {
+    size_t rn = strlen(req), cn = strlen(cpath ? cpath : "");
+    if (cn == 0 || rn < cn || strncmp(req, cpath, cn) != 0) return 0;
+    if (rn == cn) return 1;
+    if (cpath[cn - 1] == '/') return 1;
+    return req[cn] == '/';
+}
+
+static char *w_cookie_default_path(const char *req) {
+    const char *slash = strrchr(req ? req : "", '/');
+    if (!slash || slash == (req ? req : "")) return w_dup_range("/", 1);
+    return w_dup_range(req, (size_t)(slash - req));
+}
+
+static void w_cookie_put(const char *name, size_t nlen, const char *value,
+                         size_t vlen, const char *domain, const char *path,
+                         int secure, int http_only) {
+    for (size_t i = 0; i < w_cookie_count; i++) {
+        w_cookie *c = &w_cookies[i];
+        if (strlen(c->name) == nlen && memcmp(c->name, name, nlen) == 0 &&
+            w_host_ci_eq(c->domain, strlen(c->domain), domain, strlen(domain)) &&
+            strcmp(c->path, path) == 0) {
+            w_cookie_remove_at(i);
+            break;
+        }
+    }
+    if (w_cookie_count >= W_COOKIE_MAX) return;
+    w_cookie c;
+    memset(&c, 0, sizeof(c));
+    c.name = w_dup_range(name, nlen);
+    c.value = w_dup_range(value, vlen);
+    c.domain = w_dup_range(domain, strlen(domain));
+    c.path = w_dup_range(path, strlen(path));
+    c.secure = secure;
+    c.http_only = http_only;
+    if (!c.name || !c.value || !c.domain || !c.path) {
+        w_cookie_free_fields(&c);
+        return;
+    }
+    w_cookie *n = (w_cookie *)realloc(w_cookies, (w_cookie_count + 1) * sizeof(w_cookie));
+    if (!n) { w_cookie_free_fields(&c); return; }
+    w_cookies = n;
+    w_cookies[w_cookie_count++] = c;
+}
+
+static void w_jar_update(const char *resp, size_t n, const char *host,
+                         const char *req_path, int is_tls) {
     w_net_global_lock();
     const char *line = resp, *end = resp + n;
     while (line < end) {
@@ -3172,47 +3254,78 @@ static void w_jar_update(const char *resp, size_t n, const char *host) {
         while (e < end && *e != '\n') e++;
         if ((size_t)(e - line) > 11 && w_ci_eq_n(line, "set-cookie:", 11)) {
             const char *v = line + 11, *ve = e;
+            while (ve > v && (ve[-1] == '\r' || ve[-1] == ' ' || ve[-1] == '\t')) ve--;
             while (v < ve && (*v == ' ' || *v == '\t')) v++;
             const char *semi = v;
             while (semi < ve && *semi != ';') semi++;
-            while (semi > v && (semi[-1] == '\r' || semi[-1] == ' ' || semi[-1] == '\t')) semi--;
             const char *eq = v;
             while (eq < semi && *eq != '=') eq++;
             if (eq < semi) {
-                if (host && (!w_cookie_host ||
-                    !w_host_ci_eq(w_cookie_host, strlen(w_cookie_host), host, strlen(host)))) {
-                    free(w_cookie_jar);
-                    w_cookie_jar = NULL;
-                    free(w_cookie_host);
-                    w_cookie_host = w_dup_range(host, strlen(host));
-                }
-                size_t nlen = (size_t)(eq - v), vlen = (size_t)(semi - eq - 1);
-                char *newjar = (char *)malloc((w_cookie_jar ? strlen(w_cookie_jar) : 0) + nlen + vlen + 4);
-                if (newjar) {
-                    size_t k = 0;
-                    if (w_cookie_jar && *w_cookie_jar) {
-                        const char *q = w_cookie_jar;
-                        while (*q) {
-                            const char *qe = strchr(q, ';');
-                            size_t qn = qe ? (size_t)(qe - q) : strlen(q);
-                            const char *qeq = memchr(q, '=', qn);
-                            int same = qeq && (size_t)(qeq - q) == nlen && w_ci_eq_n(q, v, nlen);
-                            if (!same && qn > 0) {
-                                if (k) newjar[k++] = ';'; newjar[k++] = ' ';
-                                memcpy(newjar + k, q, qn); k += qn;
+                const char *name = v, *name_end = eq;
+                while (name_end > name && (name_end[-1] == ' ' || name_end[-1] == '\t')) name_end--;
+                const char *value = eq + 1, *value_end = semi;
+                while (value < value_end && (*value == ' ' || *value == '\t')) value++;
+                while (value_end > value && (value_end[-1] == ' ' || value_end[-1] == '\t')) value_end--;
+                int value_bad = 0;
+                for (const char *q = value; q < value_end; q++)
+                    if (*q == '\r' || *q == '\n' || (*q < 0x20 && *q != '\t')) value_bad = 1;
+                if (w_header_name_valid(name, (size_t)(name_end - name)) && !value_bad) {
+                    char *domain = NULL, *cpath = NULL;
+                    int secure_attr = 0, http_only = 0, bad = 0;
+                    const char *a = semi;
+                    while (a < ve) {
+                        if (*a == ';') a++;
+                        while (a < ve && (*a == ' ' || *a == '\t')) a++;
+                        const char *ae = a;
+                        while (ae < ve && *ae != ';') ae++;
+                        const char *ke = a;
+                        while (ke < ae && *ke != '=') ke++;
+                        const char *ks = a, *kend = ke;
+                        while (kend > ks && (kend[-1] == ' ' || kend[-1] == '\t')) kend--;
+                        const char *vs = ke < ae ? ke + 1 : ae, *vend = ae;
+                        while (vs < vend && (*vs == ' ' || *vs == '\t')) vs++;
+                        while (vend > vs && (vend[-1] == ' ' || vend[-1] == '\t')) vend--;
+                        size_t klen = (size_t)(kend - ks);
+                        if (w_ci_eq_n(ks, "domain", klen)) {
+                            const char *d = vs;
+                            if (d < vend && *d == '.') d++;
+                            while (d < vend && (*d == ' ' || *d == '\t')) d++;
+                            if (d >= vend) {
+                                bad = 1;
+                            } else {
+                                char *tmp = w_dup_range(d, (size_t)(vend - d));
+                                if (!tmp || !w_cookie_domain_ok(host, tmp)) {
+                                    free(tmp); bad = 1;
+                                } else {
+                                    free(domain); domain = tmp;
+                                }
                             }
-                            if (!qe) break;
-                            q = qe + 1;
-                            while (*q == ' ') q++;
+                        } else if (w_ci_eq_n(ks, "path", klen)) {
+                            if (vs < vend && *vs == '/') {
+                                free(cpath);
+                                cpath = w_dup_range(vs, (size_t)(vend - vs));
+                                if (!cpath) bad = 1;
+                            }
+                        } else if (w_ci_eq_n(ks, "secure", klen)) {
+                            secure_attr = 1;
+                        } else if (w_ci_eq_n(ks, "httponly", klen)) {
+                            http_only = 1;
                         }
+                        a = ae;
                     }
-                    if (k) newjar[k++] = ';'; newjar[k++] = ' ';
-                    memcpy(newjar + k, v, nlen); k += nlen;
-                    newjar[k++] = '=';
-                    memcpy(newjar + k, eq + 1, vlen); k += vlen;
-                    newjar[k] = 0;
-                    free(w_cookie_jar);
-                    w_cookie_jar = newjar;
+                    if (secure_attr && !is_tls) bad = 1;
+                    if (!bad) {
+                        if (!domain) domain = w_dup_range(host, strlen(host));
+                        if (!cpath) cpath = w_cookie_default_path(req_path);
+                        if (domain && cpath)
+                            w_cookie_put(name, (size_t)(name_end - name),
+                                         value, (size_t)(value_end - value),
+                                         domain, cpath, secure_attr, http_only);
+                        else
+                            bad = 1;
+                    }
+                    free(domain); free(cpath);
+                    (void)bad;
                 }
             }
         }
@@ -3221,19 +3334,38 @@ static void w_jar_update(const char *resp, size_t n, const char *host) {
     w_net_global_unlock();
 }
 
-static char *w_jar_header(const char *host) {
+static char *w_jar_header(const char *host, const char *req_path, int is_tls) {
     w_net_global_lock();
-    if (!w_cookie_jar || !*w_cookie_jar ||
-        !host || !w_cookie_host ||
-        !w_host_ci_eq(w_cookie_host, strlen(w_cookie_host), host, strlen(host))) {
+    size_t need = 1;
+    for (size_t i = 0; i < w_cookie_count; i++) {
+        w_cookie *c = &w_cookies[i];
+        if (w_cookie_domain_ok(host, c->domain) &&
+            w_cookie_path_ok(req_path ? req_path : "/", c->path) &&
+            (!c->secure || is_tls))
+            need += strlen(c->name) + strlen(c->value) + 3;
+    }
+    if (need == 1) {
         char *e = (char *)malloc(1); if (e) e[0] = 0;
         w_net_global_unlock();
         return e;
     }
-    size_t n = strlen(w_cookie_jar);
-    char *out = (char *)malloc(n + 12);
+    char *out = (char *)malloc(need + 12);
     if (!out) { w_net_global_unlock(); return NULL; }
-    sprintf(out, "Cookie: %s\r\n", w_cookie_jar);
+    size_t k = (size_t)sprintf(out, "Cookie: ");
+    int first = 1;
+    for (size_t i = 0; i < w_cookie_count; i++) {
+        w_cookie *c = &w_cookies[i];
+        if (!w_cookie_domain_ok(host, c->domain) ||
+            !w_cookie_path_ok(req_path ? req_path : "/", c->path) ||
+            (c->secure && !is_tls)) continue;
+        if (!first) { out[k++] = ';'; out[k++] = ' '; }
+        first = 0;
+        size_t nn = strlen(c->name), vn = strlen(c->value);
+        memcpy(out + k, c->name, nn); k += nn;
+        out[k++] = '=';
+        memcpy(out + k, c->value, vn); k += vn;
+    }
+    out[k++] = '\r'; out[k++] = '\n'; out[k] = 0;
     w_net_global_unlock();
     return out;
 }
@@ -3332,7 +3464,7 @@ static int w_http_session(const char *method, const char *url, const char *heade
             free(uh); w_url_free(&u); return -1;
         }
     }
-    char *ck = w_jar_header(u.host);
+    char *ck = w_jar_header(u.host, u.path, u.use_tls);
     if (!ck) { free(uh); w_url_free(&u); snprintf(err, errlen, "out of memory"); return -1; }
     unsigned char *raw = NULL;
     size_t bodylen = raw_body ? 0 : strlen(body);
@@ -3410,19 +3542,23 @@ static int w_http_session(const char *method, const char *url, const char *heade
                          : w_http_read_all(s, err, errlen, w_response_max());
     char *audit_host = w_dup_range(u.host, strlen(u.host));
     if (use_tls) w_tls_destroy(&tls);
-    w_closesock(s); w_url_free(&u);
-    if (!resp) { free(audit_host); return -1; }
+    w_closesock(s);
+    if (!resp) { free(audit_host); w_url_free(&u); return -1; }
     char *hdr_end = strstr(resp, "\r\n\r\n");
-    if (!hdr_end) { free(resp); free(audit_host); snprintf(err, errlen, "invalid HTTP response"); return -1; }
+    if (!hdr_end) {
+        free(resp); free(audit_host); w_url_free(&u);
+        snprintf(err, errlen, "invalid HTTP response"); return -1;
+    }
     {
         long long mh = w_quota_limit("WHISPER_NET_MAX_HEADERS");
         if (mh > 0 && (size_t)(hdr_end - resp) > (size_t)mh) {
-            free(resp); free(audit_host);
+            free(resp); free(audit_host); w_url_free(&u);
             snprintf(err, errlen, "response header quota exceeded (WHISPER_NET_MAX_HEADERS=%lld)", mh);
             return -1;
         }
     }
-    w_jar_update(resp, (size_t)(hdr_end - resp), audit_host ? audit_host : "");
+    w_jar_update(resp, (size_t)(hdr_end - resp), audit_host ? audit_host : "",
+                 u.path, use_tls);
     long status = 0;
     if (strncmp(resp, "HTTP/", 5) == 0) {
         char *sp = strchr(resp, ' ');
@@ -3438,7 +3574,7 @@ static int w_http_session(const char *method, const char *url, const char *heade
         if (rm && strcmp(rm, "deny") == 0) {
             snprintf(err, errlen, "redirect denied by WHISPER_NET_REDIRECT=deny");
             free(out->headers); free(out->body); free(resp);
-            free(audit_host);
+            free(audit_host); w_url_free(&u);
             return -1;
         }
     }
@@ -3454,6 +3590,7 @@ static int w_http_session(const char *method, const char *url, const char *heade
     w_audit_add(method, url, audit_host ? audit_host : "",
                 status, out->body ? strlen(out->body) : 0);
     free(audit_host);
+    w_url_free(&u);
     free(resp);
     if (!out->headers || !out->body) { snprintf(err, errlen, "out of memory"); return -1; }
     return 0;

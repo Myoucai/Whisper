@@ -1,55 +1,59 @@
-# Whisper 1.3.17 发布说明
+# Whisper 1.3.18 发布说明
 
 ## 主题
 
-**WAMR CVE reviewed watchlist + CI 版本门禁。**
+**Cookie 属性语义：Domain / Path / Secure / HttpOnly。**
 
 ## 新增
 
-- `security/wamr-cve-watch.json`
-- `scripts/wamr-cve-gate.py`
-- `docs/wamr-cve.md`
-- CI step `WAMR CVE watch`
+`@6` cookie jar 从单个字符串改为 per-cookie 结构：
 
-门禁做三件事：
+- 每个 cookie 记录 name/value/domain/path/secure/http_only
+- `Domain` 必须等于 host 或是 host 的父域
+  - 拒绝无点域
+  - 拒绝 IP 的宽域
+  - 拒绝 `evil-example.com` 冒充 `example.com`
+- `Path` 按 RFC 前缀规则匹配
+- `Secure` 只通过 TLS 发送
+- HTTP 响应里的 `Secure` cookie 被拒绝
+- `HttpOnly` 记录（无 JS 运行时，不影响发送）
+- 最多 128 个 cookie
 
-1. 从 `.github/workflows/wasm.yml` 读取 pinned `WAMR_VERSION`
-2. 对照 reviewed CVE 范围
-3. 超过 180 天未复核则失败
+## 测试
 
-当前：
+`http6-gate` 增加：
 
 ```text
-WAMR_VERSION = 2.4.5
-wamr-cve-gate: PASS pinned=2.4.5 watch_reviewed=2026-11-02 (2 CVEs)
+cookie-path     ✅ Path=/echo 的 cookie 只在 /echo 发送
+cookie-secure   ✅ Secure cookie 不通过 HTTP 发送
+cookie-domain   ✅ 外部 Domain 被拒绝，合法 Domain 生效
 ```
 
-## 已记录
+完整结果：
 
-- CVE-2025-64713：影响 `<2.4.4`，2.4.5 不受影响
-- CVE-2024-27532：影响 2.2.0，2.4.5 不受影响
-
-来源与更新流程见 [docs/wamr-cve.md](wamr-cve.md)。
-
-## 为什么不是实时 feed
-
-CI 不依赖 NVD/CIRCL 实时 API，避免：
-
-- 网络抖动假失败
-- 速率限制
-- CVE 记录滞后/误报
-
-采用“确定性门禁 + 定期人工复核”，发布时归档 SBOM 与 watchlist。
+```text
+http6-gate: PASS (cookie/header/audit-json/raw/timeout/redirect follow)
+http-parity-gate: PASS
+net-allow-gate: PASS
+```
 
 ## 兼容性
 
-- 无运行时行为变化
-- 不改变 WAMR 版本
-- 仅新增安全门禁与文档
+- 普通 host-only cookie 行为不变
+- 以前跨 host 共享的 cookie 不再共享（安全修复）
+- 以前忽略的 Domain/Path/Secure 现在生效
+- 旧的无属性 cookie 默认 host-only、path=目录、非 secure
 
 ## 已知限制
 
-- 这是人工复核 watchlist，不是实时 CVE feed
-- 只覆盖已记录 CVE
-- 不覆盖 OpenSSL 等系统库
-- 实时 feed / 自动升级 PR 仍待做
+- 未实现 `Max-Age`/`Expires` 过期删除
+- 未实现完整公共后缀列表（PSL）
+- 最多 128 个 cookie
+- 无 JS 运行时，`HttpOnly` 只记录不产生额外效果
+
+## 下一步
+
+- Cookie Max-Age/Expires + PSL
+- 覆盖引导 fuzz / nightly
+- 外部安全审计
+- 容器/EROFS fallback

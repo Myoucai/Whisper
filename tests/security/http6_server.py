@@ -25,6 +25,30 @@ class H(http.server.BaseHTTPRequestHandler):
             self.send_header("Location", "/set")
             self.end_headers()
             self.wfile.write(b"")
+        elif self.path == "/setpath":
+            self.send_response(200)
+            self.send_header("Set-Cookie", "p=1; Path=/echo")
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"setpath")
+        elif self.path == "/setsecure":
+            self.send_response(200)
+            self.send_header("Set-Cookie", "s=1; Secure; Path=/")
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"setsecure")
+        elif self.path == "/setdomainbad":
+            self.send_response(200)
+            self.send_header("Set-Cookie", "d=1; Domain=example.com")
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"setdomainbad")
+        elif self.path == "/setdomaingood":
+            self.send_response(200)
+            self.send_header("Set-Cookie", "d=1; Domain=127.0.0.1; HttpOnly")
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"setdomaingood")
         elif self.path == "/loop":
             self.send_response(302)
             self.send_header("Location", "/loop")

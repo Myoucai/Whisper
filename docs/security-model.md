@@ -181,8 +181,8 @@ stdlib 文档里的安全承诺以本文为准。
   `WHISPER_NET_MAX_BODY`、`WHISPER_NET_MAX_HEADERS`、
   `WHISPER_NET_MAX_CONNECTIONS`；超限明确失败。
 - **I-14 request sanitization**：method 只允许 RFC token；URL 拒绝空格/
-  控制字符；header 名只允许 token；header 值拒绝 CR/LF。cookie jar 记录
-  所属 host，跨 host 不发送；跨源重定向不跟随。
+  控制字符；header 名只允许 token；header 值拒绝 CR/LF。cookie 按
+  host/domain/path/secure 匹配，跨 host 不发送；跨源重定向不跟随。
 
 ---
 
