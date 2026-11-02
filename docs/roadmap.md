@@ -85,7 +85,8 @@ native/HTTP server 测试全绿；WASM 无网络不变。
 - [ ] 容器/EROFS/无特权环境 fallback 的严格只读方案
 - [x] native 内存/HTTP 请求/body/header/@9 连接配额
 - [x] WASM heap/stack/threads/fd/wall-clock 超时配额
-- [ ] OS/容器级聚合配额（cgroup/文件系统）
+- [x] OS/容器级聚合配额模板（systemd cgroup + compose）
+- [ ] 实际集群 cgroup 验证 / 文件系统 quota
 - [ ] WAMR 版本升级策略与 CVE 跟踪
 - [x] 多租户隔离评审（docs/multi-tenant.md）
 

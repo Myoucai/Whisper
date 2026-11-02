@@ -182,6 +182,8 @@ jobs:
         run: bash scripts/net-allow-gate.sh
       - name: SBOM generation/validation
         run: bash scripts/sbom-gate.sh
+      - name: Deployment templates
+        run: bash scripts/deploy-gate.sh
 
   wd-build:
     name: wd build (CI fast) + formatter

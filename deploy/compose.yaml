@@ -1,0 +1,47 @@
+# Example Docker Compose tenant.
+#
+# Prereqs:
+#   - /opt/whisper contains this repo (read-only)
+#   - /srv/tenant contains app.wasm and data/
+#   - the image has bash, python3, find, and the pinned iwasm at
+#     /opt/whisper/bin/iwasm
+#
+# `read_only`, `network_mode: none`, `cap_drop: ALL`, and cgroup limits are
+# host-enforced. wrun adds preopen/import/env quotas inside the container.
+# `read_only` + the `:ro` volume already make guest writes fail; `wrun --dir`
+# maps the read-only mount without needing userns/mount inside the container.
+# Use --dir-ro-strict on hosts where the container seccomp profile permits
+# unshare/mount (the systemd unit does).
+services:
+  tenant:
+    image: debian:bookworm-slim
+    user: "10001:10001"
+    working_dir: /srv/tenant
+    read_only: true
+    network_mode: none
+    mem_limit: 128m
+    memswap_limit: 128m
+    pids_limit: 16
+    cpus: 0.50
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    volumes:
+      - /opt/whisper:/opt/whisper:ro
+      - /srv/tenant:/srv/tenant:ro
+    environment:
+      WRUN_IWASM: /opt/whisper/bin/iwasm
+      WHISPER_WASM_MAX_MEMORY_MB: "64"
+      WHISPER_WASM_STACK_KB: "256"
+      WHISPER_WASM_MAX_THREADS: "4"
+      WHISPER_WASM_MAX_FDS: "64"
+      WHISPER_WASM_TIMEOUT: "30"
+    command:
+      - /usr/bin/env
+      - bash
+      - /opt/whisper/scripts/wrun.sh
+      - --dir
+      - /data::/srv/tenant/data
+      - /srv/tenant/app.wasm

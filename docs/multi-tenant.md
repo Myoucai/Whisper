@@ -35,6 +35,8 @@ bash scripts/wrun.sh \
 - 不传 `--http-allow`/`--exec`/`--ffi`
 - 外层再叠加 cgroup/容器（见第 5 节）
 
+可执行的 systemd / Docker Compose 模板见 [deploy/README.md](../deploy/README.md)。
+
 ## 3. 隔离矩阵
 
 | 边界 | 已实现 | 残余风险 |

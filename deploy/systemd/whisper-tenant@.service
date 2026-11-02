@@ -1,0 +1,51 @@
+[Unit]
+Description=Whisper WASI tenant %i
+After=network.target
+ConditionPathExists=/srv/whisper/%i/app.wasm
+
+[Service]
+Type=oneshot
+User=%i
+Group=%i
+WorkingDirectory=/srv/whisper/%i
+Environment=WRUN_IWASM=/opt/whisper/bin/iwasm
+Environment=WHISPER_WASM_MAX_MEMORY_MB=64
+Environment=WHISPER_WASM_STACK_KB=256
+Environment=WHISPER_WASM_MAX_THREADS=4
+Environment=WHISPER_WASM_MAX_FDS=64
+Environment=WHISPER_WASM_TIMEOUT=30
+ExecStart=/usr/bin/env bash /opt/whisper/scripts/wrun.sh --dir-ro-strict /data::/srv/whisper/%i/data /srv/whisper/%i/app.wasm
+
+# cgroup v2 aggregate limits (defense in depth; wrun also sets per-process quotas)
+MemoryHigh=64M
+MemoryMax=128M
+MemorySwapMax=0
+CPUQuota=50%
+TasksMax=16
+LimitNOFILE=64
+RuntimeMaxSec=120
+
+# Filesystem / privilege reduction
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateNetwork=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX
+ReadOnlyPaths=/srv/whisper/%i /opt/whisper
+
+# userns/mount are required by --dir-ro-strict; do not add ~user/~mount
+# to RestrictNamespaces, and keep the default seccomp profile.
+
+[Install]
+WantedBy=multi-user.target

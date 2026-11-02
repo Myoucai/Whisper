@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.15-7cffc4" alt="version">
+  <img src="https://img.shields.io/badge/version-1.3.16-7cffc4" alt="version">
   <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2019%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
@@ -316,7 +316,8 @@ Whisper 的安全承诺**按执行路径分档**，不是所有产物都等价�
 [docs/security-model.md](docs/security-model.md)，多租户部署清单见
 [docs/multi-tenant.md](docs/multi-tenant.md)，fuzz 覆盖见
 [docs/fuzz-plan.md](docs/fuzz-plan.md)，本轮安全自审见
-[docs/security-audit.md](docs/security-audit.md)。
+[docs/security-audit.md](docs/security-audit.md)，部署模板见
+[deploy/README.md](deploy/README.md)。
 
 WASM/WASI 的详细计划与判据见 [docs/wasm-wasi-plan.md](docs/wasm-wasi-plan.md)
 和 [tests/wasm_preregistered.md](tests/wasm_preregistered.md)。当前 M2 部分已打通：

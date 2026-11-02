@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.16 (2026-11-02) — tenant deployment templates
+
+- 新增 systemd `whisper-tenant@.service` 与 Docker Compose 模板：cgroup
+  memory/CPU/pids/nofile、只读根、无网络、cap_drop、preopen 配额。
+- 新增 `scripts/deploy-gate.sh` 与 CI 校验；multi-tenant 文档链接模板。
+
 ## v1.3.15 (2026-11-02) — security audit
 
 - 安全自审（docs/security-audit.md）：修复 cookie 跨 host 发送；拒绝
