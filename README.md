@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.19-7cffc4" alt="version">
+  <img src="https://img.shields.io/badge/version-1.3.20-7cffc4" alt="version">
   <img src="https://img.shields.io/badge/tests-467%20passed%20%2B%2019%20gates-brightgreen" alt="tests">
   <img src="https://img.shields.io/badge/self--hosting-hard-brightgreen" alt="self-hosting">
   <img src="https://img.shields.io/badge/native-C%20via%20gcc-blue" alt="native">
@@ -317,7 +317,8 @@ Whisper 的安全承诺**按执行路径分档**，不是所有产物都等价�
 [docs/multi-tenant.md](docs/multi-tenant.md)，fuzz 覆盖见
 [docs/fuzz-plan.md](docs/fuzz-plan.md)，本轮安全自审见
 [docs/security-audit.md](docs/security-audit.md)，WAMR CVE 跟踪见
-[docs/wamr-cve.md](docs/wamr-cve.md)，部署模板见
+[docs/wamr-cve.md](docs/wamr-cve.md)，PSL 见
+[docs/psl.md](docs/psl.md)，部署模板见
 [deploy/README.md](deploy/README.md)。
 
 WASM/WASI 的详细计划与判据见 [docs/wasm-wasi-plan.md](docs/wasm-wasi-plan.md)

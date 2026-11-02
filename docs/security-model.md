@@ -183,7 +183,8 @@ stdlib 文档里的安全承诺以本文为准。
 - **I-14 request sanitization**：method 只允许 RFC token；URL 拒绝空格/
   控制字符；header 名只允许 token；header 值拒绝 CR/LF。cookie 按
   host/domain/path/secure 匹配，支持 Max-Age/Expires 过期；跨 host 不发送；
-  跨源重定向不跟随。PSL 使用保守多标签后缀表，不是完整 PSL。
+  跨源重定向不跟随。PSL 使用嵌入的完整列表（ASCII 规则；Unicode 需先
+  转 punycode），见 docs/psl.md。
 
 ---
 

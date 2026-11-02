@@ -186,6 +186,8 @@ jobs:
         run: bash scripts/deploy-gate.sh
       - name: WAMR CVE watch
         run: python3 scripts/wamr-cve-gate.py
+      - name: Public Suffix List gate
+        run: bash scripts/psl-gate.sh
 
   wd-build:
     name: wd build (CI fast) + formatter

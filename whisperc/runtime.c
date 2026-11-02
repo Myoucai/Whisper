@@ -3118,6 +3118,8 @@ static char *w_user_headers(const char *json, char *err, size_t errlen) {
     return out;
 }
 
+#include "../security/psl_data.h"
+
 #define W_COOKIE_MAX 128
 
 typedef struct {
@@ -3188,22 +3190,30 @@ static void w_cookie_remove_at(size_t i) {
     w_cookie_count--;
 }
 
+static int w_psl_has(const char *const *list, size_t n, const char *value) {
+    size_t lo = 0, hi = n;
+    while (lo < hi) {
+        size_t mid = lo + (hi - lo) / 2;
+        int c = strcmp(value, list[mid]);
+        if (c == 0) return 1;
+        if (c < 0) hi = mid; else lo = mid + 1;
+    }
+    return 0;
+}
+
 static int w_public_suffix(const char *domain) {
-    // Conservative multi-label public-suffix guard. This is not the full PSL;
-    // it blocks the common delegated suffixes that would otherwise turn a
-    // Domain cookie into a cross-site cookie.
-    static const char *suffixes[] = {
-        "co.uk", "org.uk", "ac.uk", "gov.uk", "com.au", "net.au", "org.au",
-        "co.nz", "co.jp", "ne.jp", "or.jp", "com.br", "com.cn", "net.cn",
-        "org.cn", "com.hk", "com.sg", "com.tw", "co.in", "co.kr", "com.mx",
-        "com.ar", "com.tr", "com.ru", "co.za", "com.ua", "com.pl", "co.il",
-        "com.sa", "com.eg", "github.io", "appspot.com", "herokuapp.com",
-        "pages.dev", "vercel.app", "netlify.app", "cloudfront.net",
-        "s3.amazonaws.com",
-    };
-    for (size_t i = 0; i < sizeof(suffixes) / sizeof(suffixes[0]); i++)
-        if (w_host_ci_eq(domain, strlen(domain), suffixes[i], strlen(suffixes[i])))
-            return 1;
+    char lower[256];
+    size_t n = strlen(domain);
+    if (n == 0 || n >= sizeof(lower)) return 1;
+    for (size_t i = 0; i < n; i++) {
+        unsigned char c = (unsigned char)domain[i];
+        lower[i] = (char)((c >= 'A' && c <= 'Z') ? c + 32 : c);
+    }
+    lower[n] = 0;
+    if (w_psl_has(w_psl_exception, w_psl_exception_count, lower)) return 0;
+    if (w_psl_has(w_psl_normal, w_psl_normal_count, lower)) return 1;
+    const char *dot = strchr(lower, '.');
+    if (dot && w_psl_has(w_psl_wildcard, w_psl_wildcard_count, dot + 1)) return 1;
     return 0;
 }
 

@@ -59,10 +59,13 @@ pub fn build_native(source: &str, source_dir: &Path, output: &str) -> Result<(),
         .map_err(|e| format!("read compiler.all.ws: {e}"))?;
     let runtime_c = std::fs::read(whisperc_dir.join("runtime.c"))
         .map_err(|e| format!("read runtime.c: {e}"))?;
+    let psl_h = std::fs::read(whisperc_dir.join("../security/psl_data.h"))
+        .map_err(|e| format!("read security/psl_data.h: {e}"))?;
     let key = fingerprint(&[
         expanded.as_bytes(),
         &compiler_ws,
         &runtime_c,
+        &psl_h,
         cc.as_bytes(),
         march.as_bytes(),
         // Cache-key version. Bump whenever the flags below change: entries

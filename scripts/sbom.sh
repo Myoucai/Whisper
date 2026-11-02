@@ -59,6 +59,13 @@ root_pkg = root_pkg or {"name": "whisper", "version": "unknown"}
 
 components = list(packages)
 components.append({
+    "type": "data",
+    "name": "Public Suffix List",
+    "version": os.environ.get("PSL_SNAPSHOT", "2026-11-02"),
+    "license": "MPL-2.0",
+    "source": "https://publicsuffix.org/list/public_suffix_list.dat",
+})
+components.append({
     "type": "application",
     "name": "WAMR iwasm",
     "version": os.environ.get("WAMR_VERSION", "2.4.5"),

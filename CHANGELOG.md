@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.20 (2026-11-02) — full PSL
+
+- 嵌入完整 Public Suffix List（9617 normal / 312 wildcard / 8 exception），
+  替换保守后缀表；新增 `scripts/gen-psl.py`、`scripts/psl-gate.sh` 与
+  `docs/psl.md`；native cache key 纳入 `psl_data.h`。
+
 ## v1.3.19 (2026-11-02) — cookie expiry + suffix guard
 
 - cookie 支持 Max-Age/Expires；Max-Age=0 删除；过期 cookie 不发送。
