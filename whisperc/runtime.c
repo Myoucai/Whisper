@@ -252,6 +252,34 @@ static int w_net_allow_guard(const char *host, char *err, size_t errlen) {
     return -1;
 }
 
+static int w_http_token_char(unsigned char c) {
+    if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+        (c >= '0' && c <= '9')) return 1;
+    switch (c) {
+#define W_TOKEN_CASE(ch) case ch: return 1
+        W_TOKEN_CASE('!'); W_TOKEN_CASE('#'); W_TOKEN_CASE('$'); W_TOKEN_CASE('%');
+        W_TOKEN_CASE('&'); W_TOKEN_CASE('\''); W_TOKEN_CASE('*'); W_TOKEN_CASE('+');
+        W_TOKEN_CASE('-'); W_TOKEN_CASE('.'); W_TOKEN_CASE('^'); W_TOKEN_CASE('_');
+        W_TOKEN_CASE('`'); W_TOKEN_CASE('|'); W_TOKEN_CASE('~');
+#undef W_TOKEN_CASE
+        default: return 0;
+    }
+}
+
+static int w_method_valid(const char *method) {
+    if (!method || !*method) return 0;
+    for (const unsigned char *p = (const unsigned char *)method; *p; p++)
+        if (!w_http_token_char(*p)) return 0;
+    return 1;
+}
+
+static int w_header_name_valid(const char *name, size_t n) {
+    if (n == 0) return 0;
+    for (size_t i = 0; i < n; i++)
+        if (!w_http_token_char((unsigned char)name[i])) return 0;
+    return 1;
+}
+
 static int w_method_allowed(const char *method) {
     const char *e = getenv("WHISPER_NET_METHODS");
     if (!e || !*e) return 1;
@@ -2357,6 +2385,9 @@ static char *w_dup_range(const char *s, size_t n) {
 static int w_url_parse(const char *url, w_url *out) {
     const char *rest, *slash, *colon = NULL;
     size_t hplen, i;
+    for (const unsigned char *q = (const unsigned char *)url; *q; q++) {
+        if (*q <= 0x20 || *q == 0x7f) return -1;
+    }
     out->use_tls = 0;
     out->host = NULL;
     out->path = NULL;
@@ -2695,6 +2726,11 @@ static char *w_http_request(const char *method, const char *url, const char *bod
         return NULL;
     }
     if (w_net_allow_guard(u.host, err, errlen) != 0) {
+        w_url_free(&u);
+        return NULL;
+    }
+    if (!w_method_valid(method)) {
+        snprintf(err, errlen, "invalid HTTP method");
         w_url_free(&u);
         return NULL;
     }
@@ -3038,6 +3074,10 @@ static char *w_user_headers(const char *json, char *err, size_t errlen) {
         while (*p && *p != '"') p++;
         if (!*p) { snprintf(err, errlen, "unterminated headers-json key"); free(out); return NULL; }
         size_t klen = (size_t)(p - ks);
+        if (!w_header_name_valid(ks, klen)) {
+            snprintf(err, errlen, "invalid header name in headers-json");
+            free(out); return NULL;
+        }
         p++;
         while (*p == ' ' || *p == '\t') p++;
         if (*p != ':') { snprintf(err, errlen, "bad headers-json separator"); free(out); return NULL; }
@@ -3079,6 +3119,7 @@ static char *w_user_headers(const char *json, char *err, size_t errlen) {
 }
 
 static char *w_cookie_jar = NULL; // process-level @6 cookie jar, "k=v; ..."
+static char *w_cookie_host = NULL; // host that owns w_cookie_jar (no cross-host leak)
 static char *w_audit_log = NULL;  // process-level @7 audit, one line per request
 static char *w_audit_json = NULL; // entries (no surrounding brackets) for JSON mode
 
@@ -3123,7 +3164,7 @@ static void w_audit_add(const char *method, const char *url, const char *host,
     w_net_global_unlock();
 }
 
-static void w_jar_update(const char *resp, size_t n) {
+static void w_jar_update(const char *resp, size_t n, const char *host) {
     w_net_global_lock();
     const char *line = resp, *end = resp + n;
     while (line < end) {
@@ -3138,6 +3179,13 @@ static void w_jar_update(const char *resp, size_t n) {
             const char *eq = v;
             while (eq < semi && *eq != '=') eq++;
             if (eq < semi) {
+                if (host && (!w_cookie_host ||
+                    !w_host_ci_eq(w_cookie_host, strlen(w_cookie_host), host, strlen(host)))) {
+                    free(w_cookie_jar);
+                    w_cookie_jar = NULL;
+                    free(w_cookie_host);
+                    w_cookie_host = w_dup_range(host, strlen(host));
+                }
                 size_t nlen = (size_t)(eq - v), vlen = (size_t)(semi - eq - 1);
                 char *newjar = (char *)malloc((w_cookie_jar ? strlen(w_cookie_jar) : 0) + nlen + vlen + 4);
                 if (newjar) {
@@ -3173,9 +3221,11 @@ static void w_jar_update(const char *resp, size_t n) {
     w_net_global_unlock();
 }
 
-static char *w_jar_header(void) {
+static char *w_jar_header(const char *host) {
     w_net_global_lock();
-    if (!w_cookie_jar || !*w_cookie_jar) {
+    if (!w_cookie_jar || !*w_cookie_jar ||
+        !host || !w_cookie_host ||
+        !w_host_ci_eq(w_cookie_host, strlen(w_cookie_host), host, strlen(host))) {
         char *e = (char *)malloc(1); if (e) e[0] = 0;
         w_net_global_unlock();
         return e;
@@ -3261,6 +3311,10 @@ static int w_http_session(const char *method, const char *url, const char *heade
     w_url u;
     if (w_url_parse(url, &u) != 0) { snprintf(err, errlen, "Invalid URL: %s", url); return -1; }
     if (w_net_allow_guard(u.host, err, errlen) != 0) { w_url_free(&u); return -1; }
+    if (!w_method_valid(method)) {
+        snprintf(err, errlen, "invalid HTTP method");
+        w_url_free(&u); return -1;
+    }
     if (!w_method_allowed(method)) {
         snprintf(err, errlen, "method not allowed by WHISPER_NET_METHODS: %s", method);
         w_url_free(&u); return -1;
@@ -3278,7 +3332,7 @@ static int w_http_session(const char *method, const char *url, const char *heade
             free(uh); w_url_free(&u); return -1;
         }
     }
-    char *ck = w_jar_header();
+    char *ck = w_jar_header(u.host);
     if (!ck) { free(uh); w_url_free(&u); snprintf(err, errlen, "out of memory"); return -1; }
     unsigned char *raw = NULL;
     size_t bodylen = raw_body ? 0 : strlen(body);
@@ -3368,7 +3422,7 @@ static int w_http_session(const char *method, const char *url, const char *heade
             return -1;
         }
     }
-    w_jar_update(resp, (size_t)(hdr_end - resp));
+    w_jar_update(resp, (size_t)(hdr_end - resp), audit_host ? audit_host : "");
     long status = 0;
     if (strncmp(resp, "HTTP/", 5) == 0) {
         char *sp = strchr(resp, ' ');

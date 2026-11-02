@@ -110,7 +110,8 @@ native/HTTP server 测试全绿；WASM 无网络不变。
 - [x] `.wbin` 解码 property fuzz（4096 + malformed）
 - [ ] preopen 随机路径 / WASM import/`.wbin` 覆盖引导 fuzz
 - [x] 依赖 SBOM（scripts/sbom.sh + sbom-gate）
-- [ ] 完整安全审计
+- [x] 安全自审（docs/security-audit.md）
+- [ ] 外部安全审计 / Cookie 属性语义 / cgroup 模板
 - [ ] CI 零 Rust `wd` 全链 nightly 稳定（已有 workflow）
 - [ ] macOS/Linux/Windows 发布矩阵
 

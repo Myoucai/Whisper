@@ -28,11 +28,11 @@ fi
 grep -q 'local/private\|private/link-local' "$TMP/private.err" \
     || { echo "net-allow-gate: missing private-IP rejection"; cat "$TMP/private.err"; exit 1; }
 
-if WHISPER_NET_ALLOW=127.0.0.1 WHISPER_NET_ALLOW_PRIVATE=1 \
+if WHISPER_NET_ALLOW=127.0.0.1 WHISPER_NET_ALLOW_PRIVATE=1 WHISPER_NET_TIMEOUT=3 \
    "$TMP/app.exe" >"$TMP/allow.out" 2>"$TMP/allow.err"; then
     echo "net-allow-gate: connection unexpectedly succeeded"; exit 1
 fi
-grep -q 'Connect to 127.0.0.1:1 failed' "$TMP/allow.err" \
+grep -Eq 'Connect to 127.0.0.1:1 (failed|timed out)' "$TMP/allow.err" \
     || { echo "net-allow-gate: allowed host did not reach connect"; cat "$TMP/allow.err"; exit 1; }
 
 if WHISPER_NET_METHODS=POST "$TMP/app.exe" >"$TMP/method.out" 2>"$TMP/method.err"; then
@@ -64,6 +64,39 @@ if WHISPER_NET_RAW=1 WHISPER_NET_LISTEN_PORTS=8080 "$TMP/raw.exe" >"$TMP/raw3.ou
 fi
 grep -q 'listen port not allowed by WHISPER_NET_LISTEN_PORTS' "$TMP/raw3.err" \
     || { echo "net-allow-gate: missing listen port error"; cat "$TMP/raw3.err"; exit 1; }
+
+cat > "$TMP/badmethod.ws" <<'EOF'
+"BAD METHOD" "http://127.0.0.1:1/x" "{}" "" @6 drop drop drop
+EOF
+"$BIN" build "$(winpath "$TMP/badmethod.ws")" -t c2 -o "$(winpath "$TMP/badmethod.exe")" >/dev/null 2>&1 \
+    || { echo "net-allow-gate: bad method build failed"; exit 1; }
+if WHISPER_NET=1 "$TMP/badmethod.exe" >"$TMP/bm.out" 2>"$TMP/bm.err"; then
+    echo "net-allow-gate: invalid method accepted"; exit 1
+fi
+grep -q 'invalid HTTP method' "$TMP/bm.err" \
+    || { echo "net-allow-gate: missing invalid method error"; cat "$TMP/bm.err"; exit 1; }
+
+cat > "$TMP/badheader.ws" <<'EOF'
+"GET" "http://127.0.0.1:1/x" "{\"Bad Name\":\"x\"}" "" @6 drop drop drop
+EOF
+"$BIN" build "$(winpath "$TMP/badheader.ws")" -t c2 -o "$(winpath "$TMP/badheader.exe")" >/dev/null 2>&1 \
+    || { echo "net-allow-gate: bad header build failed"; exit 1; }
+if WHISPER_NET=1 "$TMP/badheader.exe" >"$TMP/bh.out" 2>"$TMP/bh.err"; then
+    echo "net-allow-gate: invalid header name accepted"; exit 1
+fi
+grep -q 'invalid header name' "$TMP/bh.err" \
+    || { echo "net-allow-gate: missing invalid header error"; cat "$TMP/bh.err"; exit 1; }
+
+cat > "$TMP/badurl.ws" <<'EOF'
+"GET" "http://127.0.0.1:1/a b" "{}" "" @6 drop drop drop
+EOF
+"$BIN" build "$(winpath "$TMP/badurl.ws")" -t c2 -o "$(winpath "$TMP/badurl.exe")" >/dev/null 2>&1 \
+    || { echo "net-allow-gate: bad url build failed"; exit 1; }
+if WHISPER_NET=1 "$TMP/badurl.exe" >"$TMP/bu.out" 2>"$TMP/bu.err"; then
+    echo "net-allow-gate: URL with space accepted"; exit 1
+fi
+grep -q 'Invalid URL' "$TMP/bu.err" \
+    || { echo "net-allow-gate: missing invalid URL error"; cat "$TMP/bu.err"; exit 1; }
 
 cat > "$TMP/post.ws" <<'EOF'
 "http://127.0.0.1:1/x" "{\"a\":1}" @3 drop

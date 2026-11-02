@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.15 (2026-11-02) — security audit
+
+- 安全自审（docs/security-audit.md）：修复 cookie 跨 host 发送；拒绝
+  method/URL/header 名中的控制字符与空格；新增回归门禁。
+- 记录残余风险：Cookie 属性、preopen TOCTOU、WAMR CVE、cgroup 等。
+
 ## v1.3.14 (2026-10-28) — wbin decode hardening
 
 - `.wbin` 解码加固：长度必须 ≤ 剩余输入，分配上限 64 MiB，PushRef
