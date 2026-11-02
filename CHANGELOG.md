@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.17 (2026-11-02) — WAMR CVE watch
+
+- 新增 WAMR CVE reviewed watchlist（security/wamr-cve-watch.json）与
+  `scripts/wamr-cve-gate.py`：CI 校验 pinned 版本、受影响范围和 180 天
+  复核期限；文档见 docs/wamr-cve.md。
+
 ## v1.3.16 (2026-11-02) — tenant deployment templates
 
 - 新增 systemd `whisper-tenant@.service` 与 Docker Compose 模板：cgroup

@@ -139,7 +139,7 @@ net-allow-gate: Invalid URL
 |---|---|---|
 | Cookie 属性未实现 | 中 | 需要完整 cookie 语义时引入 host-only 明确实现 |
 | preopen TOCTOU | 中 | 生产用不可变挂载/独立租户目录 |
-| WAMR CVE | 高 | 固定版本 + 订阅 advisory + 定期升级 |
+| WAMR CVE | 高 | 固定版本 + reviewed watchlist CI（docs/wamr-cve.md） |
 | 无 cgroup 聚合配额 | 中 | 部署层 cgroup v2 |
 | WASM 侧信道 | 中 | 高价值租户独立节点 |
 | 覆盖引导 fuzz 缺失 | 中 | 接 OSS-Fuzz/atheris |

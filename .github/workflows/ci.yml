@@ -184,6 +184,8 @@ jobs:
         run: bash scripts/sbom-gate.sh
       - name: Deployment templates
         run: bash scripts/deploy-gate.sh
+      - name: WAMR CVE watch
+        run: python3 scripts/wamr-cve-gate.py
 
   wd-build:
     name: wd build (CI fast) + formatter

@@ -1,66 +1,55 @@
-# Whisper 1.3.16 发布说明
+# Whisper 1.3.17 发布说明
 
 ## 主题
 
-**把多租户隔离清单落成 systemd cgroup 与 Docker Compose 模板。**
+**WAMR CVE reviewed watchlist + CI 版本门禁。**
 
 ## 新增
 
-### systemd
+- `security/wamr-cve-watch.json`
+- `scripts/wamr-cve-gate.py`
+- `docs/wamr-cve.md`
+- CI step `WAMR CVE watch`
 
-`deploy/systemd/whisper-tenant@.service`：
+门禁做三件事：
 
-- 每租户 `User=%i`
-- `MemoryHigh=64M` / `MemoryMax=128M`
-- `CPUQuota=50%`
-- `TasksMax=16`
-- `LimitNOFILE=64`
-- `RuntimeMaxSec=120`
-- `PrivateNetwork=yes`
-- `ProtectSystem=strict` / `ProtectHome=yes`
-- 空 `CapabilityBoundingSet`
-- `--dir-ro-strict` 保持 userns/mount 可用
+1. 从 `.github/workflows/wasm.yml` 读取 pinned `WAMR_VERSION`
+2. 对照 reviewed CVE 范围
+3. 超过 180 天未复核则失败
 
-### Docker Compose
+当前：
 
-`deploy/compose.yaml`：
-
-- `read_only: true`
-- `network_mode: none`
-- `cap_drop: ALL`
-- `no-new-privileges`
-- `mem_limit: 128m`
-- `pids_limit: 16`
-- `cpus: 0.5`
-- 只读挂载 repo 与租户目录
-- 使用 `--dir` + 只读卷（不依赖容器内 userns/mount）
-
-### 验证
-
-`scripts/deploy-gate.sh`：
-
-- `systemd-analyze verify`（可用时）
-- Compose YAML 关键字段校验
-- CI 接入
-
-## 使用
-
-```bash
-cat deploy/README.md
-sudo systemctl start whisper-tenant@tenant-a
-docker compose -f deploy/compose.yaml config
+```text
+WAMR_VERSION = 2.4.5
+wamr-cve-gate: PASS pinned=2.4.5 watch_reviewed=2026-11-02 (2 CVEs)
 ```
+
+## 已记录
+
+- CVE-2025-64713：影响 `<2.4.4`，2.4.5 不受影响
+- CVE-2024-27532：影响 2.2.0，2.4.5 不受影响
+
+来源与更新流程见 [docs/wamr-cve.md](wamr-cve.md)。
+
+## 为什么不是实时 feed
+
+CI 不依赖 NVD/CIRCL 实时 API，避免：
+
+- 网络抖动假失败
+- 速率限制
+- CVE 记录滞后/误报
+
+采用“确定性门禁 + 定期人工复核”，发布时归档 SBOM 与 watchlist。
 
 ## 兼容性
 
 - 无运行时行为变化
-- 模板是可选的部署层
-- cgroup 限制由 systemd/Docker 执行，不是 wrun 内部
-- native C 仍不是沙箱
+- 不改变 WAMR 版本
+- 仅新增安全门禁与文档
 
 ## 已知限制
 
-- 模板未在真实集群验证
-- 容器内 `--dir-ro-strict` 取决于 seccomp 是否允许 userns/mount
-- 文件系统容量/inode quota 未包含
-- WAMR CVE 跟踪、外部审计仍待做
+- 这是人工复核 watchlist，不是实时 CVE feed
+- 只覆盖已记录 CVE
+- 不覆盖 OpenSSL 等系统库
+- 实时 feed / 自动升级 PR 仍待做

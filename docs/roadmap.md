@@ -87,7 +87,8 @@ native/HTTP server 测试全绿；WASM 无网络不变。
 - [x] WASM heap/stack/threads/fd/wall-clock 超时配额
 - [x] OS/容器级聚合配额模板（systemd cgroup + compose）
 - [ ] 实际集群 cgroup 验证 / 文件系统 quota
-- [ ] WAMR 版本升级策略与 CVE 跟踪
+- [x] WAMR CVE reviewed watchlist + CI 门禁（docs/wamr-cve.md）
+- [ ] 实时 CVE feed / 自动升级 PR
 - [x] 多租户隔离评审（docs/multi-tenant.md）
 
 验收：`--dir-ro` 不再只是快照；资源耗尽只影响单个 guest。
