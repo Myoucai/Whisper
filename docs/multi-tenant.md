@@ -29,7 +29,7 @@ bash scripts/wrun.sh \
 
 - 独立进程
 - 独立 OS 用户
-- `--dir-ro-strict`（Linux，userns + ro bind）
+- `--dir-ro-strict`（Linux，现有 ro mount 直接映射，否则 userns + ro bind）
 - 不传 `--env`，或只传显式白名单
 - 不传 `--dir` 可写 preopen
 - 不传 `--http-allow`/`--exec`/`--ffi`
@@ -42,7 +42,7 @@ bash scripts/wrun.sh \
 | 边界 | 已实现 | 残余风险 |
 |---|---|---|
 | 文件读取 | preopen + symlink 拒绝 | 宿主路径 TOCTOU；WAMR CVE |
-| 文件写入 | `--dir-ro-strict` 真实 EROFS | 无 userns 时 fail closed；`--dir-ro` 仍是快照 |
+| 文件写入 | `--dir-ro-strict` 真实 EROFS（已有 ro mount 或 userns bind） | 两者都不可用时 fail closed；`--dir-ro` 仍是快照 |
 | 环境变量 | `--env` 白名单，默认空 | 宿主自身环境不会透传 |
 | 网络 | guest 无网络 import | 无 host HTTP proxy；未来需独立 broker |
 | FFI | 显式拒绝 | 无 |

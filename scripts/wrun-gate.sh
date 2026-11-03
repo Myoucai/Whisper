@@ -164,5 +164,24 @@ else
     bad W-11 "合法 preopen 运行失败"; cat "$TMP/preopen-ok.err"
 fi
 
+if [ "$(uname -s 2>/dev/null)" = "Linux" ]; then
+    mkdir -p "$TMP/rohost"
+    echo "1 1 0:1 / $TMP/rohost ro,relatime - tmpfs tmpfs rw" > "$TMP/mountinfo"
+    if WRUN_MOUNTINFO="$TMP/mountinfo" \
+       bash scripts/wrun.sh --dir-ro-strict "/data::$TMP/rohost" "$TMP/hello.wasm" \
+       >"$TMP/romount.out" 2>"$TMP/romount.err"; then
+        if grep -q 'already on a read-only mount' "$TMP/romount.err" \
+           && grep -q 'Hello, World!' "$TMP/romount.out"; then
+            ok W-12 "已只读挂载直接映射（无需 userns）"
+        else
+            bad W-12 "只读挂载 fallback 未生效"; cat "$TMP/romount.err"
+        fi
+    else
+        bad W-12 "只读挂载 fallback 运行失败"; cat "$TMP/romount.err"
+    fi
+else
+    ok W-12 "SKIP：非 Linux"
+fi
+
 echo "wrun-gate: $PASS/$((PASS+FAIL))"
 [ "$FAIL" -eq 0 ]

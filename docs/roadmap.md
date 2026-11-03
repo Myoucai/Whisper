@@ -81,8 +81,8 @@ native/HTTP server 测试全绿；WASM 无网络不变。
 
 ## P4 — 严格沙箱与资源边界
 
-- [x] `--dir-ro-strict`：Linux 私有 user/mount namespace + ro bind mount
-- [ ] 容器/EROFS/无特权环境 fallback 的严格只读方案
+- [x] `--dir-ro-strict`：已有 ro mount 直接映射，否则 userns + ro bind
+- [ ] 无 userns 且宿主 rw 时仍需 fail closed / 容器外隔离
 - [x] native 内存/HTTP 请求/body/header/@9 连接配额
 - [x] WASM heap/stack/threads/fd/wall-clock 超时配额
 - [x] OS/容器级聚合配额模板（systemd cgroup + compose）

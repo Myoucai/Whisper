@@ -59,6 +59,38 @@ validate_guest() {
     esac
 }
 
+# True only when the host path is already on a kernel-enforced read-only
+# mount (container read-only bind, EROFS, ro rootfs). This is a safe fallback
+# for environments that cannot create a new user/mount namespace.
+host_is_readonly_mount() {
+    local h="$1" opts=""
+    [ -d "$h" ] || return 1
+    if [ -z "${WRUN_MOUNTINFO:-}" ] && command -v findmnt >/dev/null 2>&1; then
+        opts="$(findmnt -no OPTIONS --target "$h" 2>/dev/null || true)"
+        [ -n "$opts" ] || return 1
+        case ",$opts," in
+            *,ro,*) return 0 ;;
+            *) return 1 ;;
+        esac
+    fi
+    local mi="${WRUN_MOUNTINFO:-/proc/self/mountinfo}"
+    [ -r "$mi" ] || return 1
+    local real
+    real="$(cd "$h" && pwd -P 2>/dev/null)" || return 1
+    awk -v target="$real" '
+        {
+            mp = $5; gsub(/\\040/, " ", mp); gsub(/\\011/, "\t", mp);
+            if (target == mp || index(target, mp "/") == 1) {
+                if (length(mp) >= best) {
+                    best = length(mp);
+                    ro = ($6 ~ /(^|,)ro(,|$)/);
+                }
+            }
+        }
+        END { exit ro ? 0 : 1 }
+    ' "$mi"
+}
+
 DIRS=()
 RODIRS=()
 ROSTRICT=()
@@ -172,14 +204,8 @@ STRICT_HOSTS=()
 STRICT_MNTS=()
 if [ "${#ROSTRICT[@]}" -gt 0 ]; then
     [ "$(uname -s 2>/dev/null)" = "Linux" ] || die "--dir-ro-strict requires Linux"
-    command -v unshare >/dev/null 2>&1 || die "--dir-ro-strict requires unshare"
-    command -v mount >/dev/null 2>&1 || die "--dir-ro-strict requires mount"
-    unshare -r -m true >/dev/null 2>&1 || die "--dir-ro-strict requires unprivileged user namespaces"
-    if [ -z "$RO_TMP" ]; then
-        mkdir -p "$ROOT/target"
-        RO_TMP="$(mktemp -d "$ROOT/target/wrun-ro.XXXXXX")" || die "cannot create strict ro mountpoint"
-    fi
     strict_n=0
+    strict_runtime_ok=0
     for d in "${ROSTRICT[@]:-}"; do
         [ -n "$d" ] || continue
         case "$d" in
@@ -194,6 +220,21 @@ if [ "${#ROSTRICT[@]}" -gt 0 ]; then
         badlink="$(find "$host" -type l -print -quit 2>/dev/null || true)"
         [ -z "$badlink" ] || die "strict ro preopen contains a symlink; refusing: $badlink"
         host_abs="$(cd "$host" && pwd)"
+        if host_is_readonly_mount "$host_abs"; then
+            echo "wrun: preopen $host_abs is already on a read-only mount; using direct ro mapping" >&2
+            ARGS+=("--map-dir=$guest::$host_abs")
+            continue
+        fi
+        if [ "$strict_runtime_ok" -eq 0 ]; then
+            command -v unshare >/dev/null 2>&1 || die "--dir-ro-strict requires unshare (or a read-only host mount)"
+            command -v mount >/dev/null 2>&1 || die "--dir-ro-strict requires mount (or a read-only host mount)"
+            unshare -r -m true >/dev/null 2>&1 || die "--dir-ro-strict requires unprivileged user namespaces (or a read-only host mount)"
+            if [ -z "$RO_TMP" ]; then
+                mkdir -p "$ROOT/target"
+                RO_TMP="$(mktemp -d "$ROOT/target/wrun-ro.XXXXXX")" || die "cannot create strict ro mountpoint"
+            fi
+            strict_runtime_ok=1
+        fi
         strict_n=$((strict_n + 1))
         mnt="$RO_TMP/strict$strict_n"
         mkdir -p "$mnt" || die "cannot create strict ro mountpoint"

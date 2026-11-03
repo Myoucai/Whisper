@@ -8,10 +8,9 @@
 #
 # `read_only`, `network_mode: none`, `cap_drop: ALL`, and cgroup limits are
 # host-enforced. wrun adds preopen/import/env quotas inside the container.
-# `read_only` + the `:ro` volume already make guest writes fail; `wrun --dir`
-# maps the read-only mount without needing userns/mount inside the container.
-# Use --dir-ro-strict on hosts where the container seccomp profile permits
-# unshare/mount (the systemd unit does).
+# `read_only` + the `:ro` volume make the preopen kernel-enforced read-only;
+# wrun --dir-ro-strict detects that existing ro mount and maps it directly,
+# without needing userns/mount inside the container.
 services:
   tenant:
     image: debian:bookworm-slim
@@ -42,6 +41,6 @@ services:
       - /usr/bin/env
       - bash
       - /opt/whisper/scripts/wrun.sh
-      - --dir
+      - --dir-ro-strict
       - /data::/srv/tenant/data
       - /srv/tenant/app.wasm

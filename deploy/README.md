@@ -44,7 +44,7 @@ journalctl -u whisper-tenant@tenant-a
 - `RuntimeMaxSec=120`
 - `PrivateNetwork=yes`, `ProtectSystem=strict`, `ProtectHome=yes`
 - `CapabilityBoundingSet=` 空
-- `--dir-ro-strict` 需要 userns/mount；模板没有限制这两个 namespace
+- `--dir-ro-strict`：宿主机卷已是 ro 时直接映射；否则需要 userns/mount
 
 ### 每租户 UID
 
@@ -72,10 +72,8 @@ docker compose up
 - `no-new-privileges`
 - `mem_limit: 128m`, `pids_limit: 16`, `cpus: 0.5`
 - `/opt/whisper` 和 `/srv/tenant` 只读挂载
-- `wrun --dir`（宿主机卷只读；不依赖容器内 userns/mount）
-
-如果容器 seccomp 允许 `unshare`/`mount`，把 `--dir` 换成
-`--dir-ro-strict` 可获得 guest 视角的真实 EROFS。
+- `wrun --dir-ro-strict`：检测到只读卷后直接映射，不依赖容器内
+  userns/mount；如果卷不是 ro 且容器禁止 userns，则 fail closed
 
 ## 3. 验证
 

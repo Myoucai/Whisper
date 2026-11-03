@@ -1,59 +1,58 @@
-# Whisper 1.3.21 发布说明
+# Whisper 1.3.22 发布说明
 
 ## 主题
 
-**Fuzz 覆盖扩展到 cookie/PSL，并加入 nightly 长跑。**
+**`--dir-ro-strict` 容器/EROFS fallback：已有只读挂载直接映射。**
 
 ## 新增
 
-### libFuzzer 覆盖
+此前 `--dir-ro-strict` 强制要求 unprivileged user namespace + mount。
+在只读容器、EROFS rootfs、锁定 userns 的宿主上会失败。
 
-同一输入现在还会进入：
+现在：
 
-- `Set-Cookie` 解析/匹配（`w_jar_update` / `w_jar_header`）
-- Public Suffix List（`w_public_suffix`）
+1. 先检查 HOST 是否已在 kernel read-only mount 上：
+   - `findmnt -no OPTIONS --target HOST`
+   - 或解析 `/proc/self/mountinfo`
+2. 是 → 直接 `--map-dir`，写入由内核 EROFS 拒绝
+3. 否 → 仍走 userns + ro bind mount
+4. 两者都不可用 → fail closed，不回退快照
 
-原有覆盖保持不变：
+支持：
 
-- 响应 headers
-- chunked 解码
-- 用户 headers JSON
-- hex body
-- URL 解析
+- Docker/Podman `:ro` 卷
+- EROFS rootfs
+- 只读 bind mount
+- rootfs 只读的容器
 
-### Nightly
+## 测试
 
-`.github/workflows/fuzz-nightly.yml`：
-
-- 每天 03:17 UTC
-- HTTP/URL/cookie/PSL：`FUZZ_MAX_TIME=900`（15 分钟）
-- WASM import mutation：5000 次
-- 支持 `workflow_dispatch`
-
-## 验证
+`wrun-gate` 新增 W-12：
 
 ```text
-fuzz-gate: PASS
-wasm-fuzz-gate: PASS
-CI: 450346f / 新 commit 通过
+W-12 ✅ 已只读挂载直接映射（无需 userns）
 ```
+
+Linux 上用合成的 mountinfo 验证 fallback；真实内核只读行为仍由
+`wrun-gate` W-8 和部署环境验证。
 
 ## 兼容性
 
-- 无运行时行为变化
-- 仅扩展 fuzz harness 与 CI
-- nightly 失败不会阻塞普通 push CI
+- 普通 rw 目录行为不变，仍走 userns bind
+- 已有 ro 挂载不再要求 unshare/mount
+- 无 ro mount 且无 userns 时仍 fail closed
+- `deploy/compose.yaml` 改用 `--dir-ro-strict`
 
 ## 已知限制
 
-- nightly 仍是单机 15 分钟，不是 OSS-Fuzz 集群
-- WASM import 仍是 mutation smoke，不是覆盖引导
-- `.wbin` 只有 property/mutation fuzz
-- cookie/PSL fuzz 输入没有专用 corpus
+- fallback 只信内核 mountinfo/findmnt 的 `ro` 标志
+- 无 userns 且宿主 rw 时没有安全 fallback
+- mountinfo 解析是保守前缀匹配
+- 仍需真实容器/EROFS 环境验证
 
 ## 下一步
 
-- OSS-Fuzz 集成评估
-- `.wbin` 覆盖引导 fuzz target
+- 真实容器/EROFS 环境验证
+- 覆盖引导 fuzz / nightly 观察
 - 外部安全审计
-- 容器/EROFS fallback
+- 真实集群 cgroup 验证

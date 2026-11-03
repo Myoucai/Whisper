@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.22 (2026-11-03) — read-only mount fallback
+
+- `--dir-ro-strict` 支持容器/EROFS fallback：宿主路径若已在 kernel
+  read-only mount 上，直接映射，不再要求 userns/mount；否则仍用 userns
+  bind，二者都不可用则 fail closed。新增 W-12。
+
 ## v1.3.21 (2026-11-03) — fuzz nightly
 
 - fuzz harness 扩展到 cookie 解析/PSL；新增 nightly workflow
