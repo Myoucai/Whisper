@@ -163,6 +163,14 @@ wrun-gate: 15/15
 验证（findmnt=ro；direct mapping）；W-12 另有合成 mountinfo 回归。
 Docker 26.1.3 + `python:3.11-slim` 的 `--read-only` + `:ro` 卷也验证通过。
 
+systemd 239 / OpenCloudOS 实测 cgroup：
+
+```text
+service success
+MemoryMax=128M, CPUQuota=50%, TasksMax=16, LimitNOFILE=64
+fake runtime 分配 256 MiB -> status=137
+```
+
 ## 11. 复核清单
 
 - [x] cookie 不跨 host

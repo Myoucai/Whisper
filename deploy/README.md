@@ -41,7 +41,7 @@ journalctl -u whisper-tenant@tenant-a
 - `CPUQuota=50%`
 - `TasksMax=16`
 - `LimitNOFILE=64`
-- `RuntimeMaxSec=120`
+- `TimeoutStartSec=120`（systemd 239 的 oneshot 不使用 `RuntimeMaxSec`）
 - `PrivateNetwork=yes`, `ProtectSystem=strict`, `ProtectHome=yes`
 - `CapabilityBoundingSet=` 空
 - `--dir-ro-strict`：宿主机卷已是 ro 时直接映射；否则需要 userns/mount
@@ -89,6 +89,19 @@ docker compose -f deploy/compose.yaml config
 只读挂载 fallback 已在 Linux 5.4 / OpenCloudOS 上用真实
 `mount --bind` + `remount,bind,ro` 验证：`findmnt` 返回 `ro`，wrun 走
 direct ro mapping；rw host 仍走 userns。
+
+systemd 239 / OpenCloudOS 实测：
+
+```text
+systemd-analyze verify: clean
+whisper-tenant@tenant-a: success
+MemoryMax=134217728  CPUQuotaPerSecUSec=500ms
+TasksMax=16          LimitNOFILE=64
+fake runtime 分配 256 MiB -> status=137 (MemoryMax 生效)
+```
+
+为兼容 systemd 239，模板移除了 `ProtectClock`/`ProtectHostname`，并用
+`TimeoutStartSec=120` 替代 oneshot 下无效的 `RuntimeMaxSec`。
 
 Docker 26.1.3 + `python:3.11-slim` 也已验证：
 

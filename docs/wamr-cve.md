@@ -23,10 +23,21 @@ python3 scripts/wamr-cve-gate.py
 当前结果：
 
 ```text
-wamr-cve-gate: PASS pinned=2.4.5 watch_reviewed=2026-11-02 (2 CVEs)
+wamr-cve-gate: PASS pinned=2.4.5 watch_reviewed=2026-11-03 (5 CVEs)
 ```
 
 ## 已记录 CVE
+
+### CVE-2026-54912 / 54913 / 54914
+
+- 影响：`< 2.4.5`
+- 修复：2.4.5
+- 类型：
+  - 54912：fast interpreter heap buffer overflow
+  - 54913：`load_init_expr` partial uninitialized memory read
+  - 54914：WASI `poll_oneoff` heap buffer overflow
+- 当前 2.4.5 **不受影响**
+- 来源：[WAMR-2.4.5 release](https://github.com/wasm-micro-runtime/wasm-micro-runtime/releases/tag/WAMR-2.4.5)
 
 ### CVE-2025-64713
 

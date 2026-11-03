@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3.25 (2026-11-03) — cgroup enforcement + CVE watch
+
+- systemd 239 实测：unit 成功，MemoryMax/CPUQuota/TasksMax/NOFILE 生效，
+  256 MiB 分配被 OOM kill（137）；模板移除 239 不支持的
+  ProtectClock/ProtectHostname，改用 TimeoutStartSec。
+- WAMR CVE watch 补 CVE-2026-54912/54913/54914（<2.4.5，2.4.5 已修）。
+
 ## v1.3.24 (2026-11-03) — real container validation
 
 - Docker 26.1.3 + python:3.11-slim 真实验证 `--dir-ro-strict` 只读卷
