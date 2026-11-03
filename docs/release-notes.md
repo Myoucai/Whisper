@@ -1,58 +1,53 @@
-# Whisper 1.3.22 发布说明
+# Whisper 1.3.23 发布说明
 
 ## 主题
 
-**`--dir-ro-strict` 容器/EROFS fallback：已有只读挂载直接映射。**
+**真实 Linux 只读挂载 fallback 验证。**
 
-## 新增
+## 验证环境
 
-此前 `--dir-ro-strict` 强制要求 unprivileged user namespace + mount。
-在只读容器、EROFS rootfs、锁定 userns 的宿主上会失败。
+- Linux 5.4 / OpenCloudOS 8.8
+- root 创建：
+  ```bash
+  mount --bind host mnt
+  mount -o remount,bind,ro mnt
+  ```
+- `findmnt -no OPTIONS --target mnt` → `ro,noatime`
+- `touch mnt/x` → `Read-only file system`
 
-现在：
-
-1. 先检查 HOST 是否已在 kernel read-only mount 上：
-   - `findmnt -no OPTIONS --target HOST`
-   - 或解析 `/proc/self/mountinfo`
-2. 是 → 直接 `--map-dir`，写入由内核 EROFS 拒绝
-3. 否 → 仍走 userns + ro bind mount
-4. 两者都不可用 → fail closed，不回退快照
-
-支持：
-
-- Docker/Podman `:ro` 卷
-- EROFS rootfs
-- 只读 bind mount
-- rootfs 只读的容器
-
-## 测试
-
-`wrun-gate` 新增 W-12：
+## 结果
 
 ```text
-W-12 ✅ 已只读挂载直接映射（无需 userns）
+wrun: preopen ... is already on a read-only mount; using direct ro mapping
+RC=0
 ```
 
-Linux 上用合成的 mountinfo 验证 fallback；真实内核只读行为仍由
-`wrun-gate` W-8 和部署环境验证。
+rw host 仍走 userns：
+
+```text
+WRUN_IWASM=/bin/true wrun --dir-ro-strict /data::rw-host hello.wasm
+RC=0
+```
+
+（测试用 `/bin/true` 替代 WAMR，以隔离 mount 行为；WAMR 的 guest 写入
+EROFS 已在 1.3.13 / OpenCloudOS 上验证。）
+
+## 文档
+
+- `docs/wasm-wasi-plan.md`
+- `docs/security-audit.md`
+- `deploy/README.md`
+
+`wrun-gate: 15/15`，W-12 使用合成 mountinfo 做稳定回归。
 
 ## 兼容性
 
-- 普通 rw 目录行为不变，仍走 userns bind
-- 已有 ro 挂载不再要求 unshare/mount
-- 无 ro mount 且无 userns 时仍 fail closed
-- `deploy/compose.yaml` 改用 `--dir-ro-strict`
+- 无运行时行为变化
+- 仅补真实环境验证记录
+- 真实容器（Docker/Podman）仍需在目标环境验证
 
 ## 已知限制
 
-- fallback 只信内核 mountinfo/findmnt 的 `ro` 标志
-- 无 userns 且宿主 rw 时没有安全 fallback
-- mountinfo 解析是保守前缀匹配
-- 仍需真实容器/EROFS 环境验证
-
-## 下一步
-
-- 真实容器/EROFS 环境验证
-- 覆盖引导 fuzz / nightly 观察
-- 外部安全审计
-- 真实集群 cgroup 验证
+- 本次未安装 Docker/Podman；容器验证使用真实 ro bind mount 等价路径
+- 无 userns 且宿主 rw 时仍 fail closed
+- 容器 seccomp 可能影响 userns；已有 ro 卷不受影响

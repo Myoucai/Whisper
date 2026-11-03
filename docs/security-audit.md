@@ -156,8 +156,11 @@ http-parity-gate: PASS
 net-allow-gate: PASS
 cargo test --workspace: pass
 wbin unit tests: 10 passed
-wrun-gate: 14/14
+wrun-gate: 15/15
 ```
+
+只读挂载 fallback 已在 Linux 5.4 / OpenCloudOS 上用真实 ro bind mount
+验证（findmnt=ro；direct mapping）；W-12 另有合成 mountinfo 回归。
 
 ## 11. 复核清单
 

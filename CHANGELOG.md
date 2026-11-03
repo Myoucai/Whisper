@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.23 (2026-11-03) — real ro-mount validation
+
+- 真实验证 `--dir-ro-strict` 的已有 ro mount fallback：Linux 5.4 /
+  OpenCloudOS，`mount --bind` + `remount,bind,ro`，findmnt=ro，wrun
+  direct mapping；rw host 仍走 userns。文档更新。
+
 ## v1.3.22 (2026-11-03) — read-only mount fallback
 
 - `--dir-ro-strict` 支持容器/EROFS fallback：宿主路径若已在 kernel

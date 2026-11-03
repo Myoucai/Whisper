@@ -86,6 +86,10 @@ systemctl show -p MemoryMax -p CPUQuotaPerSecUSec whisper-tenant@tenant-a
 docker compose -f deploy/compose.yaml config
 ```
 
+只读挂载 fallback 已在 Linux 5.4 / OpenCloudOS 上用真实
+`mount --bind` + `remount,bind,ro` 验证：`findmnt` 返回 `ro`，wrun 走
+direct ro mapping；rw host 仍走 userns。
+
 ## 4. 注意
 
 - `/opt/whisper/bin/iwasm` 必须来自固定 WAMR 版本
