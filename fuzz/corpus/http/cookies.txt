@@ -1,0 +1,4 @@
+HTTP/1.1 200 OK
+Set-Cookie: a=b; Domain=example.com; Path=/x; Secure; HttpOnly; Max-Age=3600
+Set-Cookie: c=d; Expires=Thu, 01 Jan 1970 00:00:00 GMT
+

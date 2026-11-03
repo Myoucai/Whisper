@@ -17,11 +17,20 @@ bash scripts/fuzz-gate.sh
 - 用户 headers JSON（`w_user_headers`）
 - `@8` hex body 解码（`w_hex_decode`）
 - URL 解析（`w_url_parse`）
+- `Set-Cookie` 解析/匹配（`w_jar_update` / `w_jar_header`）
+- Public Suffix List（`w_public_suffix`）
 
 参数：
 
 ```text
 -runs=20000 -max_len=4096
+```
+
+夜间 workflow（`fuzz-nightly.yml`）：
+
+```text
+FUZZ_MAX_TIME=900       # 15 分钟覆盖引导
+WASM_FUZZ_ITERS=5000
 ```
 
 种子目录：`fuzz/corpus/http/`。
@@ -93,8 +102,8 @@ fuzz-gate: PASS (20000 runs)
 - [ ] WASM import 覆盖引导 fuzz（atheris/libFuzzer）
 - [x] `wd` `.wbin` mutation/property fuzz（4096 + malformed）
 - [ ] `.wbin` 覆盖引导 fuzz / fuzz target
-- [ ] 更长 corpus + 定期 nightly
-- [ ] OSS-Fuzz 集成评估
+- [x] 定期 nightly（fuzz-nightly.yml，15 分钟）
+- [ ] 更长 corpus / OSS-Fuzz 集成评估
 
 ## 运行
 

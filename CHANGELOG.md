@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.3.21 (2026-11-03) — fuzz nightly
+
+- fuzz harness 扩展到 cookie 解析/PSL；新增 nightly workflow
+  （HTTP/URL 15 分钟覆盖引导 + WASM import 5000 次）。
+
 ## v1.3.20 (2026-11-02) — full PSL
 
 - 嵌入完整 Public Suffix List（9617 normal / 312 wildcard / 8 exception），

@@ -33,6 +33,12 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     w_url u;
     if (w_url_parse(s, &u) == 0) w_url_free(&u);
 
+    w_jar_update(s, size, "example.com", "/x", 0);
+    char *cookie = w_jar_header("example.com", "/x", 0);
+    free(cookie);
+
+    (void)w_public_suffix(s);
+
     free(s);
     return 0;
 }

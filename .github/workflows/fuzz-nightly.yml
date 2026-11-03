@@ -1,0 +1,20 @@
+name: Fuzz nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  http-wasm:
+    name: Long fuzz (HTTP/URL/cookies/PSL + WASM import)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: HTTP/URL/cookie/PSL fuzz
+        run: FUZZ_MAX_TIME=900 bash scripts/fuzz-gate.sh
+      - name: WASM import mutation
+        run: WASM_FUZZ_ITERS=5000 bash scripts/wasm-fuzz-gate.sh
