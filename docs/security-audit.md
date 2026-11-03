@@ -161,6 +161,7 @@ wrun-gate: 15/15
 
 只读挂载 fallback 已在 Linux 5.4 / OpenCloudOS 上用真实 ro bind mount
 验证（findmnt=ro；direct mapping）；W-12 另有合成 mountinfo 回归。
+Docker 26.1.3 + `python:3.11-slim` 的 `--read-only` + `:ro` 卷也验证通过。
 
 ## 11. 复核清单
 

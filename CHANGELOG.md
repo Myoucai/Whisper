@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.3.24 (2026-11-03) — real container validation
+
+- Docker 26.1.3 + python:3.11-slim 真实验证 `--dir-ro-strict` 只读卷
+  fallback：read-only/network none/cap_drop/user 10001，direct mapping
+  RC=0；文档更新。
+
 ## v1.3.23 (2026-11-03) — real ro-mount validation
 
 - 真实验证 `--dir-ro-strict` 的已有 ro mount fallback：Linux 5.4 /

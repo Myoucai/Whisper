@@ -90,6 +90,15 @@ docker compose -f deploy/compose.yaml config
 `mount --bind` + `remount,bind,ro` 验证：`findmnt` 返回 `ro`，wrun 走
 direct ro mapping；rw host 仍走 userns。
 
+Docker 26.1.3 + `python:3.11-slim` 也已验证：
+
+```text
+--network none --read-only --cap-drop ALL --user 10001:10001
+-v /srv/tenant:/srv/tenant:ro
+wrun: preopen ... is already on a read-only mount; using direct ro mapping
+DOCKER_RC=0
+```
+
 ## 4. 注意
 
 - `/opt/whisper/bin/iwasm` 必须来自固定 WAMR 版本

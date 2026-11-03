@@ -252,6 +252,8 @@ wrun [--dir GUEST::HOST]... [--env NAME]... \
   2026-11-03 在 Linux 5.4 / OpenCloudOS 上真实验证已有 ro bind mount：
   `findmnt` 返回 `ro,noatime`，wrun 输出 direct ro mapping 并成功；
   rw host 仍走 userns。W-12 同时有合成 mountinfo 回归。
+  Docker 26.1.3 + `python:3.11-slim` 的 `--read-only`/`:ro` 卷也验证了
+  同一 fallback（RC=0）。
 - WASI 资源配额（WAMR 参数）：`WHISPER_WASM_MAX_MEMORY_MB` 映射
   `--heap-size`，`WHISPER_WASM_STACK_KB` 映射 `--stack-size`，
   `WHISPER_WASM_MAX_THREADS` 映射 `--max-threads`；
